@@ -42,6 +42,26 @@ class MigrationMappingStore(context: Context) {
         }
     }
 
+    fun replaceAll(mappings: List<MigrationMapping>) {
+        helper.writableDatabase.use { db ->
+            db.beginTransaction()
+            try {
+                db.delete(TABLE_MAPPINGS, null, null)
+                mappings.forEach { mapping ->
+                    db.insertWithOnConflict(
+                        TABLE_MAPPINGS,
+                        null,
+                        mapping.toContentValues(),
+                        SQLiteDatabase.CONFLICT_ABORT,
+                    )
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+        }
+    }
+
     fun mappings(): List<MigrationMappingRow> =
         helper.readableDatabase.use { db ->
             db.rawQuery(

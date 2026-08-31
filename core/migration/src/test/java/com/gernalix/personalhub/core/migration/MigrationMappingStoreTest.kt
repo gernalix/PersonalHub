@@ -60,4 +60,28 @@ class MigrationMappingStoreTest {
 
         assertEquals(emptyMap<String, Int>(), store.mappingCountsBySourceTable())
     }
+
+    @Test
+    fun replaceAllMakesDeterministicRunsIdempotent() {
+        val store = MigrationMappingStore(context)
+        val firstRun = listOf(
+            MigrationInventory.mappingForRow(SourceApp.WORDPULSE, "sessions", "session-1"),
+        )
+        val secondRun = listOf(
+            MigrationInventory.mappingForRow(SourceApp.WORDPULSE, "sessions", "session-1"),
+            MigrationInventory.mappingForRow(SourceApp.WORDPULSE, "word_entries", "word-1"),
+        )
+
+        store.replaceAll(firstRun)
+        store.replaceAll(secondRun)
+
+        assertEquals(
+            mapOf(
+                "wordpulse.sessions" to 1,
+                "wordpulse.word_entries" to 1,
+            ),
+            store.mappingCountsBySourceTable(),
+        )
+        assertEquals(2, store.mappings().size)
+    }
 }

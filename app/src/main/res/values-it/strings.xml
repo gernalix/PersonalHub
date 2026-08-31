@@ -15,4 +15,8 @@
     <string name="module_migration_subtitle">Mappature sorgente e controlli dati</string>
     <string name="migration_sources">%1$d app sorgenti configurate</string>
     <string name="migration_integrity">Integrita database mappature: %1$s</string>
+    <string name="migration_run_action">Esegui controllo locale</string>
+    <string name="migration_run_running">Controllo migrazione in corso...</string>
+    <string name="migration_run_passed">Controllo migrazione PASS: %1$d righe sorgente, %2$d mappature, DB %3$s</string>
+    <string name="migration_run_failed">Controllo migrazione FAIL: %1$s</string>
 </resources>

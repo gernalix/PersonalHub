@@ -116,7 +116,7 @@ object MigrationInventory {
         SourceTablePlan(SourceApp.SOSTANZE, "interaction_rules", UnifiedEntityType.RELATIONSHIP, sourceIdColumn = "id"),
         SourceTablePlan(SourceApp.SOSTANZE, "interaction_targets", UnifiedEntityType.RELATIONSHIP, sourceIdColumn = "id"),
         SourceTablePlan(SourceApp.SOSTANZE, "notification_state", UnifiedEntityType.FEATURE_LOCAL_RECORD, sourceIdColumn = "id"),
-        SourceTablePlan(SourceApp.SOSTANZE, "settings", UnifiedEntityType.FEATURE_LOCAL_RECORD, sourceIdColumn = "id"),
+        SourceTablePlan(SourceApp.SOSTANZE, "settings", UnifiedEntityType.FEATURE_LOCAL_RECORD, sourceIdColumn = "key"),
         SourceTablePlan(SourceApp.SOSTANZE, "macros", UnifiedEntityType.FEATURE_LOCAL_RECORD, sourceIdColumn = "id"),
         SourceTablePlan(SourceApp.SOSTANZE, "macro_items", UnifiedEntityType.RELATIONSHIP, sourceIdColumn = "id"),
         SourceTablePlan(SourceApp.SUPERCONTACTS, "backup_metadata", UnifiedEntityType.FEATURE_LOCAL_RECORD, sourceIdColumn = "id"),

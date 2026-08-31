@@ -15,4 +15,8 @@
     <string name="module_migration_subtitle">Source mapping and data checks</string>
     <string name="migration_sources">%1$d source apps configured</string>
     <string name="migration_integrity">Mapping database integrity: %1$s</string>
+    <string name="migration_run_action">Run local check</string>
+    <string name="migration_run_running">Migration check running...</string>
+    <string name="migration_run_passed">Migration check passed: %1$d source rows, %2$d mappings, DB %3$s</string>
+    <string name="migration_run_failed">Migration check failed: %1$s</string>
 </resources>

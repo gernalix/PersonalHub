@@ -227,9 +227,12 @@ private fun MultiTimeTrackerApp(
             BackupFolderStore.ensureSavedTreeWritable(context)
         }
         val isCloneBenchmark = BuildConfig.APPLICATION_ID.endsWith(".devicetest")
+        val allowPersonalHubLocalDataWithoutSaf =
+            appContext.packageName == "com.gernalix.personalhub" &&
+                continuationMode.value == FirstRunContinuationMode.CURRENT_DATA
         if (isCloneBenchmark && hasSnapshot) {
             setupDone.value = true
-        } else if (hasFolder && continuationMode.value == FirstRunContinuationMode.CURRENT_DATA) {
+        } else if ((hasFolder && continuationMode.value == FirstRunContinuationMode.CURRENT_DATA) || allowPersonalHubLocalDataWithoutSaf) {
             setupDone.value = true
         } else {
             refreshSetupState()

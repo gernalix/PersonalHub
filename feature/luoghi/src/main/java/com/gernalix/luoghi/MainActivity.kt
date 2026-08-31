@@ -119,10 +119,12 @@ fun LuoghiHome() {
             vm.onPrimaryCheckAction()
         }
     }
+    val allowPersonalHubLocalDataWithoutSaf =
+        context.packageName == "com.gernalix.personalhub" && state.dataLoaded
 
     when {
-        state.safGate.loading -> LoadingGate()
-        state.safGate.status != BackupFolderStore.ValidationStatus.READY -> SafRequiredGate(
+        state.safGate.loading && !allowPersonalHubLocalDataWithoutSaf -> LoadingGate()
+        state.safGate.status != BackupFolderStore.ValidationStatus.READY && !allowPersonalHubLocalDataWithoutSaf -> SafRequiredGate(
             status = state.safGate.status,
         ) {
             folderLauncher.launch(openDocumentTreeIntent())

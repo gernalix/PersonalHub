@@ -49,9 +49,11 @@ The implemented table inventory lives in `MigrationInventory` under `:core:model
 - duplicate mappings for the same source row;
 - duplicate `new_id` target collisions.
 
-`MigrationMappingStore.recordAll` persists a verified batch in one SQLite transaction, so a duplicate source key rolls back the whole batch instead of leaving a partial migration map.
+`MigrationMappingStore.recordAll` persists a verified batch in one SQLite transaction, so a duplicate source key rolls back the whole batch instead of leaving a partial migration map. `replaceAll` is used by the local verification runner to make repeated checks idempotent.
 
 `MigrationSourceDatabaseScanner` is the Android SQLite bridge for this flow. It reads configured source ID columns from one source database, including attached-database table names such as `mtt_remote_sync.sync_queue`, and returns `SourceTableRows` for the verifier.
+
+`PersonalHubLocalMigrationRunner` scans the feature-local databases inside the PersonalHub sandbox, verifies every configured source row, and writes the migration map only after verification passes. The Migration screen runs this work off the UI thread and reports source-row count, mapping count, and mapping database integrity.
 
 ## Cross-Feature Links
 
@@ -72,3 +74,5 @@ The original backup/import paths are preserved inside their feature modules:
 - WordPulse keeps CSV backup/import for sessions, words, and corrections.
 
 Future import UX should write `MigrationMappingStore` rows as records are imported or linked into shared views.
+
+For PersonalHub, Luoghi and MultiTimeTracker allow already-migrated internal data to open even when no SAF folder has been granted to the new package yet. SAF remains available for backup/export, but it does not block access to local migrated data.
