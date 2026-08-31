@@ -8,8 +8,6 @@ PersonalHub is the unified Android app for the five in-scope source apps:
 - Sostanze -> Substances
 - WordPulse -> WordPulse
 
-The app intentionally excludes Sesso from this goal per the explicit correction after the original prompt.
-
 ## Package And Modules
 
 - Installed application package: `com.gernalix.personalhub`

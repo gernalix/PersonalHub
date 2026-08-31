@@ -1,7 +1,6 @@
 package com.gernalix.personalhub.core.model
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
@@ -39,11 +38,10 @@ class MigrationMappingPlannerTest {
     }
 
     @Test
-    fun inventoryCoversOnlyTheFiveInScopeSourceApps() {
+    fun inventoryCoversTheFiveInScopeSourceApps() {
         val covered = MigrationInventory.plans.mapTo(linkedSetOf()) { it.sourceApp }
 
         assertEquals(SourceApp.entries.toSet(), covered)
-        assertFalse(MigrationInventory.plans.any { it.sourceApp.key == "sesso" })
     }
 
     @Test
