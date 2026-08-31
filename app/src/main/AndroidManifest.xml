@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <application
+        android:name=".PersonalHubApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@drawable/ic_personalhub"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_personalhub"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PersonalHub">
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <provider
+            android:name="com.gernalix.luoghi.provider.PlacesProvider"
+            android:authorities="com.gernalix.personalhub.luoghi.places"
+            android:exported="false"
+            android:grantUriPermissions="false" />
+
+        <provider
+            android:name="com.example.multitimetracker.api.MttPublicSessionsProvider"
+            android:authorities="com.gernalix.personalhub.mtt.sessions"
+            android:exported="false"
+            android:grantUriPermissions="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".MigrationActivity"
+            android:exported="false" />
+
+        <activity
+            android:name="com.supercontacts.app.MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.SuperContacts"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name="com.example.multitimetracker.MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MultiTimeTracker"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name="com.example.multitimetracker.TimeFenceFullScreenActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.MultiTimeTracker"
+            android:turnScreenOn="true" />
+
+        <activity
+            android:name="com.example.multitimetracker.widget.QuickSessionWidgetClickActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.MultiTimeTracker.Transparent" />
+
+        <activity
+            android:name="com.gernalix.luoghi.MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Luoghi" />
+
+        <activity
+            android:name="com.gernalix.luoghi.MapViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Luoghi" />
+
+        <activity
+            android:name="com.gernalix.sostanze.MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Sostanze"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name="com.wordpulse.app.MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.WordPulse"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+
+        <receiver
+            android:name="com.example.multitimetracker.widget.QuickSessionWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_task_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.example.multitimetracker.TimeFenceTimerReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.gernalix.sostanze.notifications.SostanzeNotificationReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.supercontacts.app.CallStateReceiver"
+            android:exported="true"
+            android:permission="android.permission.READ_PHONE_STATE">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.supercontacts.app.CallOverlayDebugReceiver"
+            android:enabled="@bool/debug_call_overlay_receiver_enabled"
+            android:exported="false" />
+    </application>
+</manifest>

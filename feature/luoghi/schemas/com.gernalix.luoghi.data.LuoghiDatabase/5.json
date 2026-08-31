@@ -1,0 +1,879 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "85d9f2c6416eaa4e643cb97ea18efc6c",
+    "entities": [
+      {
+        "tableName": "places",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`uuid` TEXT NOT NULL, `nickname` TEXT NOT NULL, `address` TEXT, `lat` REAL, `lon` REAL, `radius_m` REAL, `notes` TEXT, `source_app` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `archived` INTEGER NOT NULL, `first_check_in_at_place` INTEGER, PRIMARY KEY(`uuid`))",
+        "fields": [
+          {
+            "fieldPath": "uuid",
+            "columnName": "uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nickname",
+            "columnName": "nickname",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "radiusM",
+            "columnName": "radius_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceApp",
+            "columnName": "source_app",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archived",
+            "columnName": "archived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstCheckInAtPlace",
+            "columnName": "first_check_in_at_place",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "uuid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_places_uuid",
+            "unique": false,
+            "columnNames": [
+              "uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_places_uuid` ON `${TABLE_NAME}` (`uuid`)"
+          },
+          {
+            "name": "index_places_lat_lon",
+            "unique": false,
+            "columnNames": [
+              "lat",
+              "lon"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_places_lat_lon` ON `${TABLE_NAME}` (`lat`, `lon`)"
+          }
+        ]
+      },
+      {
+        "tableName": "place_aliases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `place_uuid` TEXT NOT NULL, `alias` TEXT NOT NULL, `app_scope` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, FOREIGN KEY(`place_uuid`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placeUuid",
+            "columnName": "place_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "appScope",
+            "columnName": "app_scope",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_place_aliases_place_uuid",
+            "unique": false,
+            "columnNames": [
+              "place_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_aliases_place_uuid` ON `${TABLE_NAME}` (`place_uuid`)"
+          },
+          {
+            "name": "index_place_aliases_alias",
+            "unique": false,
+            "columnNames": [
+              "alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_aliases_alias` ON `${TABLE_NAME}` (`alias`)"
+          },
+          {
+            "name": "index_place_aliases_app_scope",
+            "unique": false,
+            "columnNames": [
+              "app_scope"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_aliases_app_scope` ON `${TABLE_NAME}` (`app_scope`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "places",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "place_uuid"
+            ],
+            "referencedColumns": [
+              "uuid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "place_links",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `place_uuid` TEXT NOT NULL, `owner_app` TEXT NOT NULL, `owner_type` TEXT NOT NULL, `owner_id` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, FOREIGN KEY(`place_uuid`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placeUuid",
+            "columnName": "place_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerApp",
+            "columnName": "owner_app",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerType",
+            "columnName": "owner_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerId",
+            "columnName": "owner_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_place_links_place_uuid",
+            "unique": false,
+            "columnNames": [
+              "place_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_links_place_uuid` ON `${TABLE_NAME}` (`place_uuid`)"
+          },
+          {
+            "name": "index_place_links_owner_app",
+            "unique": false,
+            "columnNames": [
+              "owner_app"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_links_owner_app` ON `${TABLE_NAME}` (`owner_app`)"
+          },
+          {
+            "name": "index_place_links_owner_id",
+            "unique": false,
+            "columnNames": [
+              "owner_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_links_owner_id` ON `${TABLE_NAME}` (`owner_id`)"
+          },
+          {
+            "name": "index_place_links_owner_app_owner_type_owner_id",
+            "unique": false,
+            "columnNames": [
+              "owner_app",
+              "owner_type",
+              "owner_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_links_owner_app_owner_type_owner_id` ON `${TABLE_NAME}` (`owner_app`, `owner_type`, `owner_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "places",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "place_uuid"
+            ],
+            "referencedColumns": [
+              "uuid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "place_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `event_uuid` TEXT NOT NULL, `session_uuid` TEXT NOT NULL, `place_id` TEXT NOT NULL, `event_type` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `lat` REAL, `lon` REAL, `accuracy_m` REAL, `source` TEXT NOT NULL, `notes` TEXT, FOREIGN KEY(`place_id`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventUuid",
+            "columnName": "event_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionUuid",
+            "columnName": "session_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "placeId",
+            "columnName": "place_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "event_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "accuracyM",
+            "columnName": "accuracy_m",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_place_events_event_uuid",
+            "unique": true,
+            "columnNames": [
+              "event_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_place_events_event_uuid` ON `${TABLE_NAME}` (`event_uuid`)"
+          },
+          {
+            "name": "index_place_events_session_uuid",
+            "unique": false,
+            "columnNames": [
+              "session_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_events_session_uuid` ON `${TABLE_NAME}` (`session_uuid`)"
+          },
+          {
+            "name": "index_place_events_place_id",
+            "unique": false,
+            "columnNames": [
+              "place_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_events_place_id` ON `${TABLE_NAME}` (`place_id`)"
+          },
+          {
+            "name": "index_place_events_event_type",
+            "unique": false,
+            "columnNames": [
+              "event_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_events_event_type` ON `${TABLE_NAME}` (`event_type`)"
+          },
+          {
+            "name": "index_place_events_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_place_events_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "places",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "place_id"
+            ],
+            "referencedColumns": [
+              "uuid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "global_stats_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `first_check_in_at_global` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstCheckInAtGlobal",
+            "columnName": "first_check_in_at_global",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "route_distance_cache",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `origin_place_id` TEXT NOT NULL, `destination_place_id` TEXT NOT NULL, `travel_mode` TEXT NOT NULL, `provider` TEXT NOT NULL, `distance_meters` INTEGER NOT NULL, `duration_seconds` INTEGER NOT NULL, `computed_at` INTEGER NOT NULL, `origin_latitude_snapshot` REAL, `origin_longitude_snapshot` REAL, `destination_latitude_snapshot` REAL, `destination_longitude_snapshot` REAL, `origin_version` INTEGER, `destination_version` INTEGER, `metadata` TEXT, FOREIGN KEY(`origin_place_id`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`destination_place_id`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originPlaceId",
+            "columnName": "origin_place_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationPlaceId",
+            "columnName": "destination_place_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "travelMode",
+            "columnName": "travel_mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceMeters",
+            "columnName": "distance_meters",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationSeconds",
+            "columnName": "duration_seconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "computedAt",
+            "columnName": "computed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originLatitudeSnapshot",
+            "columnName": "origin_latitude_snapshot",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "originLongitudeSnapshot",
+            "columnName": "origin_longitude_snapshot",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "destinationLatitudeSnapshot",
+            "columnName": "destination_latitude_snapshot",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "destinationLongitudeSnapshot",
+            "columnName": "destination_longitude_snapshot",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "originVersion",
+            "columnName": "origin_version",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "destinationVersion",
+            "columnName": "destination_version",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "metadata",
+            "columnName": "metadata",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_route_distance_cache_origin_place_id",
+            "unique": false,
+            "columnNames": [
+              "origin_place_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_route_distance_cache_origin_place_id` ON `${TABLE_NAME}` (`origin_place_id`)"
+          },
+          {
+            "name": "index_route_distance_cache_destination_place_id",
+            "unique": false,
+            "columnNames": [
+              "destination_place_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_route_distance_cache_destination_place_id` ON `${TABLE_NAME}` (`destination_place_id`)"
+          },
+          {
+            "name": "index_route_distance_cache_origin_place_id_destination_place_id_travel_mode_provider",
+            "unique": true,
+            "columnNames": [
+              "origin_place_id",
+              "destination_place_id",
+              "travel_mode",
+              "provider"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_route_distance_cache_origin_place_id_destination_place_id_travel_mode_provider` ON `${TABLE_NAME}` (`origin_place_id`, `destination_place_id`, `travel_mode`, `provider`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "places",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "origin_place_id"
+            ],
+            "referencedColumns": [
+              "uuid"
+            ]
+          },
+          {
+            "table": "places",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "destination_place_id"
+            ],
+            "referencedColumns": [
+              "uuid"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "history_audit_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `audit_uuid` TEXT NOT NULL, `action_uuid` TEXT, `action` TEXT NOT NULL, `entity_type` TEXT NOT NULL, `entity_id` TEXT NOT NULL, `session_uuid` TEXT, `operated_at` INTEGER NOT NULL, `before_json` TEXT, `after_json` TEXT, `source` TEXT NOT NULL, `reason` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "auditUuid",
+            "columnName": "audit_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionUuid",
+            "columnName": "action_uuid",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityType",
+            "columnName": "entity_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityId",
+            "columnName": "entity_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionUuid",
+            "columnName": "session_uuid",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "operatedAt",
+            "columnName": "operated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beforeJson",
+            "columnName": "before_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "afterJson",
+            "columnName": "after_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_history_audit_log_action",
+            "unique": false,
+            "columnNames": [
+              "action"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_audit_log_action` ON `${TABLE_NAME}` (`action`)"
+          },
+          {
+            "name": "index_history_audit_log_entity_type",
+            "unique": false,
+            "columnNames": [
+              "entity_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_audit_log_entity_type` ON `${TABLE_NAME}` (`entity_type`)"
+          },
+          {
+            "name": "index_history_audit_log_entity_id",
+            "unique": false,
+            "columnNames": [
+              "entity_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_audit_log_entity_id` ON `${TABLE_NAME}` (`entity_id`)"
+          },
+          {
+            "name": "index_history_audit_log_session_uuid",
+            "unique": false,
+            "columnNames": [
+              "session_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_audit_log_session_uuid` ON `${TABLE_NAME}` (`session_uuid`)"
+          },
+          {
+            "name": "index_history_audit_log_operated_at",
+            "unique": false,
+            "columnNames": [
+              "operated_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_audit_log_operated_at` ON `${TABLE_NAME}` (`operated_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "history_actions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `action_uuid` TEXT NOT NULL, `action_type` TEXT NOT NULL, `entity_id` TEXT NOT NULL, `session_uuid` TEXT, `before_json` TEXT NOT NULL, `after_json` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `status` TEXT NOT NULL, `source` TEXT NOT NULL, `reason` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionUuid",
+            "columnName": "action_uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionType",
+            "columnName": "action_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityId",
+            "columnName": "entity_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionUuid",
+            "columnName": "session_uuid",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "beforeJson",
+            "columnName": "before_json",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "afterJson",
+            "columnName": "after_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_history_actions_action_uuid",
+            "unique": true,
+            "columnNames": [
+              "action_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_history_actions_action_uuid` ON `${TABLE_NAME}` (`action_uuid`)"
+          },
+          {
+            "name": "index_history_actions_action_type",
+            "unique": false,
+            "columnNames": [
+              "action_type"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_actions_action_type` ON `${TABLE_NAME}` (`action_type`)"
+          },
+          {
+            "name": "index_history_actions_entity_id",
+            "unique": false,
+            "columnNames": [
+              "entity_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_actions_entity_id` ON `${TABLE_NAME}` (`entity_id`)"
+          },
+          {
+            "name": "index_history_actions_session_uuid",
+            "unique": false,
+            "columnNames": [
+              "session_uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_actions_session_uuid` ON `${TABLE_NAME}` (`session_uuid`)"
+          },
+          {
+            "name": "index_history_actions_status",
+            "unique": false,
+            "columnNames": [
+              "status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_actions_status` ON `${TABLE_NAME}` (`status`)"
+          },
+          {
+            "name": "index_history_actions_created_at",
+            "unique": false,
+            "columnNames": [
+              "created_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_history_actions_created_at` ON `${TABLE_NAME}` (`created_at`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '85d9f2c6416eaa4e643cb97ea18efc6c')"
+    ]
+  }
+}

@@ -1,0 +1,274 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "a9047a1993402f27b214aaae8e582ea1",
+    "entities": [
+      {
+        "tableName": "app_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `current_session_id` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentSessionId",
+            "columnName": "current_session_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "correction_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `original_word_entry_id` INTEGER NOT NULL, `original_word` TEXT NOT NULL, `normalized_word` TEXT NOT NULL, `session_id` TEXT NOT NULL, `submitted_at_utc_ms` INTEGER NOT NULL, `corrected_at_utc_ms` INTEGER NOT NULL, `correction_latency_ms` INTEGER NOT NULL, `action_type` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalWordEntryId",
+            "columnName": "original_word_entry_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalWord",
+            "columnName": "original_word",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedWord",
+            "columnName": "normalized_word",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "session_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "submittedAtUtcMs",
+            "columnName": "submitted_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correctedAtUtcMs",
+            "columnName": "corrected_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correctionLatencyMs",
+            "columnName": "correction_latency_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionType",
+            "columnName": "action_type",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_correction_events_original_word_entry_id",
+            "unique": false,
+            "columnNames": [
+              "original_word_entry_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_correction_events_original_word_entry_id` ON `${TABLE_NAME}` (`original_word_entry_id`)"
+          },
+          {
+            "name": "index_correction_events_session_id",
+            "unique": false,
+            "columnNames": [
+              "session_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_correction_events_session_id` ON `${TABLE_NAME}` (`session_id`)"
+          },
+          {
+            "name": "index_correction_events_corrected_at_utc_ms",
+            "unique": false,
+            "columnNames": [
+              "corrected_at_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_correction_events_corrected_at_utc_ms` ON `${TABLE_NAME}` (`corrected_at_utc_ms`)"
+          }
+        ]
+      },
+      {
+        "tableName": "word_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `original_word` TEXT NOT NULL, `normalized_word` TEXT NOT NULL, `created_at_utc_ms` INTEGER NOT NULL, `session_id` TEXT NOT NULL, FOREIGN KEY(`session_id`) REFERENCES `sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalWord",
+            "columnName": "original_word",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedWord",
+            "columnName": "normalized_word",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtUtcMs",
+            "columnName": "created_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "session_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_word_entries_normalized_word",
+            "unique": false,
+            "columnNames": [
+              "normalized_word"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_word_entries_normalized_word` ON `${TABLE_NAME}` (`normalized_word`)"
+          },
+          {
+            "name": "index_word_entries_session_id",
+            "unique": false,
+            "columnNames": [
+              "session_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_word_entries_session_id` ON `${TABLE_NAME}` (`session_id`)"
+          },
+          {
+            "name": "index_word_entries_created_at_utc_ms",
+            "unique": false,
+            "columnNames": [
+              "created_at_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_word_entries_created_at_utc_ms` ON `${TABLE_NAME}` (`created_at_utc_ms`)"
+          },
+          {
+            "name": "index_word_entries_normalized_word_created_at_utc_ms",
+            "unique": false,
+            "columnNames": [
+              "normalized_word",
+              "created_at_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_word_entries_normalized_word_created_at_utc_ms` ON `${TABLE_NAME}` (`normalized_word`, `created_at_utc_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "session_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `started_at_utc_ms` INTEGER NOT NULL, `ended_at_utc_ms` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtUtcMs",
+            "columnName": "started_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAtUtcMs",
+            "columnName": "ended_at_utc_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sessions_started_at_utc_ms",
+            "unique": false,
+            "columnNames": [
+              "started_at_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sessions_started_at_utc_ms` ON `${TABLE_NAME}` (`started_at_utc_ms`)"
+          },
+          {
+            "name": "index_sessions_ended_at_utc_ms",
+            "unique": false,
+            "columnNames": [
+              "ended_at_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sessions_ended_at_utc_ms` ON `${TABLE_NAME}` (`ended_at_utc_ms`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a9047a1993402f27b214aaae8e582ea1')"
+    ]
+  }
+}

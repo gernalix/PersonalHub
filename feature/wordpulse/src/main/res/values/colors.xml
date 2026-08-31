@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="wordpulse_seed">#4DB6AC</color>
+    <color name="wordpulse_icon_bg">#101418</color>
+    <color name="wordpulse_icon_line">#F2C94C</color>
+</resources>

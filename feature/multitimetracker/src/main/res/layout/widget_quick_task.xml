@@ -1,0 +1,20 @@
+<!-- v3 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widgetRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_quick_task_bg"
+    android:padding="0dp">
+
+    <TextView
+        android:id="@+id/widgetLabel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="⚡"
+        android:textStyle="bold"
+        android:textSize="26sp"
+        android:contentDescription="Quick task"
+        android:textColor="@android:color/white" />
+
+</FrameLayout>

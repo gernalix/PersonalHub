@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WordPulse</string>
+    <string name="capture_hint">only lowercase letters a-z</string>
+    <string name="dismiss_alert">Dismiss alert</string>
+    <string name="edit_last_submission">Edit</string>
+</resources>

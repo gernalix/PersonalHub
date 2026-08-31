@@ -1,0 +1,46 @@
+package com.supercontacts.app.data.repository
+
+data class ContactInput(
+    val name: String,
+    val phone: String = "",
+    val telegram: String = "",
+    val email: String = "",
+    val nickname: String = "",
+    val company: String = "",
+    val note: String = "",
+    val link: String = "",
+    val address: String = "",
+    val address2: String = "",
+    val addressLatitude: Double? = null,
+    val addressLongitude: Double? = null,
+    val addressPlaceId: String? = null,
+    val nationality: String = "",
+    val nationalityCountryCode: String? = null,
+    val birthDate: String = "",
+    val manualAge: String = "",
+    val grindrNick: String = "",
+    val instagramUsername: String = "",
+    val facebookUserId: String = "",
+    val photoPath: String = "",
+) {
+    fun hasAnyValue(): Boolean =
+        listOf(
+            name,
+            phone,
+            telegram,
+            email,
+            nickname,
+            company,
+            note,
+            link,
+            address,
+            address2,
+            nationality,
+            birthDate,
+            manualAge,
+            grindrNick,
+            instagramUsername,
+            facebookUserId,
+            photoPath,
+        ).any { it.trim().isNotEmpty() } || !addressPlaceId.isNullOrBlank()
+}

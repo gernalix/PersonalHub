@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="duration_unit_day_short">d</string>
+    <string name="duration_unit_hour_short">h</string>
+    <string name="duration_unit_minute_short">m</string>
+    <string name="duration_unit_second_short">s</string>
+</resources>

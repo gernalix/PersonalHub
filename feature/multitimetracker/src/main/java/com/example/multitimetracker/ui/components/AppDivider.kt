@@ -1,0 +1,25 @@
+package com.example.multitimetracker.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.unit.dp
+
+/**
+ * Stable divider wrapper to avoid Material API churn around Divider/HorizontalDivider.
+ */
+@Composable
+fun AppDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .alpha(0.7f)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
+}

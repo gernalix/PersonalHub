@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="@color/wordpulse_icon_bg"
+        android:pathData="M0,0h48v48h-48z" />
+    <path
+        android:fillColor="@color/wordpulse_seed"
+        android:pathData="M9,24c0,-8.28 6.72,-15 15,-15s15,6.72 15,15 -6.72,15 -15,15 -15,-6.72 -15,-15z" />
+    <path
+        android:strokeColor="@color/wordpulse_icon_line"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M14,25h5l3,-8l5,16l3,-8h4" />
+</vector>

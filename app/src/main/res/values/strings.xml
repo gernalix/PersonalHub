@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PersonalHub</string>
+    <string name="module_people">People</string>
+    <string name="module_people_subtitle">Contacts, fields, events, tags</string>
+    <string name="module_timer">Timer</string>
+    <string name="module_timer_subtitle">Sessions, quick events, alerts</string>
+    <string name="module_places">Places</string>
+    <string name="module_places_subtitle">Places, visits, routes</string>
+    <string name="module_substances">Substances</string>
+    <string name="module_substances_subtitle">Intakes, stock, prescriptions</string>
+    <string name="module_wordpulse">WordPulse</string>
+    <string name="module_wordpulse_subtitle">Words, sessions, corrections</string>
+    <string name="module_migration">Migration</string>
+    <string name="module_migration_subtitle">Source mapping and data checks</string>
+    <string name="migration_sources">%1$d source apps configured</string>
+    <string name="migration_integrity">Mapping database integrity: %1$s</string>
+</resources>
