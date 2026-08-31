@@ -20,5 +20,6 @@ dependencies {
     implementation(project(":core:model"))
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
 }

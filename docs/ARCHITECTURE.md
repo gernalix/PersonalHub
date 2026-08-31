@@ -42,6 +42,17 @@ Deduplication is only allowed when identity is proven. Ambiguous records remain 
 
 The implemented table inventory lives in `MigrationInventory` under `:core:model` and covers all audited source tables for the five source apps above.
 
+`MigrationVerifier` turns scanned source-row IDs into deterministic mappings and rejects incomplete batches before import can be considered safe:
+
+- source rows without a mapping;
+- mappings without a source row;
+- duplicate mappings for the same source row;
+- duplicate `new_id` target collisions.
+
+`MigrationMappingStore.recordAll` persists a verified batch in one SQLite transaction, so a duplicate source key rolls back the whole batch instead of leaving a partial migration map.
+
+`MigrationSourceDatabaseScanner` is the Android SQLite bridge for this flow. It reads configured source ID columns from one source database, including attached-database table names such as `mtt_remote_sync.sync_queue`, and returns `SourceTableRows` for the verifier.
+
 ## Cross-Feature Links
 
 The Luoghi provider authority is internal to PersonalHub:

@@ -17,17 +17,28 @@ class MigrationMappingStore(context: Context) {
             db.insertWithOnConflict(
                 TABLE_MAPPINGS,
                 null,
-                ContentValues().apply {
-                    put("source_app", mapping.sourceApp.key)
-                    put("source_table", mapping.sourceTable)
-                    put("source_id", mapping.sourceId)
-                    put("entity_type", mapping.entityType.key)
-                    put("new_id", mapping.newId)
-                    put("dedupe_decision", mapping.dedupeDecision.key)
-                    put("notes", mapping.notes)
-                },
+                mapping.toContentValues(),
                 SQLiteDatabase.CONFLICT_ABORT,
             )
+        }
+    }
+
+    fun recordAll(mappings: List<MigrationMapping>) {
+        helper.writableDatabase.use { db ->
+            db.beginTransaction()
+            try {
+                mappings.forEach { mapping ->
+                    db.insertWithOnConflict(
+                        TABLE_MAPPINGS,
+                        null,
+                        mapping.toContentValues(),
+                        SQLiteDatabase.CONFLICT_ABORT,
+                    )
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
         }
     }
 
@@ -54,6 +65,25 @@ class MigrationMappingStore(context: Context) {
                                 notes = cursor.getString(6).orEmpty(),
                             ),
                         )
+                    }
+                }
+            }
+        }
+
+    fun mappingCountsBySourceTable(): Map<String, Int> =
+        helper.readableDatabase.use { db ->
+            db.rawQuery(
+                """
+                SELECT source_app, source_table, COUNT(*)
+                FROM $TABLE_MAPPINGS
+                GROUP BY source_app, source_table
+                ORDER BY source_app, source_table
+                """.trimIndent(),
+                emptyArray(),
+            ).use { cursor ->
+                buildMap {
+                    while (cursor.moveToNext()) {
+                        put("${cursor.getString(0)}.${cursor.getString(1)}", cursor.getInt(2))
                     }
                 }
             }
@@ -99,6 +129,17 @@ class MigrationMappingStore(context: Context) {
         val dedupeDecision: String,
         val notes: String,
     )
+
+    private fun MigrationMapping.toContentValues(): ContentValues =
+        ContentValues().apply {
+            put("source_app", sourceApp.key)
+            put("source_table", sourceTable)
+            put("source_id", sourceId)
+            put("entity_type", entityType.key)
+            put("new_id", newId)
+            put("dedupe_decision", dedupeDecision.key)
+            put("notes", notes)
+        }
 
     companion object {
         const val DB_NAME = "personalhub_migration_map.db"
