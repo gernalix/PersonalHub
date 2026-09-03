@@ -77,6 +77,12 @@ android {
     buildTypes {
         debug {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
+            // This remains the debug variant and debug-signed artifact. It is not attachable at
+            // runtime so R8 can shrink the distributable APK below Telegram's document limit.
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         release {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
