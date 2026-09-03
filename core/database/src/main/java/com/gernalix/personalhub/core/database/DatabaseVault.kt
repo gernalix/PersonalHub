@@ -174,7 +174,7 @@ object DatabaseVault {
                             val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columns ->
                                 buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }
                             }
-                            SyncJournal.trigger(table, keys, op)
+                            SyncJournal.trigger(table, keys, op, legacy = db.version == 3)
                         }
                         else -> error("Unexpected database trigger")
                     }

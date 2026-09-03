@@ -8,6 +8,13 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(entities = [
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceProduct::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceTitle::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceChain::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceStore::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransaction::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceTag::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransactionTag::class,
     com.supercontacts.app.data.local.BackupMetadataEntity::class,
     com.supercontacts.app.data.local.ContactEntity::class,
     com.supercontacts.app.data.local.ContactFieldEntity::class,
@@ -61,18 +68,19 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.personalhub.core.database.TimerSyncQueue::class,
     com.gernalix.personalhub.core.database.TimerSyncShadow::class,
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
-], version = 3, exportSchema = true)
+], version = 4, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase() {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
     abstract fun dao(): com.gernalix.sostanze.data.SostanzeDao
     abstract fun wordPulseDao(): com.wordpulse.app.data.WordPulseDao
+    abstract fun financeDao(): com.gernalix.personalhub.core.database.capsules.soldi.FinanceDao
     abstract fun photoDao(): PeoplePhotoDao
 
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 3
+        const val SCHEMA_VERSION = 4
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -108,6 +116,7 @@ abstract class PersonalHubDatabase : RoomDatabase() {
                         }
                     }
                 })
+                .addMigrations(com.gernalix.personalhub.core.database.capsules.soldi.FinanceMigration(context))
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {

@@ -1,0 +1,31 @@
+<resources>
+    <string name="soldi_title">Soldi</string>
+    <string name="back">Indietro</string>
+    <string name="operation_failed">Impossibile salvare. Controlla importo, data e valuta. I prodotti collegati non possono essere eliminati. Un luogo deve mantenere la stessa catena.</string>
+    <string name="save">Salva</string>
+    <string name="transactions">Transazioni</string>
+    <string name="products">Prodotti</string>
+    <string name="search">Cerca</string>
+    <string name="add">Aggiungi</string>
+    <string name="balance">Saldo: %1$s %2$s</string>
+    <string name="empty">Nessun dato presente</string>
+    <string name="edit">Modifica</string>
+    <string name="delete">Elimina</string>
+    <string name="purchase">Usa in transazione</string>
+    <string name="delete_confirm">Eliminare questo dato? I prodotti collegati sono protetti.</string>
+    <string name="cancel">Annulla</string>
+    <string name="product_name">Nome prodotto</string>
+    <string name="title">Titolo</string>
+    <string name="is_product">Acquisto prodotto</string>
+    <string name="amount">Importo</string>
+    <string name="amount_help">Usa un importo negativo per le spese e positivo per le entrate.</string>
+    <string name="currency">Valuta (codice ISO)</string>
+    <string name="chain">Catena / venditore</string>
+    <string name="place">Luogo PH esistente</string>
+    <string name="none">Nessuno</string>
+    <string name="tags">Etichette, separate da virgole</string>
+    <string name="notes">Note</string>
+    <string name="select_product">Scegli dal catalogo</string>
+    <string name="date_local">Data locale con fuso (es. 2026-09-04T12:00:00+02:00)</string>
+    <string name="from_receipt">Da scontrino</string>
+</resources>

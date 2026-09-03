@@ -136,6 +136,15 @@
             android:theme="@style/Theme.WordPulse"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
 
+        <activity android:name="com.gernalix.personalhub.soldi.SoldiActivity" android:exported="false" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize" />
+        <activity-alias android:name=".shortcut.SoldiShortcutActivity" android:exported="true" android:icon="@drawable/ic_shortcut_soldi" android:label="@string/module_soldi" android:targetActivity="com.gernalix.personalhub.soldi.SoldiActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:host="module" android:path="/soldi" android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
         <activity-alias
             android:name=".shortcut.PeopleShortcutActivity"
             android:exported="true"

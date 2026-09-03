@@ -12,7 +12,7 @@
     <string name="module_wordpulse">WordPulse</string>
     <string name="module_wordpulse_subtitle">Words, sessions, corrections</string>
     <string name="database_title">Database and backup</string>
-    <string name="database_description">One file contains all five modules and contact photos. Import replaces the current data after validation and keeps a recovery copy.</string>
+    <string name="database_description">One file contains all modules and contact photos. Import replaces the current data after validation and keeps a recovery copy.</string>
     <string name="database_import">Import personalhub.db</string>
     <string name="database_folder">Choose automatic export folder</string>
     <string name="database_folder_missing">Choose a folder to enable automatic export.</string>
@@ -27,7 +27,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="home_shortcuts_title">Home shortcuts</string>
-    <string name="home_shortcuts_description">The launcher long-press menu may show only some modules. Add any of the five modules to your Home screen here.</string>
+    <string name="home_shortcuts_description">The launcher long-press menu may show only some modules. Add any module to your Home screen here.</string>
     <string name="home_shortcuts_add">Add to Home</string>
     <string name="home_shortcuts_unsupported">This launcher does not support Home shortcuts.</string>
     <string name="home_shortcuts_confirmation_requested">Confirm with the launcher to add this shortcut to Home.</string>
@@ -48,4 +48,6 @@
     <string name="datasette_retry">Changes are saved locally. Connection failed; sync will retry automatically.</string>
     <string name="datasette_waiting">Waiting to sync.</string>
     <string name="datasette_error">Unable to save. Check the HTTPS address, database, table and access token.</string>
+    <string name="module_soldi">Soldi</string>
+    <string name="module_soldi_subtitle">Transactions and products</string>
 </resources>

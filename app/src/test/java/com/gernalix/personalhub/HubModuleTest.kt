@@ -7,8 +7,9 @@ import org.junit.Test
 
 class HubModuleTest {
     @Test
-    fun hubContainsExactlyTheFiveFeatureApps() {
-        assertEquals(5, HubModule.entries.size)
+    fun hubContainsExactlyTheSixFeatureApps() {
+        assertEquals(6, HubModule.entries.size)
+        assertTrue(HubModule.entries.any { it.shortcutPath == "soldi" })
         val activityNames = HubModule.entries.map { it.activityClassName }
 
         assertTrue("com.supercontacts.app.MainActivity" in activityNames)
@@ -22,7 +23,7 @@ class HubModuleTest {
     @Test
     fun everyShortcutHasItsOwnAliasComponent() {
         val aliases = HubModule.entries.map { it.shortcutActivityAliasName }
-        assertEquals(5, aliases.size)
+        assertEquals(6, aliases.size)
         assertEquals(aliases.size, aliases.toSet().size)
         assertTrue(aliases.all { it.startsWith("com.gernalix.personalhub.shortcut.") })
     }
@@ -30,7 +31,7 @@ class HubModuleTest {
     @Test
     fun everyPinnedShortcutHasItsOwnStableIdAndIcon() {
         val pinnedIds = HubModule.entries.map { it.pinnedShortcutId }
-        assertEquals(5, pinnedIds.size)
+        assertEquals(6, pinnedIds.size)
         assertEquals(pinnedIds.size, pinnedIds.toSet().size)
         assertTrue(HubModule.entries.all { it.shortcutIconRes != 0 })
     }

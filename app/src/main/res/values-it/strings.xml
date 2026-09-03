@@ -12,7 +12,7 @@
     <string name="module_wordpulse">WordPulse</string>
     <string name="module_wordpulse_subtitle">Parole, sessioni, correzioni</string>
     <string name="database_title">Database e backup</string>
-    <string name="database_description">Un file contiene tutti i cinque moduli e le foto dei contatti. L’importazione sostituisce i dati attuali dopo la verifica e conserva una copia di recupero.</string>
+    <string name="database_description">Un file contiene tutti i moduli e le foto dei contatti. L’importazione sostituisce i dati attuali dopo la verifica e conserva una copia di recupero.</string>
     <string name="database_import">Import personalhub.db</string>
     <string name="database_folder">Scegli cartella di esportazione automatica</string>
     <string name="database_folder_missing">Scegli una cartella per attivare l’esportazione automatica.</string>
@@ -27,7 +27,7 @@
     <string name="settings_title">Impostazioni</string>
     <string name="settings_back">Indietro</string>
     <string name="home_shortcuts_title">Scorciatoie Home</string>
-    <string name="home_shortcuts_description">Il menu con pressione prolungata del launcher può mostrare solo alcuni moduli. Da qui puoi aggiungere tutti e cinque i moduli alla Home.</string>
+    <string name="home_shortcuts_description">Il menu con pressione prolungata del launcher può mostrare solo alcuni moduli. Da qui puoi aggiungere tutti i moduli alla Home.</string>
     <string name="home_shortcuts_add">Aggiungi alla Home</string>
     <string name="home_shortcuts_unsupported">Questo launcher non supporta le scorciatoie Home.</string>
     <string name="home_shortcuts_confirmation_requested">Conferma nel launcher per aggiungere questa scorciatoia alla Home.</string>
@@ -48,4 +48,6 @@
     <string name="datasette_retry">Modifiche salvate sul dispositivo. Connessione non riuscita; nuovo tentativo automatico.</string>
     <string name="datasette_waiting">In attesa di sincronizzazione.</string>
     <string name="datasette_error">Salvataggio non riuscito. Controlla indirizzo HTTPS, database, tabella e token di accesso.</string>
+    <string name="module_soldi">Soldi</string>
+    <string name="module_soldi_subtitle">Transazioni e prodotti</string>
 </resources>

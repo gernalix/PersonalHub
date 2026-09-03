@@ -87,6 +87,14 @@ enum class HubModule(
         shortcutPath = "wordpulse",
         shortcutIconRes = R.drawable.ic_shortcut_wordpulse,
     ),
+    SOLDI(
+        titleRes = R.string.module_soldi,
+        subtitleRes = R.string.module_soldi_subtitle,
+        activityClassName = "com.gernalix.personalhub.soldi.SoldiActivity",
+        shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.SoldiShortcutActivity",
+        shortcutPath = "soldi",
+        shortcutIconRes = R.drawable.ic_shortcut_soldi,
+    ),
     ;
 
     val pinnedShortcutId: String

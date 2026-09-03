@@ -79,6 +79,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    testBuildType = providers.gradleProperty("personalhub.testBuildType").getOrElse("debug")
+
     buildTypes {
         debug {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
@@ -88,6 +90,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        create("qa") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            applicationIdSuffix = ".qa"
         }
         create("benchmark") {
             initWith(getByName("release"))
@@ -148,6 +155,7 @@ dependencies {
     implementation(project(":feature:sostanze"))
     implementation(project(":feature:supercontacts"))
     implementation(project(":feature:wordpulse"))
+    implementation(project(":feature:soldi"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.extended)
