@@ -30,9 +30,6 @@ data class ContactPhotoCropSpec(
 
 class ContactPhotoStore(context: Context) {
     private val appContext = context.applicationContext
-    private val backupPrefs = BackupPreferencesStore(appContext)
-    private val photoResolver = ContactPhotoResolver(appContext)
-    private val photoIoLock = Any()
 
     suspend fun loadPreviewBitmap(uri: Uri, maxSizePx: Int = PreviewMaxSizePx): Bitmap? =
         withContext(Dispatchers.IO) {
@@ -61,12 +58,10 @@ class ContactPhotoStore(context: Context) {
             } else {
                 Bitmap.createScaledBitmap(cropped, outputSizePx, outputSizePx, true)
             }
-            val reference = relativePhotoReference(
-                fileName = buildPhotoFileName(contactId = contactId),
-            )
-            synchronized(photoIoLock) {
-                writeBitmapToPhoto(reference, scaled)
-            }
+            val bytes = java.io.ByteArrayOutputStream().also { output ->
+                check(scaled.compress(Bitmap.CompressFormat.JPEG, JpegQuality, output))
+            }.toByteArray()
+            val reference = com.gernalix.personalhub.core.database.PhotoCapsule.stage(bytes)
             if (scaled !== cropped) {
                 cropped.recycle()
             }
@@ -76,36 +71,11 @@ class ContactPhotoStore(context: Context) {
             reference
         }
 
-    suspend fun migrateLegacyPhotoToSaf(contactId: Long, reference: String): String? =
-        withContext(Dispatchers.IO) {
-            val newReference = relativePhotoReference(buildPhotoFileName(contactId))
-            synchronized(photoIoLock) {
-                openLegacyPhotoInputStream(reference)?.use { input ->
-                    writeInputStreamToPhoto(newReference, input)
-                } ?: return@withContext null
-            }
-            newReference
-        }
-
-    suspend fun deletePhoto(reference: String): Boolean =
-        withContext(Dispatchers.IO) {
-            if (reference.isBlank()) return@withContext false
-            synchronized(photoIoLock) {
-                runCatching {
-                    if (isRelativePhotoReference(reference)) {
-                        deleteRelativePhoto(reference)
-                    } else {
-                        legacyPhotoFile(reference)?.delete() == true
-                    }
-                }.onFailure { error ->
-                    Log.w(LogTag, "Photo cleanup failed for app-owned reference.", error)
-                }.getOrDefault(false).also { deleted ->
-                    if (deleted) {
-                        Log.i(LogTag, "Photo cleanup deleted app-owned file.")
-                    }
-                }
-            }
-        }
+    suspend fun deletePhoto(reference: String): Boolean {
+        com.gernalix.personalhub.core.database.PhotoCapsule.discard(reference)
+        // Committed photo deletion follows its contact/field foreign keys.
+        return true
+    }
 
     fun loadPhotoBitmap(reference: String, targetSizePx: Int): Bitmap? {
         if (reference.isBlank()) return null
@@ -212,131 +182,10 @@ class ContactPhotoStore(context: Context) {
         val size: Int,
     )
 
-    private fun buildPhotoFileName(contactId: Long?): String {
-        val owner = contactId?.let { "contact_$it" } ?: "contact_pending"
-        return "${owner}_${System.currentTimeMillis()}_${UUID.randomUUID()}.jpg"
-    }
-
-    private fun relativePhotoReference(fileName: String): String = "$PhotoDirectory/$fileName"
-
-    private fun isRelativePhotoReference(reference: String): Boolean =
-        ContactPhotoResolver.isRelativePhotoReference(reference)
-
-    private fun requireBackupRootUri(): Uri {
-        val uriString = backupPrefs.readFolderUri()
-        if (uriString.isNullOrBlank()) {
-            throw IllegalStateException(appContext.getString(R.string.backup_folder_not_configured))
-        }
-        return Uri.parse(uriString)
-    }
-
-    private fun backupRootUriOrNull(): Uri? =
-        backupPrefs.readFolderUri()?.takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
-
-    private fun writeBitmapToPhoto(reference: String, bitmap: Bitmap) {
-        writeOutputToPhoto(reference) { output ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, JpegQuality, output)
-        }
-    }
-
-    private fun writeInputStreamToPhoto(reference: String, input: InputStream) {
-        writeOutputToPhoto(reference) { output ->
-            input.copyTo(output)
-        }
-    }
-
-    private fun writeOutputToPhoto(
-        reference: String,
-        write: (java.io.OutputStream) -> Unit,
-    ) {
-        val rootUri = requireBackupRootUri()
-        if (rootUri.scheme == "file") {
-            val root = File(requireNotNull(rootUri.path))
-            val photosRoot = ContactPhotoResolver.canonicalFilePhotoDirectory(root, create = true)
-                ?: throw IllegalStateException(appContext.getString(R.string.backup_export_failed))
-            val target = ContactPhotoResolver.resolveFileForWrite(root, reference)
-                ?: throw IllegalStateException(appContext.getString(R.string.backup_export_failed))
-            require(target.parentFile?.canonicalPath == photosRoot.canonicalPath) {
-                appContext.getString(R.string.backup_export_failed)
-            }
-            FileOutputStream(target).use { output ->
-                write(output)
-                output.fd.sync()
-            }
-            return
-        }
-
-        val document = photoResolver.resolveDocumentForWrite(
-            rootUri = rootUri,
-            reference = reference,
-        ) ?: throw IllegalStateException(appContext.getString(R.string.backup_export_failed))
-        appContext.contentResolver.openOutputStream(document.uri, "rwt").use { output ->
-            requireNotNull(output) { appContext.getString(R.string.backup_export_failed) }
-            write(output)
-        }
-    }
-
     private fun openPhotoInputStream(reference: String): InputStream? {
-        if (isRelativePhotoReference(reference)) {
-            val rootUri = backupRootUriOrNull() ?: return null
-            if (rootUri.scheme == "file") {
-                val root = File(rootUri.path ?: return null)
-                val file = ContactPhotoResolver.resolveFileForRead(root, reference)
-                return if (file?.isFile == true) FileInputStream(file) else null
-            }
-            val document = photoResolver.resolveDocumentForRead(
-                rootUri = rootUri,
-                reference = reference,
-            ) ?: return null
-            return runCatching {
-                appContext.contentResolver.openInputStream(document.uri)
-            }.onFailure { error ->
-                Log.w(LogTag, "Photo document open failed for app-owned reference.", error)
-            }.getOrNull()
-        }
-
-        val uri = runCatching { Uri.parse(reference) }.getOrNull()
-        if (uri?.scheme == "content") {
-            return runCatching {
-                appContext.contentResolver.openInputStream(uri)
-            }.onFailure { error ->
-                Log.w(LogTag, "Legacy content photo open failed.", error)
-            }.getOrNull()
-        }
-
-        val file = File(reference)
-        return if (file.isFile) FileInputStream(file) else null
-    }
-
-    private fun deleteRelativePhoto(reference: String): Boolean {
-        val rootUri = backupRootUriOrNull() ?: return false
-        if (rootUri.scheme == "file") {
-            val root = File(rootUri.path ?: return false)
-            val file = ContactPhotoResolver.resolveFileForDelete(root, reference) ?: return true
-            return file.parentFile?.name?.let(ContactPhotoResolver::isPhotoDirectoryName) == true &&
-                (!file.exists() || file.delete())
-        }
-        return photoResolver.resolveDocumentForDelete(
-            rootUri = rootUri,
-            reference = reference,
-        )?.delete() ?: false
-    }
-
-    private fun legacyPhotoFile(reference: String): File? {
-        if (reference.isBlank()) return null
-        val file = File(reference)
-        val legacyRoot = File(appContext.filesDir, LegacyPhotoDirectory)
-        return if (file.parentFile?.canonicalPath == legacyRoot.canonicalPath) file else null
-    }
-
-    private fun openLegacyPhotoInputStream(reference: String): InputStream? {
-        legacyPhotoFile(reference)?.takeIf { it.isFile }?.let { return FileInputStream(it) }
-        val uri = runCatching { Uri.parse(reference) }.getOrNull()
-        return if (uri?.scheme == "content") {
-            appContext.contentResolver.openInputStream(uri)
-        } else {
-            null
-        }
+        val bytes = com.gernalix.personalhub.core.database.PhotoCapsule.preview(reference)
+            ?: com.gernalix.personalhub.core.database.PersonalHubDatabase.get(appContext).photoDao().find(reference)?.bytes
+        return bytes?.inputStream()
     }
 
     private companion object {

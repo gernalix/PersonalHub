@@ -270,7 +270,7 @@ class BackupValidator(private val context: Context) {
         val placeIds = snapshot.places.map { place ->
             requireUuid(place.uuid)
             validateCoordinates(place.lat, place.lon)
-            if (place.radiusM != null && place.radiusM <= 0.0) missingRequired("Place radius is invalid")
+            if (place.radiusM != null && (place.radiusM ?: 0.0) <= 0.0) missingRequired("Place radius is invalid")
             if (place.createdAt <= 0L || place.updatedAt <= 0L) missingRequired("Place timestamp is invalid")
             place.uuid
         }.toSet()

@@ -6,7 +6,8 @@ import org.junit.Test
 
 class HubModuleTest {
     @Test
-    fun hubContainsTheFiveMergedFeatureAppsPlusMigrationGate() {
+    fun hubContainsExactlyTheFiveFeatureApps() {
+        assertEquals(5, HubModule.entries.size)
         val activityNames = HubModule.entries.map { it.activityClassName }
 
         assertTrue("com.supercontacts.app.MainActivity" in activityNames)

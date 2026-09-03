@@ -2,8 +2,7 @@ package com.example.multitimetracker.capsules.remotesync
 
 import android.content.ContentValues
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import org.json.JSONObject
 
 internal class RemoteSyncQueueSqlite(context: Context, dbName: String = DB_NAME) {
@@ -176,42 +175,13 @@ internal class RemoteSyncQueueSqlite(context: Context, dbName: String = DB_NAME)
         }
     }
 
-    private class Helper(context: Context, dbName: String) : SQLiteOpenHelper(context, dbName, null, DB_VERSION) {
-        override fun onCreate(db: SQLiteDatabase) {
-            db.execSQL(
-                """
-                CREATE TABLE sync_queue (
-                  sync_id TEXT PRIMARY KEY,
-                  row_json TEXT NOT NULL,
-                  revision INTEGER NOT NULL,
-                  attempt_count INTEGER NOT NULL DEFAULT 0,
-                  created_at_ms INTEGER NOT NULL,
-                  last_attempt_at_ms INTEGER,
-                  last_failure_class TEXT
-                )
-                """.trimIndent(),
-            )
-            db.execSQL("CREATE INDEX idx_sync_queue_revision ON sync_queue(revision)")
-            db.execSQL(
-                """
-                CREATE TABLE sync_shadow (
-                  sync_id TEXT PRIMARY KEY,
-                  fingerprint TEXT NOT NULL,
-                  row_json TEXT NOT NULL
-                )
-                """.trimIndent(),
-            )
-            db.execSQL("CREATE TABLE sync_meta (key TEXT PRIMARY KEY, long_value INTEGER NOT NULL)")
-            db.execSQL("INSERT INTO sync_meta(key, long_value) VALUES ('revision', 0)")
-        }
-
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            check(oldVersion == newVersion) { "Unsupported remote sync queue migration $oldVersion -> $newVersion" }
-        }
+    private class Helper(private val context: Context, dbName: String) {
+        val readableDatabase get() = SQLiteDatabase.get(context)
+        val writableDatabase get() = SQLiteDatabase.get(context)
     }
 
     companion object {
-        const val DB_NAME = "mtt_remote_sync.db"
+        const val DB_NAME = "personalhub.db"
         const val DB_VERSION = 1
     }
 }

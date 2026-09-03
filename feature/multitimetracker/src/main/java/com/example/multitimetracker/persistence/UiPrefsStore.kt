@@ -3,13 +3,13 @@ package com.example.multitimetracker.persistence
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.database.sqlite.SQLiteDatabase
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.model.LifePeriodDurationMode
 import org.json.JSONObject
 
 /**
- * Tiny UI preferences stored in SharedPreferences.
+ * UI preferences stored in the canonical personalhub.db ui_prefs_mirror row.
  * Keep this intentionally small: only view toggles that affect rendering.
  */
 // === FEATURE CAPSULE: UiPrefsStore (Repository) START ===
@@ -24,101 +24,18 @@ object UiPrefsStore {
 
 
 fun getLong(context: Context, key: String, default: Long): Long {
-    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
     return getLongCompat(prefs, key) ?: default
 }
 
 fun putLong(context: Context, key: String, value: Long) {
-    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
     prefs.edit().putLong(key, value).apply()
 }
 
-/**
- * Mirror all UI prefs into the internal SQLite DB so that the DB vault copy contains
- * everything needed to restore app state after reinstall.
- *
- * NOTE: This mirrors the raw SharedPreferences map (prefs.all).
- */
-fun mirrorAllToSqlite(context: Context) {
-    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    val map = prefs.all
-    val json = JSONObject()
-
-    for ((k, v) in map) {
-        when (v) {
-            null -> json.put(k, JSONObject.NULL)
-            is Boolean, is Int, is Long, is Float, is Double, is String -> json.put(k, v)
-            is Set<*> -> {
-                val arr = org.json.JSONArray()
-                v.filterIsInstance<String>().forEach { arr.put(it) }
-                json.put(k, arr)
-            }
-            else -> json.put(k, v.toString())
-        }
-    }
-
-    val now = System.currentTimeMillis()
-    val db = SnapshotSqlite.openWritableDb(context)
-    db.beginTransaction()
-    try {
-        val cv = android.content.ContentValues().apply {
-            put("id", 1)
-            put("json", json.toString())
-            put("saved_at_ms", now)
-        }
-        db.insertWithOnConflict(MIRROR_TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
-        db.setTransactionSuccessful()
-    } finally {
-        db.endTransaction()
-        db.close()
-    }
-}
-
-/**
- * Restore UI prefs from the internal SQLite DB (if present).
- * If overwrite=true, clears current SharedPreferences and repopulates from DB.
- */
-fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
-    val db = SnapshotSqlite.openReadableDb(context)
-    val jsonStr = runCatching {
-        db.rawQuery("SELECT json FROM $MIRROR_TABLE WHERE id=1 LIMIT 1", null).use { c ->
-            if (c.moveToFirst()) c.getString(0) else null
-        }
-    }.getOrNull()
-    db.close()
-
-    if (jsonStr.isNullOrBlank()) return
-    val obj = runCatching { JSONObject(jsonStr) }.getOrNull() ?: return
-
-    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    val ed = prefs.edit()
-    if (overwrite) ed.clear()
-
-    val it = obj.keys()
-    while (it.hasNext()) {
-        val k = it.next()
-        val v = obj.opt(k)
-        when (v) {
-            null, JSONObject.NULL -> ed.remove(k)
-            is Boolean -> ed.putBoolean(k, v)
-            is Int -> ed.putInt(k, v)
-            is Long -> ed.putLong(k, v)
-            is Double -> ed.putFloat(k, v.toFloat())
-            is String -> ed.putString(k, v)
-            is org.json.JSONArray -> {
-                val set = LinkedHashSet<String>()
-                for (i in 0 until v.length()) {
-                    val sv = v.optString(i, null)
-                    if (!sv.isNullOrBlank()) set.add(sv)
-                }
-                ed.putStringSet(k, set)
-            }
-            else -> ed.putString(k, v.toString())
-        }
-    }
-    ed.apply()
-}
-
+// Settings are already canonical database rows; these compatibility hooks cannot rewrite them.
+fun mirrorAllToSqlite(context: Context) = Unit
+fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) = Unit
 
     private const val KEY_SESSION_ONLY_MODE = "session_only_mode"
     private const val KEY_SESSIONS_BOOTSTRAP_DONE = "sessions_bootstrap_done"
@@ -182,12 +99,12 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getStoredFirstInstallTimeMs(context: Context): Long? {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         return if (!prefs.contains(KEY_FIRST_INSTALL_TIME_MS)) null else getLongCompat(prefs, KEY_FIRST_INSTALL_TIME_MS)
     }
 
     fun setStoredFirstInstallTimeMs(context: Context, valueMs: Long) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putLong(KEY_FIRST_INSTALL_TIME_MS, valueMs)
             .apply()
@@ -214,11 +131,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     private const val KEY_VAULT_AUTO_RESTORE_ENABLED = "vault_auto_restore_enabled"
 
     fun getHideInactiveTime(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_HIDE_INACTIVE_TIME, false)
 
     fun setHideInactiveTime(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_HIDE_INACTIVE_TIME, value)
             .apply()
@@ -226,11 +143,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getHideInactiveTags(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_HIDE_INACTIVE_TAGS, false)
 
     fun setHideInactiveTags(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_HIDE_INACTIVE_TAGS, value)
             .apply()
@@ -238,11 +155,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getShowSeconds(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_SHOW_SECONDS, true)
 
     fun setShowSeconds(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_SHOW_SECONDS, value)
             .apply()
@@ -250,11 +167,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getHideHoursIfZero(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_HIDE_HOURS_IF_ZERO, false)
 
     fun setHideHoursIfZero(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_HIDE_HOURS_IF_ZERO, value)
             .apply()
@@ -262,11 +179,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getTimelineShowTagsInList(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_TIMELINE_SHOW_TAGS_IN_LIST, true)
 
     fun setTimelineShowTagsInList(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_TIMELINE_SHOW_TAGS_IN_LIST, value)
             .apply()
@@ -274,11 +191,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getKeepScreenOn(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_KEEP_SCREEN_ON, false)
 
     fun setKeepScreenOn(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_KEEP_SCREEN_ON, value)
             .apply()
@@ -286,14 +203,14 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getLifePeriodDurationMode(context: Context): LifePeriodDurationMode {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val raw = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getString(KEY_LIFE_PERIOD_DURATION_MODE, null)
         return LifePeriodDurationMode.entries.firstOrNull { it.name == raw }
             ?: LifePeriodDurationMode.EXACT_DURATION
     }
 
     fun setLifePeriodDurationMode(context: Context, value: LifePeriodDurationMode) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putString(KEY_LIFE_PERIOD_DURATION_MODE, value.name)
             .apply()
@@ -307,7 +224,7 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     )
 
     fun getLastManualExportMeta(context: Context): LastManualExportMeta {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         return LastManualExportMeta(
             zipName = prefs.getString(KEY_LAST_MANUAL_EXPORT_ZIP_NAME, null),
             zipSha256 = prefs.getString(KEY_LAST_MANUAL_EXPORT_ZIP_SHA256, null),
@@ -316,7 +233,7 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun setLastManualExportMeta(context: Context, zipName: String?, zipSha256: String?, backupSignature: String?) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putString(KEY_LAST_MANUAL_EXPORT_ZIP_NAME, zipName)
             .putString(KEY_LAST_MANUAL_EXPORT_ZIP_SHA256, zipSha256)
@@ -332,7 +249,7 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     )
 
     fun getLastImportMeta(context: Context): LastImportMeta {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         return LastImportMeta(
             dbFileName = prefs.getString(KEY_LAST_IMPORT_DB_FILE_NAME, null),
             dbSha256 = prefs.getString(KEY_LAST_IMPORT_DB_SHA256, null),
@@ -348,7 +265,7 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
         beforeSignature: String?,
         afterSignature: String?
     ) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putString(KEY_LAST_IMPORT_DB_FILE_NAME, dbFileName)
             .putString(KEY_LAST_IMPORT_DB_SHA256, dbSha256)
@@ -358,11 +275,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getTimeFenceCriticalDisclaimerShown(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_TIME_FENCE_CRITICAL_DISCLAIMER_SHOWN, false)
 
     fun setTimeFenceCriticalDisclaimerShown(context: Context, shown: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_TIME_FENCE_CRITICAL_DISCLAIMER_SHOWN, shown)
             .apply()
@@ -372,11 +289,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
 
 
     fun getRequireLongPressToggle(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_REQUIRE_LONG_PRESS_TOGGLE, true)
 
     fun setRequireLongPressToggle(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_REQUIRE_LONG_PRESS_TOGGLE, value)
             .apply()
@@ -384,11 +301,11 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getIgnoreShortSessions(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_IGNORE_SHORT_SESSIONS, true)
 
     fun setIgnoreShortSessions(context: Context, value: Boolean) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         val old = prefs.getBoolean(KEY_IGNORE_SHORT_SESSIONS, true)
         if (old == value) return
 
@@ -413,12 +330,12 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
     }
 
     fun getIgnoreShortSessionsThresholdSecs(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getInt(KEY_IGNORE_SHORT_THRESHOLD_SECS, 5)
 
     fun setIgnoreShortSessionsThresholdSecs(context: Context, valueSecs: Int) {
         val v = valueSecs.coerceAtLeast(0)
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         val old = prefs.getInt(KEY_IGNORE_SHORT_THRESHOLD_SECS, 5)
         if (old == v) return
 
@@ -444,7 +361,7 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) {
 
     // --- Audit log filters ---
 
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
     private fun trackPersistentSetting(context: Context, source: String) {
         PersistentMutationTracker.record(context, "UiPrefsStore.$source")
     }
@@ -566,13 +483,13 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
     }
 
     fun getLastLoggedAppVersionCode(context: Context): Long? {
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val p = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         val v = getLongCompat(p, KEY_LAST_LOGGED_APP_VERSION_CODE) ?: -1L
         return if (v > 0L) v else null
     }
 
     fun setLastLoggedAppVersionCode(context: Context, versionCode: Long) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putLong(KEY_LAST_LOGGED_APP_VERSION_CODE, versionCode)
             .apply()
@@ -580,13 +497,13 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
     // --- Cold-start guardrail ---
     // We use this to distinguish "fresh install / clear data" from "upgrade with existing prefs".
     fun getFirstInstalledAppVersionCode(context: Context): Long? {
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val p = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         val v = getLongCompat(p, KEY_FIRST_INSTALLED_APP_VERSION_CODE) ?: -1L
         return if (v <= 0L) null else v
     }
 
     fun ensureFirstInstalledAppVersionCode(context: Context, currentVersionCode: Long) {
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val p = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         if ((getLongCompat(p, KEY_FIRST_INSTALLED_APP_VERSION_CODE) ?: -1L) <= 0L) {
             p.edit().putLong(KEY_FIRST_INSTALLED_APP_VERSION_CODE, currentVersionCode).apply()
         }
@@ -605,20 +522,20 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
         if (!isDeveloperSurfaceAvailable()) {
             false
         } else {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_DEV_MODE_ENABLED, false)
         }
 
     /** Toggles dev mode and returns the new state. */
     fun toggleDevMode(context: Context): Boolean {
         if (!isDeveloperSurfaceAvailable()) {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
                 .edit()
                 .putBoolean(KEY_DEV_MODE_ENABLED, false)
                 .apply()
             return false
         }
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         val newValue = !prefs.getBoolean(KEY_DEV_MODE_ENABLED, false)
         prefs.edit().putBoolean(KEY_DEV_MODE_ENABLED, newValue).apply()
         return newValue
@@ -626,13 +543,13 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
 
     fun getDevChronologyUseSessions(context: Context): Boolean {
         if (!isDevModeEnabled(context)) return false
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_DEV_CHRONOLOGY_USE_SESSIONS, false)
     }
 
     fun setDevChronologyUseSessions(context: Context, value: Boolean) {
         if (!isDevModeEnabled(context)) return
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_DEV_CHRONOLOGY_USE_SESSIONS, value)
             .apply()
@@ -640,36 +557,36 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
 
 
     fun getLastImportMs(context: Context): Long? {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         return (getLongCompat(prefs, KEY_LAST_IMPORT_MS) ?: 0L).takeIf { it > 0L }
     }
 
     fun setLastImportMs(context: Context, valueMs: Long) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putLong(KEY_LAST_IMPORT_MS, valueMs)
             .apply()
     }
 
     fun getLastAutoExportMs(context: Context): Long? {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         return (getLongCompat(prefs, KEY_LAST_AUTO_EXPORT_MS) ?: 0L).takeIf { it > 0L }
     }
 
     fun setLastAutoExportMs(context: Context, valueMs: Long) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putLong(KEY_LAST_AUTO_EXPORT_MS, valueMs)
             .apply()
     }
 
     fun getLastManualExportMs(context: Context): Long? {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
         return (getLongCompat(prefs, KEY_LAST_MANUAL_EXPORT_MS) ?: 0L).takeIf { it > 0L }
     }
 
     fun setLastManualExportMs(context: Context, valueMs: Long) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putLong(KEY_LAST_MANUAL_EXPORT_MS, valueMs)
             .apply()
@@ -677,11 +594,11 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
 
     // v211: default=false. This prevents “data spawn a freddo” after reinstall/clear-data when Android restores prefs.
     fun isVaultAutoRestoreEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_VAULT_AUTO_RESTORE_ENABLED, false)
 
     fun setVaultAutoRestoreEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_VAULT_AUTO_RESTORE_ENABLED, enabled)
             .apply()
@@ -690,11 +607,11 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
 
 
     fun isSessionOnlyMode(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_SESSION_ONLY_MODE, true)
 
     fun setSessionOnlyMode(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .edit()
             .putBoolean(KEY_SESSION_ONLY_MODE, enabled)
             .apply()

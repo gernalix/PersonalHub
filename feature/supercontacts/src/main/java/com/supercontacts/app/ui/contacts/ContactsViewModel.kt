@@ -80,7 +80,6 @@ class ContactsViewModel(
     private val backupOwner = ContactBackupCapsule(
         backupManager = backupManager,
         status = statusOwner,
-        migrateLegacyContactPhotos = detailOwner::migrateLegacyContactPhotosIfPossible,
         scope = viewModelScope,
     )
 
@@ -153,7 +152,6 @@ class ContactsViewModel(
         )
 
     init {
-        detailOwner.migrateLegacyContactPhotosIfPossible()
     }
 
     fun setSearchQuery(query: String) = homeOwner.setSearchQuery(query)

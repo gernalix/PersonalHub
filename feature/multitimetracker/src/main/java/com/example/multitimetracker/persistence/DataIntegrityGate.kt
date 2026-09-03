@@ -3,7 +3,7 @@
 package com.example.multitimetracker.persistence
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import com.example.multitimetracker.AppPatchVersion
 import com.example.multitimetracker.R
 import com.example.multitimetracker.export.BackupFolderStore

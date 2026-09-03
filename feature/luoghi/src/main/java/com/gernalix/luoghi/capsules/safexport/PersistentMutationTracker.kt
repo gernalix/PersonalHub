@@ -15,11 +15,5 @@ object PersistentMutationTracker {
         requestExport(appContext)
     }
 
-    fun requestExport(context: Context) {
-        val appContext = context.applicationContext
-        if (AutoExportGate.isSuppressed) return
-        if (RestoreSafetyStore.isAutoExportProtected(appContext)) return
-        if (BackupFolderStore.getTreeUri(appContext) == null) return
-        ExportScheduler.queueAfterMutation(appContext, AUTOEXPORT_DEBOUNCE_MS)
-    }
+    fun requestExport(context: Context) = com.gernalix.personalhub.core.database.HubAutoExport.request(context)
 }

@@ -314,7 +314,7 @@ fun computeUnionTotalsClosedForTagIds(tagIds: Set<Long>): Map<Long, Long> {
                     SnapshotSqlite.SESSION_TAGS_TABLE,
                     null,
                     tagCv,
-                    android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
+                    com.gernalix.personalhub.core.database.LegacyDatabase.CONFLICT_IGNORE
                 )
             }
 
@@ -366,7 +366,7 @@ fun updateSessionMeta(sessionId: Long, title: String, tagIds: Set<Long>) {
                 SnapshotSqlite.SESSION_TAGS_TABLE,
                 null,
                 tagCv,
-                android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
+                com.gernalix.personalhub.core.database.LegacyDatabase.CONFLICT_IGNORE
             )
         }
 
@@ -549,7 +549,7 @@ fun insertRunningSessionIfMissing(title: String, startMs: Long, tagIds: Set<Long
                 SnapshotSqlite.SESSION_TAGS_TABLE,
                 null,
                 tagCv,
-                android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
+                com.gernalix.personalhub.core.database.LegacyDatabase.CONFLICT_IGNORE
             )
         }
 

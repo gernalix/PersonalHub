@@ -3,8 +3,7 @@ package com.example.multitimetracker.persistence
 
 import android.content.ContentValues
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import com.example.multitimetracker.core.contracts.ClosedSessionRecord
 import com.example.multitimetracker.model.Tag
 import com.example.multitimetracker.model.Task
@@ -29,49 +28,9 @@ import com.example.multitimetracker.util.CapsuleWriteApi
  */
 internal object SessionMirrorSqlite {
 
-    private class Helper(context: Context) : SQLiteOpenHelper(
-        context.applicationContext,
-        SnapshotSqlite.DB_NAME,
-        null,
-        SnapshotSqlite.DB_VERSION
-    ) {
-        override fun onCreate(db: SQLiteDatabase) {
-            // SnapshotSqlite creates the full schema, but be defensive.
-            ensureSessionTables(db)
-        }
-
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion < 3) {
-                ensureSessionTables(db)
-            }
-        }
-
-        private fun ensureSessionTables(db: SQLiteDatabase) {
-            db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS ${SnapshotSqlite.SESSIONS_TABLE} (
-                  id INTEGER PRIMARY KEY,
-                  title TEXT NOT NULL,
-                  start_ms INTEGER NOT NULL,
-                  end_ms INTEGER,
-                  created_at_ms INTEGER NOT NULL,
-                  updated_at_ms INTEGER NOT NULL,
-                  deleted_at_ms INTEGER
-                );
-                """.trimIndent()
-            )
-            db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS ${SnapshotSqlite.SESSION_TAGS_TABLE} (
-                  session_id INTEGER NOT NULL,
-                  tag_id INTEGER NOT NULL,
-                  PRIMARY KEY(session_id, tag_id)
-                );
-                """.trimIndent()
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SnapshotSqlite.SESSION_TAGS_TABLE}_tag ON ${SnapshotSqlite.SESSION_TAGS_TABLE}(tag_id);")
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SnapshotSqlite.SESSION_TAGS_TABLE}_session ON ${SnapshotSqlite.SESSION_TAGS_TABLE}(session_id);")
-        }
+    private class Helper(private val context: Context) {
+        val readableDatabase get() = SQLiteDatabase.get(context)
+        val writableDatabase get() = SQLiteDatabase.get(context)
     }
 
     private fun helper(context: Context): Helper = Helper(context.applicationContext)
@@ -97,7 +56,7 @@ fun readSessionStats(
     runCatching { SnapshotSqlite.ensureSessionTables(context) }
 
     val db = runCatching {
-        context.openOrCreateDatabase(SnapshotSqlite.DB_NAME, Context.MODE_PRIVATE, null)
+        SQLiteDatabase.get(context)
     }.getOrNull() ?: return SessionStats(emptyList(), -1, -1, -1)
 
     db.use { sqlDb ->
@@ -489,7 +448,7 @@ fun buildDiagnosticsReport(
         val manual = UiPrefsStore.getLastManualExportMeta(context)
         val importMeta = UiPrefsStore.getLastImportMeta(context)
         val lastAuto = UiPrefsStore.getLastAutoExportMs(context)
-        fun tableCount(db: android.database.sqlite.SQLiteDatabase, table: String): Long {
+        fun tableCount(db: com.gernalix.personalhub.core.database.LegacyDatabase, table: String): Long {
             val exists = db.rawQuery(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
                 arrayOf(table)
@@ -656,7 +615,7 @@ fun buildDeveloperIntegrityReport(
         return sb.toString()
     }
 
-    val db = runCatching { context.openOrCreateDatabase(SnapshotSqlite.DB_NAME, Context.MODE_PRIVATE, null) }.getOrNull()
+    val db = runCatching { SQLiteDatabase.get(context) }.getOrNull()
     if (db == null) {
         sb.appendLine("ERROR: cannot open db")
         return sb.toString()

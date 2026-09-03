@@ -2,7 +2,7 @@ package com.example.multitimetracker.persistence
 
 import android.content.ContentValues
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import com.example.multitimetracker.model.QuickEventEntry
 import com.example.multitimetracker.model.QuickEventFieldDefinition
 import com.example.multitimetracker.model.QuickEventFieldType

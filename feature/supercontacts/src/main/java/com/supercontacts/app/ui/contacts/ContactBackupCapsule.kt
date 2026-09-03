@@ -17,7 +17,6 @@ data class ContactBackupState(
 class ContactBackupCapsule(
     private val backupManager: SuperContactsBackupManager,
     private val status: ContactOperationStatusCapsule,
-    private val migrateLegacyContactPhotos: () -> Unit,
     private val scope: CoroutineScope,
 ) : ContactBackupOwner {
     private val mutableState = MutableStateFlow(ContactBackupState(backupState = backupManager.state.value))
@@ -36,7 +35,6 @@ class ContactBackupCapsule(
         scope.launch {
             runBackupAction {
                 backupManager.setBackupFolder(uri)
-                migrateLegacyContactPhotos()
             }
         }
     }

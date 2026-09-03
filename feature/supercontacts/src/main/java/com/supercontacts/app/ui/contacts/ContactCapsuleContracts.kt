@@ -132,7 +132,6 @@ interface ContactDetailOwner {
     fun loadContactPhotoPreview(sourceUri: Uri, onLoaded: (Bitmap?) -> Unit)
     fun deleteUnusedContactPhoto(path: String)
     fun updateContactPhoto(contactId: Long, photoPath: String, onUpdated: () -> Unit = {})
-    fun migrateLegacyContactPhotosIfPossible()
 }
 
 interface ContactMessagingOwner {

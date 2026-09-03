@@ -3,8 +3,7 @@ package com.example.multitimetracker.persistence
 
 import android.content.ContentValues
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import android.util.Log
 import com.example.multitimetracker.util.CapsuleAudit
 import com.example.multitimetracker.util.CapsuleWriteApi
@@ -17,7 +16,7 @@ import com.example.multitimetracker.util.CapsuleWriteApi
  */
 object SnapshotSqlite {
 
-    internal const val DB_NAME = "multitimer.db"
+    internal const val DB_NAME = "personalhub.db"
     internal const val DB_VERSION = 10
     private const val TAG = "SnapshotSqlite"
     private const val SCHEMA_GUARD_PREFS = "snapshot_sqlite_schema_guard"
@@ -117,139 +116,9 @@ object SnapshotSqlite {
         }
     }
 
-    private class Helper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
-        override fun onCreate(db: SQLiteDatabase) {
-            createBaseSchema(db)
-
-            // Session-only target tables (kept alongside the snapshot JSON for a safe gradual migration).
-            db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS $SESSIONS_TABLE (
-                  id INTEGER PRIMARY KEY,
-                  title TEXT NOT NULL,
-                  start_ms INTEGER NOT NULL,
-                  end_ms INTEGER,
-                  expected_end_ms INTEGER,
-                  created_at_ms INTEGER NOT NULL,
-                  updated_at_ms INTEGER NOT NULL,
-                  deleted_at_ms INTEGER
-                );
-                """.trimIndent()
-            )
-            db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS $SESSION_TAGS_TABLE (
-                  session_id INTEGER NOT NULL,
-                  tag_id INTEGER NOT NULL,
-                  PRIMARY KEY(session_id, tag_id)
-                );
-                """.trimIndent()
-            )
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SESSION_TAGS_TABLE}_tag ON $SESSION_TAGS_TABLE(tag_id);")
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SESSION_TAGS_TABLE}_session ON $SESSION_TAGS_TABLE(session_id);")
-            createSessionIndexes(db)
-            createQuickEventSchema(db)
-            createExportUtcViews(db)
-
-        }
-
-       
-
- override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion < 2) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS $AUDIT_TABLE (
-                      id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      ts_ms INTEGER NOT NULL,
-                      is_system INTEGER NOT NULL DEFAULT 0,
-                      action TEXT NOT NULL,
-                      entity_type TEXT,
-                      entity_id INTEGER,
-                      summary TEXT NOT NULL,
-                      payload_json TEXT,
-                      undone_at_ms INTEGER
-                    );
-                    """.trimIndent()
-                )
-            }
-
-            if (oldVersion < 3) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS $SESSIONS_TABLE (
-                      id INTEGER PRIMARY KEY,
-                      title TEXT NOT NULL,
-                      start_ms INTEGER NOT NULL,
-                      end_ms INTEGER,
-                      expected_end_ms INTEGER,
-                      created_at_ms INTEGER NOT NULL,
-                      updated_at_ms INTEGER NOT NULL,
-                      deleted_at_ms INTEGER
-                    );
-                    """.trimIndent()
-                )
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS $SESSION_TAGS_TABLE (
-                      session_id INTEGER NOT NULL,
-                      tag_id INTEGER NOT NULL,
-                      PRIMARY KEY(session_id, tag_id)
-                    );
-                    """.trimIndent()
-                )
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SESSION_TAGS_TABLE}_tag ON $SESSION_TAGS_TABLE(tag_id);")
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SESSION_TAGS_TABLE}_session ON $SESSION_TAGS_TABLE(session_id);")
-                createSessionIndexes(db)
-
-            // v314: import/export integrity counters (single-row)
-            IntegrityStatsSqlite.ensureTable(db)
-            }
-            if (oldVersion < 4) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS ui_prefs_mirror (
-                      id INTEGER PRIMARY KEY CHECK(id = 1),
-                      json TEXT NOT NULL,
-                      saved_at_ms INTEGER NOT NULL
-                    );
-                    """.trimIndent()
-                )
-            }
-
-
-            if (oldVersion < 5) {
-                // v314: import/export integrity counters (single-row)
-                IntegrityStatsSqlite.ensureTable(db)
-            }
-            if (oldVersion < 6) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS $HISTORY_TABLE (
-                      id INTEGER PRIMARY KEY AUTOINCREMENT,
-                      json TEXT NOT NULL,
-                      saved_at_ms INTEGER NOT NULL
-                    );
-                    """.trimIndent()
-                )
-                db.execSQL("CREATE INDEX IF NOT EXISTS idx_${HISTORY_TABLE}_saved_at_ms ON $HISTORY_TABLE(saved_at_ms DESC);")
-            }
-            if (oldVersion < 7) {
-                runCatching {
-                    db.execSQL("ALTER TABLE $SESSIONS_TABLE ADD COLUMN expected_end_ms INTEGER")
-                }
-            }
-            if (oldVersion < 8) {
-                ensureSnapshotHistorySchema(db)
-            }
-            if (oldVersion < 9) {
-                createQuickEventSchema(db)
-            }
-            if (oldVersion < 10) {
-                createQuickEventSchema(db)
-            }
-
-        }
+    private class Helper(private val context: Context) {
+        val readableDatabase get() = SQLiteDatabase.get(context)
+        val writableDatabase get() = SQLiteDatabase.get(context)
     }
 
     private fun helper(context: Context): Helper = Helper(context.applicationContext)

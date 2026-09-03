@@ -71,10 +71,10 @@
     <string name="import_confirm_title">Import database</string>
     <string name="import_confirm_message">Importing replaces the current app data after schema validation.</string>
     <string name="export_status_not_configured">Export not configured</string>
-    <string name="export_status_ready">Export active: sostanze.db</string>
+    <string name="export_status_ready">Export active: personalhub.db</string>
     <string name="export_status_failed">Export failed: %1$s</string>
     <string name="import_status_failed">Import rejected: %1$s</string>
-    <string name="export_folder_hint">Choose a dedicated SAF folder; the app keeps only sostanze.db there.</string>
+    <string name="export_folder_hint">Automatic export includes all five PersonalHub modules and contact photos.</string>
     <string name="notification_channel_name">Sostanze reminders</string>
     <string name="notification_default_text">Reminder</string>
     <string name="notification_interaction_end">Interaction block ended</string>

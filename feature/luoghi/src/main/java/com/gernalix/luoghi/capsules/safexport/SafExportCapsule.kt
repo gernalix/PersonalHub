@@ -13,6 +13,7 @@ class SafExportCapsule(private val context: Context) {
         treeUri: Uri,
         queueInitialExport: Boolean = true,
     ): BackupFolderStore.ValidationStatus {
+        com.gernalix.personalhub.core.database.DatabaseVault.configureFolder(context, treeUri)
         BackupFolderStore.saveTreeUri(context, treeUri)
         val status = verify()
         if (status == BackupFolderStore.ValidationStatus.READY && queueInitialExport) {

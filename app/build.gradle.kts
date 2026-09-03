@@ -97,8 +97,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:model"))
-    implementation(project(":core:migration"))
+    implementation(project(":core:database"))
     implementation(project(":feature:luoghi"))
     implementation(project(":feature:multitimetracker"))
     implementation(project(":feature:sostanze"))
@@ -117,4 +116,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.documentfile)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core)
 }

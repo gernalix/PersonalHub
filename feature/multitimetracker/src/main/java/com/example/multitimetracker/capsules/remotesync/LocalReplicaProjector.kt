@@ -2,7 +2,7 @@ package com.example.multitimetracker.capsules.remotesync
 
 import android.content.Context
 import android.database.Cursor
-import android.database.sqlite.SQLiteDatabase
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.persistence.SnapshotSqlite
 import org.json.JSONArray

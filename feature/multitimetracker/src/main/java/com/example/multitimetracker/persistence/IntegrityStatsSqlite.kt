@@ -4,7 +4,7 @@ package com.example.multitimetracker.persistence
 
 import android.content.ContentValues
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
+import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import org.json.JSONObject
 import java.io.File
 

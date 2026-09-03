@@ -11,12 +11,17 @@
     <string name="module_substances_subtitle">Assunzioni, scorte, prescrizioni</string>
     <string name="module_wordpulse">WordPulse</string>
     <string name="module_wordpulse_subtitle">Parole, sessioni, correzioni</string>
-    <string name="module_migration">Migrazione</string>
-    <string name="module_migration_subtitle">Mappature sorgente e controlli dati</string>
-    <string name="migration_sources">%1$d app sorgenti configurate</string>
-    <string name="migration_integrity">Integrita database mappature: %1$s</string>
-    <string name="migration_run_action">Esegui controllo locale</string>
-    <string name="migration_run_running">Controllo migrazione in corso...</string>
-    <string name="migration_run_passed">Controllo migrazione PASS: %1$d righe sorgente, %2$d mappature, DB %3$s</string>
-    <string name="migration_run_failed">Controllo migrazione FAIL: %1$s</string>
+    <string name="database_title">Database e backup</string>
+    <string name="database_description">Un file contiene tutti i cinque moduli e le foto dei contatti. L’importazione sostituisce i dati attuali dopo la verifica e conserva una copia di recupero.</string>
+    <string name="database_import">Import personalhub.db</string>
+    <string name="database_folder">Scegli cartella di esportazione automatica</string>
+    <string name="database_folder_missing">Scegli una cartella per attivare l’esportazione automatica.</string>
+    <string name="database_folder_ready">Esportazione automatica attiva per tutti i moduli.</string>
+    <string name="database_export">Esporta ora</string>
+    <string name="database_imported">Importazione completata. Riavvio…</string>
+    <string name="database_exported">Esportazione verificata.</string>
+    <string name="database_failed">Operazione non riuscita</string>
+    <string name="database_last_export">Ultima esportazione verificata: %1$s</string>
+    <string name="database_back">Indietro</string>
+    <string name="database_rolled_back">Importazione non riuscita. Il database precedente è stato ripristinato. Riavvio…</string>
 </resources>

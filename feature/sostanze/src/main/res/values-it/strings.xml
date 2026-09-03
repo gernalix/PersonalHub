@@ -71,10 +71,10 @@
     <string name="import_confirm_title">Import database</string>
     <string name="import_confirm_message">L\'import sostituisce i dati attuali dopo validazione dello schema.</string>
     <string name="export_status_not_configured">Export non configurato</string>
-    <string name="export_status_ready">Export attivo: sostanze.db</string>
+    <string name="export_status_ready">Export attivo: personalhub.db</string>
     <string name="export_status_failed">Export fallito: %1$s</string>
     <string name="import_status_failed">Import respinto: %1$s</string>
-    <string name="export_folder_hint">Scegliere una cartella SAF dedicata: l\'app mantiene solo sostanze.db.</string>
+    <string name="export_folder_hint">L’esportazione automatica include tutti i cinque moduli e le foto dei contatti.</string>
     <string name="notification_channel_name">Promemoria Sostanze</string>
     <string name="notification_default_text">Promemoria</string>
     <string name="notification_interaction_end">Fine blocco interazione</string>

@@ -24,8 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "PersonalHub"
 include(":app")
-include(":core:model")
-include(":core:migration")
+include(":core:database")
 include(":feature:luoghi")
 include(":feature:multitimetracker")
 include(":feature:sostanze")

@@ -234,21 +234,4 @@ class ContactDetailCapsule(
         }
     }
 
-    override fun migrateLegacyContactPhotosIfPossible() {
-        scope.launch {
-            runCatching {
-                repository.getContactPhotoReferences().forEach { photo ->
-                    val migratedPath = contactPhotoStore.migrateLegacyPhotoToSaf(
-                        contactId = photo.contactId,
-                        reference = photo.photoPath,
-                    ) ?: return@forEach
-                    val cleanup = repository.updateContactPhoto(
-                        contactId = photo.contactId,
-                        photoPath = migratedPath,
-                    )
-                    cleanup.oldPhotoPath?.let { contactPhotoStore.deletePhoto(it) }
-                }
-            }
-        }
-    }
 }

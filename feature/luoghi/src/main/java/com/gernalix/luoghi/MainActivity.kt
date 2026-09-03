@@ -281,7 +281,7 @@ private fun LuoghiNavigation(
             folderLabel = state.safGate.folderLabel,
             restoreState = state.restore,
             onBack = ::openHome,
-            onImportBackup = onChooseBackupFile,
+            onImportBackup = { com.gernalix.personalhub.core.database.DatabaseNavigation.open(context) },
             onReviewDeferredBackup = vm::showDeferredRestore,
             onChangeFolder = onChooseSafFolder,
         )

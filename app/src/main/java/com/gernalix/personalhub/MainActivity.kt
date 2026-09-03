@@ -20,12 +20,12 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,10 +69,13 @@ fun PersonalHubApp() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = stringResource(R.string.app_name),
+            text = stringResource(R.string.app_name) + " v" + BuildConfig.VERSION_NAME,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
+        Button(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) {
+            Text(stringResource(R.string.database_title))
+        }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 240.dp),
             modifier = Modifier.fillMaxSize(),
@@ -179,11 +182,5 @@ enum class HubModule(
         subtitleRes = R.string.module_wordpulse_subtitle,
         icon = Icons.Filled.TextFields,
         activityClassName = "com.wordpulse.app.MainActivity",
-    ),
-    MIGRATION(
-        titleRes = R.string.module_migration,
-        subtitleRes = R.string.module_migration_subtitle,
-        icon = Icons.Filled.History,
-        activityClassName = "com.gernalix.personalhub.MigrationActivity",
     ),
 }

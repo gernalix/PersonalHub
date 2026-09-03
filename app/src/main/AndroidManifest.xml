@@ -60,8 +60,10 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".DatabaseRestartActivity" android:process=":restart" android:exported="false" android:taskAffinity="com.gernalix.personalhub.restart" />
+
         <activity
-            android:name=".MigrationActivity"
+            android:name=".DatabaseActivity"
             android:exported="false" />
 
         <activity

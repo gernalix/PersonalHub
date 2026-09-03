@@ -116,7 +116,6 @@ import com.example.multitimetracker.ui.components.AlertPopupHost
 import com.example.multitimetracker.ui.components.DateTimePickerCommitMode
 import com.example.multitimetracker.ui.components.LocalOpenAppMenu
 import com.example.multitimetracker.ui.components.MttDateTimePickerDialog
-import com.example.multitimetracker.ui.components.MultiDbVaultsDialog
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -137,7 +136,6 @@ private enum class DrawerDestination {
     AUDIT_LOG,
     IMPORT,
     EXPORT,
-    VAULTS,
     STATISTICS,
     SETTINGS,
     INFO
@@ -228,7 +226,6 @@ private fun VarTabScaffold(
     var devReport by remember { mutableStateOf("") }
     var showDiagnostics by remember { mutableStateOf(false) }
     var showStatistics by remember { mutableStateOf(false) }
-    var showVaults by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
     var diagnosticsReport by remember { mutableStateOf<String?>(null) }
     var diagnosticsError by remember { mutableStateOf<String?>(null) }
@@ -561,9 +558,6 @@ if (developerSurfaceEnabled && showDevReport) {
         )
     }
 
-    if (showVaults) {
-        MultiDbVaultsDialog(onDismiss = { showVaults = false })
-    }
 
     if (showInfo) {
         AlertDialog(
@@ -633,7 +627,6 @@ if (developerSurfaceEnabled && showDevReport) {
             listOf(
                 DrawerItemSpec(DrawerDestination.IMPORT, R.string.cd_import, Icons.Filled.CloudDownload),
                 DrawerItemSpec(DrawerDestination.EXPORT, R.string.cd_export, Icons.Filled.CloudUpload),
-                DrawerItemSpec(DrawerDestination.VAULTS, R.string.drawer_vaults, Icons.Filled.Storage),
                 DrawerItemSpec(DrawerDestination.STATISTICS, R.string.statistics, Icons.Filled.Assessment),
                 DrawerItemSpec(DrawerDestination.SETTINGS, R.string.cd_settings, Icons.Filled.Settings),
                 DrawerItemSpec(DrawerDestination.INFO, R.string.drawer_info, Icons.Filled.Info)
@@ -658,8 +651,7 @@ if (developerSurfaceEnabled && showDevReport) {
 
     fun isDrawerItemEnabled(destination: DrawerDestination): Boolean {
         return when (destination) {
-            DrawerDestination.IMPORT,
-            DrawerDestination.VAULTS -> !state.isReadOnly
+            DrawerDestination.IMPORT -> !state.isReadOnly
             else -> true
         }
     }
@@ -688,19 +680,8 @@ if (developerSurfaceEnabled && showDevReport) {
             DrawerDestination.ALERTS -> tabState.value = Tab.ALERT
             DrawerDestination.CHAINS -> tabState.value = Tab.CHAINS
             DrawerDestination.AUDIT_LOG -> tabState.value = Tab.AUDIT
-            DrawerDestination.IMPORT -> if (!state.isReadOnly) {
-                importDbLauncher.launch(arrayOf("*/*"))
-            }
-            DrawerDestination.EXPORT -> {
-                val ok = BackupFolderStore.ensureSavedTreeWritable(context)
-                if (!ok) {
-                    pendingAfterFolderPick = { vm.exportBackup(context) }
-                    safTreeLauncher.launch(null)
-                } else {
-                    vm.exportBackup(context)
-                }
-            }
-            DrawerDestination.VAULTS -> showVaults = true
+            DrawerDestination.IMPORT, DrawerDestination.EXPORT ->
+                com.gernalix.personalhub.core.database.DatabaseNavigation.open(context)
             DrawerDestination.STATISTICS -> showStatistics = true
             DrawerDestination.SETTINGS -> showSettings = true
             DrawerDestination.INFO -> showInfo = true

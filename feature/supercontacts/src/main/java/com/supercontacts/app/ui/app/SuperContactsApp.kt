@@ -468,11 +468,11 @@ fun SuperContactsApp(
             errorMessage = uiState.errorMessage,
             onBack = { isViewingBackupSettings = false },
             onErrorDismiss = viewModel::clearError,
-            onPickFolder = { backupFolderLauncher.launch(null) },
+            onPickFolder = { com.gernalix.personalhub.core.database.DatabaseNavigation.open(context) },
             onToggleAutoExport = viewModel::setAutoExportEnabled,
             onManualExport = viewModel::exportBackupNow,
             onImportBackup = {
-                backupImportLauncher.launch(null)
+                com.gernalix.personalhub.core.database.DatabaseNavigation.open(context)
             },
         )
 

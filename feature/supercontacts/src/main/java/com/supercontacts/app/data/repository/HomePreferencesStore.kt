@@ -3,7 +3,7 @@ package com.supercontacts.app.data.repository
 import android.content.Context
 
 class HomePreferencesStore(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS_NAME)
 
     fun readSort(): ContactHomeSortState {
         val criterion = runCatching {
