@@ -18,13 +18,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.LocalPharmacy
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,19 +27,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
-
-private const val SHORTCUT_SCHEME = "personalhub"
-private const val SHORTCUT_HOST = "module"
-private const val SHORTCUT_URI_PREFIX = "$SHORTCUT_SCHEME://$SHORTCUT_HOST"
+import com.gernalix.personalhub.capsules.shortcuts.HomeShortcutsSettings
+import com.gernalix.personalhub.capsules.shortcuts.HubModule
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,6 +75,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun PersonalHubApp() {
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    if (showSettings) {
+        HomeShortcutsSettings(onBack = { showSettings = false })
+        return
+    }
     val context = LocalContext.current
     Column(
         modifier = Modifier
@@ -93,6 +93,9 @@ fun PersonalHubApp() {
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
+        androidx.compose.material3.OutlinedButton(onClick = { showSettings = true }) {
+            Text(stringResource(R.string.settings_title))
+        }
         Button(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) {
             Text(stringResource(R.string.database_title))
         }
@@ -142,9 +145,9 @@ private fun ModuleTile(module: HubModule, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Icon(
-                imageVector = module.icon,
+                painter = painterResource(module.shortcutIconRes),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = androidx.compose.ui.graphics.Color.Unspecified,
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -164,78 +167,6 @@ private fun ModuleTile(module: HubModule, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(
-                imageVector = Icons.Filled.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-            )
-        }
-    }
-}
-
-enum class HubModule(
-    val titleRes: Int,
-    val subtitleRes: Int,
-    val icon: ImageVector,
-    val activityClassName: String,
-    val shortcutPath: String,
-) {
-    PEOPLE(
-        titleRes = R.string.module_people,
-        subtitleRes = R.string.module_people_subtitle,
-        icon = Icons.Filled.Person,
-        activityClassName = "com.supercontacts.app.MainActivity",
-        shortcutPath = "people",
-    ),
-    TIMER(
-        titleRes = R.string.module_timer,
-        subtitleRes = R.string.module_timer_subtitle,
-        icon = Icons.Filled.Timer,
-        activityClassName = "com.example.multitimetracker.MainActivity",
-        shortcutPath = "timer",
-    ),
-    PLACES(
-        titleRes = R.string.module_places,
-        subtitleRes = R.string.module_places_subtitle,
-        icon = Icons.Filled.Place,
-        activityClassName = "com.gernalix.luoghi.MainActivity",
-        shortcutPath = "places",
-    ),
-    SUBSTANCES(
-        titleRes = R.string.module_substances,
-        subtitleRes = R.string.module_substances_subtitle,
-        icon = Icons.Filled.LocalPharmacy,
-        activityClassName = "com.gernalix.sostanze.MainActivity",
-        shortcutPath = "substances",
-    ),
-    WORDPULSE(
-        titleRes = R.string.module_wordpulse,
-        subtitleRes = R.string.module_wordpulse_subtitle,
-        icon = Icons.Filled.TextFields,
-        activityClassName = "com.wordpulse.app.MainActivity",
-        shortcutPath = "wordpulse",
-    ),
-
-    ;
-
-    val shortcutUri: String
-        get() = "$SHORTCUT_URI_PREFIX/$shortcutPath"
-
-    companion object {
-        fun fromShortcutIntent(intent: Intent?): HubModule? {
-            val data = intent?.data ?: return null
-            return fromShortcutParts(intent.action, data.scheme, data.host, data.pathSegments)
-        }
-
-        fun fromShortcutParts(
-            action: String?,
-            scheme: String?,
-            host: String?,
-            pathSegments: List<String>,
-        ): HubModule? {
-            if (action != Intent.ACTION_VIEW || scheme != SHORTCUT_SCHEME || host != SHORTCUT_HOST) return null
-            val shortcutPath = pathSegments.singleOrNull() ?: return null
-            return entries.firstOrNull { it.shortcutPath == shortcutPath }
         }
     }
 }

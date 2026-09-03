@@ -24,7 +24,7 @@ Persistent SQLite triggers increment `hub_generation` inside the modifying trans
 
 `version.txt` at repository root is the sole source of truth for `versionCode`, `versionName`, and the debug APK filename. Each future PersonalHub development prompt increments its integer exactly once by one. The debug output is exactly `<version>.apk`; versions are never generated from time, Git state, or source files. The Home heading stays `PersonalHub` and displays only the small numeric version at bottom-right.
 
-Static launcher shortcuts route through `MainActivity` to People, Timer, Places, Substances, and WordPulse using the `personalhub://module/<feature>` URI. They preserve the current single-database import/export shell and include no migration destination.
+Static launcher shortcuts route through `MainActivity` to People, Timer, Places, Substances, and WordPulse using the `personalhub://module/<feature>` URI. They preserve the current single-database import/export shell and include no migration destination. Home `Settings` exposes the same five modules as official pinned shortcuts, reusing their vector icons and detecting an existing pinned static or Home shortcut before requesting another. Pixel Launcher intentionally shows only four static items in the long-press menu; WordPulse remains available through Settings for pinning to Home.
 
 ## Building the real database offline
 

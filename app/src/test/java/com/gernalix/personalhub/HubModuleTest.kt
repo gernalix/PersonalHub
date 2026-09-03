@@ -1,6 +1,7 @@
 package com.gernalix.personalhub
 
 import android.content.Intent
+import com.gernalix.personalhub.capsules.shortcuts.HubModule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,6 +25,14 @@ class HubModuleTest {
         val shortcutUris = HubModule.entries.map { it.shortcutUri }
         assertEquals(5, shortcutUris.size)
         assertEquals(shortcutUris.size, shortcutUris.toSet().size)
+    }
+
+    @Test
+    fun everyPinnedShortcutHasItsOwnStableIdAndIcon() {
+        val pinnedIds = HubModule.entries.map { it.pinnedShortcutId }
+        assertEquals(5, pinnedIds.size)
+        assertEquals(pinnedIds.size, pinnedIds.toSet().size)
+        assertTrue(HubModule.entries.all { it.shortcutIconRes != 0 })
     }
 
     @Test
