@@ -26,6 +26,25 @@ data class SostanzeSnapshot(
 class SostanzeRepository(private val db: SostanzeDatabase) {
     private val dao = db.dao()
 
+    val homeSnapshot: Flow<SostanzeSnapshot> = combine(
+        dao.observeSubstances(),
+        dao.observeRecentIntakes(),
+        dao.observeInteractionRules(),
+        dao.observeInteractionTargets(),
+        dao.observeMacros(),
+        dao.observeMacroItems(),
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        SostanzeSnapshot(
+            substances = values[0] as List<SubstanceEntity>,
+            intakes = values[1] as List<IntakeEventEntity>,
+            interactionRules = values[2] as List<InteractionRuleEntity>,
+            interactionTargets = values[3] as List<InteractionTargetEntity>,
+            macros = values[4] as List<MacroEntity>,
+            macroItems = values[5] as List<MacroItemEntity>,
+        )
+    }
+
     val snapshot: Flow<SostanzeSnapshot> = combine(
         dao.observeSubstances(),
         dao.observeAllIntakes(),

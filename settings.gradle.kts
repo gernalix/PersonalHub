@@ -24,6 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "PersonalHub"
 include(":app")
+include(":benchmark")
 include(":core:database")
 include(":feature:luoghi")
 include(":feature:multitimetracker")

@@ -27,9 +27,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -84,9 +86,16 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     private val nowMs = MutableStateFlow(System.currentTimeMillis())
     private val lastExportResult = MutableStateFlow<ExportResult>(ExportResult.Skipped)
     private val lastImportError = MutableStateFlow<String?>(null)
+    private val secondaryStateEnabled = MutableStateFlow(false)
     private val scheduledNotificationKeys = mutableSetOf<String>()
+    private var maintenanceStarted = false
 
-    val uiState = combine(repository.snapshot, nowMs, lastExportResult, lastImportError) { snapshot, now, exportResult, importError ->
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val snapshot = secondaryStateEnabled.flatMapLatest { enabled ->
+        if (enabled) repository.snapshot else repository.homeSnapshot
+    }
+
+    val uiState = combine(snapshot, nowMs, lastExportResult, lastImportError) { snapshot, now, exportResult, importError ->
         val substances = snapshot.substances
         val plans = substances.map { it.toPlan() }
         val intakes = snapshot.intakes.map { it.toRecord() }
@@ -160,18 +169,18 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SostanzeUiState())
 
     init {
-        SostanzeNotificationScheduler.ensureChannel(application)
         viewModelScope.launch {
             repository.seedIfEmpty()
-            refreshExport()
         }
+        viewModelScope.launch { tickClock() }
+    }
+
+    fun loadSecondaryState() {
+        if (maintenanceStarted) return
+        maintenanceStarted = true
+        secondaryStateEnabled.value = true
+        SostanzeNotificationScheduler.ensureChannel(getApplication())
         viewModelScope.launch { lastExportResult.value = importExport.exportStatusNow() }
-        viewModelScope.launch {
-            while (true) {
-                nowMs.value = System.currentTimeMillis()
-                delay(60_000)
-            }
-        }
         viewModelScope.launch {
             uiState.collect { state ->
                 val names = state.substances.associateBy({ it.id }, { it.name })
@@ -184,6 +193,13 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                     SostanzeNotificationScheduler.schedule(getApplication(), plan, names[plan.entityId].orEmpty())
                 }
             }
+        }
+    }
+
+    private suspend fun tickClock() {
+        while (true) {
+            nowMs.value = System.currentTimeMillis()
+            delay(60_000)
         }
     }
 

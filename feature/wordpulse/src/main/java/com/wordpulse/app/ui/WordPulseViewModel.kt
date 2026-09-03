@@ -74,6 +74,7 @@ class WordPulseViewModel(
     )
     private var latestCorrectableSubmission: CorrectableSubmission? = null
     private var nextCorrectionToken = 0L
+    private var startupEnsured = false
 
     private val currentSessionId = repository.observeCurrentSessionId()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -136,9 +137,6 @@ class WordPulseViewModel(
 
     init {
         viewModelScope.launch {
-            repository.ensureCurrentSession()
-        }
-        viewModelScope.launch {
             for (submission in submissions) {
                 val sessionId = currentSessionId.value ?: repository.ensureCurrentSession().id
                 val result = repository.submitWord(
@@ -157,6 +155,14 @@ class WordPulseViewModel(
                 )
                 publishSubmissionAlert(result, token)
             }
+        }
+    }
+
+    fun ensureStartupSession() {
+        if (startupEnsured) return
+        startupEnsured = true
+        viewModelScope.launch {
+            repository.ensureCurrentSession()
         }
     }
 

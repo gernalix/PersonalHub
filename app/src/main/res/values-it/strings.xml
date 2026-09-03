@@ -29,9 +29,7 @@
     <string name="home_shortcuts_title">Scorciatoie Home</string>
     <string name="home_shortcuts_description">Il menu con pressione prolungata del launcher può mostrare solo alcuni moduli. Da qui puoi aggiungere tutti e cinque i moduli alla Home.</string>
     <string name="home_shortcuts_add">Aggiungi alla Home</string>
-    <string name="home_shortcuts_added">Aggiunta alla Home</string>
     <string name="home_shortcuts_unsupported">Questo launcher non supporta le scorciatoie Home.</string>
-    <string name="home_shortcuts_already_added">Questa scorciatoia è già nella Home.</string>
     <string name="home_shortcuts_confirmation_requested">Conferma nel launcher per aggiungere questa scorciatoia alla Home.</string>
     <string name="home_shortcuts_request_rejected">Il launcher non ha accettato la richiesta della scorciatoia.</string>
     <string name="datasette_sync_title">Sincronizzazione Datasette</string>

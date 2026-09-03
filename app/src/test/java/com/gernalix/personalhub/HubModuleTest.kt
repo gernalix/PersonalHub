@@ -1,6 +1,5 @@
 package com.gernalix.personalhub
 
-import android.content.Intent
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,10 +20,11 @@ class HubModuleTest {
     }
 
     @Test
-    fun everyShortcutHasItsOwnDeepLink() {
-        val shortcutUris = HubModule.entries.map { it.shortcutUri }
-        assertEquals(5, shortcutUris.size)
-        assertEquals(shortcutUris.size, shortcutUris.toSet().size)
+    fun everyShortcutHasItsOwnAliasComponent() {
+        val aliases = HubModule.entries.map { it.shortcutActivityAliasName }
+        assertEquals(5, aliases.size)
+        assertEquals(aliases.size, aliases.toSet().size)
+        assertTrue(aliases.all { it.startsWith("com.gernalix.personalhub.shortcut.") })
     }
 
     @Test
@@ -36,21 +36,8 @@ class HubModuleTest {
     }
 
     @Test
-    fun everyShortcutResolvesOnlyItsOwnFeature() {
-        HubModule.entries.forEach { module ->
-            assertEquals(
-                module,
-                HubModule.fromShortcutParts(
-                    action = Intent.ACTION_VIEW,
-                    scheme = "personalhub",
-                    host = "module",
-                    pathSegments = listOf(module.shortcutPath),
-                ),
-            )
-        }
-        assertEquals(
-            null,
-            HubModule.fromShortcutParts(Intent.ACTION_VIEW, "personalhub", "module", listOf("migration")),
-        )
+    fun directShortcutAliasesDoNotRouteThroughPersonalHubHome() {
+        assertTrue(HubModule.entries.none { it.shortcutActivityAliasName == "com.gernalix.personalhub.MainActivity" })
+        assertTrue(HubModule.entries.none { it.activityClassName == "com.gernalix.personalhub.MainActivity" })
     }
 }

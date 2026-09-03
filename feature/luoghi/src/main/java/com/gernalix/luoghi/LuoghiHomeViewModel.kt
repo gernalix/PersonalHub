@@ -252,7 +252,6 @@ class LuoghiHomeViewModel(
     )
 
     init {
-        refreshSafGate()
         observeHistoryActions()
     }
 

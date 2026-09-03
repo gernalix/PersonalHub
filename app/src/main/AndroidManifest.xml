@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -27,6 +28,16 @@
         android:roundIcon="@drawable/ic_personalhub"
         android:supportsRtl="true"
         android:theme="@style/Theme.PersonalHub">
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -79,6 +90,7 @@
         <activity
             android:name="com.example.multitimetracker.MainActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.MultiTimeTracker"
             android:windowSoftInputMode="adjustResize" />
 
@@ -102,6 +114,7 @@
         <activity
             android:name="com.gernalix.luoghi.MainActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.Luoghi" />
 
         <activity
@@ -112,14 +125,96 @@
         <activity
             android:name="com.gernalix.sostanze.MainActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.Sostanze"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name="com.wordpulse.app.MainActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.WordPulse"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+
+        <activity-alias
+            android:name=".shortcut.PeopleShortcutActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_people"
+            android:label="@string/module_people"
+            android:targetActivity="com.supercontacts.app.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:host="module"
+                    android:path="/people"
+                    android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".shortcut.TimerShortcutActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_timer"
+            android:label="@string/module_timer"
+            android:targetActivity="com.example.multitimetracker.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:host="module"
+                    android:path="/timer"
+                    android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".shortcut.PlacesShortcutActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_places"
+            android:label="@string/module_places"
+            android:targetActivity="com.gernalix.luoghi.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:host="module"
+                    android:path="/places"
+                    android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".shortcut.SubstancesShortcutActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_substances"
+            android:label="@string/module_substances"
+            android:targetActivity="com.gernalix.sostanze.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:host="module"
+                    android:path="/substances"
+                    android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".shortcut.WordPulseShortcutActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_wordpulse"
+            android:label="@string/module_wordpulse"
+            android:targetActivity="com.wordpulse.app.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
+                    android:host="module"
+                    android:path="/wordpulse"
+                    android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver
             android:name="com.example.multitimetracker.widget.QuickSessionWidgetProvider"

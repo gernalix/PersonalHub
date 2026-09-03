@@ -5,9 +5,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.Instant
@@ -20,6 +22,10 @@ fun WordPulseRoute(viewModel: WordPulseViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val captureFieldValue by viewModel.captureFieldState.collectAsStateWithLifecycle()
     val typingAlert by viewModel.typingAlertState.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        viewModel.ensureStartupSession()
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

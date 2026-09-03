@@ -77,10 +77,7 @@ object DatabaseVault {
     /** Run before any feature/database initialization. An interrupted replacement restores the last good DB. */
     fun recoverInterruptedImport(context: Context) {
         val marker = marker(context)
-        if (!marker.isFile) {
-            cleanupOrphanedPreImportBackups(context)
-            return
-        }
+        if (!marker.isFile) return
         val backup = File(marker.readText())
         require(backup.isFile && backup.parentFile == context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile)
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)

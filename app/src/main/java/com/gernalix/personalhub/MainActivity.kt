@@ -46,7 +46,6 @@ import com.gernalix.personalhub.capsules.shortcuts.HubModule
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        openShortcutModule(intent)
         enableEdgeToEdge()
         setContent {
             PersonalHubTheme {
@@ -57,20 +56,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        openShortcutModule(intent)
-    }
-
-    private fun openShortcutModule(intent: Intent?): Boolean {
-        val module = HubModule.fromShortcutIntent(intent) ?: return false
-        startActivity(
-            Intent().setClassName(packageName, module.activityClassName).apply {
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            },
-        )
-        return true
-    }
 }
 
 @Composable

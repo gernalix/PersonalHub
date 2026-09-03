@@ -64,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -98,6 +99,10 @@ private enum class AppTab {
 @Composable
 fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        viewModel.loadSecondaryState()
+    }
     var tab by rememberSaveable { mutableStateOf(AppTab.Home) }
     var query by rememberSaveable { mutableStateOf("") }
     var editingSubstance by remember { mutableStateOf<SubstanceEntity?>(null) }

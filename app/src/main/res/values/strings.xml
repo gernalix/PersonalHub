@@ -29,9 +29,7 @@
     <string name="home_shortcuts_title">Home shortcuts</string>
     <string name="home_shortcuts_description">The launcher long-press menu may show only some modules. Add any of the five modules to your Home screen here.</string>
     <string name="home_shortcuts_add">Add to Home</string>
-    <string name="home_shortcuts_added">Added to Home</string>
     <string name="home_shortcuts_unsupported">This launcher does not support Home shortcuts.</string>
-    <string name="home_shortcuts_already_added">This shortcut is already on Home.</string>
     <string name="home_shortcuts_confirmation_requested">Confirm with the launcher to add this shortcut to Home.</string>
     <string name="home_shortcuts_request_rejected">The launcher did not accept the shortcut request.</string>
     <string name="datasette_sync_title">Datasette sync</string>

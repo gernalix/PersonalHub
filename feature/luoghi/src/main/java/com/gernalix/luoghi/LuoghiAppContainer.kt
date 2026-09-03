@@ -30,15 +30,17 @@ class LuoghiAppContainer(context: Context) {
     val links = LinksCapsule(placeRepository)
     val checkIns = CheckInCapsule(placeRepository)
     val stats = StatsCapsule(placeRepository)
-    val routeDistances = RouteDistanceCapsule(
+    val routeDistances by lazy {
+        RouteDistanceCapsule(
         RouteDistanceRepository(
             dao = dao,
             googleRoutesClient = HttpGoogleRoutesClient(),
             onCacheChanged = { PersistentMutationTracker.record(appContext, "route_distance_cache.upsert") },
         )
-    )
-    val location: LocationSource = FusedLocationCapsule(appContext)
-    val safExport = SafExportCapsule(appContext)
-    val restore = RestoreCoordinator(appContext, database)
-    val addressAutocomplete: AddressAutocompleteSource = AddressAutocompleteRepository(appContext)
+        )
+    }
+    val location: LocationSource by lazy { FusedLocationCapsule(appContext) }
+    val safExport by lazy { SafExportCapsule(appContext) }
+    val restore by lazy { RestoreCoordinator(appContext, database) }
+    val addressAutocomplete: AddressAutocompleteSource by lazy { AddressAutocompleteRepository(appContext) }
 }
