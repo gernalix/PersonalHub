@@ -86,8 +86,9 @@ abstract class PersonalHubDatabase : RoomDatabase() {
         fun canMigrateFrom(version: Int) = version == SCHEMA_VERSION
         fun closeInstance() = synchronized(this) { instance?.close(); instance = null }
         fun resetForTests() = closeInstance()
-        private fun build(context: Context, name: String): PersonalHubDatabase =
-            Room.databaseBuilder(context, PersonalHubDatabase::class.java, name)
+        private fun build(context: Context, name: String): PersonalHubDatabase {
+            DatabaseGate.configureAutoExport(context)
+            return Room.databaseBuilder(context, PersonalHubDatabase::class.java, name)
                 .addMigrations(object : androidx.room.migration.Migration(1, 2) {
                     override fun migrate(db: SupportSQLiteDatabase) {
                         db.execSQL("CREATE TABLE IF NOT EXISTS `hub_preferences` (`namespace` TEXT NOT NULL, `json` TEXT NOT NULL, PRIMARY KEY(`namespace`))")
@@ -123,5 +124,6 @@ abstract class PersonalHubDatabase : RoomDatabase() {
                         }
                     }
                 }).build()
+        }
     }
 }

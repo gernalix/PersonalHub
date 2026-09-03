@@ -26,6 +26,26 @@ object DatabaseVault {
     fun folder(context: Context): String? = preferences(context).getString("tree_uri", null)
     fun error(context: Context): String? = preferences(context).getString("error", null)
     fun lastExport(context: Context): Long = preferences(context).getLong("exported_at", 0)
+    fun exportedGeneration(context: Context): Long = preferences(context).getLong("exported_generation", -1)
+    fun currentGeneration(context: Context): Long = PersonalHubDatabase.get(context).openHelper.readableDatabase.query("SELECT generation FROM hub_generation WHERE id=1").use { c ->
+        require(c.moveToFirst()) { "Missing database generation" }
+        c.getLong(0)
+    }
+    fun autoExportStatus(context: Context): AutoExportStatus {
+        val current = currentGeneration(context)
+        val exported = exportedGeneration(context)
+        return AutoExportStatus(
+            folderConfigured = folder(context) != null,
+            currentGeneration = current,
+            exportedGeneration = exported,
+            lastSuccessfulExportAt = lastExport(context),
+            lastError = error(context),
+            stale = folder(context) != null && current != exported,
+        )
+    }
+    fun recordAutoExportFailure(context: Context, error: Throwable) {
+        preferences(context).edit().putString("error", error.message ?: error.javaClass.simpleName).commit()
+    }
     private fun fileHash(file: File): String {
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->
@@ -268,6 +288,7 @@ object DatabaseVault {
                     PersonalHubDatabase.get(context).openHelper.writableDatabase
                     validate(context, target)
                     preferences(context).edit().putLong("exported_generation", -1).remove("error").commit()
+                    HubAutoExport.request(context)
                     retireSeparateDatabases(context)
                     check(marker(context).delete())
                     syncDirectory(context.filesDir)
@@ -297,3 +318,12 @@ object DatabaseVault {
         }
     }
 }
+
+data class AutoExportStatus(
+    val folderConfigured: Boolean,
+    val currentGeneration: Long,
+    val exportedGeneration: Long,
+    val lastSuccessfulExportAt: Long,
+    val lastError: String?,
+    val stale: Boolean,
+)
