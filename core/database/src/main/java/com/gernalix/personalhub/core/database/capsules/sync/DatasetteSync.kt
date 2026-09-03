@@ -55,39 +55,63 @@ object DatasetteSync {
 
     internal data class Item(val table: String, val key: String, val revision: Long, val row: JSONObject)
 
-    private fun batch(context: Context, device: String, timestamp: Long): List<Item> = DatabaseGate.access {
+    private data class Snapshot(val table: String, val key: String, val revision: Long, val payload: Map<String, Any?>?)
+
+    private fun snapshot(context: Context): List<Snapshot> = DatabaseGate.access {
         val db = db(context)
         db.beginTransaction()
         try {
-        val tables = SyncJournal.tables(db).toSet()
-        val primaryKeys = mutableMapOf<String, List<String>>()
-        val pending = db.query("SELECT table_name,row_key,revision FROM hub_sync_pending ORDER BY table_name,row_key LIMIT 50").use { c ->
-            buildList { while (c.moveToNext()) add(Triple(c.getString(0), c.getString(1), c.getLong(2))) }
-        }
+            val tables = SyncJournal.tables(db).toSet()
+            val primaryKeys = mutableMapOf<String, List<String>>()
+            val pending = db.query("SELECT table_name,row_key,revision FROM hub_sync_pending ORDER BY table_name,row_key LIMIT 50").use { c ->
+                buildList { while (c.moveToNext()) add(Triple(c.getString(0), c.getString(1), c.getLong(2))) }
+            }
+            var bytes = 0L
+            val items = mutableListOf<Snapshot>()
+            for ((table, key, revision) in pending) {
+                require(table in tables)
+                val columns = primaryKeys.getOrPut(table) { SyncJournal.primaryKeys(db, table) }
+                val values = SyncJournal.keyValues(key)
+                require(values.size == columns.size)
+                val where = columns.joinToString(" AND ") { "`$it` IS ?" }
+                // Cursor values (including owned BLOB byte arrays) are detached before releasing the gate.
+                val payload = db.query("SELECT * FROM `$table` WHERE $where", values).use { c ->
+                    if (!c.moveToFirst()) null else c.columnNames.mapIndexed { index, column -> column to when (c.getType(index)) {
+                        Cursor.FIELD_TYPE_NULL -> null
+                        Cursor.FIELD_TYPE_INTEGER -> c.getLong(index)
+                        Cursor.FIELD_TYPE_FLOAT -> c.getDouble(index)
+                        Cursor.FIELD_TYPE_BLOB -> c.getBlob(index)
+                        else -> c.getString(index)
+                    } }.toMap()
+                }
+                val size = payload?.values?.sumOf { when (it) { is ByteArray -> it.size.toLong(); is String -> it.length * 2L; else -> 8L } } ?: 0
+                if (items.isNotEmpty() && bytes + size > 512 * 1024) break
+                bytes += size
+                items.add(Snapshot(table, key, revision, payload))
+            }
+            db.setTransactionSuccessful()
+            items
+        } finally { db.endTransaction() }
+    }
+
+    private fun batch(context: Context, device: String, timestamp: Long, encodeBlob: (ByteArray) -> String): List<Item> {
+        val captured = snapshot(context)
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
         var bytes = 0
         val items = mutableListOf<Item>()
-        for ((table, key, revision) in pending) {
-            require(table in tables)
-            val columns = primaryKeys.getOrPut(table) { SyncJournal.primaryKeys(db, table) }
-            val values = SyncJournal.keyValues(key)
-            require(values.size == columns.size)
-            val where = columns.joinToString(" AND ") { "`$it` IS ?" }
-            val payload = db.query("SELECT * FROM `$table` WHERE $where", values).use { c ->
-                if (!c.moveToFirst()) null else JSONObject().also { json ->
-                    c.columnNames.forEachIndexed { index, column -> json.put(column, when (c.getType(index)) {
-                        Cursor.FIELD_TYPE_NULL -> JSONObject.NULL
-                        Cursor.FIELD_TYPE_INTEGER -> c.getLong(index)
-                        Cursor.FIELD_TYPE_FLOAT -> c.getDouble(index)
-                        Cursor.FIELD_TYPE_BLOB -> JSONObject().put("encoding", "base64").put("data", Base64.encodeToString(c.getBlob(index), Base64.NO_WRAP))
-                        else -> c.getString(index)
-                    }) }
-                }
-            }
+        for ((table, key, revision, values) in captured) {
+            // No writer gate during Base64, JSON construction/serialization, UUID or UTF-8 encoding.
+            val payload = values?.let { JSONObject().also { json -> it.forEach { (column, value) ->
+                json.put(column, when (value) {
+                    null -> JSONObject.NULL
+                    is ByteArray -> JSONObject().put("encoding", "base64").put("data", encodeBlob(value))
+                    else -> value
+                })
+            } } }
             val deleted = when {
-                payload == null -> timestamp
-                !payload.isNull("deleted_at_ms") -> payload.getLong("deleted_at_ms")
-                table == "contacts" && !payload.isNull("deleted_at") -> payload.getLong("deleted_at")
+                values == null -> timestamp
+                values["deleted_at_ms"] != null -> values["deleted_at_ms"] as Long
+                table == "contacts" && values["deleted_at"] != null -> values["deleted_at"] as Long
                 else -> null
             }
             val syncId = UUID.nameUUIDFromBytes("personalhub:$device:$table:$key".toByteArray(Charsets.UTF_8)).toString()
@@ -98,16 +122,22 @@ object DatasetteSync {
             val rowBytes = row.toString().toByteArray(Charsets.UTF_8).size
             if (items.isNotEmpty() && bytes + rowBytes > 512 * 1024) break
             bytes += rowBytes
-            // Record before HTTP: an ambiguous response must still be reconciled after an import.
-            db.execSQL("INSERT OR IGNORE INTO hub_sync_known VALUES (?,?)", arrayOf(table, key))
             items.add(Item(table, key, revision, row))
         }
-        db.setTransactionSuccessful()
-        items
-        } finally { db.endTransaction() }
+        // Record only prepared identities, before any HTTP. Import still serializes with uploads.
+        if (items.isEmpty()) return items
+        DatabaseGate.access {
+            val db = db(context)
+            db.beginTransaction()
+            try {
+                items.forEach { db.execSQL("INSERT OR IGNORE INTO hub_sync_known VALUES (?,?)", arrayOf(it.table, it.key)) }
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+        }
+        return items
     }
 
-    fun run(context: Context, stopped: () -> Boolean = { false }, send: (DatasetteConfiguration, String, List<JSONObject>) -> Boolean = DatasetteClient::upsert): Boolean = uploads.withLock {
+    fun run(context: Context, stopped: () -> Boolean = { false }, send: (DatasetteConfiguration, String, List<JSONObject>) -> Boolean = DatasetteClient::upsert, encodeBlob: (ByteArray) -> String = { Base64.encodeToString(it, Base64.NO_WRAP) }): Boolean = uploads.withLock {
         try {
             if (!DatasetteSettings.configuration(context).enabled || stopped()) return true
             if (DatasetteSettings.needsFull(context)) requests.withLock {
@@ -121,7 +151,7 @@ object DatasetteSync {
             repeat(10_000) {
                 if (android.os.SystemClock.elapsedRealtime() >= deadline) return false
                 if (stopped() || !DatasetteSettings.configuration(context).enabled) return true
-                val items = batch(context, device, DatasetteSettings.nextTimestamp(context))
+                val items = batch(context, device, DatasetteSettings.nextTimestamp(context), encodeBlob)
                 if (items.isEmpty()) {
                     statusPrefs(context).edit().putString("state", "complete").apply()
                     return true
