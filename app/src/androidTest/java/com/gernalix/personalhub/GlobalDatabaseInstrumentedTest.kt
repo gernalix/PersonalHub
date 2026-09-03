@@ -19,8 +19,11 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class GlobalDatabaseInstrumentedTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private fun requireEmulator() {
+    private fun requireEmulatorOnly() {
         check(android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("sdk_gphone")) { "Mutation QA must run on the emulator" }
+    }
+    private fun requireEmulator() {
+        requireEmulatorOnly()
         check(DatabaseVault.folder(context)?.contains("PersonalHubQA") == true) { "Choose the isolated PersonalHubQA SAF folder first" }
     }
     private fun exportCopy(): File {
@@ -154,6 +157,36 @@ class GlobalDatabaseInstrumentedTest {
         assertEquals(people, scalar("SELECT COUNT(*) FROM contacts"))
         assertEquals(before, logicalHash())
         Log.i("PersonalHubQA", "corrupt+incompatible imports rejected; every table logically unchanged")
+    }
+    @Test fun repeatedImportsDeleteOrphansButProtectAPendingRollbackCopy() {
+        requireEmulatorOnly()
+        val databaseDir = context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile!!
+        val pending = DatabaseVault.backupCurrent(context).renameTo(File(databaseDir, "personalhub-pre-import-pending.db"))
+        assertTrue(pending)
+        val pendingFile = File(databaseDir, "personalhub-pre-import-pending.db")
+        val orphan = DatabaseVault.backupCurrent(context).renameTo(File(databaseDir, "personalhub-pre-import-orphan.db"))
+        assertTrue(orphan)
+        val orphanFile = File(databaseDir, "personalhub-pre-import-orphan.db")
+        val marker = File(context.filesDir, "personalhub-import.pending")
+        try {
+            marker.writeText(pendingFile.path)
+            DatabaseVault.cleanupOrphanedPreImportBackups(context)
+            assertTrue("The pending marker must protect its rollback copy", pendingFile.isFile)
+            assertFalse("Unreferenced pre-import copies must be removed", orphanFile.exists())
+        } finally {
+            marker.delete()
+            DatabaseVault.cleanupOrphanedPreImportBackups(context)
+        }
+        val source = DatabaseVault.backupCurrent(context)
+        try {
+            repeat(3) { DatabaseVault.importDatabase(context, Uri.fromFile(source)) }
+            val leftovers = databaseDir.listFiles().orEmpty().filter {
+                it.name.startsWith("personalhub-pre-import-") && it.name.endsWith(".db")
+            }
+            assertTrue("Completed imports must not accumulate rollback copies: $leftovers", leftovers.isEmpty())
+        } finally {
+            source.delete()
+        }
     }
     @Test fun newMultiplePhotosCommitExportAndCascadeTogether() = runBlocking {
         requireEmulator()

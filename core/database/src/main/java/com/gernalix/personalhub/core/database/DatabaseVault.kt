@@ -20,6 +20,8 @@ class ImportRolledBack(cause: Throwable) : IllegalStateException("Import rolled 
 object DatabaseVault {
     private val operations = ReentrantLock(true)
     private const val SCHEMA_ASSET = "com.gernalix.personalhub.core.database.PersonalHubDatabase/2.json"
+    private const val PRE_IMPORT_BACKUP_PREFIX = "personalhub-pre-import-"
+    private const val PRE_IMPORT_BACKUP_SUFFIX = ".db"
     internal fun preferences(context: Context) = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
     fun folder(context: Context): String? = preferences(context).getString("tree_uri", null)
     fun error(context: Context): String? = preferences(context).getString("error", null)
@@ -47,10 +49,38 @@ object DatabaseVault {
     private fun sidecars(file: File) { listOf("-wal", "-shm", "-journal").forEach { File(file.path + it).delete() } }
     private fun marker(context: Context) = File(context.filesDir, "personalhub-import.pending")
 
+    /**
+     * Removes only backups that cannot be needed for an in-progress import.
+     * If a marker cannot be read or validated, it is deliberately treated as pending: preserving
+     * an extra recovery copy is safer than deleting the only copy that can roll back a swap.
+     */
+    fun cleanupOrphanedPreImportBackups(context: Context) = operations.withLock {
+        val pendingMarker = marker(context)
+        val databaseDir = context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile ?: return@withLock
+        val protected = when {
+            !pendingMarker.exists() -> null
+            else -> runCatching {
+                File(pendingMarker.readText()).canonicalFile.takeIf { backup ->
+                    backup.isFile && backup.parentFile == databaseDir.canonicalFile
+                } ?: return@withLock
+            }.getOrElse { return@withLock }
+        }
+        databaseDir.listFiles()
+            ?.filter { it.name.startsWith(PRE_IMPORT_BACKUP_PREFIX) && it.name.endsWith(PRE_IMPORT_BACKUP_SUFFIX) }
+            ?.filter { it.canonicalFile != protected }
+            ?.forEach { backup ->
+                sidecars(backup)
+                backup.delete()
+            }
+    }
+
     /** Run before any feature/database initialization. An interrupted replacement restores the last good DB. */
     fun recoverInterruptedImport(context: Context) {
         val marker = marker(context)
-        if (!marker.isFile) return
+        if (!marker.isFile) {
+            cleanupOrphanedPreImportBackups(context)
+            return
+        }
         val backup = File(marker.readText())
         require(backup.isFile && backup.parentFile == context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile)
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
@@ -61,6 +91,7 @@ object DatabaseVault {
         check(marker.delete())
         syncDirectory(context.filesDir)
         preferences(context).edit().putString("error", "Interrupted import was rolled back").commit()
+        cleanupOrphanedPreImportBackups(context)
     }
 
     fun validate(context: Context, file: File): Long {
@@ -192,7 +223,7 @@ object DatabaseVault {
             context.contentResolver.openInputStream(uri).use { input -> FileOutputStream(stage).use { out -> requireNotNull(input).copyTo(out); out.fd.sync() } }
             validate(context, stage)
             DatabaseGate.replace {
-                val backup = File(target.parentFile, "personalhub-pre-import-${System.currentTimeMillis()}.db")
+                val backup = File(target.parentFile, "$PRE_IMPORT_BACKUP_PREFIX${UUID.randomUUID()}$PRE_IMPORT_BACKUP_SUFFIX")
                 try {
                     snapshot(context, backup)
                     PersonalHubDatabase.closeInstance()
@@ -206,6 +237,7 @@ object DatabaseVault {
                     retireSeparateDatabases(context)
                     check(marker(context).delete())
                     syncDirectory(context.filesDir)
+                    cleanupOrphanedPreImportBackups(context)
                 } catch (error: Throwable) {
                     PersonalHubDatabase.closeInstance()
                     if (marker(context).exists()) recoverInterruptedImport(context)

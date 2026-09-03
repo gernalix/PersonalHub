@@ -16,7 +16,15 @@ The app shell exposes **Database and backup**, **Import personalhub.db**, and a 
 
 Import copies the selection to staging and verifies the SQLite header/version, complete table/column/PK/FK schema, required indexes, allowed dirty triggers, quick check, foreign key check and photo SHA-256. The writer gate drains active transactions, checkpoints WAL, saves a durable pre-import copy, closes Room, replaces the file by atomic rename, clears old sidecars and verifies reopening. A journal permits automatic rollback after interruption. A separate foreground relay process restarts the application graph after success. Old writers remain suspended until that restart.
 
+The pending journal points to the only rollback copy that must survive an interrupted import. Startup recovery uses it before deleting the journal, then removes it and any older unreferenced `personalhub-pre-import-*.db` files. A completed import likewise removes its verified, now-unused copy. Cleanup never removes a copy while a valid pending journal names it.
+
 Persistent SQLite triggers increment `hub_generation` inside the modifying transaction. Rollbacks do not advance it. This covers every Room DAO and timer compatibility write. A short process-local check schedules a debounced WorkManager job; periodic recovery and application startup recover unexported commits after process death. Operations serialize. Export excludes writers while checkpointing and taking a standalone snapshot. The SAF temporary file is read back and checked byte-for-byte before publication; the last good export is retained as `personalhub.db.bak`. Failed exports remain dirty and retry. Export status is stored outside the data DB to avoid a dirty/export loop. Android force-stop and revoked/inaccessible SAF access necessarily delay recovery until the application can run and the folder is available again.
+
+## Version and module shortcuts
+
+`version.txt` at repository root is the sole source of truth for `versionCode`, `versionName`, and the debug APK filename. Each future PersonalHub development prompt increments its integer exactly once by one. The debug output is exactly `<version>.apk`; versions are never generated from time, Git state, or source files. The Home heading stays `PersonalHub` and displays only the small numeric version at bottom-right.
+
+Static launcher shortcuts route through `MainActivity` to People, Timer, Places, Substances, and WordPulse using the `personalhub://module/<feature>` URI. They preserve the current single-database import/export shell and include no migration destination.
 
 ## Building the real database offline
 

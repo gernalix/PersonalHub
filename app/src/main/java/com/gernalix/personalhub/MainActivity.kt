@@ -44,9 +44,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 
+private const val SHORTCUT_SCHEME = "personalhub"
+private const val SHORTCUT_HOST = "module"
+private const val SHORTCUT_URI_PREFIX = "$SHORTCUT_SCHEME://$SHORTCUT_HOST"
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        openShortcutModule(intent)
         enableEdgeToEdge()
         setContent {
             PersonalHubTheme {
@@ -55,6 +60,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openShortcutModule(intent)
+    }
+
+    private fun openShortcutModule(intent: Intent?): Boolean {
+        val module = HubModule.fromShortcutIntent(intent) ?: return false
+        startActivity(
+            Intent().setClassName(packageName, module.activityClassName).apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            },
+        )
+        return true
     }
 }
 
@@ -69,7 +89,7 @@ fun PersonalHubApp() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = stringResource(R.string.app_name) + " v" + BuildConfig.VERSION_NAME,
+            text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -78,7 +98,7 @@ fun PersonalHubApp() {
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 240.dp),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -93,6 +113,12 @@ fun PersonalHubApp() {
                 )
             }
         }
+        Text(
+            text = BuildConfig.VERSION_NAME,
+            modifier = Modifier.align(Alignment.End),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -152,35 +178,64 @@ enum class HubModule(
     val subtitleRes: Int,
     val icon: ImageVector,
     val activityClassName: String,
+    val shortcutPath: String,
 ) {
     PEOPLE(
         titleRes = R.string.module_people,
         subtitleRes = R.string.module_people_subtitle,
         icon = Icons.Filled.Person,
         activityClassName = "com.supercontacts.app.MainActivity",
+        shortcutPath = "people",
     ),
     TIMER(
         titleRes = R.string.module_timer,
         subtitleRes = R.string.module_timer_subtitle,
         icon = Icons.Filled.Timer,
         activityClassName = "com.example.multitimetracker.MainActivity",
+        shortcutPath = "timer",
     ),
     PLACES(
         titleRes = R.string.module_places,
         subtitleRes = R.string.module_places_subtitle,
         icon = Icons.Filled.Place,
         activityClassName = "com.gernalix.luoghi.MainActivity",
+        shortcutPath = "places",
     ),
     SUBSTANCES(
         titleRes = R.string.module_substances,
         subtitleRes = R.string.module_substances_subtitle,
         icon = Icons.Filled.LocalPharmacy,
         activityClassName = "com.gernalix.sostanze.MainActivity",
+        shortcutPath = "substances",
     ),
     WORDPULSE(
         titleRes = R.string.module_wordpulse,
         subtitleRes = R.string.module_wordpulse_subtitle,
         icon = Icons.Filled.TextFields,
         activityClassName = "com.wordpulse.app.MainActivity",
+        shortcutPath = "wordpulse",
     ),
+
+    ;
+
+    val shortcutUri: String
+        get() = "$SHORTCUT_URI_PREFIX/$shortcutPath"
+
+    companion object {
+        fun fromShortcutIntent(intent: Intent?): HubModule? {
+            val data = intent?.data ?: return null
+            return fromShortcutParts(intent.action, data.scheme, data.host, data.pathSegments)
+        }
+
+        fun fromShortcutParts(
+            action: String?,
+            scheme: String?,
+            host: String?,
+            pathSegments: List<String>,
+        ): HubModule? {
+            if (action != Intent.ACTION_VIEW || scheme != SHORTCUT_SCHEME || host != SHORTCUT_HOST) return null
+            val shortcutPath = pathSegments.singleOrNull() ?: return null
+            return entries.firstOrNull { it.shortcutPath == shortcutPath }
+        }
+    }
 }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="people" android:enabled="true" android:icon="@drawable/ic_shortcut_people" android:shortcutShortLabel="@string/module_people" android:shortcutLongLabel="@string/module_people">
+        <intent android:action="android.intent.action.VIEW" android:data="personalhub://module/people" android:targetClass="com.gernalix.personalhub.MainActivity" android:targetPackage="com.gernalix.personalhub" />
+    </shortcut>
+    <shortcut android:shortcutId="timer" android:enabled="true" android:icon="@drawable/ic_shortcut_timer" android:shortcutShortLabel="@string/module_timer" android:shortcutLongLabel="@string/module_timer">
+        <intent android:action="android.intent.action.VIEW" android:data="personalhub://module/timer" android:targetClass="com.gernalix.personalhub.MainActivity" android:targetPackage="com.gernalix.personalhub" />
+    </shortcut>
+    <shortcut android:shortcutId="places" android:enabled="true" android:icon="@drawable/ic_shortcut_places" android:shortcutShortLabel="@string/module_places" android:shortcutLongLabel="@string/module_places">
+        <intent android:action="android.intent.action.VIEW" android:data="personalhub://module/places" android:targetClass="com.gernalix.personalhub.MainActivity" android:targetPackage="com.gernalix.personalhub" />
+    </shortcut>
+    <shortcut android:shortcutId="substances" android:enabled="true" android:icon="@drawable/ic_shortcut_substances" android:shortcutShortLabel="@string/module_substances" android:shortcutLongLabel="@string/module_substances">
+        <intent android:action="android.intent.action.VIEW" android:data="personalhub://module/substances" android:targetClass="com.gernalix.personalhub.MainActivity" android:targetPackage="com.gernalix.personalhub" />
+    </shortcut>
+    <shortcut android:shortcutId="wordpulse" android:enabled="true" android:icon="@drawable/ic_shortcut_wordpulse" android:shortcutShortLabel="@string/module_wordpulse" android:shortcutLongLabel="@string/module_wordpulse">
+        <intent android:action="android.intent.action.VIEW" android:data="personalhub://module/wordpulse" android:targetClass="com.gernalix.personalhub.MainActivity" android:targetPackage="com.gernalix.personalhub" />
+    </shortcut>
+</shortcuts>

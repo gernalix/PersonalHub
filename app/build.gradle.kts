@@ -96,6 +96,12 @@ android {
     }
 }
 
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.forEach { output -> output.outputFileName.set("$appVersion.apk") }
+    }
+}
+
 dependencies {
     implementation(project(":core:database"))
     implementation(project(":feature:luoghi"))
