@@ -6,6 +6,7 @@ android {
     namespace = "com.gernalix.personalhub.core.database"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
+    testOptions { unitTests.isIncludeAndroidResources = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -25,4 +26,9 @@ dependencies {
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
-androidComponents { onVariants { it.sources.assets?.addStaticSourceDirectory("schemas") } }
+androidComponents { onVariants { variant ->
+    variant.sources.assets?.addStaticSourceDirectory("schemas")
+    val suffix = variant.name.replaceFirstChar { it.uppercase() }
+    // Migration/transfer validation must package the schema from this compilation.
+    tasks.matching { it.name == "merge${suffix}Assets" }.configureEach { dependsOn("ksp${suffix}Kotlin") }
+} }

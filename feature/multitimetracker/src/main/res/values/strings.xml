@@ -238,16 +238,6 @@
     <string name="senza_titolo">Untitled</string>
     <string name="sessioni_taskname">Sessions: %1$s</string>
     <string name="settings_cd">Settings</string>
-    <string name="sync_status_title">Sync status</string>
-    <string name="sync_status_db_mutation">Last DB change</string>
-    <string name="sync_status_successful_export">Last good export</string>
-    <string name="sync_status_export_attempt">Last export attempt</string>
-    <string name="sync_status_export_state">Export state</string>
-    <string name="sync_status_last_error">Last error</string>
-    <string name="sync_status_saf_file">SAF file</string>
-    <string name="sync_status_integrity">Integrity check</string>
-    <string name="sync_status_tolerance">Tolerance</string>
-    <string name="sync_status_tolerance_value">3 seconds maximum</string>
     <string name="show">Show</string>
     <string name="show_trash">Show trash</string>
     <string name="sposta_giu">Sposta giu</string>

@@ -1,6 +1,6 @@
 package com.gernalix.personalhub
 
-import com.example.multitimetracker.capsules.remotesync.RemoteSyncScheduler
+import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.example.multitimetracker.perf.StartupPerfTrace
 import com.wordpulse.app.WordPulseApplication
 
@@ -11,6 +11,6 @@ class PersonalHubApplication : WordPulseApplication() {
         super.onCreate()
         com.gernalix.personalhub.core.database.HubAutoExport.start(this)
         StartupPerfTrace.applicationOnCreate()
-        RemoteSyncScheduler.ensurePeriodicRecovery(this)
+        DatasetteSync.start(this)
     }
 }

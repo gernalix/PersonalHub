@@ -1,6 +1,7 @@
 package com.gernalix.personalhub.core.database
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.capsules.sync.*
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -59,8 +60,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.personalhub.core.database.TimerSyncMeta::class,
     com.gernalix.personalhub.core.database.TimerSyncQueue::class,
     com.gernalix.personalhub.core.database.TimerSyncShadow::class,
-    PeoplePhoto::class, HubGeneration::class, HubPreferences::class,
-], version = 2, exportSchema = true)
+    PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
+], version = 3, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase() {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -71,7 +72,7 @@ abstract class PersonalHubDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 3
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -93,14 +94,28 @@ abstract class PersonalHubDatabase : RoomDatabase() {
                         db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                     }
                 })
+                .addMigrations(object : androidx.room.migration.Migration(2, 3) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        SyncJournal.create(db)
+                        // Timer compatibility indices were previously created lazily outside Room.
+                        // Declare and create the same indices before Room validates the upgrade.
+                        val schema = org.json.JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/3.json").bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
+                        for (i in 0 until schema.length()) {
+                            val entity = schema.getJSONObject(i)
+                            val indices = entity.optJSONArray("indices") ?: continue
+                            for (j in 0 until indices.length()) db.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
+                        }
+                    }
+                })
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
-                        val tables = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('room_master_table','android_metadata','hub_generation')").use { c ->
+                        val tables = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('room_master_table','android_metadata','hub_generation','hub_sync_pending','hub_sync_known')").use { c ->
                             buildList { while (c.moveToNext()) add(c.getString(0)) }
                         }
+                        SyncJournal.install(db)
                         tables.forEach { table ->
                             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
                                 db.execSQL("CREATE TRIGGER IF NOT EXISTS `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END")

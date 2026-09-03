@@ -20,7 +20,7 @@ object HubAutoExport {
         // Raw timer commits and Room commits share persistent triggers. Polling also closes
         // the commit-before-enqueue crash/race window; the periodic worker survives process death.
         Executors.newSingleThreadScheduledExecutor { Thread(it, "personalhub-dirty-check").apply { isDaemon = true } }
-            .scheduleWithFixedDelay({ runCatching { if (dirty(app)) request(app) } }, 0, 2, TimeUnit.SECONDS)
+            .scheduleWithFixedDelay({ runCatching { if (dirty(app)) request(app); com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync.checkForChanges(app) } }, 0, 2, TimeUnit.SECONDS)
     }
     fun dirty(context: Context): Boolean {
         if (DatabaseVault.folder(context) == null) return false

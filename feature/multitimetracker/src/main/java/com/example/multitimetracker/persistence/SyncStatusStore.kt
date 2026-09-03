@@ -5,8 +5,6 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 object SyncStatusStore {
-    const val SYNC_TOLERANCE_MS: Long = 3_000L
-
     private const val PREFS = "mtt_sync_status"
     private const val KEY_LAST_DATABASE_MUTATION_MS = "last_database_mutation_at_ms"
     private const val KEY_LAST_DATABASE_MUTATION_UTC = "last_database_mutation_at_utc_z"
@@ -22,13 +20,6 @@ object SyncStatusStore {
 
     enum class ExportStatus { NEVER, IN_PROGRESS, SUCCESS, FAILED }
 
-    enum class VisualState(val symbol: String) {
-        SYNCED("✅"),
-        EXPORTING("⟳"),
-        DIRTY("❌"),
-        FAILED("⚠")
-    }
-
     data class Snapshot(
         val lastDatabaseMutationAtMs: Long,
         val lastDatabaseMutationAtUtcZ: String?,
@@ -41,15 +32,7 @@ object SyncStatusStore {
         val lastExportFile: String?,
         val lastIntegrityCheck: String?,
         val lastMutationSource: String?,
-    ) {
-        val visualState: VisualState
-            get() = when {
-                lastExportStatus == ExportStatus.IN_PROGRESS -> VisualState.EXPORTING
-                lastExportStatus == ExportStatus.FAILED -> VisualState.FAILED
-                lastSuccessfulExportAtMs + SYNC_TOLERANCE_MS >= lastDatabaseMutationAtMs -> VisualState.SYNCED
-                else -> VisualState.DIRTY
-            }
-    }
+    )
 
     fun read(context: Context): Snapshot {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

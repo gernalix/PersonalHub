@@ -234,16 +234,6 @@
     <string name="senza_titolo">Senza titolo</string>
     <string name="sessioni_taskname">Sessioni: %1$s</string>
     <string name="settings_cd">Settings</string>
-    <string name="sync_status_title">Stato sync</string>
-    <string name="sync_status_db_mutation">Ultima modifica DB</string>
-    <string name="sync_status_successful_export">Ultimo export valido</string>
-    <string name="sync_status_export_attempt">Ultimo tentativo export</string>
-    <string name="sync_status_export_state">Stato export</string>
-    <string name="sync_status_last_error">Ultimo errore</string>
-    <string name="sync_status_saf_file">File SAF</string>
-    <string name="sync_status_integrity">Integrity check</string>
-    <string name="sync_status_tolerance">Tolleranza</string>
-    <string name="sync_status_tolerance_value">massimo 3 secondi</string>
     <string name="show">Mostra</string>
     <string name="show_trash">Show trash</string>
     <string name="sposta_giu">Sposta giu</string>

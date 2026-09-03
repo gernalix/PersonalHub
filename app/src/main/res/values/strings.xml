@@ -34,4 +34,20 @@
     <string name="home_shortcuts_already_added">This shortcut is already on Home.</string>
     <string name="home_shortcuts_confirmation_requested">Confirm with the launcher to add this shortcut to Home.</string>
     <string name="home_shortcuts_request_rejected">The launcher did not accept the shortcut request.</string>
+    <string name="datasette_sync_title">Datasette sync</string>
+    <string name="datasette_enable">Enable sync</string>
+    <string name="datasette_description">When enabled, all current data and subsequent changes are sent. Local changes remain saved while offline. Disabling waits for any current request to finish.</string>
+    <string name="datasette_connection">Connection settings</string>
+    <string name="datasette_url">Base URL (HTTPS)</string>
+    <string name="datasette_database">Database name</string>
+    <string name="datasette_table">Table name</string>
+    <string name="datasette_token">Access token</string>
+    <string name="datasette_token_saved">A token is saved securely. Leave blank to keep it.</string>
+    <string name="datasette_save">Save connection</string>
+    <string name="datasette_off">Sync is off. No data is sent.</string>
+    <string name="datasette_sending">Sending pending changes…</string>
+    <string name="datasette_complete">All queued changes sent.</string>
+    <string name="datasette_retry">Changes are saved locally. Connection failed; sync will retry automatically.</string>
+    <string name="datasette_waiting">Waiting to sync.</string>
+    <string name="datasette_error">Unable to save. Check the HTTPS address, database, table and access token.</string>
 </resources>

@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
-import com.gernalix.personalhub.capsules.shortcuts.HomeShortcutsSettings
+import com.gernalix.personalhub.capsules.settings.HubSettings
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
 
 class MainActivity : ComponentActivity() {
@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
 fun PersonalHubApp() {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     if (showSettings) {
-        HomeShortcutsSettings(onBack = { showSettings = false })
+        HubSettings(onBack = { showSettings = false })
         return
     }
     val context = LocalContext.current
@@ -95,9 +95,6 @@ fun PersonalHubApp() {
         )
         androidx.compose.material3.OutlinedButton(onClick = { showSettings = true }) {
             Text(stringResource(R.string.settings_title))
-        }
-        Button(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) {
-            Text(stringResource(R.string.database_title))
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 240.dp),

@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database
 
+import com.gernalix.personalhub.core.database.capsules.sync.*
 import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
@@ -19,7 +20,6 @@ class ImportRolledBack(cause: Throwable) : IllegalStateException("Import rolled 
 
 object DatabaseVault {
     private val operations = ReentrantLock(true)
-    private const val SCHEMA_ASSET = "com.gernalix.personalhub.core.database.PersonalHubDatabase/2.json"
     private const val PRE_IMPORT_BACKUP_PREFIX = "personalhub-pre-import-"
     private const val PRE_IMPORT_BACKUP_SUFFIX = ".db"
     internal fun preferences(context: Context) = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
@@ -97,9 +97,10 @@ object DatabaseVault {
     fun validate(context: Context, file: File): Long {
         require(file.isFile && file.length() >= 100) { "Invalid SQLite file" }
         file.inputStream().use { input -> val header = ByteArray(16); java.io.DataInputStream(input).readFully(header); require(header.contentEquals("SQLite format 3\u0000".toByteArray())) { "Invalid SQLite header" } }
-        val schema = JSONObject(context.assets.open(SCHEMA_ASSET).bufferedReader().use { it.readText() }).getJSONObject("database")
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-            require(db.version == schema.getInt("version")) { "Incompatible database version" }
+            require(db.version in 2..PersonalHubDatabase.SCHEMA_VERSION) { "Incompatible database version" }
+            val asset = "com.gernalix.personalhub.core.database.PersonalHubDatabase/${db.version}.json"
+            val schema = JSONObject(context.assets.open(asset).bufferedReader().use { it.readText() }).getJSONObject("database")
             db.rawQuery("PRAGMA quick_check", null).use { c -> require(c.moveToFirst() && c.getString(0) == "ok" && !c.moveToNext()) { "SQLite integrity check failed" } }
             db.rawQuery("PRAGMA foreign_key_check", null).use { require(!it.moveToFirst()) { "Invalid database relationships" } }
             val entities = schema.getJSONArray("entities")
@@ -144,9 +145,22 @@ object DatabaseVault {
                 while (c.moveToNext()) {
                     val name = c.getString(0); val table = c.getString(1)
                     val op = name.substringAfterLast('_')
-                    require(table in tables && op in listOf("INSERT", "UPDATE", "DELETE") && name == "hub_dirty_${table}_$op") { "Unexpected database trigger" }
+                    require(table in tables && op in listOf("INSERT", "UPDATE", "DELETE")) { "Unexpected database trigger" }
                     val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
-                    val expected = "CREATE TRIGGER `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
+                    val expected = when (name) {
+                        "hub_dirty_${table}_$op" -> {
+                            require(table !in setOf("hub_sync_pending", "hub_sync_known"))
+                            "CREATE TRIGGER `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
+                        }
+                        "hub_sync_${table}_$op" -> {
+                            require(db.version >= 3 && table !in SyncJournal.excluded)
+                            val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columns ->
+                                buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }
+                            }
+                            SyncJournal.trigger(table, keys, op)
+                        }
+                        else -> error("Unexpected database trigger")
+                    }
                     require(sql == expected) { "Incompatible database trigger" }
                 }
             }
@@ -215,17 +229,40 @@ object DatabaseVault {
     }
 
     /** Returns only after verified replacement; caller must restart the process before allowing further edits. */
-    fun importDatabase(context: Context, uri: Uri) = operations.withLock {
+    fun importDatabase(context: Context, uri: Uri) = DatasetteSync.pauseUploads { operations.withLock {
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
         target.parentFile!!.mkdirs()
         val stage = File(target.parentFile, "personalhub-import-${UUID.randomUUID()}.db")
         try {
             context.contentResolver.openInputStream(uri).use { input -> FileOutputStream(stage).use { out -> requireNotNull(input).copyTo(out); out.fd.sync() } }
             validate(context, stage)
+            // Room upgrades accepted v2 exports without changing the source file.
+            val importedVersion = SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
+            if (importedVersion < PersonalHubDatabase.SCHEMA_VERSION) {
+                PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
+                    try { temporary.openHelper.writableDatabase } finally { temporary.close() }
+                }
+            }
+            validate(context, stage)
             DatabaseGate.replace {
                 val backup = File(target.parentFile, "$PRE_IMPORT_BACKUP_PREFIX${UUID.randomUUID()}$PRE_IMPORT_BACKUP_SUFFIX")
                 try {
                     snapshot(context, backup)
+                    // Preserve this installation's sent/uncertain identities across file replacement.
+                    // Imported data can omit rows that still need remote tombstones.
+                    SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READWRITE).use { imported ->
+                        imported.execSQL("ATTACH DATABASE ? AS previous", arrayOf(backup.path))
+                        imported.beginTransaction()
+                        try {
+                            imported.execSQL("DELETE FROM hub_sync_pending")
+                            imported.execSQL("DELETE FROM hub_sync_known")
+                            imported.execSQL("INSERT OR IGNORE INTO hub_sync_known SELECT table_name,row_key FROM previous.hub_sync_known")
+                            imported.execSQL("INSERT OR IGNORE INTO hub_sync_known SELECT table_name,row_key FROM previous.hub_sync_pending")
+                            imported.setTransactionSuccessful()
+                        } finally { imported.endTransaction() }
+                        imported.execSQL("DETACH DATABASE previous")
+                    }
+                    DatasetteSettings.requireFull(context)
                     PersonalHubDatabase.closeInstance()
                     FileOutputStream(marker(context)).use { it.write(backup.path.toByteArray()); it.fd.sync() }
                     syncDirectory(context.filesDir)
@@ -247,7 +284,7 @@ object DatabaseVault {
                 }
             }
         } finally { stage.delete(); sidecars(stage) }
-    }
+    } }
 
     private fun retireSeparateDatabases(context: Context) {
         val names = listOf("luoghi.db", "multitimer.db", "mtt_remote_sync.db", "sostanze.db", "super_contacts.db", "wordpulse.db", "personalhub_migration_map.db")

@@ -34,4 +34,20 @@
     <string name="home_shortcuts_already_added">Questa scorciatoia è già nella Home.</string>
     <string name="home_shortcuts_confirmation_requested">Conferma nel launcher per aggiungere questa scorciatoia alla Home.</string>
     <string name="home_shortcuts_request_rejected">Il launcher non ha accettato la richiesta della scorciatoia.</string>
+    <string name="datasette_sync_title">Sincronizzazione Datasette</string>
+    <string name="datasette_enable">Abilita sincronizzazione</string>
+    <string name="datasette_description">Quando attiva, invia tutti i dati attuali e le modifiche successive. Le modifiche locali restano salvate senza rete. La disattivazione attende la fine della richiesta in corso.</string>
+    <string name="datasette_connection">Impostazioni connessione</string>
+    <string name="datasette_url">URL di base (HTTPS)</string>
+    <string name="datasette_database">Nome database</string>
+    <string name="datasette_table">Nome tabella</string>
+    <string name="datasette_token">Token di accesso</string>
+    <string name="datasette_token_saved">Un token è salvato in modo sicuro. Lascia vuoto per conservarlo.</string>
+    <string name="datasette_save">Salva connessione</string>
+    <string name="datasette_off">Sincronizzazione disattivata. Nessun dato viene inviato.</string>
+    <string name="datasette_sending">Invio delle modifiche in attesa…</string>
+    <string name="datasette_complete">Tutte le modifiche in coda sono state inviate.</string>
+    <string name="datasette_retry">Modifiche salvate sul dispositivo. Connessione non riuscita; nuovo tentativo automatico.</string>
+    <string name="datasette_waiting">In attesa di sincronizzazione.</string>
+    <string name="datasette_error">Salvataggio non riuscito. Controlla indirizzo HTTPS, database, tabella e token di accesso.</string>
 </resources>
