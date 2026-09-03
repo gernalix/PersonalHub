@@ -37,12 +37,12 @@ class HubAutoExportDurabilityTest {
     }
 
     @Test
-    fun mutationWithConfiguredFolderCreatesDurableWorkBeforeAndAfterCommit() {
+    fun mutationWithConfiguredFolderCreatesDurableWorkAfterGenerationChanges() {
         configureFolderPreference()
         val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
 
         db.beginTransaction()
-        assertEquals("A work request must already exist before any transaction can commit", 1, scheduler.autoExportRequests)
+        assertEquals(0, scheduler.autoExportRequests)
         try {
             db.execSQL(
                 "INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)",
@@ -53,8 +53,25 @@ class HubAutoExportDurabilityTest {
             db.endTransaction()
         }
 
-        assertTrue("Commit completion must refresh the durable work request", scheduler.autoExportRequests >= 2)
+        assertEquals(1, scheduler.autoExportRequests)
         assertTrue(DatabaseVault.autoExportStatus(context).stale)
+    }
+
+    @Test
+    fun internalSyncBookkeepingDoesNotScheduleExportWhenGenerationIsClean() {
+        configureFolderPreference()
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        val current = DatabaseVault.currentGeneration(context)
+        DatabaseVault.preferences(context).edit().putLong("exported_generation", current).commit()
+        scheduler.autoExportRequests = 0
+
+        db.execSQL(
+            "INSERT OR REPLACE INTO hub_sync_known(table_name,row_key) VALUES(?,?)",
+            arrayOf("contacts", "already-synced"),
+        )
+
+        assertEquals(current, DatabaseVault.currentGeneration(context))
+        assertEquals(0, scheduler.autoExportRequests)
     }
 
     @Test
@@ -83,6 +100,24 @@ class HubAutoExportDurabilityTest {
         HubAutoExport.request(context)
 
         assertEquals(1, scheduler.periodicRecoveryRequests)
+        assertEquals(1, scheduler.autoExportRequests)
+    }
+
+    @Test
+    fun requestIfDirtySkipsCleanStateAndQueuesDirtyState() {
+        configureFolderPreference()
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        val current = DatabaseVault.currentGeneration(context)
+        DatabaseVault.preferences(context).edit().putLong("exported_generation", current).commit()
+
+        HubAutoExport.requestIfDirty(context)
+        assertEquals(0, scheduler.autoExportRequests)
+
+        db.execSQL(
+            "INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)",
+            arrayOf("dirty_request_test", "{}"),
+        )
+
         assertEquals(1, scheduler.autoExportRequests)
     }
 

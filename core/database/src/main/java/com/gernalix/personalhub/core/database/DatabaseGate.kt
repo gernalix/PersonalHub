@@ -23,14 +23,10 @@ object DatabaseGate {
         while (frozen && privileged.get() != true) resumed.await()
         block()
     }
-    fun beforeMutation() {
-        if (privileged.get() != true) autoExportContext?.let { HubAutoExport.request(it) }
-    }
     fun afterMutation() {
-        if (privileged.get() != true) autoExportContext?.let { HubAutoExport.request(it) }
+        if (privileged.get() != true) autoExportContext?.let { HubAutoExport.requestIfDirty(it) }
     }
     fun begin(mutating: Boolean = true, block: () -> Unit) {
-        if (mutating) beforeMutation()
         lock.lock()
         try { while (frozen && privileged.get() != true) resumed.await(); block() }
         catch (error: Throwable) { lock.unlock(); throw error }
@@ -48,7 +44,6 @@ object DatabaseGate {
         }
     }
     fun <T> mutate(block: () -> T): T {
-        beforeMutation()
         return try { access(block) } finally { if ((transactionDepth.get() ?: 0) == 0) afterMutation() }
     }
     fun <T> replace(block: () -> T): T = lock.withLock {

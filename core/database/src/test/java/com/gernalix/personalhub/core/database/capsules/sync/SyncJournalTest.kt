@@ -90,4 +90,32 @@ class SyncJournalTest {
             assertEquals(generation, db.query("SELECT generation FROM hub_generation").use { it.moveToFirst(); it.getLong(0) })
         } finally { owner.close(); context.deleteDatabase("sync-key-test.db") }
     }
+
+    @Test fun installingJournalReplacesNonIdempotentTriggersAndCoalescesRepeatedUpdates() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val owner = PersonalHubDatabase.openTemporary(context, "sync-trigger-replace-test.db")
+        try {
+            val db = owner.openHelper.writableDatabase
+            db.execSQL("PRAGMA foreign_keys=OFF")
+            db.execSQL("DROP TRIGGER IF EXISTS `hub_sync_place_events_UPDATE`")
+            db.execSQL(
+                "CREATE TRIGGER `hub_sync_place_events_UPDATE` AFTER UPDATE ON `place_events` BEGIN " +
+                    "INSERT INTO hub_sync_pending(table_name,row_key,revision) SELECT 'place_events',hex(quote(NEW.`id`)),1; END",
+            )
+            SyncJournal.install(db)
+
+            db.execSQL(
+                "INSERT INTO place_events(id,event_uuid,session_uuid,place_id,event_type,timestamp,lat,lon,accuracy_m,source,notes) " +
+                    "VALUES (1,'event-1','event-1','place-1','CHECK_IN',1000,NULL,NULL,NULL,'test',NULL)",
+            )
+            db.execSQL("UPDATE place_events SET timestamp=1001 WHERE id=1")
+            db.execSQL("UPDATE place_events SET timestamp=1002 WHERE id=1")
+
+            db.query("SELECT count(*), max(revision) FROM hub_sync_pending WHERE table_name='place_events' AND row_key=hex(quote(1))").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(1, it.getInt(0))
+                assertTrue(it.getLong(1) >= 3)
+            }
+        } finally { owner.close(); context.deleteDatabase("sync-trigger-replace-test.db") }
+    }
 }

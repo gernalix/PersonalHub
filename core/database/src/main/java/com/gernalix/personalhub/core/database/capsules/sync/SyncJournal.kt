@@ -47,7 +47,11 @@ object SyncJournal {
     }
 
     fun trigger(table: String, keys: List<String>, op: String): String {
-        fun enqueue(prefix: String): String = "INSERT OR REPLACE INTO hub_sync_pending(table_name,row_key,revision) SELECT '$table',${keyExpression(keys, prefix)},COALESCE((SELECT revision FROM hub_sync_pending WHERE table_name='$table' AND row_key=${keyExpression(keys, prefix)}),0)+1;"
+        fun enqueue(prefix: String): String {
+            val key = keyExpression(keys, prefix)
+            return "UPDATE hub_sync_pending SET revision=revision+1 WHERE table_name='$table' AND row_key=$key; " +
+                "INSERT OR IGNORE INTO hub_sync_pending(table_name,row_key,revision) SELECT '$table',$key,1;"
+        }
         // An UPDATE can change a primary key: retain the old identity as a deletion too.
         val body = when (op) { "INSERT" -> enqueue("NEW."); "DELETE" -> enqueue("OLD."); else -> enqueue("OLD.") + " " + enqueue("NEW.") }
         return "CREATE TRIGGER `hub_sync_${table}_$op` AFTER $op ON `$table` BEGIN $body END"
@@ -58,7 +62,8 @@ object SyncJournal {
             val keys = primaryKeys(db, table)
             check(keys.isNotEmpty()) { "Sync requires a primary key" }
             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                db.execSQL(trigger(table, keys, op).replace("CREATE TRIGGER ", "CREATE TRIGGER IF NOT EXISTS "))
+                db.execSQL("DROP TRIGGER IF EXISTS `hub_sync_${table}_$op`")
+                db.execSQL(trigger(table, keys, op))
             }
         }
     }

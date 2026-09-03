@@ -76,10 +76,14 @@ object HubAutoExport {
             throw error
         }
     }
+    fun requestIfDirty(context: Context) {
+        if (dirty(context)) request(context)
+    }
 }
 
 class HubExportWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
     override fun doWork(): Result { return try {
+        if (!HubAutoExport.dirty(applicationContext)) return Result.success()
         do {
             if (isStopped) return Result.retry()
             DatabaseVault.exportNow(applicationContext)
