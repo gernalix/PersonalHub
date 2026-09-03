@@ -49,6 +49,11 @@ if (hasCanonicalSigning) {
 }
 
 val appVersion = rootProject.file("version.txt").readText().trim().toInt()
+val realPersonalHubPackage = "com.gernalix.personalhub"
+val isolatedBenchmarkPackage = "$realPersonalHubPackage.benchmarktarget"
+val realPackageDestructiveOptIn = providers.gradleProperty("personalhub.allowRealPackageDestructive")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
 
 android {
     namespace = "com.gernalix.personalhub"
@@ -87,6 +92,7 @@ android {
         create("benchmark") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
+            applicationIdSuffix = ".benchmarktarget"
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
             isDebuggable = false
         }
@@ -105,6 +111,33 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.outputs.forEach { output -> output.outputFileName.set("$appVersion.apk") }
+    }
+}
+
+fun Provider<Boolean>.requireRealPackageDestructiveOptIn(action: String) {
+    if (!get()) {
+        throw GradleException(
+            "$action would target the real PersonalHub package $realPersonalHubPackage. " +
+                "Use the isolated benchmark package $isolatedBenchmarkPackage, or pass " +
+                "-Ppersonalhub.allowRealPackageDestructive=true only when the same prompt explicitly authorizes real-device data risk.",
+        )
+    }
+}
+
+tasks.configureEach {
+    val taskPath = path.lowercase()
+    when {
+        taskPath == ":app:uninstallall" ||
+            (taskPath.startsWith(":app:uninstall") && !taskPath.contains("benchmark")) -> {
+            doFirst {
+                realPackageDestructiveOptIn.requireRealPackageDestructiveOptIn(path)
+            }
+        }
+        taskPath == ":app:connecteddebugandroidtest" -> {
+            doFirst {
+                realPackageDestructiveOptIn.requireRealPackageDestructiveOptIn(path)
+            }
+        }
     }
 }
 

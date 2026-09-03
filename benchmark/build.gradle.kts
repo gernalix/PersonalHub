@@ -7,6 +7,14 @@ plugins {
     alias(libs.plugins.android.test)
 }
 
+val realPersonalHubPackage = "com.gernalix.personalhub"
+val isolatedBenchmarkTargetPackage = "$realPersonalHubPackage.benchmarktarget"
+val benchmarkTargetPackage = providers.gradleProperty("personalhub.benchmark.targetPackage")
+    .orElse(isolatedBenchmarkTargetPackage)
+val realPackageDestructiveOptIn = providers.gradleProperty("personalhub.allowRealPackageDestructive")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
+
 val canonicalSigningEnvFile = File("/home/daniele/.config/codex/secrets/android_signing.env")
 val canonicalSigningProperties = Properties().apply {
     if (canonicalSigningEnvFile.exists()) canonicalSigningEnvFile.inputStream().use(::load)
@@ -52,6 +60,7 @@ android {
         minSdk = 29
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments["targetPackage"] = benchmarkTargetPackage.get()
     }
 
     buildTypes {
@@ -66,6 +75,39 @@ android {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
         }
     }
+}
+
+val preflightPersonalHubBenchmarkSafety = tasks.register("preflightPersonalHubBenchmarkSafety") {
+    group = "verification"
+    description = "Fails before benchmark/profile execution if the real PersonalHub package would be targeted without explicit opt-in."
+    doLast {
+        val targetPackage = benchmarkTargetPackage.get().trim()
+        require(targetPackage.isNotEmpty()) { "personalhub.benchmark.targetPackage must not be blank." }
+        if (targetPackage == realPersonalHubPackage && !realPackageDestructiveOptIn.get()) {
+            throw GradleException(
+                "Refusing to benchmark/profile the real PersonalHub package $realPersonalHubPackage. " +
+                    "Macrobenchmark/BaselineProfile installs and tears down the tested app, so use " +
+                    "$isolatedBenchmarkTargetPackage or pass -Ppersonalhub.allowRealPackageDestructive=true only with explicit same-prompt authorization.",
+            )
+        }
+    }
+}
+
+tasks.register("verifyPersonalHubBenchmarkSafety") {
+    group = "verification"
+    description = "Verifies that benchmark/profile tests default to the isolated PersonalHub package."
+    doLast {
+        check(benchmarkTargetPackage.get() == isolatedBenchmarkTargetPackage) {
+            "Benchmark target must default to $isolatedBenchmarkTargetPackage, got ${benchmarkTargetPackage.get()}."
+        }
+    }
+}
+
+tasks.matching {
+    it.name.startsWith("connected", ignoreCase = true) ||
+        it.name.contains("BaselineProfile", ignoreCase = true)
+}.configureEach {
+    dependsOn(preflightPersonalHubBenchmarkSafety)
 }
 
 dependencies {

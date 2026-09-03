@@ -51,13 +51,13 @@
 
         <provider
             android:name="com.gernalix.luoghi.provider.PlacesProvider"
-            android:authorities="com.gernalix.personalhub.luoghi.places"
+            android:authorities="${applicationId}.luoghi.places"
             android:exported="false"
             android:grantUriPermissions="false" />
 
         <provider
             android:name="com.example.multitimetracker.api.MttPublicSessionsProvider"
-            android:authorities="com.gernalix.personalhub.mtt.sessions"
+            android:authorities="${applicationId}.mtt.sessions"
             android:exported="false"
             android:grantUriPermissions="false" />
 
