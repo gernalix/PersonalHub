@@ -8,6 +8,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(entities = [
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount::class,
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceProduct::class,
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceTitle::class,
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceChain::class,
@@ -68,7 +69,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.personalhub.core.database.TimerSyncQueue::class,
     com.gernalix.personalhub.core.database.TimerSyncShadow::class,
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
-], version = 4, exportSchema = true)
+], version = 5, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase() {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -80,7 +81,7 @@ abstract class PersonalHubDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 4
+        const val SCHEMA_VERSION = 5
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -116,7 +117,7 @@ abstract class PersonalHubDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(com.gernalix.personalhub.core.database.capsules.soldi.FinanceMigration(context))
+                .addMigrations(com.gernalix.personalhub.core.database.capsules.soldi.FinanceMigration(context), com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccountsMigration(context))
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
