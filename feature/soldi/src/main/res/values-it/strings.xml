@@ -52,4 +52,5 @@
     <string name="git_success">Interscambio completato</string>
     <string name="git_error">Interscambio interrotto. Controlla URL, rete e accesso al server. Se il remoto è cambiato serve Pull; conflitti locali o dati non validi richiedono una verifica. Nessuna credenziale è accettata.</string>
     <string name="git_configured">Configurazione salvata</string>
+    <string name="transaction_actions">Azioni transazione</string>
 </resources>

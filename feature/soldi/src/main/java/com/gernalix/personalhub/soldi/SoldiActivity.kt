@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -116,23 +118,36 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
                         0 -> {
                             if (transactions.isEmpty()) item { Text(stringResource(R.string.empty)) }
                             items(transactions.filter { row -> accounts.any { it.id == row.value.accountId && it.included } && java.time.YearMonth.from(Instant.parse(row.value.occurredAt).atZone(ZoneId.systemDefault())) == month && listOf(row.title,row.chain,row.place,row.value.notes).any { it?.contains(search,true) == true } }, key = { it.value.id }) { row ->
-                                Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
-                                    Text(row.title, style = MaterialTheme.typography.titleMedium)
-                                    Text("${row.value.amount} ${row.value.currency}")
-                                    Text(accounts.find { it.id == row.value.accountId }?.name.orEmpty())
-                                    Text(listOfNotNull(row.chain, row.place).joinToString(" · "))
-                                    Text(localDate(row.value.occurredAt))
-                                    if (row.value.fromReceipt) Text(stringResource(R.string.from_receipt))
-                                    if (row.value.notes.isNotBlank()) Text(row.value.notes)
-                                    Row {
-                                        TextButton(enabled = !busy, onClick = { action {
-                                            transaction = TransactionDraft(row.value.id, row.title, row.value.productId != null, row.value.amount, row.value.currency,
-                                                row.chain.orEmpty(), row.value.placeId, row.value.notes, capsule.tags(row.value.id).joinToString(", "), row.value.fromReceipt, row.value.occurredAt, row.value.accountId, row.value.productId)
-                                        } }) { Text(stringResource(R.string.edit)) }
-
-                                        TextButton(enabled = !busy, onClick = { deletion = 0 to row.value.id }) { Text(stringResource(R.string.delete)) }
-                                    }
+                                var menuOpen by remember { mutableStateOf(false) }
+                                val edit = { action {
+                                    transaction = TransactionDraft(row.value.id, row.title, row.value.productId != null, row.value.amount, row.value.currency,
+                                        row.chain.orEmpty(), row.value.placeId, row.value.notes, capsule.tags(row.value.id).joinToString(", "), row.value.fromReceipt, row.value.occurredAt, row.value.accountId, row.value.productId)
                                 } }
+                                Card(onClick = edit, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                                    Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                                Text(row.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                                Text("${row.value.amount} ${row.value.currency}", style = MaterialTheme.typography.titleSmall)
+                                            }
+                                            Text(listOfNotNull(accounts.find { it.id == row.value.accountId }?.name, localDate(row.value.occurredAt)).joinToString(" · "),
+                                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                            val details = listOfNotNull(row.chain, row.place, row.value.notes,
+                                                if (row.value.fromReceipt) stringResource(R.string.from_receipt) else null).filter { it.isNotBlank() }
+                                            if (details.isNotEmpty()) Text(details.joinToString(" · "), style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                        }
+                                        Box {
+                                            val actions = stringResource(R.string.transaction_actions)
+                                            TextButton(onClick = { menuOpen = true }, enabled = !busy, modifier = Modifier.size(48.dp).semantics { contentDescription = actions }, contentPadding = PaddingValues(0.dp)) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                                DropdownMenuItem(text = { Text(stringResource(R.string.edit)) }, onClick = { menuOpen = false; edit() })
+                                                DropdownMenuItem(text = { Text(stringResource(R.string.delete)) }, onClick = { menuOpen = false; deletion = 0 to row.value.id })
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         1 -> {

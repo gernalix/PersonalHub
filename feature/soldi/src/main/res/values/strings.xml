@@ -52,4 +52,5 @@
     <string name="git_success">Exchange completed</string>
     <string name="git_error">Exchange stopped. Check the URL, network and server access. A changed remote requires Pull; conflicting local edits or invalid records require review. No credentials are accepted.</string>
     <string name="git_configured">Configuration saved</string>
+    <string name="transaction_actions">Transaction actions</string>
 </resources>

@@ -40,3 +40,12 @@ JGit Java baseline reference: https://help.eclipse.org/latest/topic/org.eclipse.
 - Pixel received a coherent private app backup. TCL v8 was not debuggable, so its native verified SAF export supplied the backup; the temporary folder setting was subsequently removed to restore its previous unconfigured state. No main uninstall, reset or destructive instrumentation occurred.
 - Both migrated databases passed integrity/foreign-key checks at Room schema 5; all rows of all 54 preexisting domain tables matched their respective backups exactly. Both main finance transaction tables remain empty: no standalone Soldi import and no QA-data import.
 - QA/test packages, synthetic device export folders and ADB fixture forwarding were removed; the local Git fixture server was stopped. Private evidence and backups remain outside Git under the task's `artifacts/684213` directory.
+
+
+### Compact transaction cards — application 15
+
+The transaction list now puts the title and amount on one line, with account/date beneath. Empty merchant/place rows are omitted; nonempty supplementary details use one truncated preview line and remain fully accessible in the editor. Tapping a card edits it. An accessible 48 dp overflow target contains Edit/Delete, retaining the deletion confirmation without a permanent action row. Typical two-line cards are 64 dp tall. No persistence or accounting behavior changed.
+
+Debug and isolated QA builds passed. Pixel QA with synthetic records verified readable two/three-line cards, direct card editing, overflow editing and deletion confirmation. Version 15 is an in-place UI update; no original Soldi data or QA fixtures enter the main app.
+
+Pixel and TCL main packages were updated in place from 14 to 15 and both launch/version checks passed. Canonical signing was accepted by both installers. The isolated Pixel QA package was removed. This follow-up is UI-only; no roadmap entry was advanced.
