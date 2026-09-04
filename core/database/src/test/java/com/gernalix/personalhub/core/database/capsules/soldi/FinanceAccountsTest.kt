@@ -54,6 +54,25 @@ class FinanceAccountsTest {
         assertEquals("88",FinanceCapsule.balance(a,db.financeDao().allTransactions()).toPlainString())
         db.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
     }
+    @Test fun titleSuggestionCopiesLatestFieldsButPreservesDateAndIdentity() = db { db, finance ->
+        val a = FinanceAccount(name="Cash", currency="DKK")
+        val b = FinanceAccount(name="Euro", currency="EUR")
+        finance.saveAccount(a); finance.saveAccount(b)
+        val newest = TransactionDraft(title="Groceries", amount="-24.5", currency="EUR", accountId=b.id,
+            chain="Market", notes="Latest details", tags="food, weekly", fromReceipt=true,
+            occurredAt="2026-06-02T12:00:00Z")
+        finance.saveTransaction(newest)
+        // An older occurrence inserted later must not become the template.
+        finance.saveTransaction(TransactionDraft(title="Groceries", amount="-1", accountId=a.id, occurredAt="2026-06-01T12:00:00Z"))
+        val draft = TransactionDraft(id=999, title="Gro", occurredAt="2026-09-04T12:34:56Z")
+        val filled = finance.reuseLatestTitle(draft, "Groceries")
+        assertEquals(newest.copy(id=draft.id, occurredAt=draft.occurredAt), filled)
+        assertEquals(2, db.financeDao().allTransactions().size)
+        val id = finance.saveTransaction(filled.copy(id=null))
+        assertEquals(draft.occurredAt, db.financeDao().transaction(id)!!.occurredAt)
+        assertEquals(b.id, db.financeDao().transaction(id)!!.accountId)
+        assertEquals(listOf("food", "weekly"), finance.tags(id))
+    }
     @Test fun deterministicExchangeAtomicConflictsAndCredentialFreeConfiguration() = db { db,finance ->
         val account=FinanceAccount(name="QA",currency="DKK"); finance.saveAccount(account)
         finance.saveTransaction(TransactionDraft(title="QA transaction",amount="-2",accountId=account.id))

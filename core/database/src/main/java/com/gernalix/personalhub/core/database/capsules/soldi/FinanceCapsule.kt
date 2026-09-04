@@ -18,6 +18,17 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
     val tagNames = dao.tagNames()
     suspend fun tags(id: Long) = dao.tags(id)
 
+    /** Reuse the most recent occurrence, preserving the draft's identity and selected date. */
+    suspend fun reuseLatestTitle(draft: TransactionDraft, title: String): TransactionDraft = db.withTransaction {
+        val previous = dao.transactionsWithTitle(title).maxWithOrNull(
+            compareBy<FinanceTransaction> { Instant.parse(it.occurredAt) }.thenBy { it.id }
+        ) ?: return@withTransaction draft.copy(title = title)
+        draft.copy(title = title, isProduct = false, productId = null,
+            amount = previous.amount, currency = previous.currency, accountId = previous.accountId,
+            chain = previous.chainId?.let { dao.chainName(it) }.orEmpty(), placeId = previous.placeId,
+            notes = previous.notes, tags = dao.tags(previous.id).joinToString(", "), fromReceipt = previous.fromReceipt)
+    }
+
     private suspend fun product(name: String): Long {
         val n = name.trim(); require(n.isNotEmpty())
         return dao.productId(n) ?: dao.add(FinanceProduct(name = n))

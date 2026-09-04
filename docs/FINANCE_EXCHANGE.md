@@ -49,3 +49,12 @@ The transaction list now puts the title and amount on one line, with account/dat
 Debug and isolated QA builds passed. Pixel QA with synthetic records verified readable two/three-line cards, direct card editing, overflow editing and deletion confirmation. Version 15 is an in-place UI update; no original Soldi data or QA fixtures enter the main app.
 
 Pixel and TCL main packages were updated in place from 14 to 15 and both launch/version checks passed. Canonical signing was accepted by both installers. The isolated Pixel QA package was removed. This follow-up is UI-only; no roadmap entry was advanced.
+
+
+### Title suggestions reuse the last transaction — application 16
+
+Selecting a suggested general title fills amount, currency, account, merchant, place, notes, tags and receipt-provenance flag from that title's latest occurrence. Latest means greatest occurrence instant, with row ID as a deterministic tie-breaker; a later-inserted older transaction does not win. The draft's selected date and identity remain unchanged. Typing alone and suggestions in other fields retain their existing behavior. Template reads go through the finance capsule and do not modify existing transactions.
+
+Four targeted FinanceAccountsTest cases passed, including complete template field equality, latest-occurrence selection, preserved date/identity and saving a separate new record. Debug/QA builds passed. Pixel QA selected a synthetic 02:30 transaction, retained the new draft's 02:47 date and saved it as a separate row; amount, account and receipt flag were copied and the original remained intact. No real data was used in QA.
+
+Pixel and TCL main packages were updated in place from 15 to 16; installed version and successful launch were verified on both. The isolated Pixel QA package was removed. No database schema change or roadmap advancement.

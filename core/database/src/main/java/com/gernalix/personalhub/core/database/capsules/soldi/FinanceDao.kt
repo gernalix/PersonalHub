@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 interface FinanceDao {
     @Query("SELECT t.*, COALESCE(p.name,n.name,'') AS title,c.name AS chain,l.nickname AS place FROM finance_transactions t LEFT JOIN finance_products p ON p.id=t.productId LEFT JOIN finance_titles n ON n.id=t.titleId LEFT JOIN finance_chains c ON c.id=t.chainId LEFT JOIN places l ON l.uuid=t.placeId ORDER BY t.occurredAt DESC,t.id DESC")
     fun transactions(): Flow<List<TransactionView>>
+    @Query("SELECT t.* FROM finance_transactions t JOIN finance_titles n ON n.id=t.titleId WHERE n.name=:title")
+    suspend fun transactionsWithTitle(title: String): List<FinanceTransaction>
     @Query("SELECT * FROM finance_accounts ORDER BY name,id") fun accounts(): Flow<List<FinanceAccount>>
     @Query("SELECT * FROM finance_accounts ORDER BY id") suspend fun allAccounts(): List<FinanceAccount>
     @Query("SELECT * FROM finance_accounts WHERE id=:id") suspend fun account(id: String): FinanceAccount?

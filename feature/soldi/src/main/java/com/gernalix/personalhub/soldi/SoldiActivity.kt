@@ -83,7 +83,7 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
         if (error) Text(stringResource(R.string.operation_failed), color = MaterialTheme.colorScheme.error)
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         when {
-            transaction != null -> TransactionEditor(transaction!!, products, places, accounts, transactions, tags, { transaction = it }, busy) {
+            transaction != null -> TransactionEditor(transaction!!, products, places, accounts, transactions, tags, { title -> action { transaction = capsule.reuseLatestTitle(transaction!!, title) } }, { transaction = it }, busy) {
                 val draft = transaction!!
                 action { capsule.saveTransaction(draft); back() }
             }
@@ -203,10 +203,10 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
 }
 
 @Composable
-private fun TransactionEditor(d: TransactionDraft, products: List<FinanceProduct>, places: List<PlaceChoice>, accounts: List<FinanceAccount>, transactions: List<TransactionView>, tags: List<String>, change: (TransactionDraft) -> Unit, busy: Boolean, save: () -> Unit) {
+private fun TransactionEditor(d: TransactionDraft, products: List<FinanceProduct>, places: List<PlaceChoice>, accounts: List<FinanceAccount>, transactions: List<TransactionView>, tags: List<String>, selectTitle: (String) -> Unit, change: (TransactionDraft) -> Unit, busy: Boolean, save: () -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { AccountPicker(accounts,d.accountId) { change(d.copy(accountId = it.id,currency = it.currency)) } }
-        item { Field(R.string.title, d.title, readOnly = d.productId != null, suggestions = transactions.filter { it.value.productId == null }.map { it.title }) { change(d.copy(title = it)) } }
+        item { Field(R.string.title, d.title, readOnly = d.productId != null, suggestions = transactions.filter { it.value.productId == null }.map { it.title }, selectSuggestion = selectTitle) { change(d.copy(title = it)) } }
         item { Row { Checkbox(d.isProduct, { change(d.copy(isProduct = it,productId = if(it) d.productId else null)) }); Text(stringResource(R.string.is_product)) } }
         if (d.isProduct) item { ProductPicker(products) { change(d.copy(title = it.name,productId = it.id)) } }
         item { Field(R.string.amount, d.amount) { change(d.copy(amount = it)) } }
@@ -223,7 +223,7 @@ private fun TransactionEditor(d: TransactionDraft, products: List<FinanceProduct
 }
 
 @Composable
-private fun Field(label: Int, value: String, readOnly: Boolean = false, suggestions: List<String> = emptyList(), commaSeparated: Boolean = false, change: (String) -> Unit) {
+private fun Field(label: Int, value: String, readOnly: Boolean = false, suggestions: List<String> = emptyList(), commaSeparated: Boolean = false, selectSuggestion: ((String) -> Unit)? = null, change: (String) -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val query = (if (commaSeparated) value.substringAfterLast(',') else value).trim()
     val options = suggestions.distinct().filter {
@@ -237,7 +237,7 @@ private fun Field(label: Int, value: String, readOnly: Boolean = false, suggesti
             label = { Text(stringResource(label)) }, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused })
         if (focused && !readOnly && query.isNotEmpty()) options.forEach { suggestion ->
             TextButton(onClick = {
-                change(if (commaSeparated && value.contains(',')) value.substringBeforeLast(',') + ", " + suggestion else suggestion)
+                (selectSuggestion ?: change)(if (commaSeparated && value.contains(',')) value.substringBeforeLast(',') + ", " + suggestion else suggestion)
             }) { Text(suggestion) }
         }
     }
