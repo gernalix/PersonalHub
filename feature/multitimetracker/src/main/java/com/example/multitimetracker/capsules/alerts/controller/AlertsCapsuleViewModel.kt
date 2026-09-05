@@ -50,18 +50,18 @@ internal fun timeFenceRuleMatchesTagIds(
 internal fun normalizedTimeFenceTagIds(tagIds: Set<Long>): List<Long> =
     tagIds.filter { it > 0L }.sorted()
 
-internal fun hasDuplicateTimeFenceRuleForTags(
+internal fun hasDuplicateTimeFenceRuleForTriggerAndTags(
     rules: List<TimeFenceRule>,
     candidateRuleId: Long?,
+    trigger: TimeFenceTrigger,
     tagIds: Set<Long>
 ): Boolean {
     val normalizedCandidate = normalizedTimeFenceTagIds(tagIds)
-    if (normalizedCandidate.isEmpty()) return false
-
     return rules.any { rule ->
         !rule.isDeleted &&
             rule.id != candidateRuleId &&
-            normalizedTimeFenceTagIds(rule.tagIds).any { it in normalizedCandidate }
+            rule.trigger == trigger &&
+            normalizedTimeFenceTagIds(rule.tagIds) == normalizedCandidate
     }
 }
 
@@ -275,7 +275,7 @@ class AlertsCapsuleViewModel(
         val beforeRules = rules()
         val rule = synchronized(ruleMutationLock) {
             val currentRules = beforeRules
-            if (hasDuplicateTimeFenceRuleForTags(currentRules, null, tagIds)) {
+            if (hasDuplicateTimeFenceRuleForTriggerAndTags(currentRules, null, trigger, tagIds)) {
                 return false
             }
             val id = System.currentTimeMillis() + Random.nextInt(0, 9999)
@@ -329,7 +329,7 @@ class AlertsCapsuleViewModel(
         var oldRule: TimeFenceRule? = null
         val newRules = synchronized(ruleMutationLock) {
             val currentRules = beforeRules
-            if (hasDuplicateTimeFenceRuleForTags(currentRules, ruleId, tagIds)) {
+            if (hasDuplicateTimeFenceRuleForTriggerAndTags(currentRules, ruleId, trigger, tagIds)) {
                 return false
             }
             oldRule = currentRules.firstOrNull { it.id == ruleId }

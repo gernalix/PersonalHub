@@ -1,6 +1,6 @@
 package com.example.multitimetracker
 
-import com.example.multitimetracker.capsules.alerts.controller.hasDuplicateTimeFenceRuleForTags
+import com.example.multitimetracker.capsules.alerts.controller.hasDuplicateTimeFenceRuleForTriggerAndTags
 import com.example.multitimetracker.model.TimeFenceDelivery
 import com.example.multitimetracker.model.TimeFenceMatchMode
 import com.example.multitimetracker.model.TimeFenceRule
@@ -12,12 +12,13 @@ import org.junit.Test
 
 class TimeFenceRuleDuplicateTest {
     @Test
-    fun activeRuleBlocksAnotherAlertForSameTagAcrossDifferentTriggers() {
+    fun activeRuleBlocksAnotherAlertForSameTriggerAndSameTagSet() {
         val existing = rule(id = 1L, trigger = TimeFenceTrigger.ON_START, tagIds = setOf(14L))
 
-        val duplicate = hasDuplicateTimeFenceRuleForTags(
+        val duplicate = hasDuplicateTimeFenceRuleForTriggerAndTags(
             rules = listOf(existing),
             candidateRuleId = null,
+            trigger = TimeFenceTrigger.ON_START,
             tagIds = setOf(14L),
         )
 
@@ -25,16 +26,24 @@ class TimeFenceRuleDuplicateTest {
     }
 
     @Test
-    fun activeRuleBlocksAnotherAlertWhenAnyTagOverlaps() {
-        val existing = rule(id = 1L, tagIds = setOf(1L, 14L))
+    fun sameTagWithDifferentTriggerOrDifferentTagSetIsAllowed() {
+        val existing = rule(id = 1L, trigger = TimeFenceTrigger.ON_START, tagIds = setOf(1L, 14L))
 
-        val duplicate = hasDuplicateTimeFenceRuleForTags(
+        val differentTrigger = hasDuplicateTimeFenceRuleForTriggerAndTags(
             rules = listOf(existing),
             candidateRuleId = null,
+            trigger = TimeFenceTrigger.ON_STOP,
+            tagIds = setOf(1L, 14L),
+        )
+        val overlappingButDifferentSet = hasDuplicateTimeFenceRuleForTriggerAndTags(
+            rules = listOf(existing),
+            candidateRuleId = null,
+            trigger = TimeFenceTrigger.ON_START,
             tagIds = setOf(14L, 22L),
         )
 
-        assertTrue(duplicate)
+        assertFalse(differentTrigger)
+        assertFalse(overlappingButDifferentSet)
     }
 
     @Test
@@ -43,16 +52,18 @@ class TimeFenceRuleDuplicateTest {
         val deleted = rule(id = 2L, tagIds = setOf(22L), isDeleted = true)
 
         assertFalse(
-            hasDuplicateTimeFenceRuleForTags(
+            hasDuplicateTimeFenceRuleForTriggerAndTags(
                 rules = listOf(existing, deleted),
                 candidateRuleId = 1L,
+                trigger = TimeFenceTrigger.ON_STOP,
                 tagIds = setOf(14L),
             )
         )
         assertFalse(
-            hasDuplicateTimeFenceRuleForTags(
+            hasDuplicateTimeFenceRuleForTriggerAndTags(
                 rules = listOf(deleted),
                 candidateRuleId = null,
+                trigger = TimeFenceTrigger.ON_STOP,
                 tagIds = setOf(22L),
             )
         )
