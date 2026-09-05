@@ -6,6 +6,9 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.gernalix.luoghi.data.PlaceDeleteResult
+import com.gernalix.luoghi.data.PlaceEntity
+import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.core.database.*
 import com.gernalix.personalhub.core.database.capsules.soldi.*
 import kotlinx.coroutines.runBlocking
@@ -22,7 +25,18 @@ class FinanceInstrumentedTest {
         check(context.packageName == "com.gernalix.personalhub.qa") { "Only the isolated QA package is allowed" }
         check(DatabaseVault.folder(context)?.contains("PersonalHubSoldiQA") == true) { "Select the isolated SAF test folder" }
     }
+    private fun guardQaPackage() {
+        check(context.packageName == "com.gernalix.personalhub.qa") { "Only the isolated QA package is allowed" }
+    }
     private fun scalar(sql: String) = PersonalHubDatabase.get(context).openHelper.readableDatabase.query(sql).use { it.moveToFirst(); it.getLong(0) }
+    private fun cleanupPlacePolicyRows() {
+        PersonalHubDatabase.get(context).openHelper.writableDatabase.apply {
+            execSQL("DELETE FROM finance_transaction_tags WHERE transactionId IN (SELECT id FROM finance_transactions WHERE notes='QA place delete policy')")
+            execSQL("DELETE FROM finance_transactions WHERE notes='QA place delete policy'")
+            execSQL("DELETE FROM finance_stores WHERE placeId LIKE '761284-%'")
+            execSQL("DELETE FROM places WHERE uuid LIKE '761284-%'")
+        }
+    }
     private fun exportedCount(expected: Long) {
         val expectedGeneration = scalar("SELECT generation FROM hub_generation")
         val deadline = System.currentTimeMillis() + 45_000
@@ -71,5 +85,50 @@ class FinanceInstrumentedTest {
         // Leave one explicitly synthetic record for UI/read/reopen QA; original Soldi has never been read.
         finance.saveTransaction(TransactionDraft(title = "QA UI transaction", amount = "-10", fromReceipt = true))
         exportedCount(1)
+    }
+
+    @Test fun placeDeleteArchivesFinanceReferencesAndPreservesFinanceHistory() = runBlocking {
+        guardQaPackage()
+        cleanupPlacePolicyRows()
+        val db = PersonalHubDatabase.get(context)
+        val places = PlaceRepository(context)
+        val placeDao = db.placeDao()
+        val financeDao = db.financeDao()
+        val finance = FinanceCapsule(db)
+        try {
+            val freePlace = "761284-free-place"
+            placeDao.upsertPlace(PlaceEntity(uuid = freePlace, nickname = "QA delete free"))
+            assertEquals(PlaceDeleteResult.Deleted, places.deletePlace(freePlace))
+            assertNull(placeDao.getPlace(freePlace))
+
+            val transactionPlace = "761284-transaction-place"
+            placeDao.upsertPlace(PlaceEntity(uuid = transactionPlace, nickname = "QA delete transaction"))
+            val transactionId = finance.saveTransaction(
+                TransactionDraft(
+                    title = "QA place linked transaction",
+                    amount = "-4.20",
+                    placeId = transactionPlace,
+                    notes = "QA place delete policy",
+                )
+            )
+            PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL(
+                "DELETE FROM finance_stores WHERE placeId=?",
+                arrayOf(transactionPlace),
+            )
+            assertEquals(PlaceDeleteResult.ArchivedBecauseReferenced, places.deletePlace(transactionPlace))
+            assertTrue(requireNotNull(placeDao.getPlace(transactionPlace)).archived)
+            assertEquals(transactionPlace, requireNotNull(financeDao.transaction(transactionId)).placeId)
+
+            val storePlace = "761284-store-place"
+            placeDao.upsertPlace(PlaceEntity(uuid = storePlace, nickname = "QA delete store"))
+            financeDao.add(FinanceStore(storePlace, chainId = null))
+            assertEquals(PlaceDeleteResult.ArchivedBecauseReferenced, places.deletePlace(storePlace))
+            assertTrue(requireNotNull(placeDao.getPlace(storePlace)).archived)
+            assertNotNull(financeDao.store(storePlace))
+
+            assertEquals(PlaceDeleteResult.NotFound, places.deletePlace("761284-missing-place"))
+        } finally {
+            cleanupPlacePolicyRows()
+        }
     }
 }

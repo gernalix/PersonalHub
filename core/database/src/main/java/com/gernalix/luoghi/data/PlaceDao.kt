@@ -93,7 +93,7 @@ interface PlaceDao {
     suspend fun deletePlace(place: PlaceEntity)
 
     @Query("DELETE FROM places WHERE uuid = :uuid")
-    suspend fun deletePlaceByUuid(uuid: String)
+    suspend fun deletePlaceByUuid(uuid: String): Int
 
     @Query("UPDATE places SET archived = :archived, updated_at = :updatedAt WHERE uuid = :uuid")
     suspend fun setPlaceArchived(uuid: String, archived: Boolean, updatedAt: Long): Int

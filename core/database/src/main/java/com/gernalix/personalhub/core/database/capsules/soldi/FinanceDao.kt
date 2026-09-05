@@ -26,6 +26,8 @@ interface FinanceDao {
     @Query("SELECT uuid AS id, nickname AS name FROM places WHERE archived=0 ORDER BY nickname") fun places(): Flow<List<PlaceChoice>>
     @Query("SELECT * FROM finance_transactions WHERE id=:id") suspend fun transaction(id: Long): FinanceTransaction?
     @Query("SELECT * FROM finance_stores WHERE placeId=:id") suspend fun store(id: String): FinanceStore?
+    @Query("SELECT COUNT(*) FROM finance_transactions WHERE placeId=:id") suspend fun transactionCountForPlace(id: String): Int
+    @Query("SELECT COUNT(*) FROM finance_stores WHERE placeId=:id") suspend fun storeCountForPlace(id: String): Int
     @Query("SELECT name FROM finance_tags JOIN finance_transaction_tags ON id=tagId WHERE transactionId=:id ORDER BY name") suspend fun tags(id: Long): List<String>
     @Query("SELECT id FROM finance_products WHERE name=:name") suspend fun productId(name: String): Long?
     @Query("SELECT id FROM finance_titles WHERE name=:name") suspend fun titleId(name: String): Long?

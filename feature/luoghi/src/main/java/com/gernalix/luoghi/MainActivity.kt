@@ -315,6 +315,28 @@ private fun LuoghiNavigation(
     if (globalStatsOpen) {
         GlobalStatsDialog(state = state, onDismiss = { globalStatsOpen = false })
     }
+    state.placeDeleteMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = vm::clearPlaceDeleteMessage,
+            title = { Text(stringResource(R.string.delete_place)) },
+            text = {
+                Text(
+                    stringResource(
+                        when (message) {
+                            PlaceDeleteMessage.DELETED -> R.string.delete_place_deleted
+                            PlaceDeleteMessage.ARCHIVED_REFERENCED -> R.string.delete_place_archived_referenced
+                            PlaceDeleteMessage.NOT_FOUND -> R.string.delete_place_not_found
+                        }
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = vm::clearPlaceDeleteMessage) {
+                    Text(stringResource(R.string.close))
+                }
+            },
+        )
+    }
     pendingDelete?.let { item ->
         AlertDialog(
             onDismissRequest = { pendingDeletePlaceId = null },

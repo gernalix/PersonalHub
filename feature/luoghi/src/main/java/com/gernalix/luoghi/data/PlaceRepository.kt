@@ -17,6 +17,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
+sealed interface PlaceDeleteResult {
+    data object Deleted : PlaceDeleteResult
+    data object ArchivedBecauseReferenced : PlaceDeleteResult
+    data object NotFound : PlaceDeleteResult
+}
+
 class PlaceRepository(
     private val context: Context,
     private val database: LuoghiDatabase = LuoghiDatabase.get(context),
@@ -64,9 +70,29 @@ class PlaceRepository(
         return resolvedUuid
     }
 
-    suspend fun deletePlace(uuid: String) {
-        DatabaseMutationCoordinator.mutex.withLock { dao.deletePlaceByUuid(uuid) }
-        PersistentMutationTracker.record(context, "places.delete")
+    suspend fun deletePlace(uuid: String): PlaceDeleteResult {
+        val result = DatabaseMutationCoordinator.mutex.withLock {
+            database.withTransaction {
+                val place = dao.getPlace(uuid) ?: return@withTransaction PlaceDeleteResult.NotFound
+                val financeReferences =
+                    database.financeDao().transactionCountForPlace(uuid) +
+                        database.financeDao().storeCountForPlace(uuid)
+                if (financeReferences > 0) {
+                    dao.setPlaceArchived(uuid, archived = true, updatedAt = System.currentTimeMillis())
+                    PlaceDeleteResult.ArchivedBecauseReferenced
+                } else if (dao.deletePlaceByUuid(place.uuid) > 0) {
+                    PlaceDeleteResult.Deleted
+                } else {
+                    PlaceDeleteResult.NotFound
+                }
+            }
+        }
+        when (result) {
+            PlaceDeleteResult.Deleted -> PersistentMutationTracker.record(context, "places.delete")
+            PlaceDeleteResult.ArchivedBecauseReferenced -> PersistentMutationTracker.record(context, "places.archive")
+            PlaceDeleteResult.NotFound -> Unit
+        }
+        return result
     }
 
     suspend fun archivePlace(uuid: String, archived: Boolean = true): Int {

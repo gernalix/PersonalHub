@@ -58,7 +58,10 @@
     <string name="close">Close</string>
     <string name="map">Map</string>
     <string name="delete_place">Delete place</string>
-    <string name="delete_place_confirm_format">Confirm deletion of %1$s?</string>
+    <string name="delete_place_confirm_format">Remove %1$s from active places?</string>
+    <string name="delete_place_deleted">Place deleted.</string>
+    <string name="delete_place_archived_referenced">This place is used by Finance, so it was archived instead of deleted. Financial history was preserved.</string>
+    <string name="delete_place_not_found">Place no longer exists.</string>
     <string name="delete">Delete</string>
     <string name="edit">Edit</string>
     <string name="undo">Undo</string>

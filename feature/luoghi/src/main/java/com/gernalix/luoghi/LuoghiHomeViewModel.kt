@@ -26,6 +26,7 @@ import com.gernalix.luoghi.backup.RestoreResult
 import com.gernalix.luoghi.backup.RestoreSummary
 import com.gernalix.luoghi.backup.ValidatedBackup
 import com.gernalix.luoghi.data.PlaceEntity
+import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.export.BackupFolderStore
 import androidx.core.content.edit
@@ -114,6 +115,12 @@ enum class HistoryMessage {
     NOTHING_TO_REDO,
 }
 
+enum class PlaceDeleteMessage {
+    DELETED,
+    ARCHIVED_REFERENCED,
+    NOT_FOUND,
+}
+
 data class ActiveVisitUi(
     val placeUuid: String,
     val placeName: String,
@@ -199,6 +206,7 @@ data class HomeUiState(
     val routeDistances: RouteDistanceStatsUi = RouteDistanceStatsUi(),
     val history: HistoryUiState = HistoryUiState(),
     val restore: RestoreUiState = RestoreUiState(),
+    val placeDeleteMessage: PlaceDeleteMessage? = null,
 )
 
 class LuoghiHomeViewModel(
@@ -874,9 +882,22 @@ class LuoghiHomeViewModel(
 
     fun deletePlace(uuid: String) {
         viewModelScope.launch {
-            container.places.delete(uuid)
+            val result = container.places.delete(uuid)
             if (mutableState.value.form.uuid == uuid) newPlace()
+            mutableState.update {
+                it.copy(
+                    placeDeleteMessage = when (result) {
+                        PlaceDeleteResult.Deleted -> PlaceDeleteMessage.DELETED
+                        PlaceDeleteResult.ArchivedBecauseReferenced -> PlaceDeleteMessage.ARCHIVED_REFERENCED
+                        PlaceDeleteResult.NotFound -> PlaceDeleteMessage.NOT_FOUND
+                    }
+                )
+            }
         }
+    }
+
+    fun clearPlaceDeleteMessage() {
+        mutableState.update { it.copy(placeDeleteMessage = null) }
     }
 
     fun editHistoryEvent(eventId: Long, timestamp: Long, notes: String?) {

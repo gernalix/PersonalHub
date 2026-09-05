@@ -58,7 +58,10 @@
     <string name="close">Chiudi</string>
     <string name="map">Mappa</string>
     <string name="delete_place">Elimina luogo</string>
-    <string name="delete_place_confirm_format">Confermi eliminazione di %1$s?</string>
+    <string name="delete_place_confirm_format">Rimuovere %1$s dai luoghi attivi?</string>
+    <string name="delete_place_deleted">Luogo eliminato.</string>
+    <string name="delete_place_archived_referenced">Questo luogo e usato da Soldi, quindi e stato archiviato invece di eliminarlo. La cronologia finanziaria e stata conservata.</string>
+    <string name="delete_place_not_found">Il luogo non esiste piu.</string>
     <string name="delete">Elimina</string>
     <string name="edit">Modifica</string>
     <string name="undo">Annulla</string>

@@ -1,6 +1,7 @@
 package com.gernalix.luoghi.capsules.places
 
 import com.gernalix.luoghi.data.PlaceEntity
+import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.PlaceRepository
 import kotlinx.coroutines.flow.Flow
 
@@ -30,9 +31,7 @@ class PlacesCapsule(private val repository: PlaceRepository) {
             sourceApp = mutation.sourceApp,
         )
 
-    suspend fun delete(uuid: String) {
-        repository.deletePlace(uuid)
-    }
+    suspend fun delete(uuid: String): PlaceDeleteResult = repository.deletePlace(uuid)
 
     suspend fun archive(uuid: String) {
         repository.archivePlace(uuid, archived = true)
