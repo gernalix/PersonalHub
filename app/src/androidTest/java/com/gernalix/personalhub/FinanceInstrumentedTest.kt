@@ -4,13 +4,20 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.core.database.*
 import com.gernalix.personalhub.core.database.capsules.soldi.*
+import com.gernalix.personalhub.soldi.R
+import com.gernalix.personalhub.soldi.SoldiActivity
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -61,6 +68,89 @@ class FinanceInstrumentedTest {
         }
         fail("Automatic SAF export did not converge: ${DatabaseVault.error(context)}")
     }
+
+    private fun UiDevice.text(value: String) =
+        wait(Until.findObject(By.text(value)), 5_000) ?: error("Missing UI text: $value")
+
+    private fun UiDevice.typeIntoField(index: Int, value: String) {
+        val fields = wait(Until.findObjects(By.clazz("android.widget.EditText")), 5_000)
+        require(index in fields.indices) { "Missing text field index $index; found ${fields.size}" }
+        fields[index].click()
+        waitForIdle()
+        fields[index].setText(value)
+        waitForIdle()
+    }
+
+    @Test fun soldiEditorsFiltersAndNavigationSurviveActivityRecreation() {
+        guardQaPackage()
+        runBlocking {
+            val finance = FinanceCapsule(PersonalHubDatabase.get(context))
+            val accountId = "finance-lifecycle-account"
+            finance.saveAccount(FinanceAccount(id = accountId, name = "QA lifecycle account", currency = "DKK"))
+            finance.saveProduct(null, "QA lifecycle product")
+        }
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.wakeUp()
+        device.pressHome()
+        val scenario = ActivityScenario.launch(SoldiActivity::class.java)
+        assertTrue(
+            "SoldiActivity did not reach the foreground",
+            device.wait(Until.hasObject(By.pkg(context.packageName)), 5_000),
+        )
+
+        val add = context.getString(R.string.add)
+        val back = context.getString(R.string.back)
+        val transactions = context.getString(R.string.transactions)
+        val products = context.getString(R.string.products)
+        val accounts = context.getString(R.string.accounts)
+        val reconcile = context.getString(R.string.reconcile)
+        val desiredBalance = context.getString(R.string.desired_balance)
+
+        device.text(add).click()
+        device.typeIntoField(0, "QA unsaved transaction")
+        device.typeIntoField(1, "-12.34")
+        device.text("QA unsaved transaction")
+        device.text("-12.34")
+        scenario.recreate()
+        device.text("QA unsaved transaction")
+        device.text("-12.34")
+        assertEquals(0, scalar("SELECT count(*) FROM finance_transactions WHERE amount='-12.34'"))
+
+        device.text(back).click()
+        device.text(products).click()
+        device.typeIntoField(0, "lifecycle product")
+        scenario.recreate()
+        device.text(products)
+        device.text("lifecycle product")
+        device.text("QA lifecycle product")
+
+        device.text(add).click()
+        device.typeIntoField(0, "QA unsaved product")
+        scenario.recreate()
+        device.text("QA unsaved product")
+        device.text(back).click()
+
+        device.text(accounts).click()
+        device.text(add).click()
+        device.typeIntoField(0, "QA unsaved account")
+        scenario.recreate()
+        device.text("QA unsaved account")
+        device.text(back).click()
+
+        device.text(accounts).click()
+        device.text(reconcile).click()
+        device.typeIntoField(0, "123")
+        scenario.recreate()
+        device.text("123")
+        device.text(desiredBalance)
+
+        device.text(back).click()
+        device.text(transactions).click()
+        scenario.recreate()
+        device.text(transactions)
+        scenario.close()
+    }
+
     @Test fun syntheticCrudPersistsAndReachesAutoExportAndSyncJournal() = runBlocking {
         guard()
         val db = PersonalHubDatabase.get(context)

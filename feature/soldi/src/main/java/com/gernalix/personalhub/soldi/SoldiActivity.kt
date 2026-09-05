@@ -11,6 +11,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -43,14 +46,14 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
     val places by capsule.places.collectAsState(emptyList())
     val tags by capsule.tagNames.collectAsState(emptyList())
     val scope = rememberCoroutineScope()
-    var tab by remember { mutableIntStateOf(0) }
-    var search by remember { mutableStateOf("") }
-    var transaction by remember { mutableStateOf<TransactionDraft?>(null) }
-    var account by remember { mutableStateOf<FinanceAccount?>(null) }
-    var reconcile by remember { mutableStateOf<FinanceAccount?>(null) }
-    var settings by remember { mutableStateOf(false) }
-    var month by remember { mutableStateOf(java.time.YearMonth.now()) }
-    var product by remember { mutableStateOf<FinanceProduct?>(null) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var search by rememberSaveable { mutableStateOf("") }
+    var transaction by rememberSaveable(stateSaver = NullableTransactionDraftSaver) { mutableStateOf<TransactionDraft?>(null) }
+    var account by rememberSaveable(stateSaver = NullableFinanceAccountSaver) { mutableStateOf<FinanceAccount?>(null) }
+    var reconcile by rememberSaveable(stateSaver = NullableFinanceAccountSaver) { mutableStateOf<FinanceAccount?>(null) }
+    var settings by rememberSaveable { mutableStateOf(false) }
+    var month by rememberSaveable(stateSaver = YearMonthSaver) { mutableStateOf(java.time.YearMonth.now()) }
+    var product by rememberSaveable(stateSaver = NullableFinanceProductSaver) { mutableStateOf<FinanceProduct?>(null) }
     var error by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var deletion by remember { mutableStateOf<Pair<Int, Long>?>(null) }
@@ -305,11 +308,11 @@ private fun AccountEditor(value: FinanceAccount, change: (FinanceAccount) -> Uni
 
 @Composable
 private fun ReconcileEditor(account: FinanceAccount, rows: List<FinanceTransaction>, busy: Boolean, save: (String,String,String,String) -> Unit) {
-    var at by remember { mutableStateOf(Instant.now().toString()) }
-    var desired by remember { mutableStateOf("") }
+    var at by rememberSaveable(account.id) { mutableStateOf(Instant.now().toString()) }
+    var desired by rememberSaveable(account.id) { mutableStateOf("") }
     val defaultTitle = stringResource(R.string.compensation)
-    var title by remember { mutableStateOf(defaultTitle) }
-    var notes by remember { mutableStateOf("") }
+    var title by rememberSaveable(account.id) { mutableStateOf(defaultTitle) }
+    var notes by rememberSaveable(account.id) { mutableStateOf("") }
     val balance = runCatching { FinanceCapsule.balance(account,rows,Instant.parse(at)) }.getOrNull()
     val difference = runCatching { BigDecimal(FinanceCapsule.decimal(desired)) - requireNotNull(balance) }.getOrNull()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -324,6 +327,84 @@ private fun ReconcileEditor(account: FinanceAccount, rows: List<FinanceTransacti
         item { Button(enabled = !busy && difference != null,onClick = { save(at,desired,title,notes) }) { Text(stringResource(R.string.save)) } }
     }
 }
+
+private val YearMonthSaver: Saver<java.time.YearMonth, String> = Saver(
+    save = { it.toString() },
+    restore = { java.time.YearMonth.parse(it) },
+)
+
+private val NullableFinanceProductSaver = listSaver<FinanceProduct?, Any?>(
+    save = { product -> if (product == null) listOf(false) else listOf(true, product.id, product.name, product.uuid) },
+    restore = { values ->
+        if (values.firstOrNull() != true) null else FinanceProduct(
+            id = values[1] as Long,
+            name = values[2] as String,
+            uuid = values[3] as String,
+        )
+    },
+)
+
+private val NullableFinanceAccountSaver = listSaver<FinanceAccount?, Any?>(
+    save = { account ->
+        if (account == null) listOf(false) else listOf(
+            true,
+            account.id,
+            account.name,
+            account.currency,
+            account.openingBalance,
+            account.openedAt,
+            account.included,
+        )
+    },
+    restore = { values ->
+        if (values.firstOrNull() != true) null else FinanceAccount(
+            id = values[1] as String,
+            name = values[2] as String,
+            currency = values[3] as String,
+            openingBalance = values[4] as String,
+            openedAt = values[5] as String,
+            included = values[6] as Boolean,
+        )
+    },
+)
+
+private val NullableTransactionDraftSaver = listSaver<TransactionDraft?, Any?>(
+    save = { draft ->
+        if (draft == null) listOf(false) else listOf(
+            true,
+            draft.id,
+            draft.title,
+            draft.isProduct,
+            draft.amount,
+            draft.currency,
+            draft.chain,
+            draft.placeId,
+            draft.notes,
+            draft.tags,
+            draft.fromReceipt,
+            draft.occurredAt,
+            draft.accountId,
+            draft.productId,
+        )
+    },
+    restore = { values ->
+        if (values.firstOrNull() != true) null else TransactionDraft(
+            id = values[1] as Long?,
+            title = values[2] as String,
+            isProduct = values[3] as Boolean,
+            amount = values[4] as String,
+            currency = values[5] as String,
+            chain = values[6] as String,
+            placeId = values[7] as String?,
+            notes = values[8] as String,
+            tags = values[9] as String,
+            fromReceipt = values[10] as Boolean,
+            occurredAt = values[11] as String,
+            accountId = values[12] as String?,
+            productId = values[13] as Long?,
+        )
+    },
+)
 
 @Composable
 private fun GitSettings() {
