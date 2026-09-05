@@ -3,8 +3,6 @@ package com.example.multitimetracker
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ActivityInfo
-import android.content.pm.ResolveInfo
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
@@ -39,33 +37,40 @@ class TimeFenceNotifierTest {
     }
 
     @Test
-    fun exactHttpOnlyTextRoutesToExternalViewIntent() {
+    fun exactHttpOnlyTextRoutesNotificationTapThroughDispatcher() {
         val url = "https://example.com/timer?a=1"
-        addResolvableViewTarget(url)
 
         val intent = TimeFenceNotifier.timerAlertContentIntent(context, 7, "  $url  ")
 
         assertEquals(Intent.ACTION_VIEW, intent.action)
         assertEquals(Uri.parse(url), intent.data)
-        assertTrue(intent.categories.orEmpty().contains(Intent.CATEGORY_BROWSABLE))
+        assertEquals("com.example.multitimetracker.TimerAlertLinkDispatcherActivity", intent.component?.className)
     }
 
     @Test
-    fun exactCustomDeepLinkOnlyTextRoutesToResolvableViewIntent() {
+    fun exactWorkflowyMessageRoutesNotificationTapThroughDispatcher() {
+        val url = "https://workflowy.com/#/a3b177f21c87"
+
+        val intent = TimeFenceNotifier.timerAlertContentIntent(context, 12, url)
+
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals(Uri.parse(url), intent.data)
+        assertEquals("com.example.multitimetracker.TimerAlertLinkDispatcherActivity", intent.component?.className)
+    }
+
+    @Test
+    fun exactCustomDeepLinkOnlyTextRoutesWithoutResolvePrecheck() {
         val uri = "otherapp://timer/123"
-        addResolvableViewTarget(uri)
 
         val intent = TimeFenceNotifier.timerAlertContentIntent(context, 8, uri)
 
         assertEquals(Intent.ACTION_VIEW, intent.action)
         assertEquals(Uri.parse(uri), intent.data)
-        assertTrue(intent.categories.orEmpty().contains(Intent.CATEGORY_BROWSABLE))
+        assertEquals("com.example.multitimetracker.TimerAlertLinkDispatcherActivity", intent.component?.className)
     }
 
     @Test
     fun mixedTextAndUrlUsesTimerFallback() {
-        addResolvableViewTarget("https://example.com")
-
         val intent = TimeFenceNotifier.timerAlertContentIntent(context, 9, "testo https://example.com")
 
         assertEquals("mtt://time-fence-alert/9", intent.data.toString())
@@ -73,20 +78,19 @@ class TimeFenceNotifierTest {
     }
 
     @Test
-    fun malformedOrUnhandledUriUsesTimerFallback() {
+    fun malformedUriUsesTimerFallbackButUnhandledAbsoluteUriUsesDispatcher() {
         val malformed = TimeFenceNotifier.timerAlertContentIntent(context, 10, "https://")
         val unhandled = TimeFenceNotifier.timerAlertContentIntent(context, 11, "unknownscheme://timer/1")
 
         assertEquals("mtt://time-fence-alert/10", malformed.data.toString())
-        assertEquals("mtt://time-fence-alert/11", unhandled.data.toString())
+        assertEquals(Uri.parse("unknownscheme://timer/1"), unhandled.data)
+        assertEquals("com.example.multitimetracker.TimerAlertLinkDispatcherActivity", unhandled.component?.className)
     }
 
     @Test
     fun differentLinkAlertsKeepDistinctPendingIntentDestinations() {
         val first = "https://example.com/one"
         val second = "otherapp://timer/two"
-        addResolvableViewTarget(first)
-        addResolvableViewTarget(second)
 
         TimeFenceNotifier.notify(context, 21, "Timer", first)
         TimeFenceNotifier.notify(context, 22, "Timer", second)
@@ -103,19 +107,5 @@ class TimeFenceNotifierTest {
     fun linkParserRejectsPlainAndMixedText() {
         assertNull(TimeFenceNotifier.timerAlertLinkIntentOrNull(context, "plain reminder"))
         assertNull(TimeFenceNotifier.timerAlertLinkIntentOrNull(context, "https://example.com more"))
-    }
-
-    private fun addResolvableViewTarget(uri: String) {
-        val candidate = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
-            addCategory(Intent.CATEGORY_BROWSABLE)
-        }
-        val resolveInfo = ResolveInfo().apply {
-            activityInfo = ActivityInfo().apply {
-                packageName = "com.example.browser"
-                name = "BrowserActivity"
-                exported = true
-            }
-        }
-        shadowOf(context.packageManager).addResolveInfoForIntent(candidate, resolveInfo)
     }
 }

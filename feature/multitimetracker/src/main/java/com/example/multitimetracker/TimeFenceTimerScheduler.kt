@@ -11,6 +11,21 @@ import android.util.Log
 import androidx.core.app.AlarmManagerCompat
 
 object TimeFenceTimerScheduler {
+    enum class SchedulePath {
+        EXACT,
+        EXACT_IDLE,
+        ALARM_CLOCK,
+        FAILURE,
+    }
+
+    data class ScheduleResult(
+        val scheduled: Boolean,
+        val path: SchedulePath,
+        val requestedAtMs: Long,
+        val fireAtMs: Long,
+        val failureMessage: String? = null,
+    )
+
     fun canScheduleExactAlarms(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
@@ -72,8 +87,16 @@ object TimeFenceTimerScheduler {
         fireAtMs: Long,
         title: String,
         message: String,
-    ) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+    ): ScheduleResult {
+        val requestedAtMs = System.currentTimeMillis()
+        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            ?: return ScheduleResult(
+                scheduled = false,
+                path = SchedulePath.FAILURE,
+                requestedAtMs = requestedAtMs,
+                fireAtMs = fireAtMs,
+                failureMessage = "AlarmManager unavailable",
+            )
         cancel(context, ruleId, sessionId, expectedSessionStartAtMs)
         val pi = scheduledTimeFencePendingIntent(
             context = context,
@@ -89,7 +112,16 @@ object TimeFenceTimerScheduler {
             requestCode = (ruleId xor sessionId xor expectedSessionStartAtMs).hashCode(),
             data = Uri.parse("mtt://time-fence/$ruleId/$sessionId/$expectedSessionStartAtMs/show"),
         )
-        setExact(am, fireAtMs, pi, showPi)
+        return setExactTimerAlert(
+            am = am,
+            fireAtMs = fireAtMs,
+            pi = pi,
+            showPi = showPi,
+            requestedAtMs = requestedAtMs,
+            ruleId = ruleId,
+            sessionId = sessionId,
+            expectedSessionStartAtMs = expectedSessionStartAtMs,
+        )
     }
 
     fun cancel(
@@ -228,5 +260,77 @@ object TimeFenceTimerScheduler {
             am.setWindow(AlarmManager.RTC_WAKEUP, fireAtMs, windowMs, pi)
         } catch (_: Throwable) {
         }
+    }
+
+    private fun setExactTimerAlert(
+        am: AlarmManager,
+        fireAtMs: Long,
+        pi: PendingIntent,
+        showPi: PendingIntent,
+        requestedAtMs: Long,
+        ruleId: Long,
+        sessionId: Long,
+        expectedSessionStartAtMs: Long,
+    ): ScheduleResult {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+                AlarmManagerCompat.setAlarmClock(am, fireAtMs, showPi, pi)
+                logTimerSchedule(
+                    path = SchedulePath.ALARM_CLOCK,
+                    ruleId = ruleId,
+                    sessionId = sessionId,
+                    expectedSessionStartAtMs = expectedSessionStartAtMs,
+                    requestedAtMs = requestedAtMs,
+                    fireAtMs = fireAtMs,
+                )
+                ScheduleResult(true, SchedulePath.ALARM_CLOCK, requestedAtMs, fireAtMs)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAtMs, pi)
+                logTimerSchedule(
+                    path = SchedulePath.EXACT_IDLE,
+                    ruleId = ruleId,
+                    sessionId = sessionId,
+                    expectedSessionStartAtMs = expectedSessionStartAtMs,
+                    requestedAtMs = requestedAtMs,
+                    fireAtMs = fireAtMs,
+                )
+                ScheduleResult(true, SchedulePath.EXACT_IDLE, requestedAtMs, fireAtMs)
+            } else {
+                am.setExact(AlarmManager.RTC_WAKEUP, fireAtMs, pi)
+                logTimerSchedule(
+                    path = SchedulePath.EXACT,
+                    ruleId = ruleId,
+                    sessionId = sessionId,
+                    expectedSessionStartAtMs = expectedSessionStartAtMs,
+                    requestedAtMs = requestedAtMs,
+                    fireAtMs = fireAtMs,
+                )
+                ScheduleResult(true, SchedulePath.EXACT, requestedAtMs, fireAtMs)
+            }
+        } catch (se: SecurityException) {
+            val message = "${se::class.java.simpleName}: ${se.message}"
+            Log.w("MTT_TIMER", "Timer alert exact scheduling failed fireAtMs=$fireAtMs", se)
+            ScheduleResult(false, SchedulePath.FAILURE, requestedAtMs, fireAtMs, message)
+        } catch (t: Throwable) {
+            val message = "${t::class.java.simpleName}: ${t.message}"
+            Log.e("MTT_TIMER", "Timer alert scheduling failed fireAtMs=$fireAtMs", t)
+            ScheduleResult(false, SchedulePath.FAILURE, requestedAtMs, fireAtMs, message)
+        }
+    }
+
+    private fun logTimerSchedule(
+        path: SchedulePath,
+        ruleId: Long,
+        sessionId: Long,
+        expectedSessionStartAtMs: Long,
+        requestedAtMs: Long,
+        fireAtMs: Long,
+    ) {
+        Log.i(
+            "MTT_TIMER_ALERT",
+            "schedule path=${path.name} ruleId=$ruleId sessionId=$sessionId " +
+                "sessionStartAtMs=$expectedSessionStartAtMs timerRequestAtMs=$requestedAtMs " +
+                "fireAtMs=$fireAtMs requestLeadMs=${fireAtMs - requestedAtMs}"
+        )
     }
 }

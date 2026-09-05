@@ -115,6 +115,32 @@ object SnapshotStore {
         }
     }
 
+    private fun preserveNewerTimeFenceRuntimeState(
+        incomingRules: List<TimeFenceRule>,
+        existingRules: List<TimeFenceRule>,
+    ): List<TimeFenceRule> {
+        if (incomingRules.isEmpty() || existingRules.isEmpty()) return incomingRules
+
+        val existingById = existingRules.associateBy { it.id }
+        return incomingRules.map { incoming ->
+            val existing = existingById[incoming.id] ?: return@map incoming
+            val incomingLast = incoming.lastFiredAtMs ?: 0L
+            val existingLast = existing.lastFiredAtMs ?: 0L
+            if (existingLast <= incomingLast) {
+                incoming
+            } else {
+                incoming.copy(
+                    lastFiredAtMs = existing.lastFiredAtMs,
+                    isEnabled = if (existing.scope == TimeFenceScope.ONE_TIME && !existing.isEnabled) {
+                        false
+                    } else {
+                        incoming.isEnabled
+                    }
+                )
+            }
+        }
+    }
+
     @CapsuleWriteApi
     fun save(
         context: Context,
@@ -151,6 +177,10 @@ object SnapshotStore {
         val resolvedQuickEventMacros = quickEventMacros ?: existingSnapshot?.quickEventMacros.orEmpty()
         val resolvedQuickEventMacroActions = quickEventMacroActions ?: existingSnapshot?.quickEventMacroActions.orEmpty()
         val normalizedTagSessions = normalizeTagSessionsAgainstTags(tags, tagSessions)
+        val resolvedTimeFenceRules = preserveNewerTimeFenceRuntimeState(
+            incomingRules = timeFenceRules,
+            existingRules = existingSnapshot?.timeFenceRules.orEmpty(),
+        )
 
         val root = JSONObject()
 
@@ -240,7 +270,7 @@ object SnapshotStore {
         })
         // Time-fence rules (promemoria tag-driven su start/stop)
         root.put("timeFenceRules", JSONArray().apply {
-            timeFenceRules.forEach { r ->
+            resolvedTimeFenceRules.forEach { r ->
                 put(
                     JSONObject()
                         .put("id", r.id)
@@ -458,6 +488,7 @@ object SnapshotStore {
         val tagSessions = root.optJSONArray("tagSessions")?.toTaggedSessionRecords() ?: emptyList()
         val lifePeriods = root.optJSONArray("lifePeriods")?.toLifePeriods() ?: emptyList()
 
+        var timeFenceDeliveryMigrated = false
         val timeFenceRules = mutableListOf<TimeFenceRule>()
         root.optJSONArray("timeFenceRules")?.let { arr ->
             for (i in 0 until arr.length()) {
@@ -475,8 +506,16 @@ object SnapshotStore {
                     .getOrElse { TimeFenceScope.ALWAYS }
                 val matchMode = runCatching { TimeFenceMatchMode.valueOf(o.optString("matchMode")) }
                     .getOrElse { TimeFenceMatchMode.AND }
-                val delivery = runCatching { TimeFenceDelivery.valueOf(o.optString("delivery", TimeFenceDelivery.PREFENCE.name)) }
-                    .getOrElse { TimeFenceDelivery.PREFENCE }
+                val rawDelivery = o.optString("delivery", "")
+                val delivery = runCatching { TimeFenceDelivery.valueOf(rawDelivery) }
+                    .getOrDefault(TimeFenceDelivery.NOTIFICATION)
+                    .let { parsed ->
+                        if (parsed == TimeFenceDelivery.PREFENCE) TimeFenceDelivery.NOTIFICATION else parsed
+                    }
+                if (rawDelivery != TimeFenceDelivery.NOTIFICATION.name || o.optString("delivery") != TimeFenceDelivery.NOTIFICATION.name) {
+                    o.put("delivery", TimeFenceDelivery.NOTIFICATION.name)
+                    timeFenceDeliveryMigrated = true
+                }
 
                 val timerMinutes = o.optInt("timerMinutes", 0).coerceAtLeast(0)
 
@@ -499,6 +538,9 @@ object SnapshotStore {
                     )
                 )
             }
+        }
+        if (timeFenceDeliveryMigrated) {
+            SnapshotSqlite.writeSnapshot(context, root.toString())
         }
 
         val chains = root.optJSONArray("chains")?.toChains() ?: emptyList()

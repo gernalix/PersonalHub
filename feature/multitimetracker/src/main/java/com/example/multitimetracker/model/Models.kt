@@ -23,7 +23,7 @@ data class TimeFenceRule(
     val id: Long,
     val message: String,
     val trigger: TimeFenceTrigger,
-    val delivery: TimeFenceDelivery = TimeFenceDelivery.PREFENCE,
+    val delivery: TimeFenceDelivery = TimeFenceDelivery.NOTIFICATION,
     val scope: TimeFenceScope,
     val matchMode: TimeFenceMatchMode = TimeFenceMatchMode.AND,
     val tagIds: Set<Long>,

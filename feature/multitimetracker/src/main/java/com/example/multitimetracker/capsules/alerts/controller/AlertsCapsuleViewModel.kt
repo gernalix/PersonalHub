@@ -50,18 +50,18 @@ internal fun timeFenceRuleMatchesTagIds(
 internal fun normalizedTimeFenceTagIds(tagIds: Set<Long>): List<Long> =
     tagIds.filter { it > 0L }.sorted()
 
-internal fun hasDuplicateTimeFenceRuleForTriggerAndTags(
+internal fun hasDuplicateTimeFenceRuleForTags(
     rules: List<TimeFenceRule>,
     candidateRuleId: Long?,
-    trigger: TimeFenceTrigger,
     tagIds: Set<Long>
 ): Boolean {
     val normalizedCandidate = normalizedTimeFenceTagIds(tagIds)
+    if (normalizedCandidate.isEmpty()) return false
+
     return rules.any { rule ->
         !rule.isDeleted &&
             rule.id != candidateRuleId &&
-            rule.trigger == trigger &&
-            normalizedTimeFenceTagIds(rule.tagIds) == normalizedCandidate
+            normalizedTimeFenceTagIds(rule.tagIds).any { it in normalizedCandidate }
     }
 }
 
@@ -171,7 +171,7 @@ class AlertsCapsuleViewModel(
     ): Boolean {
         scheduleTimerOverride?.let { return it(ruleId, sessionId, expectedSessionStartAtMs, fireAtMs, title, message) }
         val ctx = getContext() ?: return false
-        TimeFenceTimerScheduler.schedule(
+        val result = TimeFenceTimerScheduler.schedule(
             context = ctx,
             ruleId = ruleId,
             sessionId = sessionId,
@@ -180,7 +180,22 @@ class AlertsCapsuleViewModel(
             title = title,
             message = message
         )
-        return true
+        if (!result.scheduled) {
+            logSystemEvent(
+                "ALERT_TIMER_SCHEDULE_FAILED",
+                "TIME_FENCE_RULE",
+                ruleId,
+                "Timer alert exact scheduling failed",
+                JSONObject()
+                    .put("ruleId", ruleId)
+                    .put("sessionId", sessionId)
+                    .put("sessionStartAtMs", expectedSessionStartAtMs)
+                    .put("fireAtMs", fireAtMs)
+                    .put("schedulerPath", result.path.name)
+                    .put("failure", result.failureMessage)
+            )
+        }
+        return result.scheduled
     }
 
     private fun showNotification(ruleId: Long, title: String, message: String): Boolean {
@@ -247,7 +262,7 @@ class AlertsCapsuleViewModel(
     fun addTimeFenceRule(
         message: String,
         trigger: TimeFenceTrigger,
-        delivery: TimeFenceDelivery = TimeFenceDelivery.PREFENCE,
+        delivery: TimeFenceDelivery = TimeFenceDelivery.NOTIFICATION,
         scope: TimeFenceScope,
         matchMode: TimeFenceMatchMode = TimeFenceMatchMode.AND,
         tagIds: Set<Long>,
@@ -260,7 +275,7 @@ class AlertsCapsuleViewModel(
         val beforeRules = rules()
         val rule = synchronized(ruleMutationLock) {
             val currentRules = beforeRules
-            if (hasDuplicateTimeFenceRuleForTriggerAndTags(currentRules, null, trigger, tagIds)) {
+            if (hasDuplicateTimeFenceRuleForTags(currentRules, null, tagIds)) {
                 return false
             }
             val id = System.currentTimeMillis() + Random.nextInt(0, 9999)
@@ -314,7 +329,7 @@ class AlertsCapsuleViewModel(
         var oldRule: TimeFenceRule? = null
         val newRules = synchronized(ruleMutationLock) {
             val currentRules = beforeRules
-            if (hasDuplicateTimeFenceRuleForTriggerAndTags(currentRules, ruleId, trigger, tagIds)) {
+            if (hasDuplicateTimeFenceRuleForTags(currentRules, ruleId, tagIds)) {
                 return false
             }
             oldRule = currentRules.firstOrNull { it.id == ruleId }
@@ -492,8 +507,7 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
      * Evaluate emitted TimeFenceEvent(s) against current rules, fire side-effects and update rule state.
      *
      * Side-effects:
-     * - NOTIFICATION: immediate notification OR scheduled timer (ON_START only, timerMinutes > 0)
-     * - PREFENCE: show in-app prompt through the prompt queue.
+     * - Timer Alerts are always Android notifications, immediate or scheduled (ON_START only, timerMinutes > 0).
      */
     fun handleTimeFenceEvents(events: List<TimeFenceEvent>, nowMs: Long) {
         if (events.isEmpty()) return
@@ -552,45 +566,18 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
                     continue
                 }
 
-                when (r.delivery) {
-                    TimeFenceDelivery.NOTIFICATION -> {
-                        if (!showNotification(r.id, title, r.message)) continue
-                        logSystemEvent(
-                            "ALERT_FIRED",
-                            "TIME_FENCE_RULE",
-                            r.id,
-                            "Alert fired",
-                            JSONObject()
-                                .put("ruleId", r.id)
-                                .put("sessionId", ev.sessionId)
-                                .put("trigger", ev.trigger.name)
-                                .put("delivery", r.delivery.name)
-                        )
-                    }
-                    TimeFenceDelivery.PREFENCE -> {
-                        // Show in-app prompt instead of notification.
-                        enqueuePreFencePrompt(
-                            PreFencePrompt(
-                                ruleId = r.id,
-                                sessionId = ev.sessionId,
-                                sessionTitle = ev.sessionTitle,
-                                message = r.message,
-                                firedAtMs = nowMs
-                            )
-                        )
-                        logSystemEvent(
-                            "PREFENCE_SHOWN",
-                            "TIME_FENCE_RULE",
-                            r.id,
-                            "Prefence prompt shown",
-                            JSONObject()
-                                .put("ruleId", r.id)
-                                .put("sessionId", ev.sessionId)
-                                .put("trigger", ev.trigger.name)
-                                .put("delivery", r.delivery.name)
-                        )
-                    }
-                }
+                if (!showNotification(r.id, title, r.message)) continue
+                logSystemEvent(
+                    "ALERT_FIRED",
+                    "TIME_FENCE_RULE",
+                    r.id,
+                    "Alert fired",
+                    JSONObject()
+                        .put("ruleId", r.id)
+                        .put("sessionId", ev.sessionId)
+                        .put("trigger", ev.trigger.name)
+                        .put("delivery", TimeFenceDelivery.NOTIFICATION.name)
+                )
 
                 // Update rule state (last fired + optional one-time disable)
                 val updated = when (r.scope) {

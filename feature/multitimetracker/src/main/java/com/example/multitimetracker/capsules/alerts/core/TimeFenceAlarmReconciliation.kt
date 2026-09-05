@@ -197,7 +197,7 @@ internal fun buildTimeFenceAlarmReconciliation(
 internal fun executeTimeFenceAlarmReconciliation(
     context: Context,
     reconciliation: TimeFenceAlarmReconciliation,
-) {
+): List<TimeFenceTimerScheduler.ScheduleResult> {
     reconciliation.cancelNotificationIds.forEach { notificationId ->
         TimeFenceNotifier.cancelNotification(context, notificationId)
     }
@@ -209,7 +209,7 @@ internal fun executeTimeFenceAlarmReconciliation(
             expectedSessionStartAtMs = key.expectedSessionStartAtMs,
         )
     }
-    reconciliation.scheduleTimers.forEach { timer ->
+    return reconciliation.scheduleTimers.map { timer ->
         TimeFenceTimerScheduler.schedule(
             context = context,
             ruleId = timer.key.ruleId,

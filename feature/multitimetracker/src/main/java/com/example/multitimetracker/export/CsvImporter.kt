@@ -577,8 +577,11 @@ private fun buildSnapshot(
             val message = o.optString("message", "")
             val trigger = runCatching { TimeFenceTrigger.valueOf(o.optString("trigger", TimeFenceTrigger.ON_START.name)) }
                 .getOrDefault(TimeFenceTrigger.ON_START)
-            val delivery = runCatching { TimeFenceDelivery.valueOf(o.optString("delivery", TimeFenceDelivery.PREFENCE.name)) }
-                .getOrDefault(TimeFenceDelivery.PREFENCE)
+            val delivery = runCatching { TimeFenceDelivery.valueOf(o.optString("delivery", TimeFenceDelivery.NOTIFICATION.name)) }
+                .getOrDefault(TimeFenceDelivery.NOTIFICATION)
+                .let { parsed ->
+                    if (parsed == TimeFenceDelivery.PREFENCE) TimeFenceDelivery.NOTIFICATION else parsed
+                }
             val scope = runCatching { TimeFenceScope.valueOf(o.optString("scope", TimeFenceScope.ALWAYS.name)) }
                 .getOrDefault(TimeFenceScope.ALWAYS)
             val matchMode = runCatching { TimeFenceMatchMode.valueOf(o.optString("matchMode", TimeFenceMatchMode.AND.name)) }

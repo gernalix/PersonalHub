@@ -105,6 +105,12 @@
             android:turnScreenOn="true" />
 
         <activity
+            android:name="com.example.multitimetracker.TimerAlertLinkDispatcherActivity"
+            android:exported="false"
+            android:noHistory="true"
+            android:theme="@style/Theme.MultiTimeTracker" />
+
+        <activity
             android:name="com.example.multitimetracker.widget.QuickSessionWidgetClickActivity"
             android:excludeFromRecents="true"
             android:exported="false"

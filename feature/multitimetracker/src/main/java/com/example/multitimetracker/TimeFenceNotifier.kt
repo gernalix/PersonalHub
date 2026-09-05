@@ -1,8 +1,10 @@
 package com.example.multitimetracker
 
+import android.app.Activity
 import android.app.PendingIntent
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -254,8 +256,10 @@ object TimeFenceNotifier {
     }
 
     internal fun timerAlertContentIntent(context: Context, notificationId: Int, message: String): Intent {
-        val linkIntent = timerAlertLinkIntentOrNull(context, message)
-        if (linkIntent != null) return linkIntent
+        val linkUri = timerAlertLinkUriOrNull(message)
+        if (linkUri != null) {
+            return TimerAlertLinkDispatcherActivity.intent(context, notificationId, linkUri)
+        }
         return Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = Uri.parse("mtt://time-fence-alert/$notificationId")
@@ -264,17 +268,21 @@ object TimeFenceNotifier {
     }
 
     internal fun timerAlertLinkIntentOrNull(context: Context, message: String): Intent? {
+        val uri = timerAlertLinkUriOrNull(message) ?: return null
+        return Intent(Intent.ACTION_VIEW, uri).apply {
+            addCategory(Intent.CATEGORY_BROWSABLE)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
+    internal fun timerAlertLinkUriOrNull(message: String): Uri? {
         val trimmed = message.trim()
         if (trimmed.isBlank() || trimmed.any(Char::isWhitespace)) return null
         val uri = runCatching { Uri.parse(trimmed) }.getOrNull() ?: return null
         if (uri.scheme.isNullOrBlank() || !uri.isAbsolute) return null
         if (uri.schemeSpecificPart.isNullOrBlank()) return null
         if ((uri.scheme == "http" || uri.scheme == "https") && uri.host.isNullOrBlank()) return null
-        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-            addCategory(Intent.CATEGORY_BROWSABLE)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        return if (intent.resolveActivity(context.packageManager) != null) intent else null
+        return uri
     }
 
     private fun timerAlertContentPendingIntent(
@@ -287,5 +295,50 @@ object TimeFenceNotifier {
             (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
         val requestCode = 31 * notificationId + message.trim().hashCode()
         return PendingIntent.getActivity(context, requestCode, intent, piFlags)
+    }
+}
+
+class TimerAlertLinkDispatcherActivity : Activity() {
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1)
+        if (notificationId > 0) {
+            TimeFenceNotifier.cancelNotification(this, notificationId)
+        }
+        val uri = intent.data
+        if (uri != null) {
+            val viewIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                startActivity(viewIntent)
+                finish()
+                return
+            } catch (_: ActivityNotFoundException) {
+            } catch (_: SecurityException) {
+            }
+        }
+        startActivity(
+            Intent(this, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("mtt://time-fence-alert/${notificationId.coerceAtLeast(1)}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+        )
+        finish()
+    }
+
+    companion object {
+        private const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
+
+        fun intent(context: Context, notificationId: Int, uri: Uri): Intent {
+            return Intent(context, TimerAlertLinkDispatcherActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = uri
+                putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+        }
     }
 }

@@ -7,6 +7,7 @@ import com.example.multitimetracker.util.CapsuleWriteApi
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.example.multitimetracker.capsules.alerts.core.hasScheduledTimeFenceAlreadyFired
 import com.example.multitimetracker.capsules.alerts.controller.timeFenceRuleMatchesTagIds
 import com.example.multitimetracker.model.TimeFenceDelivery
@@ -87,6 +88,7 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
             sessionId = intent.getLongExtra(EXTRA_ALERT_SESSION_ID, -1L),
             expectedSessionStartAtMs = intent.getLongExtra(EXTRA_EXPECTED_SESSION_START_AT_MS, -1L),
         ) ?: return
+        val receiverAtMs = System.currentTimeMillis()
 
         val snap = SnapshotStore.load(context) ?: return
         val rule = snap.timeFenceRules.firstOrNull { it.id == request.ruleId } ?: return
@@ -110,11 +112,22 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
         val message = intent.getStringExtra(EXTRA_MESSAGE).orEmpty()
 
         val notifId = (rule.id % Int.MAX_VALUE).toInt().coerceAtLeast(1)
+        val notifyAtMs = System.currentTimeMillis()
         TimeFenceNotifier.notify(
             context = context,
             notificationId = notifId,
             title = title,
             message = message
+        )
+        val fireAtMs = com.example.multitimetracker.capsules.alerts.core.scheduledTimeFenceFireAtMs(
+            expectedSessionStartAtMs = request.expectedSessionStartAtMs,
+            timerMinutes = rule.timerMinutes,
+        )
+        Log.i(
+            "MTT_TIMER_ALERT",
+            "receive ruleId=${rule.id} sessionId=${request.sessionId} sessionStartAtMs=${request.expectedSessionStartAtMs} " +
+                "timerMinutes=${rule.timerMinutes} fireAtMs=$fireAtMs receiverAtMs=$receiverAtMs notifyAtMs=$notifyAtMs " +
+                "alarm_delivery_lateness_ms=${receiverAtMs - fireAtMs} notification_post_delay_ms=${notifyAtMs - receiverAtMs}"
         )
 
         val taskOrSessionName = targetState?.displayName.orEmpty()
@@ -131,6 +144,11 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
                 .put("sessionTitle", taskOrSessionName)
                 .put("delivery", rule.delivery.name)
                 .put("timerMinutes", rule.timerMinutes)
+                .put("fireAtMs", fireAtMs)
+                .put("receiverAtMs", receiverAtMs)
+                .put("notifyAtMs", notifyAtMs)
+                .put("alarm_delivery_lateness_ms", receiverAtMs - fireAtMs)
+                .put("notification_post_delay_ms", notifyAtMs - receiverAtMs)
         )
 
         // Update rule state *only when actually fired*.
@@ -206,5 +224,4 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
         private const val LEGACY_EXTRA_TASK_ID = "extra_task_id"
     }
 }
-
 
