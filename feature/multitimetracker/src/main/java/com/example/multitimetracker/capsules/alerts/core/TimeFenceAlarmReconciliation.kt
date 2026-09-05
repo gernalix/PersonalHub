@@ -6,41 +6,42 @@ import com.example.multitimetracker.TimeFenceTimerScheduler
 import com.example.multitimetracker.capsules.alerts.public.TimeFenceEvent
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
-import com.example.multitimetracker.model.TimeFenceDelivery
+import com.example.multitimetracker.model.TimedTagNotificationType
 import com.example.multitimetracker.model.TimeFenceMatchMode
 import com.example.multitimetracker.model.TimeFenceRule
 import com.example.multitimetracker.model.TimeFenceTrigger
 
-internal data class TimeFenceTimerKey(
+internal data class LegacyTimerAlertKey(
     val ruleId: Long,
     val sessionId: Long,
     val expectedSessionStartAtMs: Long,
 )
 
-internal data class TimeFenceTimerSchedule(
-    val key: TimeFenceTimerKey,
-    val fireAtMs: Long,
-    val title: String,
-    val message: String,
+internal data class LegacyTimerAlertCleanup(
+    val cancelAlarmKeys: Set<LegacyTimerAlertKey>,
+    val cancelNotificationIds: Set<Int>,
 )
 
-internal data class TimeFenceAlarmReconciliation(
-    val cancelTimerKeys: Set<TimeFenceTimerKey>,
-    val scheduleTimers: List<TimeFenceTimerSchedule>,
-    val cancelNotificationIds: Set<Int>,
+internal data class TimedSessionAlarmRestore(
+    val sessionId: Long,
+    val fireAtMs: Long,
+    val alarmStyle: Boolean,
+)
+
+internal data class TimedSessionRestorePlan(
+    val expiredSessionIds: Set<Long>,
+    val alarms: List<TimedSessionAlarmRestore>,
 )
 
 internal data class TimeFenceRuntimeMatch(
     val title: String,
 )
 
-internal fun timeFenceRuleNotificationId(ruleId: Long): Int {
-    return (ruleId % Int.MAX_VALUE).toInt().coerceAtLeast(1)
-}
+internal fun timeFenceRuleNotificationId(ruleId: Long): Int =
+    (ruleId % Int.MAX_VALUE).toInt().coerceAtLeast(1)
 
-internal fun isLiveTimeFenceRule(rule: TimeFenceRule): Boolean {
-    return !rule.isDeleted && rule.isEnabled
-}
+internal fun isLiveTimeFenceRule(rule: TimeFenceRule): Boolean =
+    !rule.isDeleted && rule.isEnabled
 
 internal fun matchTimeFenceRuleForEvent(
     rule: TimeFenceRule,
@@ -65,111 +66,73 @@ internal fun matchTimeFenceRuleForEvent(
     return TimeFenceRuntimeMatch(title = title)
 }
 
-internal fun scheduledTimeFenceFireAtMs(
-    expectedSessionStartAtMs: Long,
-    timerMinutes: Int,
-): Long {
-    return expectedSessionStartAtMs + (timerMinutes.toLong() * 60_000L)
-}
-
-internal fun hasScheduledTimeFenceAlreadyFired(
-    rule: TimeFenceRule,
-    expectedSessionStartAtMs: Long,
-): Boolean {
-    if (rule.timerMinutes <= 0) return false
-    val lastFiredAtMs = rule.lastFiredAtMs ?: return false
-    return lastFiredAtMs >= scheduledTimeFenceFireAtMs(
-        expectedSessionStartAtMs = expectedSessionStartAtMs,
-        timerMinutes = rule.timerMinutes,
-    )
-}
-
-internal fun normalizeScheduledTimeFenceFireAtMs(
-    expectedFireAtMs: Long,
-    nowMs: Long,
-): Long {
-    return expectedFireAtMs.coerceAtLeast(nowMs)
-}
-
-internal fun buildTimeFenceAlarmReconciliation(
-    beforeRules: List<TimeFenceRule>,
-    afterRules: List<TimeFenceRule>,
+internal fun buildLegacyTimerAlertCleanup(
+    rules: List<TimeFenceRule>,
     sessions: List<SessionUi>,
-    tags: List<Tag>,
-    nowMs: Long,
-): TimeFenceAlarmReconciliation {
+): LegacyTimerAlertCleanup {
+    val legacyRules = rules.filter { rule ->
+        rule.trigger == TimeFenceTrigger.ON_START && rule.timerMinutes > 0
+    }
     val runningSessions = sessions.filter { it.endMs == null }
-    val ruleIdsSeen = linkedSetOf<Long>()
-    val candidateRules = buildList {
-        (beforeRules + afterRules).forEach { rule ->
-            if (ruleIdsSeen.add(rule.id)) {
-                add(rule)
-            }
-        }
-    }
-    val timerCandidateRules = candidateRules.filter { rule ->
-        rule.delivery == TimeFenceDelivery.NOTIFICATION &&
-            rule.trigger == TimeFenceTrigger.ON_START &&
-            rule.timerMinutes > 0
-    }
-    val candidateCancelTimerKeys = buildSet {
-        timerCandidateRules.forEach { rule ->
-            runningSessions.forEach { session ->
-                add(
-                    TimeFenceTimerKey(
-                        ruleId = rule.id,
-                        sessionId = session.id,
-                        expectedSessionStartAtMs = session.startMs,
+    return LegacyTimerAlertCleanup(
+        cancelAlarmKeys = buildSet {
+            legacyRules.forEach { rule ->
+                runningSessions.forEach { session ->
+                    add(
+                        LegacyTimerAlertKey(
+                            ruleId = rule.id,
+                            sessionId = session.id,
+                            expectedSessionStartAtMs = session.startMs,
+                        )
                     )
-                )
+                }
             }
-        }
-    }
-
-    val afterRulesById = afterRules.associateBy { it.id }
-    val cancelNotificationIds = buildSet {
-        candidateRules.forEach { beforeRule ->
-            val afterRule = afterRulesById[beforeRule.id]
-            val shouldCancel = afterRule == null ||
-                !isLiveTimeFenceRule(afterRule) ||
-                afterRule.delivery != TimeFenceDelivery.NOTIFICATION
-            if (shouldCancel) {
-                add(timeFenceRuleNotificationId(beforeRule.id))
-            }
-        }
-    }
-
-    return TimeFenceAlarmReconciliation(
-        cancelTimerKeys = candidateCancelTimerKeys,
-        scheduleTimers = emptyList(),
-        cancelNotificationIds = cancelNotificationIds,
+        },
+        cancelNotificationIds = legacyRules.mapTo(linkedSetOf()) { rule ->
+            timeFenceRuleNotificationId(rule.id)
+        },
     )
 }
 
-internal fun executeTimeFenceAlarmReconciliation(
+internal fun executeLegacyTimerAlertCleanup(
     context: Context,
-    reconciliation: TimeFenceAlarmReconciliation,
-): List<TimeFenceTimerScheduler.ScheduleResult> {
-    reconciliation.cancelNotificationIds.forEach { notificationId ->
+    cleanup: LegacyTimerAlertCleanup,
+) {
+    cleanup.cancelNotificationIds.forEach { notificationId ->
         TimeFenceNotifier.cancelNotification(context, notificationId)
     }
-    reconciliation.cancelTimerKeys.forEach { key ->
-        TimeFenceTimerScheduler.cancel(
+    cleanup.cancelAlarmKeys.forEach { key ->
+        TimeFenceTimerScheduler.cancelLegacyTimerAlert(
             context = context,
             ruleId = key.ruleId,
             sessionId = key.sessionId,
             expectedSessionStartAtMs = key.expectedSessionStartAtMs,
         )
     }
-    return reconciliation.scheduleTimers.map { timer ->
-        TimeFenceTimerScheduler.schedule(
-            context = context,
-            ruleId = timer.key.ruleId,
-            sessionId = timer.key.sessionId,
-            expectedSessionStartAtMs = timer.key.expectedSessionStartAtMs,
-            fireAtMs = timer.fireAtMs,
-            title = timer.title,
-            message = timer.message,
+}
+
+internal fun buildTimedSessionRestorePlan(
+    sessions: List<SessionUi>,
+    tags: List<Tag>,
+    nowMs: Long,
+): TimedSessionRestorePlan {
+    val liveTagsById = tags.filterNot { it.isDeleted }.associateBy { it.id }
+    val running = sessions.filter { it.endMs == null && it.expectedEndMs != null }
+    val expiredIds = running
+        .filter { session -> session.expectedEndMs!! <= nowMs }
+        .mapTo(linkedSetOf()) { it.id }
+    val alarms = running.mapNotNull { session ->
+        val expectedEndMs = session.expectedEndMs ?: return@mapNotNull null
+        if (expectedEndMs <= nowMs) return@mapNotNull null
+        val timedTags = session.tagIds.mapNotNull(liveTagsById::get)
+            .filter { (it.timedDurationMinutes ?: 0) > 0 }
+        val timedTag = timedTags.singleOrNull() ?: return@mapNotNull null
+        if (timedTag.notificationType == TimedTagNotificationType.NONE) return@mapNotNull null
+        TimedSessionAlarmRestore(
+            sessionId = session.id,
+            fireAtMs = expectedEndMs,
+            alarmStyle = timedTag.notificationType == TimedTagNotificationType.ALARM,
         )
     }
+    return TimedSessionRestorePlan(expiredSessionIds = expiredIds, alarms = alarms)
 }

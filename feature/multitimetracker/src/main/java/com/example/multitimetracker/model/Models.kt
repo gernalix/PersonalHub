@@ -27,7 +27,7 @@ data class TimeFenceRule(
     val scope: TimeFenceScope,
     val matchMode: TimeFenceMatchMode = TimeFenceMatchMode.AND,
     val tagIds: Set<Long>,
-    /** Optional delay timer (minutes). If >0, notification is sent only after the delay. */
+    /** Legacy persisted delay. Timer Alerts ignore it; new and edited rules store zero. */
     val timerMinutes: Int = 0,
     val isEnabled: Boolean = true,
     /** Cooldown anti-spam (ms). */

@@ -11,36 +11,6 @@ import android.util.Log
 import androidx.core.app.AlarmManagerCompat
 
 object TimeFenceTimerScheduler {
-    enum class SchedulePath {
-        EXACT,
-        EXACT_IDLE,
-        ALARM_CLOCK,
-        REUSED,
-        FAILURE,
-    }
-
-    data class ScheduleResult(
-        val scheduled: Boolean,
-        val path: SchedulePath,
-        val requestedAtMs: Long,
-        val fireAtMs: Long,
-        val failureMessage: String? = null,
-    )
-
-    private data class ScheduledTimerIdentity(
-        val ruleId: Long,
-        val sessionId: Long,
-        val expectedSessionStartAtMs: Long,
-    )
-
-    private data class ScheduledTimerState(
-        val fireAtMs: Long,
-        val title: String,
-        val message: String,
-    )
-
-    private val scheduledTimerAlerts = mutableMapOf<ScheduledTimerIdentity, ScheduledTimerState>()
-
     fun canScheduleExactAlarms(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
@@ -94,139 +64,33 @@ object TimeFenceTimerScheduler {
         cancelPendingIntent(am, timedSessionPendingIntent(context, sessionId, legacyIdentity = true))
     }
 
-    fun schedule(
-        context: Context,
-        ruleId: Long,
-        sessionId: Long,
-        expectedSessionStartAtMs: Long,
-        fireAtMs: Long,
-        title: String,
-        message: String,
-    ): ScheduleResult {
-        val requestedAtMs = System.currentTimeMillis()
-        val identity = ScheduledTimerIdentity(
-            ruleId = ruleId,
-            sessionId = sessionId,
-            expectedSessionStartAtMs = expectedSessionStartAtMs,
-        )
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-            ?: return ScheduleResult(
-                scheduled = false,
-                path = SchedulePath.FAILURE,
-                requestedAtMs = requestedAtMs,
-                fireAtMs = fireAtMs,
-                failureMessage = "AlarmManager unavailable",
-            )
-        val pi = scheduledTimeFencePendingIntent(
-            context = context,
-            ruleId = ruleId,
-            sessionId = sessionId,
-            expectedSessionStartAtMs = expectedSessionStartAtMs,
-            title = title,
-            message = message,
-            legacyIdentity = false,
-        )
-        val nextState = ScheduledTimerState(
-            fireAtMs = fireAtMs,
-            title = title,
-            message = message,
-        )
-        synchronized(scheduledTimerAlerts) {
-            if (scheduledTimerAlerts[identity]?.fireAtMs == fireAtMs) {
-                scheduledTimerAlerts[identity] = nextState
-                logTimerSchedule(
-                    path = SchedulePath.REUSED,
-                    ruleId = ruleId,
-                    sessionId = sessionId,
-                    expectedSessionStartAtMs = expectedSessionStartAtMs,
-                    requestedAtMs = requestedAtMs,
-                    fireAtMs = fireAtMs,
-                )
-                return ScheduleResult(true, SchedulePath.REUSED, requestedAtMs, fireAtMs)
-            }
-        }
-        cancel(context, ruleId, sessionId, expectedSessionStartAtMs)
-        val showPi = alarmClockShowIntent(
-            context = context,
-            requestCode = (ruleId xor sessionId xor expectedSessionStartAtMs).hashCode(),
-            data = Uri.parse("mtt://time-fence/$ruleId/$sessionId/$expectedSessionStartAtMs/show"),
-        )
-        val result = setExactTimerAlert(
-            am = am,
-            fireAtMs = fireAtMs,
-            pi = pi,
-            showPi = showPi,
-            requestedAtMs = requestedAtMs,
-            ruleId = ruleId,
-            sessionId = sessionId,
-            expectedSessionStartAtMs = expectedSessionStartAtMs,
-        )
-        synchronized(scheduledTimerAlerts) {
-            if (result.scheduled) {
-                scheduledTimerAlerts[identity] = nextState
-            } else {
-                scheduledTimerAlerts.remove(identity)
-            }
-        }
-        return result
-    }
-
-    fun cancel(
+    fun cancelLegacyTimerAlert(
         context: Context,
         ruleId: Long,
         sessionId: Long,
         expectedSessionStartAtMs: Long,
     ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        synchronized(scheduledTimerAlerts) {
-            scheduledTimerAlerts.remove(
-                ScheduledTimerIdentity(
-                    ruleId = ruleId,
-                    sessionId = sessionId,
-                    expectedSessionStartAtMs = expectedSessionStartAtMs,
-                )
-            )
-        }
         cancelPendingIntent(
             am,
-            scheduledTimeFencePendingIntent(
+            legacyTimerAlertPendingIntent(
                 context = context,
                 ruleId = ruleId,
                 sessionId = sessionId,
                 expectedSessionStartAtMs = expectedSessionStartAtMs,
-                title = "",
-                message = "",
                 legacyIdentity = false,
             )
         )
         cancelPendingIntent(
             am,
-            scheduledTimeFencePendingIntent(
+            legacyTimerAlertPendingIntent(
                 context = context,
                 ruleId = ruleId,
                 sessionId = sessionId,
                 expectedSessionStartAtMs = expectedSessionStartAtMs,
-                title = "",
-                message = "",
                 legacyIdentity = true,
             )
         )
-    }
-
-    fun forgetScheduledTimerAlert(
-        ruleId: Long,
-        sessionId: Long,
-        expectedSessionStartAtMs: Long,
-    ) {
-        synchronized(scheduledTimerAlerts) {
-            scheduledTimerAlerts.remove(
-                ScheduledTimerIdentity(
-                    ruleId = ruleId,
-                    sessionId = sessionId,
-                    expectedSessionStartAtMs = expectedSessionStartAtMs,
-                )
-            )
-        }
     }
 
     private fun immutableFlags(base: Int): Int {
@@ -276,22 +140,15 @@ object TimeFenceTimerScheduler {
         )
     }
 
-    private fun scheduledTimeFencePendingIntent(
+    private fun legacyTimerAlertPendingIntent(
         context: Context,
         ruleId: Long,
         sessionId: Long,
         expectedSessionStartAtMs: Long,
-        title: String,
-        message: String,
         legacyIdentity: Boolean,
     ): PendingIntent {
         val intent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
-            action = TimeFenceTimerReceiver.ACTION_FIRE_TIMER
-            putExtra(TimeFenceTimerReceiver.EXTRA_RULE_ID, ruleId)
-            putExtra(TimeFenceTimerReceiver.EXTRA_ALERT_SESSION_ID, sessionId)
-            putExtra(TimeFenceTimerReceiver.EXTRA_EXPECTED_SESSION_START_AT_MS, expectedSessionStartAtMs)
-            putExtra(TimeFenceTimerReceiver.EXTRA_TITLE, title)
-            putExtra(TimeFenceTimerReceiver.EXTRA_MESSAGE, message)
+            action = LEGACY_ACTION_FIRE_TIMER
             if (!legacyIdentity) {
                 data = Uri.parse("mtt://time-fence/$ruleId/$sessionId/$expectedSessionStartAtMs")
             }
@@ -334,75 +191,5 @@ object TimeFenceTimerScheduler {
         }
     }
 
-    private fun setExactTimerAlert(
-        am: AlarmManager,
-        fireAtMs: Long,
-        pi: PendingIntent,
-        showPi: PendingIntent,
-        requestedAtMs: Long,
-        ruleId: Long,
-        sessionId: Long,
-        expectedSessionStartAtMs: Long,
-    ): ScheduleResult {
-        return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
-                AlarmManagerCompat.setAlarmClock(am, fireAtMs, showPi, pi)
-                logTimerSchedule(
-                    path = SchedulePath.ALARM_CLOCK,
-                    ruleId = ruleId,
-                    sessionId = sessionId,
-                    expectedSessionStartAtMs = expectedSessionStartAtMs,
-                    requestedAtMs = requestedAtMs,
-                    fireAtMs = fireAtMs,
-                )
-                ScheduleResult(true, SchedulePath.ALARM_CLOCK, requestedAtMs, fireAtMs)
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAtMs, pi)
-                logTimerSchedule(
-                    path = SchedulePath.EXACT_IDLE,
-                    ruleId = ruleId,
-                    sessionId = sessionId,
-                    expectedSessionStartAtMs = expectedSessionStartAtMs,
-                    requestedAtMs = requestedAtMs,
-                    fireAtMs = fireAtMs,
-                )
-                ScheduleResult(true, SchedulePath.EXACT_IDLE, requestedAtMs, fireAtMs)
-            } else {
-                am.setExact(AlarmManager.RTC_WAKEUP, fireAtMs, pi)
-                logTimerSchedule(
-                    path = SchedulePath.EXACT,
-                    ruleId = ruleId,
-                    sessionId = sessionId,
-                    expectedSessionStartAtMs = expectedSessionStartAtMs,
-                    requestedAtMs = requestedAtMs,
-                    fireAtMs = fireAtMs,
-                )
-                ScheduleResult(true, SchedulePath.EXACT, requestedAtMs, fireAtMs)
-            }
-        } catch (se: SecurityException) {
-            val message = "${se::class.java.simpleName}: ${se.message}"
-            Log.w("MTT_TIMER", "Timer alert exact scheduling failed fireAtMs=$fireAtMs", se)
-            ScheduleResult(false, SchedulePath.FAILURE, requestedAtMs, fireAtMs, message)
-        } catch (t: Throwable) {
-            val message = "${t::class.java.simpleName}: ${t.message}"
-            Log.e("MTT_TIMER", "Timer alert scheduling failed fireAtMs=$fireAtMs", t)
-            ScheduleResult(false, SchedulePath.FAILURE, requestedAtMs, fireAtMs, message)
-        }
-    }
-
-    private fun logTimerSchedule(
-        path: SchedulePath,
-        ruleId: Long,
-        sessionId: Long,
-        expectedSessionStartAtMs: Long,
-        requestedAtMs: Long,
-        fireAtMs: Long,
-    ) {
-        Log.i(
-            "MTT_TIMER_ALERT",
-            "schedule path=${path.name} ruleId=$ruleId sessionId=$sessionId " +
-                "sessionStartAtMs=$expectedSessionStartAtMs timerRequestAtMs=$requestedAtMs " +
-                "fireAtMs=$fireAtMs requestLeadMs=${fireAtMs - requestedAtMs}"
-        )
-    }
+    private const val LEGACY_ACTION_FIRE_TIMER = "com.example.multitimetracker.ACTION_TIMEFENCE_TIMER"
 }

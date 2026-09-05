@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="exact_alarm_permission_title">Le notifiche temporizzate richiedono accesso agli allarmi esatti</string>
-    <string name="exact_alarm_permission_body">MultiTimeTracker usa gli allarmi esatti solo per sessioni temporizzate e timer alert configurati da te. Senza questo accesso, questi promemoria locali possono arrivare in ritardo o solo quando riapri la app.</string>
+    <string name="exact_alarm_permission_body">MultiTimeTracker usa gli allarmi esatti solo per le sessioni temporizzate. Senza questo accesso, i relativi promemoria locali possono arrivare in ritardo o solo quando riapri l’app.</string>
     <string name="cd_filters">Filtri</string>
     <string name="cd_settings">Impostazioni</string>
     <string name="cd_open_app_menu">Apri menu laterale</string>
@@ -44,14 +44,12 @@
     <string name="timed_tag_alarm_permission_body">La modalita allarme e opzionale e viene usata solo per gli alert di scadenza delle sessioni temporizzate scelti da te. Android richiede accesso alle notifiche full-screen prima che MultiTimeTracker possa mostrarli sopra la schermata di blocco o altre app.</string>
     <string name="timed_tag_alarm_permission_open_settings">Apri impostazioni</string>
     <string name="notification_permission_title">Consentire le notifiche promemoria locali?</string>
-    <string name="notification_permission_body">MultiTimeTracker usa le notifiche solo per sessioni temporizzate, timer alert e promemoria locali. Non usa push remoti o annunci.</string>
+    <string name="notification_permission_body">MultiTimeTracker usa le notifiche solo per sessioni temporizzate e promemoria locali. Non usa push remoti o annunci.</string>
     <string name="notification_permission_allow">Consenti notifiche</string>
     <string name="notification_permission_not_now">Non ora</string>
     <string name="time_fence_fallback_title">Alert time-fence</string>
     <string name="time_fence_critical_channel_name">Alert time-fence</string>
     <string name="time_fence_critical_channel_description">Promemoria locali di inizio e fine guidati dai tag</string>
-    <string name="time_fence_reminder_channel_name">Promemoria Timer</string>
-    <string name="time_fence_reminder_channel_description">Semplici notifiche Android per gli alert Timer.</string>
     <string name="timed_session_channel_name">Sessioni temporizzate</string>
     <string name="timed_session_channel_description">Promemoria locali di completamento sessione temporizzata</string>
     <string name="timed_session_alarm_channel_name">Allarmi sessioni temporizzate</string>
@@ -62,7 +60,6 @@
     <string name="alert_scope_always">Sempre</string>
     <string name="alert_scope_one_time">Una volta</string>
     <string name="alert_tags_prefix">Tag: </string>
-    <string name="alert_timer_short">Timer %1$d min</string>
     <string name="alert_popup_dismiss">Chiudi alert</string>
     <string name="alert_popup_more_count">Altri %1$d alert in coda</string>
     <string name="alert_link_open_failed">Nessuna app puo aprire questo link.</string>
@@ -71,9 +68,7 @@
     <string name="almeno_uno">Almeno uno</string>
     <string name="annulla">Annulla</string>
     <string name="archivio">Archivio</string>
-    <string name="alert_timer_minutes_label">Minuti dall’inizio</string>
-    <string name="alert_timer_help">Usa 0 per avvisare subito, oppure imposta i minuti per avvisare solo se la sessione e ancora in corso.</string>
-    <string name="alert_notification_delivery_hint">Gli alert Timer vengono consegnati come normali notifiche Android.</string>
+    <string name="alert_notification_delivery_hint">Gli alert Timer appaiono immediatamente dentro l’app.</string>
     <string name="audit_alert_created">Alert audit creato: %1$s</string>
     <string name="audit_alert_deleted">Audit alert deleted</string>
     <string name="audit_alert_disabled">Alert audit disabilitato: %1$s</string>

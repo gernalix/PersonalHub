@@ -1,10 +1,8 @@
 package com.example.multitimetracker
 
-import android.app.Activity
 import android.app.PendingIntent
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -22,7 +20,6 @@ object TimeFenceNotifier {
     // IMPORTANT: Changing the channel id forces Android to re-create channel settings.
     // Users might have disabled "pop on screen" for older channels, which we cannot override.
     const val CHANNEL_ID = "time_fence_critical"
-    const val TIMER_ALERT_CHANNEL_ID = "time_fence_reminder_v1"
     private const val LEGACY_TIMED_SESSION_NORMAL_CHANNEL_ID = "timed_session_normal"
     private const val LEGACY_TIMED_SESSION_ALARM_CHANNEL_ID = "timed_session_alarm"
     private const val TIMED_SESSION_NORMAL_CHANNEL_ID = "timed_session_normal_v2"
@@ -96,23 +93,6 @@ object TimeFenceNotifier {
             }
             nm.createNotificationChannel(channel)
         }
-        if (nm.getNotificationChannel(TIMER_ALERT_CHANNEL_ID) == null) {
-            nm.createNotificationChannel(
-                NotificationChannel(
-                    TIMER_ALERT_CHANNEL_ID,
-                    context.getString(R.string.time_fence_reminder_channel_name),
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = context.getString(R.string.time_fence_reminder_channel_description)
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 250, 120, 250)
-                    enableLights(true)
-                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                    setShowBadge(true)
-                    setSound(notificationSound, notificationAttrs)
-                }
-            )
-        }
         if (nm.getNotificationChannel(TIMED_SESSION_NORMAL_CHANNEL_ID) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(
@@ -144,40 +124,6 @@ object TimeFenceNotifier {
                 }
             )
         }
-    }
-
-    fun notify(
-        context: Context,
-        notificationId: Int,
-        title: String,
-        message: String,
-        // Kept for forward-compat with older patches; defaults match the desired behavior.
-        headsUpEnabled: Boolean = true,
-        criticalFullScreenEnabled: Boolean = true,
-    ) {
-        ensureChannel(context)
-        val nm = context.getSystemService(NotificationManager::class.java) ?: return
-
-        val contentPi = timerAlertContentPendingIntent(
-            context = context,
-            notificationId = notificationId,
-            message = message,
-        )
-
-        val n = NotificationCompat.Builder(context, TIMER_ALERT_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setPriority(if (headsUpEnabled) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(contentPi)
-            .setAutoCancel(true)
-            .build()
-
-        nm.notify(notificationId, n)
     }
 
     fun notifyTimedSession(
@@ -255,90 +201,4 @@ object TimeFenceNotifier {
         }.getOrDefault(false)
     }
 
-    internal fun timerAlertContentIntent(context: Context, notificationId: Int, message: String): Intent {
-        val linkUri = timerAlertLinkUriOrNull(message)
-        if (linkUri != null) {
-            return TimerAlertLinkDispatcherActivity.intent(context, notificationId, linkUri)
-        }
-        return Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            data = Uri.parse("mtt://time-fence-alert/$notificationId")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
-    }
-
-    internal fun timerAlertLinkIntentOrNull(context: Context, message: String): Intent? {
-        val uri = timerAlertLinkUriOrNull(message) ?: return null
-        return Intent(Intent.ACTION_VIEW, uri).apply {
-            addCategory(Intent.CATEGORY_BROWSABLE)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-    }
-
-    internal fun timerAlertLinkUriOrNull(message: String): Uri? {
-        val trimmed = message.trim()
-        if (trimmed.isBlank() || trimmed.any(Char::isWhitespace)) return null
-        val uri = runCatching { Uri.parse(trimmed) }.getOrNull() ?: return null
-        if (uri.scheme.isNullOrBlank() || !uri.isAbsolute) return null
-        if (uri.schemeSpecificPart.isNullOrBlank()) return null
-        if ((uri.scheme == "http" || uri.scheme == "https") && uri.host.isNullOrBlank()) return null
-        return uri
-    }
-
-    private fun timerAlertContentPendingIntent(
-        context: Context,
-        notificationId: Int,
-        message: String,
-    ): PendingIntent {
-        val intent = timerAlertContentIntent(context, notificationId, message)
-        val piFlags = PendingIntent.FLAG_UPDATE_CURRENT or
-            (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
-        val requestCode = 31 * notificationId + message.trim().hashCode()
-        return PendingIntent.getActivity(context, requestCode, intent, piFlags)
-    }
-}
-
-class TimerAlertLinkDispatcherActivity : Activity() {
-    override fun onCreate(savedInstanceState: android.os.Bundle?) {
-        super.onCreate(savedInstanceState)
-        val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1)
-        if (notificationId > 0) {
-            TimeFenceNotifier.cancelNotification(this, notificationId)
-        }
-        val uri = intent.data
-        if (uri != null) {
-            val viewIntent = Intent(Intent.ACTION_VIEW, uri).apply {
-                addCategory(Intent.CATEGORY_BROWSABLE)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            try {
-                startActivity(viewIntent)
-                finish()
-                return
-            } catch (_: ActivityNotFoundException) {
-            } catch (_: SecurityException) {
-            }
-        }
-        startActivity(
-            Intent(this, MainActivity::class.java).apply {
-                action = Intent.ACTION_VIEW
-                data = Uri.parse("mtt://time-fence-alert/${notificationId.coerceAtLeast(1)}")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
-        )
-        finish()
-    }
-
-    companion object {
-        private const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
-
-        fun intent(context: Context, notificationId: Int, uri: Uri): Intent {
-            return Intent(context, TimerAlertLinkDispatcherActivity::class.java).apply {
-                action = Intent.ACTION_VIEW
-                data = uri
-                putExtra(EXTRA_NOTIFICATION_ID, notificationId)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
-        }
-    }
 }

@@ -6,7 +6,6 @@ import android.os.SystemClock
 import android.util.Log
 import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.R
-import com.example.multitimetracker.TimeFenceTimerScheduler
 import com.example.multitimetracker.capsules.alerts.core.*
 import com.example.multitimetracker.capsules.alerts.public.TimeFenceEvent
 import com.example.multitimetracker.capsules.alerts.state.AlertsHostState
@@ -89,7 +88,6 @@ class AlertsCapsuleViewModel(
     private val logSystemEvent: (String, String?, Long?, String, JSONObject?) -> Unit,
     private val elapsedRealtimeMs: () -> Long = { SystemClock.elapsedRealtime() },
     private val logDebug: (String, String) -> Unit = { tag, message -> Log.d(tag, message) },
-    private val scheduleTimerOverride: ((Long, Long, Long, Long, String, String) -> Boolean)? = null,
     private val showNotificationOverride: ((Long, String, String) -> Boolean)? = null
 ) : CapsuleRuntimeParticipant {
     override val capsuleId: String = "alerts"
@@ -160,43 +158,6 @@ class AlertsCapsuleViewModel(
         timeMachineRules.value = null
     }
 
-    private fun scheduleTimer(
-        ruleId: Long,
-        sessionId: Long,
-        expectedSessionStartAtMs: Long,
-        fireAtMs: Long,
-        title: String,
-        message: String
-    ): Boolean {
-        scheduleTimerOverride?.let { return it(ruleId, sessionId, expectedSessionStartAtMs, fireAtMs, title, message) }
-        val ctx = getContext() ?: return false
-        val result = TimeFenceTimerScheduler.schedule(
-            context = ctx,
-            ruleId = ruleId,
-            sessionId = sessionId,
-            expectedSessionStartAtMs = expectedSessionStartAtMs,
-            fireAtMs = fireAtMs,
-            title = title,
-            message = message
-        )
-        if (!result.scheduled) {
-            logSystemEvent(
-                "ALERT_TIMER_SCHEDULE_FAILED",
-                "TIME_FENCE_RULE",
-                ruleId,
-                "Timer alert exact scheduling failed",
-                JSONObject()
-                    .put("ruleId", ruleId)
-                    .put("sessionId", sessionId)
-                    .put("sessionStartAtMs", expectedSessionStartAtMs)
-                    .put("fireAtMs", fireAtMs)
-                    .put("schedulerPath", result.path.name)
-                    .put("failure", result.failureMessage)
-            )
-        }
-        return result.scheduled
-    }
-
     fun showTimerAlertPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long) {
         enqueuePreFencePrompt(
             PreFencePrompt(
@@ -215,18 +176,6 @@ class AlertsCapsuleViewModel(
         return true
     }
 
-    private fun reconcileTimeFenceRuleAlarms(beforeRules: List<TimeFenceRule>, nowMs: Long = System.currentTimeMillis()) {
-        val ctx = getContext() ?: return
-        val reconciliation = buildTimeFenceAlarmReconciliation(
-            beforeRules = beforeRules,
-            afterRules = rules(),
-            sessions = getRunningSessions(),
-            tags = getTags(),
-            nowMs = nowMs,
-        )
-        executeTimeFenceAlarmReconciliation(ctx, reconciliation)
-    }
-
     fun reconcileSnapshotRuntimeAlarms(
         context: Context,
         rules: List<TimeFenceRule>,
@@ -234,14 +183,10 @@ class AlertsCapsuleViewModel(
         tags: List<Tag>,
         nowMs: Long,
     ) {
-        val reconciliation = buildTimeFenceAlarmReconciliation(
-            beforeRules = rules,
-            afterRules = rules,
-            sessions = sessions,
-            tags = tags,
-            nowMs = nowMs,
+        executeLegacyTimerAlertCleanup(
+            context = context,
+            cleanup = buildLegacyTimerAlertCleanup(rules = rules, sessions = sessions),
         )
-        executeTimeFenceAlarmReconciliation(context, reconciliation)
     }
 
 
@@ -271,7 +216,6 @@ class AlertsCapsuleViewModel(
         matchMode: TimeFenceMatchMode = TimeFenceMatchMode.AND,
         tagIds: Set<Long>,
         cooldownMs: Long = 0L,
-        timerMinutes: Int = 0
     ): Boolean {
         val msg = message.trim()
         if (msg.isBlank()) return false
@@ -291,7 +235,7 @@ class AlertsCapsuleViewModel(
                 scope = scope,
                 matchMode = matchMode,
                 tagIds = tagIds,
-                timerMinutes = max(0, timerMinutes),
+                timerMinutes = 0,
                 cooldownMs = max(0L, cooldownMs)
             )
             replaceRules((currentRules + created).sortedBy { it.id })
@@ -311,7 +255,6 @@ class AlertsCapsuleViewModel(
 
         persistAsync()
         scheduleAutoBackup()
-        reconcileTimeFenceRuleAlarms(beforeRules)
         return true
     }
 
@@ -324,7 +267,6 @@ class AlertsCapsuleViewModel(
         matchMode: TimeFenceMatchMode,
         tagIds: Set<Long>,
         cooldownMs: Long,
-        timerMinutes: Int
     ): Boolean {
         val msg = message.trim()
         if (msg.isBlank()) return false
@@ -346,7 +288,7 @@ class AlertsCapsuleViewModel(
                     scope = scope,
                     matchMode = matchMode,
                     tagIds = tagIds,
-                    timerMinutes = max(0, timerMinutes),
+                    timerMinutes = 0,
                     cooldownMs = max(0L, cooldownMs)
                 )
             }.also { replaceRules(it) }
@@ -370,7 +312,6 @@ class AlertsCapsuleViewModel(
 
         persistAsync()
         scheduleAutoBackup()
-        reconcileTimeFenceRuleAlarms(beforeRules)
         return true
     }
 
@@ -402,7 +343,6 @@ class AlertsCapsuleViewModel(
     }
     persistAsync()
     scheduleAutoBackup()
-    reconcileTimeFenceRuleAlarms(beforeRules, nowMs = now)
 }
 
 fun restoreTimeFenceRule(ruleId: Long) {
@@ -426,7 +366,6 @@ fun restoreTimeFenceRule(ruleId: Long) {
     }
     persistAsync()
     scheduleAutoBackup()
-    reconcileTimeFenceRuleAlarms(beforeRules)
 }
 
 fun purgeTimeFenceRule(ruleId: Long) {
@@ -448,7 +387,6 @@ fun purgeTimeFenceRule(ruleId: Long) {
     }
     persistAsync()
     scheduleAutoBackup()
-    reconcileTimeFenceRuleAlarms(beforeRules)
 }
 
 fun purgeAllDeletedTimeFenceRules() {
@@ -471,7 +409,6 @@ fun purgeAllDeletedTimeFenceRules() {
     }
     persistAsync()
     scheduleAutoBackup()
-    reconcileTimeFenceRuleAlarms(beforeRules)
 }
 fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
         val beforeRules = rules()
@@ -504,14 +441,13 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
 
         persistAsync()
         scheduleAutoBackup()
-        reconcileTimeFenceRuleAlarms(beforeRules)
     }
 
     /**
      * Evaluate emitted TimeFenceEvent(s) against current rules, fire side-effects and update rule state.
      *
      * Side-effects:
-     * - Timer Alerts are always in-app prompts, immediate or scheduled (ON_START only, timerMinutes > 0).
+     * - Timer Alerts are always immediate in-app prompts.
      */
     fun handleTimeFenceEvents(events: List<TimeFenceEvent>, nowMs: Long) {
         if (events.isEmpty()) return

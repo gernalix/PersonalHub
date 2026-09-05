@@ -1,6 +1,7 @@
 package com.example.multitimetracker
 
 import android.content.Context
+import com.example.multitimetracker.capsules.alerts.core.buildTimedSessionRestorePlan
 import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
@@ -88,6 +89,22 @@ object TimedSessionSupport {
             }
     }
 
+    fun restoreScheduledAlarmsAfterBootOrUpdate(
+        context: Context,
+        tags: List<Tag>,
+        nowMs: Long,
+    ) {
+        reconcileExpiredSessions(context = context, tags = tags, nowMs = nowMs, notify = true)
+        val runningSessions = DefaultSessionCore(context).readRunningSessions()
+        syncScheduledAlarms(
+            context = context,
+            sessions = runningSessions,
+            tags = tags,
+            trackedSessionIds = mutableSetOf(),
+            nowMs = nowMs,
+        )
+    }
+
     fun syncScheduledAlarms(
         context: Context,
         sessions: List<SessionUi>,
@@ -95,28 +112,18 @@ object TimedSessionSupport {
         trackedSessionIds: MutableSet<Long>,
         nowMs: Long,
     ) {
-        val desiredIds = mutableSetOf<Long>()
-        sessions.forEach { session ->
-            val timedMatch = findTimedTagMatchForSession(session, tags)
-            val expectedEndMs = session.expectedEndMs
-            val shouldSchedule = session.endMs == null &&
-                expectedEndMs != null &&
-                expectedEndMs > nowMs &&
-                timedMatch != null &&
-                timedMatch.notificationType != TimedTagNotificationType.NONE
-
-            if (shouldSchedule) {
-                desiredIds += session.id
-                TimeFenceTimerScheduler.scheduleTimedSession(
-                    context = context,
-                    sessionId = session.id,
-                    fireAtMs = expectedEndMs,
-                    alarmStyle = timedMatch.notificationType == TimedTagNotificationType.ALARM,
-                )
-            } else {
-                TimeFenceTimerScheduler.cancelTimedSession(context, session.id)
-            }
+        val plan = buildTimedSessionRestorePlan(sessions = sessions, tags = tags, nowMs = nowMs)
+        val desiredIds = plan.alarms.mapTo(mutableSetOf()) { it.sessionId }
+        plan.alarms.forEach { alarm ->
+            TimeFenceTimerScheduler.scheduleTimedSession(
+                context = context,
+                sessionId = alarm.sessionId,
+                fireAtMs = alarm.fireAtMs,
+                alarmStyle = alarm.alarmStyle,
+            )
         }
+        sessions.filter { it.id !in desiredIds }
+            .forEach { TimeFenceTimerScheduler.cancelTimedSession(context, it.id) }
 
         trackedSessionIds
             .filter { it !in desiredIds }

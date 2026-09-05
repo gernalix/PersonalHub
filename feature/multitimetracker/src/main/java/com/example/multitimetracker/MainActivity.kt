@@ -267,20 +267,11 @@ DisposableEffect(Unit) {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == QuickSessionWidgetProvider.ACTION_SNAPSHOT_CHANGED) {
                 latestVm.value.reloadFromSnapshot(context)
-            } else if (i.action == TimeFenceTimerReceiver.ACTION_SHOW_TIMER_ALERT_PROMPT) {
-                latestVm.value.alertsCapsule.showTimerAlertPrompt(
-                    ruleId = i.getLongExtra(TimeFenceTimerReceiver.EXTRA_RULE_ID, -1L),
-                    sessionId = i.getLongExtra(TimeFenceTimerReceiver.EXTRA_ALERT_SESSION_ID, -1L),
-                    title = i.getStringExtra(TimeFenceTimerReceiver.EXTRA_TITLE).orEmpty(),
-                    message = i.getStringExtra(TimeFenceTimerReceiver.EXTRA_MESSAGE).orEmpty(),
-                    firedAtMs = i.getLongExtra(TimeFenceTimerReceiver.EXTRA_FIRED_AT_MS, System.currentTimeMillis()),
-                )
             }
         }
     }
     val filter = IntentFilter().apply {
         addAction(QuickSessionWidgetProvider.ACTION_SNAPSHOT_CHANGED)
-        addAction(TimeFenceTimerReceiver.ACTION_SHOW_TIMER_ALERT_PROMPT)
     }
     ContextCompat.registerReceiver(
         context,

@@ -933,7 +933,7 @@ if (developerSurfaceEnabled && showDevReport) {
                         AlertsScreen(
                             modifier = Modifier.padding(inner),
                             state = alertsState,
-                            onAddTimeFenceRule = { msg, trigger, scope, matchMode, tagIds, cooldownMs, timerMinutes, delivery ->
+                            onAddTimeFenceRule = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
                                 vm.alertsCapsule.addTimeFenceRule(
                                     message = msg,
                                     trigger = trigger,
@@ -941,11 +941,10 @@ if (developerSurfaceEnabled && showDevReport) {
                                     scope = scope,
                                     matchMode = matchMode,
                                     tagIds = tagIds,
-                                    cooldownMs = cooldownMs,
-                                    timerMinutes = timerMinutes
+                                    cooldownMs = cooldownMs
                                 )
                             },
-                            onUpdateTimeFenceRule = { id, msg, trigger, scope, matchMode, tagIds, cooldownMs, timerMinutes, delivery ->
+                            onUpdateTimeFenceRule = { id, msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
                                 vm.alertsCapsule.updateTimeFenceRule(
                                     ruleId = id,
                                     message = msg,
@@ -954,8 +953,7 @@ if (developerSurfaceEnabled && showDevReport) {
                                     scope = scope,
                                     matchMode = matchMode,
                                     tagIds = tagIds,
-                                    cooldownMs = cooldownMs,
-                                    timerMinutes = timerMinutes
+                                    cooldownMs = cooldownMs
                                 )
                             },
                             onDeleteTimeFenceRule = vm.alertsCapsule::deleteTimeFenceRule,

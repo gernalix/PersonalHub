@@ -72,8 +72,8 @@ import com.example.multitimetracker.capsules.system.ui.TrashListDialog
 fun AlertsScreen(
     modifier: Modifier = Modifier,
     state: AlertsUiState,
-    onAddTimeFenceRule: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, Int, TimeFenceDelivery) -> Unit,
-    onUpdateTimeFenceRule: (Long, String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, Int, TimeFenceDelivery) -> Unit,
+    onAddTimeFenceRule: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery) -> Unit,
+    onUpdateTimeFenceRule: (Long, String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery) -> Unit,
     onDeleteTimeFenceRule: (Long) -> Unit,
     onRestoreTimeFenceRule: (Long) -> Unit,
     onPurgeTimeFenceRule: (Long) -> Unit,
@@ -153,8 +153,8 @@ fun AlertsScreen(
             tagLastUsedMsByTagId = state.tagLastUsedMsByTagId,
             initial = null,
             onDismiss = { showAdd = false },
-            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, timerMinutes, delivery ->
-                onAddTimeFenceRule(msg, trigger, scope, matchMode, tagIds, cooldownMs, timerMinutes, delivery)
+            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
+                onAddTimeFenceRule(msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery)
                 showAdd = false
             }
         )
@@ -167,9 +167,9 @@ fun AlertsScreen(
             tagLastUsedMsByTagId = state.tagLastUsedMsByTagId,
             initial = editRule,
             onDismiss = { editRule = null },
-            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, timerMinutes, delivery ->
+            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
                 val r = editRule ?: return@AlertRuleDialog
-                onUpdateTimeFenceRule(r.id, msg, trigger, scope, matchMode, tagIds, cooldownMs, timerMinutes, delivery)
+                onUpdateTimeFenceRule(r.id, msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery)
                 editRule = null
             }
         )
@@ -254,13 +254,6 @@ private fun AlertRuleCard(
                             else
                                 stringResource(R.string.alert_match_any)
                         )
-                        if (rule.delivery == TimeFenceDelivery.NOTIFICATION &&
-                            rule.trigger == TimeFenceTrigger.ON_START &&
-                            rule.timerMinutes > 0
-                        ) {
-                            append(" · ")
-                            append(stringResource(R.string.alert_timer_short, rule.timerMinutes))
-                        }
                         if (rule.cooldownMs > 0) {
                             append(" · ")
                             append(stringResource(R.string.alert_cooldown_short))
@@ -314,24 +307,21 @@ private fun AlertRuleDialog(
     tagLastUsedMsByTagId: Map<Long, Long>,
     initial: TimeFenceRule?,
     onDismiss: () -> Unit,
-    onConfirm: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, Int, TimeFenceDelivery) -> Unit
+    onConfirm: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery) -> Unit
 ) {
     var message by remember { mutableStateOf(initial?.message ?: "") }
     var trigger by remember { mutableStateOf(initial?.trigger ?: TimeFenceTrigger.ON_START) }
     var scope by remember { mutableStateOf(initial?.scope ?: TimeFenceScope.ALWAYS) }
     var matchMode by remember { mutableStateOf(initial?.matchMode ?: TimeFenceMatchMode.AND) }
     var cooldownMs by remember { mutableStateOf(initial?.cooldownMs ?: 0L) }
-    var timerMinutesText by remember { mutableStateOf((initial?.timerMinutes ?: 1).coerceAtLeast(0).toString()) }
     var selectedTagIds by remember { mutableStateOf(initial?.tagIds ?: emptySet()) }
     var tagQuery by remember { mutableStateOf("") }
-    val timerMinutes = timerMinutesText.toIntOrNull()?.coerceIn(0, 24 * 60)
-    val normalizedTimerMinutes = if (trigger == TimeFenceTrigger.ON_START) timerMinutes else 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             SingleSubmitButton(
-                enabled = message.trim().isNotEmpty() && selectedTagIds.isNotEmpty() && normalizedTimerMinutes != null,
+                enabled = message.trim().isNotEmpty() && selectedTagIds.isNotEmpty(),
                 onClick = {
                     onConfirm(
                         message,
@@ -340,7 +330,6 @@ private fun AlertRuleDialog(
                         matchMode,
                         selectedTagIds,
                         cooldownMs,
-                        normalizedTimerMinutes ?: 0,
                         TimeFenceDelivery.NOTIFICATION
                     )
                 }
@@ -401,18 +390,6 @@ private fun AlertRuleDialog(
                         selected = matchMode == TimeFenceMatchMode.OR,
                         onClick = { matchMode = TimeFenceMatchMode.OR },
                         label = { Text(stringResource(R.string.almeno_uno)) }
-                    )
-                }
-
-                if (trigger == TimeFenceTrigger.ON_START) {
-                    OutlinedTextField(
-                        value = timerMinutesText,
-                        onValueChange = { value -> timerMinutesText = value.filter { it.isDigit() }.take(4) },
-                        label = { Text(stringResource(R.string.alert_timer_minutes_label)) },
-                        supportingText = { Text(stringResource(R.string.alert_timer_help)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        isError = timerMinutes == null
                     )
                 }
 
