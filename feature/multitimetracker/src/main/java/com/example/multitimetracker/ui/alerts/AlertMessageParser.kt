@@ -9,6 +9,10 @@ sealed interface AlertMessageSegment {
 
 fun parseAlertMessageSegments(message: String): List<AlertMessageSegment> {
     if (message.isEmpty()) return emptyList()
+    val trimmed = message.trim()
+    if (isAllowedAlertLink(trimmed)) {
+        return listOf(AlertMessageSegment.Link(abbreviateNakedUrl(trimmed), trimmed))
+    }
 
     val segments = mutableListOf<AlertMessageSegment>()
     var index = 0
@@ -54,7 +58,12 @@ fun parseAlertMessageSegments(message: String): List<AlertMessageSegment> {
 fun isAllowedAlertLink(url: String): Boolean {
     val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false
     val scheme = uri.scheme?.lowercase() ?: return false
-    return (scheme == "https" || scheme == "http") && !uri.host.isNullOrBlank()
+    if (uri.schemeSpecificPart.isNullOrBlank()) return false
+    return if (scheme == "https" || scheme == "http") {
+        !uri.host.isNullOrBlank()
+    } else {
+        true
+    }
 }
 
 private data class ParsedLink(
@@ -116,15 +125,19 @@ private fun String.trimTrailingUrlPunctuation(): String =
     trimEnd('.', ',', ';', ':', '!', '?')
 
 private fun abbreviateNakedUrl(url: String): String {
-    val withoutScheme = url
-        .removePrefix("https://")
-        .removePrefix("http://")
-        .trimEnd('/')
-    return if (withoutScheme.length <= MAX_NAKED_URL_LABEL_LENGTH) {
-        withoutScheme
-    } else {
-        withoutScheme.take(MAX_NAKED_URL_LABEL_LENGTH - 3) + "..."
-    }
+    val uri = runCatching { URI(url.trim()) }.getOrNull()
+    val scheme = uri?.scheme?.takeIf { it.isNotBlank() }
+    if (scheme != null && scheme.lowercase() != "http" && scheme.lowercase() != "https") return scheme
+
+    val host = uri?.host
+        ?.removePrefix("www.")
+        ?.split('.')
+        ?.firstOrNull { it.isNotBlank() }
+    if (!host.isNullOrBlank()) return host
+
+    if (!scheme.isNullOrBlank()) return scheme
+
+    return url.trim().take(MAX_NAKED_URL_LABEL_LENGTH)
 }
 
 private const val MAX_NAKED_URL_LABEL_LENGTH = 42

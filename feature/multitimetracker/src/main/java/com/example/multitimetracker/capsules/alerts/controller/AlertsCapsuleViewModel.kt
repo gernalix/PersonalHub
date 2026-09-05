@@ -6,7 +6,6 @@ import android.os.SystemClock
 import android.util.Log
 import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.R
-import com.example.multitimetracker.TimeFenceNotifier
 import com.example.multitimetracker.TimeFenceTimerScheduler
 import com.example.multitimetracker.capsules.alerts.core.*
 import com.example.multitimetracker.capsules.alerts.public.TimeFenceEvent
@@ -198,16 +197,21 @@ class AlertsCapsuleViewModel(
         return result.scheduled
     }
 
-    private fun showNotification(ruleId: Long, title: String, message: String): Boolean {
-        showNotificationOverride?.let { return it(ruleId, title, message) }
-        val ctx = getContext() ?: return false
-        val notifId = (ruleId % Int.MAX_VALUE).toInt().coerceAtLeast(1)
-        TimeFenceNotifier.notify(
-            context = ctx,
-            notificationId = notifId,
-            title = title,
-            message = message
+    fun showTimerAlertPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long) {
+        enqueuePreFencePrompt(
+            PreFencePrompt(
+                ruleId = ruleId,
+                sessionId = sessionId,
+                sessionTitle = title,
+                message = message,
+                firedAtMs = firedAtMs,
+            )
         )
+    }
+
+    private fun showInAppPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long): Boolean {
+        showNotificationOverride?.let { return it(ruleId, title, message) }
+        showTimerAlertPrompt(ruleId, sessionId, title, message, firedAtMs)
         return true
     }
 
@@ -507,7 +511,7 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
      * Evaluate emitted TimeFenceEvent(s) against current rules, fire side-effects and update rule state.
      *
      * Side-effects:
-     * - Timer Alerts are always Android notifications, immediate or scheduled (ON_START only, timerMinutes > 0).
+     * - Timer Alerts are always in-app prompts, immediate or scheduled (ON_START only, timerMinutes > 0).
      */
     fun handleTimeFenceEvents(events: List<TimeFenceEvent>, nowMs: Long) {
         if (events.isEmpty()) return
@@ -536,37 +540,7 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
                 ) ?: continue
                 val title = match.title
 
-                // Timer scheduling is only for ON_START + notification delivery.
-                // We schedule the notification and exit early (rule state will be updated when the timer actually fires).
-                if (r.delivery == TimeFenceDelivery.NOTIFICATION &&
-                    ev.trigger == TimeFenceTrigger.ON_START &&
-                    r.timerMinutes > 0
-                ) {
-                    val expectedStartAtMs = resolveSessionStartAtMs(ev.sessionId, nowMs) ?: continue
-                    val fireAtMs = normalizeScheduledTimeFenceFireAtMs(
-                        expectedFireAtMs = scheduledTimeFenceFireAtMs(
-                            expectedSessionStartAtMs = expectedStartAtMs,
-                            timerMinutes = r.timerMinutes,
-                        ),
-                        nowMs = nowMs,
-                    )
-                    if (!scheduleTimer(r.id, ev.sessionId, expectedStartAtMs, fireAtMs, title, r.message)) continue
-
-                    logSystemEvent(
-                        "ALERT_TIMER_SCHEDULED",
-                        "TIME_FENCE_RULE",
-                        r.id,
-                        "Timer scheduled",
-                        JSONObject()
-                            .put("ruleId", r.id)
-                            .put("sessionId", ev.sessionId)
-                            .put("timerMinutes", r.timerMinutes)
-                            .put("fireAtMs", fireAtMs)
-                    )
-                    continue
-                }
-
-                if (!showNotification(r.id, title, r.message)) continue
+                if (!showInAppPrompt(r.id, ev.sessionId, title, r.message, nowMs)) continue
                 logSystemEvent(
                     "ALERT_FIRED",
                     "TIME_FENCE_RULE",

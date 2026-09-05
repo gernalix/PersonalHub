@@ -267,10 +267,21 @@ DisposableEffect(Unit) {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == QuickSessionWidgetProvider.ACTION_SNAPSHOT_CHANGED) {
                 latestVm.value.reloadFromSnapshot(context)
+            } else if (i.action == TimeFenceTimerReceiver.ACTION_SHOW_TIMER_ALERT_PROMPT) {
+                latestVm.value.alertsCapsule.showTimerAlertPrompt(
+                    ruleId = i.getLongExtra(TimeFenceTimerReceiver.EXTRA_RULE_ID, -1L),
+                    sessionId = i.getLongExtra(TimeFenceTimerReceiver.EXTRA_ALERT_SESSION_ID, -1L),
+                    title = i.getStringExtra(TimeFenceTimerReceiver.EXTRA_TITLE).orEmpty(),
+                    message = i.getStringExtra(TimeFenceTimerReceiver.EXTRA_MESSAGE).orEmpty(),
+                    firedAtMs = i.getLongExtra(TimeFenceTimerReceiver.EXTRA_FIRED_AT_MS, System.currentTimeMillis()),
+                )
             }
         }
     }
-    val filter = IntentFilter(QuickSessionWidgetProvider.ACTION_SNAPSHOT_CHANGED)
+    val filter = IntentFilter().apply {
+        addAction(QuickSessionWidgetProvider.ACTION_SNAPSHOT_CHANGED)
+        addAction(TimeFenceTimerReceiver.ACTION_SHOW_TIMER_ALERT_PROMPT)
+    }
     ContextCompat.registerReceiver(
         context,
         receiver,
@@ -667,14 +678,7 @@ private fun requiresExactAlarmPermission(nowState: NowUiState, alertsState: Aler
                 it != TimedTagNotificationType.NONE
             } == true
     }
-    val hasTimerAlertRule = alertsState.timeFenceRules.any { rule ->
-        !rule.isDeleted &&
-            rule.isEnabled &&
-            rule.delivery == TimeFenceDelivery.NOTIFICATION &&
-            rule.trigger == TimeFenceTrigger.ON_START &&
-            rule.timerMinutes > 0
-    }
-    return hasTimedSessionAlarm || hasTimerAlertRule
+    return hasTimedSessionAlarm
 }
 
 private fun hasNotificationPermission(context: Context): Boolean {

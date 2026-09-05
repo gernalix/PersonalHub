@@ -89,6 +89,11 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
             expectedSessionStartAtMs = intent.getLongExtra(EXTRA_EXPECTED_SESSION_START_AT_MS, -1L),
         ) ?: return
         val receiverAtMs = System.currentTimeMillis()
+        TimeFenceTimerScheduler.forgetScheduledTimerAlert(
+            ruleId = request.ruleId,
+            sessionId = request.sessionId,
+            expectedSessionStartAtMs = request.expectedSessionStartAtMs,
+        )
 
         val snap = SnapshotStore.load(context) ?: return
         val rule = snap.timeFenceRules.firstOrNull { it.id == request.ruleId } ?: return
@@ -111,13 +116,15 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
             .ifBlank { context.getString(R.string.time_fence_fallback_title) }
         val message = intent.getStringExtra(EXTRA_MESSAGE).orEmpty()
 
-        val notifId = (rule.id % Int.MAX_VALUE).toInt().coerceAtLeast(1)
         val notifyAtMs = System.currentTimeMillis()
-        TimeFenceNotifier.notify(
-            context = context,
-            notificationId = notifId,
-            title = title,
-            message = message
+        context.sendBroadcast(
+            Intent(ACTION_SHOW_TIMER_ALERT_PROMPT)
+                .setPackage(context.packageName)
+                .putExtra(EXTRA_RULE_ID, rule.id)
+                .putExtra(EXTRA_ALERT_SESSION_ID, request.sessionId)
+                .putExtra(EXTRA_TITLE, title)
+                .putExtra(EXTRA_MESSAGE, message)
+                .putExtra(EXTRA_FIRED_AT_MS, notifyAtMs)
         )
         val fireAtMs = com.example.multitimetracker.capsules.alerts.core.scheduledTimeFenceFireAtMs(
             expectedSessionStartAtMs = request.expectedSessionStartAtMs,
@@ -218,10 +225,11 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
         const val EXTRA_EXPECTED_SESSION_START_AT_MS = "extra_expected_session_start_at_ms"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_MESSAGE = "extra_message"
+        const val EXTRA_FIRED_AT_MS = "extra_fired_at_ms"
         const val EXTRA_SESSION_ID = "extra_session_id"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
+        const val ACTION_SHOW_TIMER_ALERT_PROMPT = "com.example.multitimetracker.ACTION_SHOW_TIMER_ALERT_PROMPT"
 
         private const val LEGACY_EXTRA_TASK_ID = "extra_task_id"
     }
 }
-

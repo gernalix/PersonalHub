@@ -16,7 +16,7 @@ import org.junit.Test
 
 class TimeFenceAlarmReconciliationTest {
     @Test
-    fun activePersistedRuleRestoresOneScheduleForRunningMatchingSession() {
+    fun activePersistedRuleCancelsLegacyTimerScheduleForRunningMatchingSession() {
         val rule = notificationRule(timerMinutes = 5)
         val session = runningSession(startMs = 1_000L)
 
@@ -28,9 +28,8 @@ class TimeFenceAlarmReconciliationTest {
             nowMs = 2_000L,
         )
 
-        assertEquals(1, reconciliation.scheduleTimers.size)
+        assertTrue(reconciliation.scheduleTimers.isEmpty())
         assertEquals(1, reconciliation.cancelTimerKeys.size)
-        assertEquals(scheduledTimeFenceFireAtMs(1_000L, 5), reconciliation.scheduleTimers.single().fireAtMs)
     }
 
     @Test

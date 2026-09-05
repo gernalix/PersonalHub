@@ -15,6 +15,7 @@ object TimeFenceTimerScheduler {
         EXACT,
         EXACT_IDLE,
         ALARM_CLOCK,
+        REUSED,
         FAILURE,
     }
 
@@ -25,6 +26,20 @@ object TimeFenceTimerScheduler {
         val fireAtMs: Long,
         val failureMessage: String? = null,
     )
+
+    private data class ScheduledTimerIdentity(
+        val ruleId: Long,
+        val sessionId: Long,
+        val expectedSessionStartAtMs: Long,
+    )
+
+    private data class ScheduledTimerState(
+        val fireAtMs: Long,
+        val title: String,
+        val message: String,
+    )
+
+    private val scheduledTimerAlerts = mutableMapOf<ScheduledTimerIdentity, ScheduledTimerState>()
 
     fun canScheduleExactAlarms(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
@@ -89,6 +104,11 @@ object TimeFenceTimerScheduler {
         message: String,
     ): ScheduleResult {
         val requestedAtMs = System.currentTimeMillis()
+        val identity = ScheduledTimerIdentity(
+            ruleId = ruleId,
+            sessionId = sessionId,
+            expectedSessionStartAtMs = expectedSessionStartAtMs,
+        )
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
             ?: return ScheduleResult(
                 scheduled = false,
@@ -97,7 +117,6 @@ object TimeFenceTimerScheduler {
                 fireAtMs = fireAtMs,
                 failureMessage = "AlarmManager unavailable",
             )
-        cancel(context, ruleId, sessionId, expectedSessionStartAtMs)
         val pi = scheduledTimeFencePendingIntent(
             context = context,
             ruleId = ruleId,
@@ -107,12 +126,32 @@ object TimeFenceTimerScheduler {
             message = message,
             legacyIdentity = false,
         )
+        val nextState = ScheduledTimerState(
+            fireAtMs = fireAtMs,
+            title = title,
+            message = message,
+        )
+        synchronized(scheduledTimerAlerts) {
+            if (scheduledTimerAlerts[identity]?.fireAtMs == fireAtMs) {
+                scheduledTimerAlerts[identity] = nextState
+                logTimerSchedule(
+                    path = SchedulePath.REUSED,
+                    ruleId = ruleId,
+                    sessionId = sessionId,
+                    expectedSessionStartAtMs = expectedSessionStartAtMs,
+                    requestedAtMs = requestedAtMs,
+                    fireAtMs = fireAtMs,
+                )
+                return ScheduleResult(true, SchedulePath.REUSED, requestedAtMs, fireAtMs)
+            }
+        }
+        cancel(context, ruleId, sessionId, expectedSessionStartAtMs)
         val showPi = alarmClockShowIntent(
             context = context,
             requestCode = (ruleId xor sessionId xor expectedSessionStartAtMs).hashCode(),
             data = Uri.parse("mtt://time-fence/$ruleId/$sessionId/$expectedSessionStartAtMs/show"),
         )
-        return setExactTimerAlert(
+        val result = setExactTimerAlert(
             am = am,
             fireAtMs = fireAtMs,
             pi = pi,
@@ -122,6 +161,14 @@ object TimeFenceTimerScheduler {
             sessionId = sessionId,
             expectedSessionStartAtMs = expectedSessionStartAtMs,
         )
+        synchronized(scheduledTimerAlerts) {
+            if (result.scheduled) {
+                scheduledTimerAlerts[identity] = nextState
+            } else {
+                scheduledTimerAlerts.remove(identity)
+            }
+        }
+        return result
     }
 
     fun cancel(
@@ -131,6 +178,15 @@ object TimeFenceTimerScheduler {
         expectedSessionStartAtMs: Long,
     ) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        synchronized(scheduledTimerAlerts) {
+            scheduledTimerAlerts.remove(
+                ScheduledTimerIdentity(
+                    ruleId = ruleId,
+                    sessionId = sessionId,
+                    expectedSessionStartAtMs = expectedSessionStartAtMs,
+                )
+            )
+        }
         cancelPendingIntent(
             am,
             scheduledTimeFencePendingIntent(
@@ -155,6 +211,22 @@ object TimeFenceTimerScheduler {
                 legacyIdentity = true,
             )
         )
+    }
+
+    fun forgetScheduledTimerAlert(
+        ruleId: Long,
+        sessionId: Long,
+        expectedSessionStartAtMs: Long,
+    ) {
+        synchronized(scheduledTimerAlerts) {
+            scheduledTimerAlerts.remove(
+                ScheduledTimerIdentity(
+                    ruleId = ruleId,
+                    sessionId = sessionId,
+                    expectedSessionStartAtMs = expectedSessionStartAtMs,
+                )
+            )
+        }
     }
 
     private fun immutableFlags(base: Int): Int {

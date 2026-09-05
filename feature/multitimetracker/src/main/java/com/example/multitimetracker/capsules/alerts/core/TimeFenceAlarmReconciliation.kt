@@ -112,7 +112,7 @@ internal fun buildTimeFenceAlarmReconciliation(
             rule.trigger == TimeFenceTrigger.ON_START &&
             rule.timerMinutes > 0
     }
-    val cancelTimerKeys = buildSet {
+    val candidateCancelTimerKeys = buildSet {
         timerCandidateRules.forEach { rule ->
             runningSessions.forEach { session ->
                 add(
@@ -139,57 +139,9 @@ internal fun buildTimeFenceAlarmReconciliation(
         }
     }
 
-    val tagNameById = tags.associateBy({ it.id }, { it.name })
-    val scheduleTimers = buildList {
-        afterRules.forEach { rule ->
-            if (!isLiveTimeFenceRule(rule)) return@forEach
-            if (rule.delivery != TimeFenceDelivery.NOTIFICATION) return@forEach
-            if (rule.trigger != TimeFenceTrigger.ON_START) return@forEach
-            if (rule.timerMinutes <= 0) return@forEach
-
-            runningSessions.forEach { session ->
-                val match = matchTimeFenceRuleForEvent(
-                    rule = rule,
-                    event = TimeFenceEvent(
-                        trigger = TimeFenceTrigger.ON_START,
-                        sessionId = session.id,
-                        sessionTitle = session.title,
-                        sessionTagIds = session.tagIds,
-                    ),
-                    nowMs = session.startMs,
-                    tagNameById = tagNameById,
-                ) ?: return@forEach
-
-                if (hasScheduledTimeFenceAlreadyFired(rule, session.startMs)) return@forEach
-
-                val expectedFireAtMs = scheduledTimeFenceFireAtMs(
-                    expectedSessionStartAtMs = session.startMs,
-                    timerMinutes = rule.timerMinutes,
-                )
-                val fireAtMs = normalizeScheduledTimeFenceFireAtMs(
-                    expectedFireAtMs = expectedFireAtMs,
-                    nowMs = nowMs,
-                )
-
-                add(
-                    TimeFenceTimerSchedule(
-                        key = TimeFenceTimerKey(
-                            ruleId = rule.id,
-                            sessionId = session.id,
-                            expectedSessionStartAtMs = session.startMs,
-                        ),
-                        fireAtMs = fireAtMs,
-                        title = match.title,
-                        message = rule.message,
-                    )
-                )
-            }
-        }
-    }
-
     return TimeFenceAlarmReconciliation(
-        cancelTimerKeys = cancelTimerKeys,
-        scheduleTimers = scheduleTimers,
+        cancelTimerKeys = candidateCancelTimerKeys,
+        scheduleTimers = emptyList(),
         cancelNotificationIds = cancelNotificationIds,
     )
 }
