@@ -52,6 +52,8 @@
     <string name="time_fence_fallback_title">Time-fence alert</string>
     <string name="time_fence_critical_channel_name">Time-fence alerts</string>
     <string name="time_fence_critical_channel_description">Local start and end reminders driven by tags</string>
+    <string name="time_fence_reminder_channel_name">Timer reminders</string>
+    <string name="time_fence_reminder_channel_description">Simple Timer alert notifications.</string>
     <string name="timed_session_channel_name">Timed sessions</string>
     <string name="timed_session_channel_description">Local timed-session completion reminders</string>
     <string name="timed_session_alarm_channel_name">Timed session alarms</string>
@@ -62,8 +64,10 @@
     <string name="alert_scope_always">Always</string>
     <string name="alert_scope_one_time">One time</string>
     <string name="alert_tags_prefix">Tags: </string>
-    <string name="alert_timer_short">Alert timer short</string>
-    <string name="alert_timer_help">If set, the notification fires only after X minutes from the start (and only if it is still running).</string>
+    <string name="alert_timer_short">%1$d min timer</string>
+    <string name="alert_timer_minutes_label">Minutes after start</string>
+    <string name="alert_timer_help">Use 0 to notify immediately, or set minutes to notify only if the session is still running.</string>
+    <string name="alert_notification_delivery_hint">Timer alerts are delivered as normal Android notifications.</string>
     <string name="alert_popup_dismiss">Dismiss alert</string>
     <string name="alert_popup_more_count">%1$d more alerts queued</string>
     <string name="alert_link_open_failed">No app can open this link.</string>

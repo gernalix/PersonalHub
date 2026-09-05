@@ -254,6 +254,13 @@ private fun AlertRuleCard(
                             else
                                 stringResource(R.string.alert_match_any)
                         )
+                        if (rule.delivery == TimeFenceDelivery.NOTIFICATION &&
+                            rule.trigger == TimeFenceTrigger.ON_START &&
+                            rule.timerMinutes > 0
+                        ) {
+                            append(" · ")
+                            append(stringResource(R.string.alert_timer_short, rule.timerMinutes))
+                        }
                         if (rule.cooldownMs > 0) {
                             append(" · ")
                             append(stringResource(R.string.alert_cooldown_short))
@@ -314,14 +321,17 @@ private fun AlertRuleDialog(
     var scope by remember { mutableStateOf(initial?.scope ?: TimeFenceScope.ALWAYS) }
     var matchMode by remember { mutableStateOf(initial?.matchMode ?: TimeFenceMatchMode.AND) }
     var cooldownMs by remember { mutableStateOf(initial?.cooldownMs ?: 0L) }
+    var timerMinutesText by remember { mutableStateOf((initial?.timerMinutes ?: 1).coerceAtLeast(0).toString()) }
     var selectedTagIds by remember { mutableStateOf(initial?.tagIds ?: emptySet()) }
     var tagQuery by remember { mutableStateOf("") }
+    val timerMinutes = timerMinutesText.toIntOrNull()?.coerceIn(0, 24 * 60)
+    val normalizedTimerMinutes = if (trigger == TimeFenceTrigger.ON_START) timerMinutes else 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             SingleSubmitButton(
-                enabled = message.trim().isNotEmpty() && selectedTagIds.isNotEmpty(),
+                enabled = message.trim().isNotEmpty() && selectedTagIds.isNotEmpty() && normalizedTimerMinutes != null,
                 onClick = {
                     onConfirm(
                         message,
@@ -330,8 +340,8 @@ private fun AlertRuleDialog(
                         matchMode,
                         selectedTagIds,
                         cooldownMs,
-                        0,
-                        TimeFenceDelivery.PREFENCE
+                        normalizedTimerMinutes ?: 0,
+                        TimeFenceDelivery.NOTIFICATION
                     )
                 }
             ) { Text(stringResource(R.string.salva)) }
@@ -345,6 +355,11 @@ private fun AlertRuleDialog(
                     onValueChange = { message = it },
                     label = { Text(stringResource(R.string.messaggio)) },
                     modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = stringResource(R.string.alert_notification_delivery_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -386,6 +401,18 @@ private fun AlertRuleDialog(
                         selected = matchMode == TimeFenceMatchMode.OR,
                         onClick = { matchMode = TimeFenceMatchMode.OR },
                         label = { Text(stringResource(R.string.almeno_uno)) }
+                    )
+                }
+
+                if (trigger == TimeFenceTrigger.ON_START) {
+                    OutlinedTextField(
+                        value = timerMinutesText,
+                        onValueChange = { value -> timerMinutesText = value.filter { it.isDigit() }.take(4) },
+                        label = { Text(stringResource(R.string.alert_timer_minutes_label)) },
+                        supportingText = { Text(stringResource(R.string.alert_timer_help)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = timerMinutes == null
                     )
                 }
 
