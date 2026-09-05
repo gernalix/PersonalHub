@@ -22,7 +22,20 @@ object DatabaseVault {
     private val operations = ReentrantLock(true)
     private const val PRE_IMPORT_BACKUP_PREFIX = "personalhub-pre-import-"
     private const val PRE_IMPORT_BACKUP_SUFFIX = ".db"
+    private val noTransferHooks = object : TransferHooks {}
+    private var transferHooks: TransferHooks = noTransferHooks
+    private var exportPublisherFactory: (Context, Uri) -> ExportPublisher = { context, uri -> DocumentFileExportPublisher(context, uri) }
+    private var directorySyncForTests: ((File) -> Unit)? = null
     internal fun preferences(context: Context) = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
+    internal fun setTransferHooksForTests(hooks: TransferHooks?) {
+        transferHooks = hooks ?: noTransferHooks
+    }
+    internal fun setExportPublisherFactoryForTests(factory: ((Context, Uri) -> ExportPublisher)?) {
+        exportPublisherFactory = factory ?: { context, uri -> DocumentFileExportPublisher(context, uri) }
+    }
+    internal fun setDirectorySyncForTests(sync: ((File) -> Unit)?) {
+        directorySyncForTests = sync
+    }
     fun folder(context: Context): String? = preferences(context).getString("tree_uri", null)
     fun error(context: Context): String? = preferences(context).getString("error", null)
     fun lastExport(context: Context): Long = preferences(context).getLong("exported_at", 0)
@@ -63,11 +76,51 @@ object DatabaseVault {
         syncDirectory(to.parentFile!!)
     }
     private fun syncDirectory(directory: File) {
+        directorySyncForTests?.let { sync ->
+            sync(directory)
+            return
+        }
         val fd = android.system.Os.open(directory.path, android.system.OsConstants.O_RDONLY, 0)
         try { android.system.Os.fsync(fd) } finally { android.system.Os.close(fd) }
     }
     private fun sidecars(file: File) { listOf("-wal", "-shm", "-journal").forEach { File(file.path + it).delete() } }
     private fun marker(context: Context) = File(context.filesDir, "personalhub-import.pending")
+    private fun damagedMarker(context: Context) = File(context.filesDir, "personalhub-import.pending.damaged")
+    private fun databaseDir(context: Context) = context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile!!
+    private fun validPendingBackup(context: Context, marker: File): File? {
+        val expectedDir = databaseDir(context).canonicalFile
+        val raw = runCatching { marker.readText().trim() }.getOrElse { "" }
+        if (raw.isBlank()) return null
+        return runCatching {
+            File(raw).canonicalFile.takeIf { backup -> backup.isFile && backup.parentFile == expectedDir }
+        }.getOrNull()
+    }
+    private fun writeImportMarker(context: Context, backup: File) {
+        val final = marker(context)
+        val temp = File(context.filesDir, "${final.name}.${UUID.randomUUID()}.tmp")
+        try {
+            FileOutputStream(temp).use { out ->
+                out.write(backup.canonicalPath.toByteArray())
+                out.fd.sync()
+            }
+            transferHooks.beforeImportMarkerPublish(temp, final)
+            atomicMove(temp, final)
+        } finally {
+            temp.delete()
+        }
+    }
+    internal fun writeImportMarkerForTests(context: Context, backup: File) = writeImportMarker(context, backup)
+    private fun retireInvalidImportMarker(context: Context, marker: File) {
+        runCatching {
+            val damaged = damagedMarker(context)
+            if (damaged.exists()) damaged.delete()
+            atomicMove(marker, damaged)
+        }.getOrElse {
+            preferences(context).edit().putString("error", "Invalid interrupted import marker; recovery backups were preserved").commit()
+            return
+        }
+        preferences(context).edit().putString("error", "Invalid interrupted import marker was preserved; recovery backups were preserved").commit()
+    }
 
     /**
      * Removes only backups that cannot be needed for an in-progress import.
@@ -79,11 +132,7 @@ object DatabaseVault {
         val databaseDir = context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile ?: return@withLock
         val protected = when {
             !pendingMarker.exists() -> null
-            else -> runCatching {
-                File(pendingMarker.readText()).canonicalFile.takeIf { backup ->
-                    backup.isFile && backup.parentFile == databaseDir.canonicalFile
-                } ?: return@withLock
-            }.getOrElse { return@withLock }
+            else -> validPendingBackup(context, pendingMarker) ?: return@withLock
         }
         databaseDir.listFiles()
             ?.filter { it.name.startsWith(PRE_IMPORT_BACKUP_PREFIX) && it.name.endsWith(PRE_IMPORT_BACKUP_SUFFIX) }
@@ -98,8 +147,7 @@ object DatabaseVault {
     fun recoverInterruptedImport(context: Context) {
         val marker = marker(context)
         if (!marker.isFile) return
-        val backup = File(marker.readText())
-        require(backup.isFile && backup.parentFile == context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile)
+        val backup = validPendingBackup(context, marker) ?: return retireInvalidImportMarker(context, marker)
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
         val recovery = File(target.parentFile, "personalhub-recover.tmp")
         syncCopy(backup, recovery)
@@ -215,19 +263,19 @@ object DatabaseVault {
         val stage = File(context.cacheDir, "personalhub-export-${UUID.randomUUID()}.db")
         try {
             val generation = snapshot(context, stage)
-            val dir = requireNotNull(DocumentFile.fromTreeUri(context, uri)) { "Export folder unavailable" }
-            val temporary = requireNotNull(dir.createFile("application/octet-stream", "personalhub-${UUID.randomUUID()}.tmp"))
-            val previous = dir.findFile(PersonalHubDatabase.DB_NAME)
-            var movedPrevious: DocumentFile? = null
+            val publisher = exportPublisherFactory(context, uri)
+            val temporary = publisher.createTemporary("personalhub-${UUID.randomUUID()}.tmp")
+            val previous = publisher.find(PersonalHubDatabase.DB_NAME)
+            var movedPrevious: ExportFile? = null
             try {
-                context.contentResolver.openOutputStream(temporary.uri, "wt").use { out -> stage.inputStream().use { it.copyTo(requireNotNull(out)) } }
+                publisher.writeFrom(stage, temporary)
                 val verify = File(context.cacheDir, "personalhub-verify-${UUID.randomUUID()}.db")
                 try {
-                    context.contentResolver.openInputStream(temporary.uri).use { input -> FileOutputStream(verify).use { out -> requireNotNull(input).copyTo(out); out.fd.sync() } }
+                    publisher.readTo(temporary, verify)
                     require(validate(context, verify) == generation && stage.length() == verify.length() && fileHash(stage) == fileHash(verify)) { "Export readback differs" }
                 } finally { verify.delete() }
                 if (previous != null) {
-                    val backup = dir.findFile("personalhub.db.bak")
+                    val backup = publisher.find("personalhub.db.bak")
                     require(backup == null || backup.delete()) { "Cannot rotate export backup" }
                     require(previous.renameTo("personalhub.db.bak")) { "Provider cannot safely rotate export" }
                     movedPrevious = previous
@@ -236,7 +284,16 @@ object DatabaseVault {
                 prefs.edit().putLong("exported_generation", generation).putLong("exported_at", System.currentTimeMillis()).remove("error").commit()
                 true
             } catch (error: Throwable) {
-                movedPrevious?.renameTo(PersonalHubDatabase.DB_NAME)
+                val moved = movedPrevious
+                if (moved != null) {
+                    val restored = runCatching { moved.renameTo(PersonalHubDatabase.DB_NAME) }.getOrDefault(false)
+                    if (!restored) {
+                        throw IllegalStateException(
+                            "Export failed; previous SAF copy remains recoverable as personalhub.db.bak but could not be restored",
+                            error,
+                        )
+                    }
+                }
                 throw error
             } finally { if (temporary.name != PersonalHubDatabase.DB_NAME) temporary.delete() }
         } catch (error: Throwable) {
@@ -281,8 +338,7 @@ object DatabaseVault {
                     }
                     DatasetteSettings.requireFull(context)
                     PersonalHubDatabase.closeInstance()
-                    FileOutputStream(marker(context)).use { it.write(backup.path.toByteArray()); it.fd.sync() }
-                    syncDirectory(context.filesDir)
+                    writeImportMarker(context, backup)
                     sidecars(target)
                     atomicMove(stage, target)
                     PersonalHubDatabase.get(context).openHelper.writableDatabase
@@ -316,6 +372,50 @@ object DatabaseVault {
                 }
             }
         }
+    }
+
+    internal interface TransferHooks {
+        fun beforeImportMarkerPublish(temp: File, final: File) = Unit
+    }
+
+    internal interface ExportFile {
+        val name: String?
+        fun renameTo(displayName: String): Boolean
+        fun delete(): Boolean
+    }
+
+    internal interface ExportPublisher {
+        fun createTemporary(name: String): ExportFile
+        fun find(name: String): ExportFile?
+        fun writeFrom(source: File, target: ExportFile)
+        fun readTo(source: ExportFile, target: File)
+    }
+
+    private class DocumentFileExportPublisher(private val context: Context, uri: Uri) : ExportPublisher {
+        private val dir = requireNotNull(DocumentFile.fromTreeUri(context, uri)) { "Export folder unavailable" }
+        override fun createTemporary(name: String) = DocumentExportFile(requireNotNull(dir.createFile("application/octet-stream", name)))
+        override fun find(name: String) = dir.findFile(name)?.let(::DocumentExportFile)
+        override fun writeFrom(source: File, target: ExportFile) {
+            val file = target as DocumentExportFile
+            context.contentResolver.openOutputStream(file.document.uri, "wt").use { out ->
+                source.inputStream().use { it.copyTo(requireNotNull(out)) }
+            }
+        }
+        override fun readTo(source: ExportFile, target: File) {
+            val file = source as DocumentExportFile
+            context.contentResolver.openInputStream(file.document.uri).use { input ->
+                FileOutputStream(target).use { out ->
+                    requireNotNull(input).copyTo(out)
+                    out.fd.sync()
+                }
+            }
+        }
+    }
+
+    private class DocumentExportFile(val document: DocumentFile) : ExportFile {
+        override val name: String? get() = document.name
+        override fun renameTo(displayName: String) = document.renameTo(displayName)
+        override fun delete() = document.delete()
     }
 }
 

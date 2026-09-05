@@ -12,6 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -26,12 +27,18 @@ class HubAutoExportDurabilityTest {
         DatabaseVault.preferences(context).edit().clear().commit()
         scheduler = RecordingScheduler()
         HubAutoExport.setSchedulerForTests(scheduler)
+        DatabaseVault.setTransferHooksForTests(null)
+        DatabaseVault.setExportPublisherFactoryForTests(null)
+        DatabaseVault.setDirectorySyncForTests { }
     }
 
     @After
     fun tearDown() {
         PersonalHubDatabase.resetForTests()
         HubAutoExport.resetSchedulerForTests()
+        DatabaseVault.setTransferHooksForTests(null)
+        DatabaseVault.setExportPublisherFactoryForTests(null)
+        DatabaseVault.setDirectorySyncForTests(null)
         DatabaseVault.preferences(context).edit().clear().commit()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
     }
@@ -158,6 +165,106 @@ class HubAutoExportDurabilityTest {
         assertEquals(1234L, status.lastSuccessfulExportAt)
     }
 
+    @Test
+    fun validInterruptedImportRollsBackAndRetiresMarker() {
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        db.execSQL("INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)", arrayOf("rollback_test", "{\"value\":\"before\"}"))
+        val backup = File(context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile, "personalhub-pre-import-rollback.db")
+        assertTrue(DatabaseVault.backupCurrent(context).renameTo(backup))
+        db.execSQL("UPDATE hub_preferences SET json=? WHERE namespace=?", arrayOf("{\"value\":\"after\"}", "rollback_test"))
+        DatabaseVault.writeImportMarkerForTests(context, backup)
+        PersonalHubDatabase.resetForTests()
+
+        DatabaseVault.recoverInterruptedImport(context)
+
+        val restored = PersonalHubDatabase.get(context).openHelper.readableDatabase
+            .query("SELECT json FROM hub_preferences WHERE namespace=?", arrayOf("rollback_test"))
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                cursor.getString(0)
+            }
+        assertEquals("{\"value\":\"before\"}", restored)
+        assertFalse(File(context.filesDir, "personalhub-import.pending").exists())
+        assertFalse(backup.exists())
+    }
+
+    @Test
+    fun damagedImportMarkersDoNotCrashOrDeleteRecoveryCopies() {
+        val backup = DatabaseVault.backupCurrent(context)
+        val marker = File(context.filesDir, "personalhub-import.pending")
+        marker.writeText("")
+
+        DatabaseVault.recoverInterruptedImport(context)
+
+        assertTrue(backup.exists())
+        assertFalse(marker.exists())
+        assertTrue(File(context.filesDir, "personalhub-import.pending.damaged").exists())
+        assertEquals(
+            "Invalid interrupted import marker was preserved; recovery backups were preserved",
+            DatabaseVault.error(context),
+        )
+
+        File(context.filesDir, "personalhub-import.pending.damaged").delete()
+        marker.writeText("/not/a/valid/backup")
+
+        DatabaseVault.recoverInterruptedImport(context)
+
+        assertTrue(backup.exists())
+        assertFalse(marker.exists())
+        assertTrue(File(context.filesDir, "personalhub-import.pending.damaged").exists())
+    }
+
+    @Test
+    fun importMarkerPublicationDoesNotExposePartialFinalMarker() {
+        val backup = DatabaseVault.backupCurrent(context)
+        DatabaseVault.setTransferHooksForTests(object : DatabaseVault.TransferHooks {
+            override fun beforeImportMarkerPublish(temp: File, final: File) {
+                throw IllegalStateException("interrupted before marker publish")
+            }
+        })
+
+        val error = runCatching { DatabaseVault.writeImportMarkerForTests(context, backup) }.exceptionOrNull()
+
+        assertNotNull(error)
+        assertFalse(File(context.filesDir, "personalhub-import.pending").exists())
+        assertTrue(context.filesDir.listFiles().orEmpty().none { it.name.startsWith("personalhub-import.pending.") && it.name.endsWith(".tmp") })
+    }
+
+    @Test
+    fun publishFailureRestoresPreviousSafCopyWithoutMarkingSuccess() {
+        configureFolderPreference()
+        val publisher = RecordingExportPublisher(failPublish = true)
+        publisher.files[PersonalHubDatabase.DB_NAME] = ByteArray(12) { 7 }
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+
+        val error = runCatching { DatabaseVault.exportNow(context) }.exceptionOrNull()
+
+        assertNotNull(error)
+        assertTrue(publisher.files.containsKey(PersonalHubDatabase.DB_NAME))
+        assertFalse(publisher.files.containsKey("personalhub.db.bak"))
+        assertEquals(-1, DatabaseVault.exportedGeneration(context))
+        assertEquals("Provider cannot publish export", DatabaseVault.error(context))
+    }
+
+    @Test
+    fun rollbackRenameFailureKeepsRecoverableBackupAndPersistentError() {
+        configureFolderPreference()
+        val publisher = RecordingExportPublisher(failPublish = true, failRestore = true)
+        publisher.files[PersonalHubDatabase.DB_NAME] = ByteArray(12) { 9 }
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+
+        val error = runCatching { DatabaseVault.exportNow(context) }.exceptionOrNull()
+
+        assertNotNull(error)
+        assertEquals(
+            "Export failed; previous SAF copy remains recoverable as personalhub.db.bak but could not be restored",
+            DatabaseVault.error(context),
+        )
+        assertFalse(publisher.files.containsKey(PersonalHubDatabase.DB_NAME))
+        assertTrue(publisher.files.containsKey("personalhub.db.bak"))
+        assertEquals(-1, DatabaseVault.exportedGeneration(context))
+    }
+
     private fun configureFolderPreference() {
         DatabaseVault.preferences(context).edit()
             .putString("tree_uri", "content://personalhub-test/tree")
@@ -179,6 +286,52 @@ class HubAutoExportDurabilityTest {
         override fun enqueueAutoExport(context: Context) {
             failure?.let { throw it }
             autoExportRequests += 1
+        }
+    }
+
+    private class RecordingExportPublisher(
+        private val failPublish: Boolean = false,
+        private val failRestore: Boolean = false,
+    ) : DatabaseVault.ExportPublisher {
+        val files = linkedMapOf<String, ByteArray>()
+
+        override fun createTemporary(name: String): DatabaseVault.ExportFile {
+            files[name] = ByteArray(0)
+            return RecordingExportFile(this, name)
+        }
+
+        override fun find(name: String): DatabaseVault.ExportFile? = if (files.containsKey(name)) RecordingExportFile(this, name) else null
+
+        override fun writeFrom(source: File, target: DatabaseVault.ExportFile) {
+            files[requireNotNull(target.name)] = source.readBytes()
+        }
+
+        override fun readTo(source: DatabaseVault.ExportFile, target: File) {
+            target.outputStream().use { out ->
+                out.write(requireNotNull(files[requireNotNull(source.name)]))
+                out.fd.sync()
+            }
+        }
+
+        private class RecordingExportFile(
+            private val publisher: RecordingExportPublisher,
+            private var currentName: String,
+        ) : DatabaseVault.ExportFile {
+            override val name: String? get() = currentName
+
+            override fun renameTo(displayName: String): Boolean {
+                if (displayName == PersonalHubDatabase.DB_NAME && currentName.endsWith(".tmp") && publisher.failPublish) return false
+                if (displayName == PersonalHubDatabase.DB_NAME && currentName == "personalhub.db.bak" && publisher.failRestore) return false
+                val content = publisher.files.remove(currentName) ?: return false
+                publisher.files[displayName] = content
+                currentName = displayName
+                return true
+            }
+
+            override fun delete(): Boolean {
+                publisher.files.remove(currentName)
+                return true
+            }
         }
     }
 }
