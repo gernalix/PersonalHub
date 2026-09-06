@@ -35,7 +35,7 @@ class SyncJournalTest {
         val owner = PersonalHubDatabase.openTemporary(context, file.absolutePath)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(5, db.version)
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
             db.query("SELECT title,start_ms,end_ms FROM sessions").use { assertTrue(it.moveToFirst()); assertEquals("preserved", it.getString(0)); assertEquals(1000L, it.getLong(1)); assertEquals(2000L, it.getLong(2)) }
             db.query("SELECT generation FROM hub_generation").use { it.moveToFirst(); assertEquals(44L, it.getLong(0)) }
             db.execSQL("UPDATE sessions SET title='changed'")

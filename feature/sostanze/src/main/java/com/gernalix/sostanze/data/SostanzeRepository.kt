@@ -47,7 +47,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
 
     val snapshot: Flow<SostanzeSnapshot> = combine(
         dao.observeSubstances(),
-        dao.observeAllIntakes(),
+        dao.observeRecentIntakes(),
         dao.observeStockAdjustments(),
         dao.observePrescriptions(),
         dao.observeInteractionRules(),
@@ -70,186 +70,52 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
         )
     }
 
-    suspend fun seedIfEmpty(nowMs: Long = System.currentTimeMillis()) {
-        if (dao.substanceCount() > 0) {
-            ensureDefaultMacroIfMissing()
-            return
-        }
-        db.withTransaction {
-            val today = LocalDate.now().toEpochDay()
-            val pregabalin = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Pregabalin",
-                    type = SubstanceTypes.FARMACO,
-                    stockCurrent = 30.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 75.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 3,
-                    startEpochDay = today,
-                    forever = true,
-                )
-            )
-            val vitaminD = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Vitamina D",
-                    type = SubstanceTypes.INTEGRATORE,
-                    stockCurrent = 20000.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 25.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 1,
-                    startEpochDay = today,
-                    forever = true,
-                )
-            )
-            val psyllium = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Psyllium",
-                    type = SubstanceTypes.INTEGRATORE,
-                    stockCurrent = 250.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 5.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 1,
-                    startEpochDay = today,
-                    forever = true,
-                )
-            )
-            val ibuprofene = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Ibuprofene",
-                    type = SubstanceTypes.FARMACO,
-                    stockCurrent = 2400.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 200.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 0,
-                    startEpochDay = today,
-                    forever = true,
-                    prn = true,
-                )
-            )
-            val prep = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Prep",
-                    type = SubstanceTypes.FARMACO,
-                    stockCurrent = 9000.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 300.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 1,
-                    startEpochDay = today,
-                    forever = true,
-                )
-            )
-            val tadalafil = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Tadalafil",
-                    type = SubstanceTypes.FARMACO,
-                    stockCurrent = 280.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 5.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 1,
-                    startEpochDay = today,
-                    forever = true,
-                )
-            )
-            dao.upsertPrescription(
-                PrescriptionEntity(
-                    substanceId = pregabalin,
-                    prescriptionEpochDay = today,
-                    prescriptionDateUtc = UtcDateCodec.prescriptionIsoUtc(today),
-                    quantityPrescribed = 30.0,
-                    refillEveryMonths = 1,
-                    alertRefill = true,
-                )
-            )
-            dao.upsertPrescription(
-                PrescriptionEntity(
-                    substanceId = ibuprofene,
-                    prescriptionEpochDay = today,
-                    prescriptionDateUtc = UtcDateCodec.prescriptionIsoUtc(today),
-                    quantityPrescribed = 2400.0,
-                    refillEveryMonths = 1,
-                    alertRefill = false,
-                )
-            )
-            val ruleId = dao.upsertInteractionRule(
-                InteractionRuleEntity(
-                    sourceSubstanceId = psyllium,
-                    avoidBeforeHours = 2.0,
-                    avoidAfterHours = 2.0,
-                    enforcement = InteractionEnforcement.BLOCK,
-                )
-            )
-            dao.upsertInteractionTarget(
-                InteractionTargetEntity(
-                    ruleId = ruleId,
-                    targetKind = InteractionTargetKinds.ALL_PRESENT_AND_FUTURE,
-                )
-            )
-            dao.upsertNotificationState(
-                NotificationStateEntity(
-                    kind = "seed_created",
-                    entityId = vitaminD,
-                    scheduledForMs = nowMs,
-                    scheduledForUtc = UtcDateCodec.isoUtc(nowMs),
-                    sentAtMs = nowMs,
-                    sentAtUtc = UtcDateCodec.isoUtc(nowMs),
-                )
-            )
-            val macroId = dao.upsertMacro(MacroEntity(name = "Pillole del mattino"))
-            dao.upsertMacroItem(MacroItemEntity(macroId = macroId, substanceId = prep))
-            dao.upsertMacroItem(MacroItemEntity(macroId = macroId, substanceId = tadalafil))
+    /** Production databases intentionally start empty. Demo/personal rows are never seeded. */
+    suspend fun initialize() = Unit
+
+    suspend fun saveSubstance(substance: SubstanceEntity): SubstanceSaveOutcome = db.withTransaction {
+        val canonical = canonicalName(substance.name)
+        if (canonical.isEmpty()) return@withTransaction SubstanceSaveOutcome.Invalid("name")
+        val matches = dao.substancesByCanonicalName(canonical).filter { it.id != substance.id }
+        matches.firstOrNull { it.archived }?.let { return@withTransaction SubstanceSaveOutcome.RestoreRequired(it.id) }
+        if (matches.isNotEmpty()) return@withTransaction SubstanceSaveOutcome.Duplicate(matches.first().id)
+        val normalized = substance.copy(name = substance.name.trim(), canonicalName = canonical).validatedUnits()
+        if (normalized.id == 0L) SubstanceSaveOutcome.Saved(dao.insertSubstance(normalized))
+        else {
+            requireNotNull(dao.substanceById(normalized.id))
+            dao.updateSubstance(normalized)
+            SubstanceSaveOutcome.Saved(normalized.id)
         }
     }
 
-    private suspend fun ensureDefaultMacroIfMissing() {
-        if (dao.macroCount() > 0) return
-        db.withTransaction {
-            val today = LocalDate.now().toEpochDay()
-            val prep = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Prep",
-                    type = SubstanceTypes.FARMACO,
-                    stockCurrent = 9000.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 300.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 1,
-                    startEpochDay = today,
-                    forever = true,
-                )
-            )
-            val tadalafil = dao.upsertSubstance(
-                SubstanceEntity(
-                    name = "Tadalafil",
-                    type = SubstanceTypes.FARMACO,
-                    stockCurrent = 280.0,
-                    stockUnit = "mg",
-                    dosePerIntake = 5.0,
-                    doseUnit = "mg",
-                    dailyFrequency = 1,
-                    startEpochDay = today,
-                    forever = true,
-                )
-            )
-            val macroId = dao.upsertMacro(MacroEntity(name = "Pillole del mattino"))
-            dao.upsertMacroItem(MacroItemEntity(macroId = macroId, substanceId = prep))
-            dao.upsertMacroItem(MacroItemEntity(macroId = macroId, substanceId = tadalafil))
-        }
-    }
-
-    suspend fun saveSubstance(substance: SubstanceEntity): Long {
-        val id = dao.upsertSubstance(substance.forceMg())
-        return id
-    }
-
-    suspend fun recordIntake(substanceId: Long, timestampMs: Long = System.currentTimeMillis()): Long {
-        val id = db.withTransaction {
-            val substance = dao.substanceById(substanceId) ?: return@withTransaction 0L
+    suspend fun recordIntake(
+        substanceId: Long,
+        timestampMs: Long = System.currentTimeMillis(),
+        idempotencyKey: String = UUID.randomUUID().toString(),
+        allowWarning: Boolean = true,
+        quantity: Double = 1.0,
+        unit: String? = null,
+    ): IntakeOutcome = db.withTransaction {
+            val substance = dao.substanceById(substanceId) ?: return@withTransaction IntakeOutcome.NotFound
+            if (substance.archived) return@withTransaction IntakeOutcome.Archived
+            if (dao.intakeCountForKey(idempotencyKey) > 0) return@withTransaction IntakeOutcome.Duplicate
+            if (quantity <= 0.0) return@withTransaction IntakeOutcome.InvalidQuantity
+            val requestedUnit = unit ?: substance.doseUnit
+            if (!substance.stockUnit.equals(substance.doseUnit, ignoreCase = true) || !requestedUnit.equals(substance.doseUnit, ignoreCase = true)) return@withTransaction IntakeOutcome.UnsupportedUnits
+            val appliedDose = substance.dosePerIntake * quantity
+            if (substance.dosePerIntake <= 0.0 || substance.stockCurrent < appliedDose) return@withTransaction IntakeOutcome.InsufficientStock
+            val plans = dao.allSubstances().map { it.toPlan() }
+            val intakes = dao.recentIntakes().map { it.toRecord() }
+            val rules = dao.allInteractionRules().map { it.toPlan(dao.allInteractionTargets()) }
+            val state = SostanzeEngine.doseState(substance.toPlan(), intakes, rules, plans, timestampMs)
+            val block = state.block
+            if (block != null && !block.warningOnly) return@withTransaction IntakeOutcome.Blocked(block.sourceName, block.untilMs)
+            if (block?.warningOnly == true && !allowWarning) return@withTransaction IntakeOutcome.Warning(block.sourceName, block.untilMs)
+            if (state.nextIdealMs != null && timestampMs < state.nextIdealMs && !substance.prn) {
+                return@withTransaction IntakeOutcome.Early(state.nextIdealMs)
+            }
+            if (state.dosesPlannedToday > 0 && state.dosesDoneToday >= state.dosesPlannedToday) return@withTransaction IntakeOutcome.Duplicate
+            val prescription = dao.currentPrescription(substanceId)
             val eventId = dao.insertIntake(
                 IntakeEventEntity(
                     substanceId = substanceId,
@@ -257,57 +123,33 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                     timestampUtc = UtcDateCodec.isoUtc(timestampMs),
                     dose = substance.dosePerIntake,
                     doseUnit = substance.doseUnit,
-                    tapGroupId = UUID.randomUUID().toString(),
+                    tapGroupId = idempotencyKey,
+                    quantity = quantity,
+                    appliedStockDelta = -appliedDose,
+                    prescriptionId = prescription?.id,
                 )
             )
-            val newStock = SostanzeEngine.applyIntakeStock(substance.stockCurrent, substance.dosePerIntake)
+            val newStock = substance.stockCurrent - appliedDose
             dao.updateStock(substanceId, newStock)
             dao.insertStockAdjustment(
                 StockAdjustmentEntity(
                     substanceId = substanceId,
                     timestampMs = timestampMs,
                     timestampUtc = UtcDateCodec.isoUtc(timestampMs),
-                    delta = -substance.dosePerIntake,
+                    delta = -appliedDose,
                     note = "intake",
                     resultingStock = newStock,
                 )
             )
-            eventId
-        }
-        return id
+            prescription?.let { dao.updatePrescriptionRemaining(it.id, it.remainingDoses - 1) }
+            IntakeOutcome.Recorded(eventId, block?.takeIf { it.warningOnly }?.sourceName)
     }
 
-    suspend fun recordMacro(macroId: Long, timestampMs: Long = System.currentTimeMillis()): List<Long> {
+    suspend fun recordMacro(macroId: Long, timestampMs: Long = System.currentTimeMillis()): List<IntakeOutcome> {
         val groupId = UUID.randomUUID().toString()
-        val ids = db.withTransaction {
-            dao.macroItems(macroId).mapNotNull { item ->
-                val substance = dao.substanceById(item.substanceId)?.takeIf { !it.archived } ?: return@mapNotNull null
-                val eventId = dao.insertIntake(
-                    IntakeEventEntity(
-                        substanceId = substance.id,
-                        timestampMs = timestampMs,
-                        timestampUtc = UtcDateCodec.isoUtc(timestampMs),
-                        dose = substance.dosePerIntake,
-                        doseUnit = substance.doseUnit,
-                        tapGroupId = groupId,
-                    )
-                )
-                val newStock = SostanzeEngine.applyIntakeStock(substance.stockCurrent, substance.dosePerIntake)
-                dao.updateStock(substance.id, newStock)
-                dao.insertStockAdjustment(
-                    StockAdjustmentEntity(
-                        substanceId = substance.id,
-                        timestampMs = timestampMs,
-                        timestampUtc = UtcDateCodec.isoUtc(timestampMs),
-                        delta = -substance.dosePerIntake,
-                        note = "macro",
-                        resultingStock = newStock,
-                    )
-                )
-                eventId
-            }
+        return dao.macroItems(macroId).mapIndexed { index, item ->
+            recordIntake(item.substanceId, timestampMs, "$groupId:$index")
         }
-        return ids
     }
 
     suspend fun undoLastIntake(substanceId: Long): Boolean {
@@ -315,18 +157,22 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             val substance = dao.substanceById(substanceId) ?: return@withTransaction false
             val intake = dao.lastIntakeFor(substanceId) ?: return@withTransaction false
             dao.deleteIntake(intake)
-            val newStock = substance.stockCurrent + intake.dose
+            val restored = -intake.appliedStockDelta
+            val newStock = substance.stockCurrent + restored
             dao.updateStock(substanceId, newStock)
             dao.insertStockAdjustment(
                 StockAdjustmentEntity(
                     substanceId = substanceId,
                     timestampMs = System.currentTimeMillis(),
                     timestampUtc = UtcDateCodec.isoUtc(System.currentTimeMillis()),
-                    delta = intake.dose,
+                    delta = restored,
                     note = "undo intake",
                     resultingStock = newStock,
                 )
             )
+            intake.prescriptionId?.let { id ->
+                dao.prescriptionById(id)?.let { dao.updatePrescriptionRemaining(id, (it.remainingDoses + 1).coerceAtMost(it.packageDoseCount)) }
+            }
             true
         }
         return ok
@@ -339,7 +185,8 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             intakes.forEach { intake ->
                 val substance = dao.substanceById(intake.substanceId) ?: return@forEach
                 dao.deleteIntake(intake)
-                val newStock = substance.stockCurrent + intake.dose
+                val restored = -intake.appliedStockDelta
+                val newStock = substance.stockCurrent + restored
                 dao.updateStock(intake.substanceId, newStock)
                 val now = System.currentTimeMillis()
                 dao.insertStockAdjustment(
@@ -347,21 +194,61 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                         substanceId = intake.substanceId,
                         timestampMs = now,
                         timestampUtc = UtcDateCodec.isoUtc(now),
-                        delta = intake.dose,
+                        delta = restored,
                         note = "undo tap",
                         resultingStock = newStock,
                     )
                 )
+                intake.prescriptionId?.let { id ->
+                    dao.prescriptionById(id)?.let { dao.updatePrescriptionRemaining(id, (it.remainingDoses + 1).coerceAtMost(it.packageDoseCount)) }
+                }
             }
             intakes.isNotEmpty()
         }
         return ok
     }
 
-    suspend fun adjustStock(substanceId: Long, delta: Double, note: String?) {
-        db.withTransaction {
-            val substance = dao.substanceById(substanceId) ?: return@withTransaction
-            val newStock = SostanzeEngine.applyStockAdjustment(substance.stockCurrent, delta)
+    suspend fun deleteIntake(id: Long): Boolean = undoIntakes(listOf(id))
+
+    suspend fun editIntake(id: Long, timestampMs: Long, quantity: Double): IntakeEditOutcome = db.withTransaction {
+        if (quantity <= 0.0) return@withTransaction IntakeEditOutcome.Invalid
+        val intake = dao.intakeById(id) ?: return@withTransaction IntakeEditOutcome.NotFound
+        val substance = dao.substanceById(intake.substanceId) ?: return@withTransaction IntakeEditOutcome.NotFound
+        if (!substance.stockUnit.equals(intake.doseUnit, ignoreCase = true)) return@withTransaction IntakeEditOutcome.UnsupportedUnits
+        val newApplied = -(intake.dose * quantity)
+        val correctedStock = substance.stockCurrent - intake.appliedStockDelta + newApplied
+        if (correctedStock < 0.0) return@withTransaction IntakeEditOutcome.InsufficientStock
+        dao.updateIntake(
+            intake.copy(
+                timestampMs = timestampMs,
+                timestampUtc = UtcDateCodec.isoUtc(timestampMs),
+                quantity = quantity,
+                appliedStockDelta = newApplied,
+            )
+        )
+        dao.updateStock(intake.substanceId, correctedStock)
+        val now = System.currentTimeMillis()
+        dao.insertStockAdjustment(
+            StockAdjustmentEntity(
+                substanceId = intake.substanceId,
+                timestampMs = now,
+                timestampUtc = UtcDateCodec.isoUtc(now),
+                delta = newApplied - intake.appliedStockDelta,
+                note = "edit intake:$id",
+                resultingStock = correctedStock,
+            )
+        )
+        IntakeEditOutcome.Updated
+    }
+
+    suspend fun historyPage(limit: Int = 100, offset: Int = 0): List<IntakeEventEntity> =
+        dao.historyPage(limit.coerceIn(1, 200), offset.coerceAtLeast(0))
+
+    suspend fun adjustStock(substanceId: Long, delta: Double, note: String?): StockOutcome = db.withTransaction {
+            val substance = dao.substanceById(substanceId) ?: return@withTransaction StockOutcome.NotFound
+            if (delta == 0.0) return@withTransaction StockOutcome.NoChange
+            val newStock = substance.stockCurrent + delta
+            if (newStock < 0.0) return@withTransaction StockOutcome.Insufficient(substance.stockCurrent)
             dao.updateStock(substanceId, newStock)
             dao.insertStockAdjustment(
                 StockAdjustmentEntity(
@@ -373,17 +260,64 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                     resultingStock = newStock,
                 )
             )
-        }
+            StockOutcome.Applied(delta, newStock)
     }
 
-    suspend fun savePrescription(prescription: PrescriptionEntity): Long {
-        val id = dao.upsertPrescription(
-            prescription.copy(
+    suspend fun setStock(substanceId: Long, target: Double, note: String? = "set stock"): StockOutcome {
+        require(target >= 0.0)
+        val current = dao.substanceById(substanceId)?.stockCurrent ?: return StockOutcome.NotFound
+        return adjustStock(substanceId, target - current, note)
+    }
+
+    suspend fun savePrescription(prescription: PrescriptionEntity): Long = db.withTransaction {
+        require(prescription.packageDoseCount > 0 && prescription.remainingDoses in 0..prescription.packageDoseCount)
+        require(prescription.doseMg > 0.0 && prescription.frequencyCount > 0)
+        require(prescription.frequencyPeriod == "DAY" || prescription.frequencyPeriod == "WEEK")
+        val value = prescription.copy(
                 prescriptionDateUtc = UtcDateCodec.prescriptionIsoUtc(prescription.prescriptionEpochDay)
             )
-        )
-        return id
+        if (value.id == 0L) dao.insertPrescription(value) else { dao.updatePrescription(value); value.id }
     }
+
+    suspend fun createPrescription(draft: PrescriptionDraft): Long = db.withTransaction {
+        val canonical = canonicalName(draft.name)
+        require(canonical.isNotEmpty())
+        val matches = dao.substancesByCanonicalName(canonical)
+        val substanceId = matches.firstOrNull { !it.archived }?.id
+            ?: matches.firstOrNull()?.let { archived -> dao.restoreSubstance(archived.id); archived.id }
+            ?: dao.insertSubstance(
+                SubstanceEntity(
+                    name = draft.name.trim(), canonicalName = canonical, type = SubstanceTypes.FARMACO,
+                    stockCurrent = 0.0, stockUnit = "mg", dosePerIntake = draft.doseMg, doseUnit = "mg",
+                    dailyFrequency = if (draft.frequencyPeriod == "DAY") draft.frequencyCount else 0,
+                    startEpochDay = LocalDate.now().toEpochDay(), forever = true,
+                )
+            )
+        savePrescription(
+            PrescriptionEntity(
+                substanceId = substanceId,
+                prescriptionEpochDay = draft.prescriptionEpochDay,
+                quantityPrescribed = draft.packageDoseCount.toDouble(),
+                refillEveryMonths = 1,
+                orderEpochDay = draft.orderEpochDay,
+                packageDoseCount = draft.packageDoseCount,
+                remainingDoses = draft.remainingDoses,
+                doseMg = draft.doseMg,
+                frequencyPeriod = draft.frequencyPeriod,
+                frequencyCount = draft.frequencyCount,
+                doctorContactId = draft.doctorContactId,
+                financeTransactionId = draft.financeTransactionId,
+            )
+        )
+    }
+
+    suspend fun prescriptionPrefill(substanceId: Long): PrescriptionEntity? = dao.latestPrescription(substanceId)
+    suspend fun doctorChoices(query: String): List<DoctorChoice> = dao.doctorChoices(query.trim())
+    suspend fun doctorName(contactId: Long): String? = dao.doctorName(contactId)
+    suspend fun recentMatchingCosts(name: String): List<CostChoice> = dao.recentMatchingCosts(name)
+    suspend fun costAmount(transactionId: Long): String? = dao.costAmount(transactionId)
+
+    suspend fun deletePrescription(id: Long) = db.withTransaction { dao.deletePrescription(id) }
 
     suspend fun saveInteractionRule(
         rule: InteractionRuleEntity,
@@ -391,7 +325,13 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
         targetSubstanceId: Long?,
     ) {
         db.withTransaction {
-            val ruleId = dao.upsertInteractionRule(rule)
+            require(rule.sourceSubstanceId != targetSubstanceId)
+            require(rule.avoidBeforeHours >= 0.0 && rule.avoidAfterHours >= 0.0)
+            val ruleId = if (rule.id == 0L) dao.upsertInteractionRule(rule) else {
+                dao.updateInteractionRule(rule)
+                rule.id
+            }
+            dao.deleteInteractionTargets(ruleId)
             dao.upsertInteractionTarget(
                 InteractionTargetEntity(
                     ruleId = ruleId,
@@ -401,6 +341,18 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             )
         }
     }
+
+    suspend fun deleteInteractionRule(ruleId: Long) = db.withTransaction { dao.deleteInteractionRule(ruleId) }
+
+    suspend fun saveMacro(macro: MacroEntity, substanceIds: List<Long>): Long = db.withTransaction {
+        require(macro.name.isNotBlank() && substanceIds.isNotEmpty())
+        val id = dao.upsertMacro(macro.copy(name = macro.name.trim()))
+        dao.deleteMacroItems(id)
+        substanceIds.distinct().forEach { dao.upsertMacroItem(MacroItemEntity(macroId = id, substanceId = it)) }
+        id
+    }
+
+    suspend fun deleteMacro(macroId: Long) = db.withTransaction { dao.deleteMacro(macroId) }
 
     suspend fun saveNotifications(plans: List<com.gernalix.sostanze.domain.NotificationPlan>) {
         plans.forEach { plan ->
@@ -418,9 +370,24 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
     suspend fun archiveSubstance(substanceId: Long) {
         dao.archiveSubstance(substanceId)
     }
+
+    suspend fun restoreSubstance(substanceId: Long) = db.withTransaction { dao.restoreSubstance(substanceId) }
 }
 
 data class IntakeUndoToken(val intakeIds: List<Long>)
+
+data class PrescriptionDraft(
+    val name: String,
+    val packageDoseCount: Int,
+    val remainingDoses: Int = packageDoseCount,
+    val doseMg: Double,
+    val frequencyPeriod: String,
+    val frequencyCount: Int,
+    val orderEpochDay: Long = LocalDate.now().toEpochDay(),
+    val prescriptionEpochDay: Long = LocalDate.now().toEpochDay(),
+    val doctorContactId: Long? = null,
+    val financeTransactionId: Long? = null,
+)
 
 fun SubstanceEntity.toPlan(): SubstancePlan =
     SubstancePlan(
@@ -437,10 +404,52 @@ fun SubstanceEntity.toPlan(): SubstancePlan =
         forever = forever,
         archived = archived,
         prn = prn,
+        doseTimesCsv = doseTimesCsv,
+        daysMask = daysMask,
     )
 
-private fun SubstanceEntity.forceMg(): SubstanceEntity =
-    copy(stockUnit = "mg", doseUnit = "mg")
+private fun SubstanceEntity.validatedUnits(): SubstanceEntity {
+    require(stockCurrent >= 0.0 && dosePerIntake > 0.0)
+    require(stockUnit.isNotBlank() && doseUnit.isNotBlank())
+    return this
+}
+
+fun canonicalName(value: String): String = value.trim().lowercase(java.util.Locale.ROOT)
+
+sealed interface SubstanceSaveOutcome {
+    data class Saved(val id: Long) : SubstanceSaveOutcome
+    data class Duplicate(val existingId: Long) : SubstanceSaveOutcome
+    data class RestoreRequired(val archivedId: Long) : SubstanceSaveOutcome
+    data class Invalid(val field: String) : SubstanceSaveOutcome
+}
+
+sealed interface IntakeOutcome {
+    data class Recorded(val id: Long, val warningSource: String? = null) : IntakeOutcome
+    data class Blocked(val source: String, val untilMs: Long) : IntakeOutcome
+    data class Early(val recommendedAtMs: Long) : IntakeOutcome
+    data class Warning(val source: String, val untilMs: Long) : IntakeOutcome
+    data object InsufficientStock : IntakeOutcome
+    data object UnsupportedUnits : IntakeOutcome
+    data object InvalidQuantity : IntakeOutcome
+    data object Duplicate : IntakeOutcome
+    data object Archived : IntakeOutcome
+    data object NotFound : IntakeOutcome
+}
+
+sealed interface StockOutcome {
+    data class Applied(val actualDelta: Double, val resultingStock: Double) : StockOutcome
+    data class Insufficient(val available: Double) : StockOutcome
+    data object NoChange : StockOutcome
+    data object NotFound : StockOutcome
+}
+
+sealed interface IntakeEditOutcome {
+    data object Updated : IntakeEditOutcome
+    data object Invalid : IntakeEditOutcome
+    data object NotFound : IntakeEditOutcome
+    data object UnsupportedUnits : IntakeEditOutcome
+    data object InsufficientStock : IntakeEditOutcome
+}
 
 fun IntakeEventEntity.toRecord(): IntakeRecord =
     IntakeRecord(
@@ -448,6 +457,7 @@ fun IntakeEventEntity.toRecord(): IntakeRecord =
         substanceId = substanceId,
         timestampMs = timestampMs,
         dose = dose,
+        quantity = quantity,
     )
 
 fun InteractionRuleEntity.toPlan(targets: List<InteractionTargetEntity>): InteractionRulePlan {

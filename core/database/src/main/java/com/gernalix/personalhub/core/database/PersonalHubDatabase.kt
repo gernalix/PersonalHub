@@ -69,7 +69,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.personalhub.core.database.TimerSyncQueue::class,
     com.gernalix.personalhub.core.database.TimerSyncShadow::class,
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
-], version = 5, exportSchema = true)
+], version = 6, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase() {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -81,7 +81,7 @@ abstract class PersonalHubDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 5
+        const val SCHEMA_VERSION = 6
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -92,7 +92,7 @@ abstract class PersonalHubDatabase : RoomDatabase() {
         fun create(context: Context) = get(context)
         fun openTemporary(context: Context, name: String) = build(context, name)
         fun openStaging(context: Context, name: String) = build(context, name)
-        fun canMigrateFrom(version: Int) = version == SCHEMA_VERSION
+        fun canMigrateFrom(version: Int) = version in 1..SCHEMA_VERSION
         fun closeInstance() = synchronized(this) { instance?.close(); instance = null }
         fun resetForTests() = closeInstance()
         private fun build(context: Context, name: String): PersonalHubDatabase {
@@ -118,6 +118,32 @@ abstract class PersonalHubDatabase : RoomDatabase() {
                     }
                 })
                 .addMigrations(com.gernalix.personalhub.core.database.capsules.soldi.FinanceMigration(context), com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccountsMigration(context))
+                .addMigrations(object : androidx.room.migration.Migration(5, 6) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE substances ADD COLUMN canonical_name TEXT NOT NULL DEFAULT ''")
+                        db.execSQL("ALTER TABLE substances ADD COLUMN dose_times_csv TEXT NOT NULL DEFAULT ''")
+                        db.execSQL("ALTER TABLE substances ADD COLUMN days_mask INTEGER NOT NULL DEFAULT 127")
+                        db.execSQL("UPDATE substances SET canonical_name=lower(trim(name))")
+                        db.execSQL("UPDATE substances SET canonical_name=canonical_name || '#legacy:' || id WHERE id NOT IN (SELECT min(id) FROM substances GROUP BY lower(trim(name)))")
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_substances_canonical_name ON substances(canonical_name)")
+                        db.execSQL("ALTER TABLE intake_events ADD COLUMN quantity REAL NOT NULL DEFAULT 1.0")
+                        db.execSQL("ALTER TABLE intake_events ADD COLUMN applied_stock_delta REAL NOT NULL DEFAULT 0.0")
+                        db.execSQL("ALTER TABLE intake_events ADD COLUMN prescription_id INTEGER")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN order_epoch_day INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN package_dose_count INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN remaining_doses INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN dose_mg REAL NOT NULL DEFAULT 0.0")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN frequency_period TEXT NOT NULL DEFAULT 'DAY'")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN frequency_count INTEGER NOT NULL DEFAULT 1")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN doctor_contact_id INTEGER")
+                        db.execSQL("ALTER TABLE prescriptions ADD COLUMN finance_transaction_id INTEGER")
+                        db.execSQL("UPDATE prescriptions SET order_epoch_day=prescription_epoch_day, package_dose_count=max(1, CAST(quantity_prescribed AS INTEGER)), remaining_doses=max(1, CAST(quantity_prescribed AS INTEGER)), dose_mg=quantity_prescribed")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_intake_events_prescription_id ON intake_events(prescription_id)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_prescriptions_order_epoch_day ON prescriptions(order_epoch_day)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_prescriptions_doctor_contact_id ON prescriptions(doctor_contact_id)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS index_prescriptions_finance_transaction_id ON prescriptions(finance_transaction_id)")
+                    }
+                })
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {

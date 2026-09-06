@@ -22,6 +22,8 @@ data class SubstancePlan(
     val forever: Boolean,
     val archived: Boolean,
     val prn: Boolean,
+    val doseTimesCsv: String = "",
+    val daysMask: Int = 127,
 )
 
 data class IntakeRecord(
@@ -29,6 +31,7 @@ data class IntakeRecord(
     val substanceId: Long,
     val timestampMs: Long,
     val dose: Double,
+    val quantity: Double = 1.0,
 )
 
 data class InteractionRulePlan(
@@ -69,6 +72,7 @@ data class DoseButtonState(
     val nextIdealMs: Long?,
     val canRecord: Boolean,
     val block: InteractionBlock? = null,
+    val blocks: List<InteractionBlock> = block?.let(::listOf) ?: emptyList(),
 )
 
 data class StockCoverage(
@@ -96,26 +100,33 @@ object SostanzeEngine {
         val todaysIntakes = intakes
             .filter { it.substanceId == substance.id && isSameDay(it.timestampMs, nowMs, zoneId) }
             .sortedBy { it.timestampMs }
-        val planned = max(0, substance.dailyFrequency)
-        val block = activeInteractionBlock(substance, intakes, rules, allSubstances, nowMs)
-        val nextIdeal = nextIdealMs(todaysIntakes, planned, nowMs, zoneId)
+        val regimenActive = isRegimenActive(substance, today)
+        val explicitTimes = if (regimenActive) scheduledTimesMs(substance, today, zoneId) else emptyList()
+        val planned = if (!regimenActive) 0 else explicitTimes.size.takeIf { it > 0 } ?: max(0, substance.dailyFrequency)
+        val completed = todaysIntakes.sumOf { it.quantity }.toInt().coerceAtLeast(0)
+        val blocks = activeInteractionBlocks(substance, intakes, rules, allSubstances, nowMs)
+        val block = blocks.firstOrNull { !it.warningOnly } ?: blocks.firstOrNull()
+        val nextIdeal = if (explicitTimes.isNotEmpty()) explicitTimes.getOrNull(completed) else nextIdealMs(todaysIntakes, planned, nowMs, zoneId)
 
         val section = when {
             substance.archived -> DoseSection.ARCHIVED
-            substance.prn || planned == 0 -> DoseSection.PRN
+            substance.prn -> DoseSection.PRN
+            !regimenActive -> DoseSection.LATER
             block?.warningOnly == false -> DoseSection.BLOCKED
-            todaysIntakes.size >= planned -> DoseSection.TAKEN
-            todaysIntakes.isNotEmpty() && nextIdeal != null && nowMs < nextIdeal -> DoseSection.LATER
+            completed >= planned -> DoseSection.TAKEN
+            nextIdeal != null && nowMs < nextIdeal -> DoseSection.LATER
             else -> DoseSection.DUE_TODAY
         }
         return DoseButtonState(
             substance = substance,
             section = section,
-            dosesDoneToday = todaysIntakes.size.coerceAtMost(planned),
+            dosesDoneToday = completed.coerceAtMost(planned),
             dosesPlannedToday = planned,
             nextIdealMs = nextIdeal,
-            canRecord = section != DoseSection.ARCHIVED && section != DoseSection.TAKEN && section != DoseSection.BLOCKED,
+            // BLOCK is enforced by the command after a tap; the action must remain visible/tappable.
+            canRecord = section != DoseSection.ARCHIVED && section != DoseSection.TAKEN,
             block = block,
+            blocks = blocks,
         )
     }
 
@@ -129,6 +140,28 @@ object SostanzeEngine {
         if (todaysIntakes.isEmpty()) return nowMs
         val intervalMs = (24.hoursMs / dailyFrequency).toLong()
         return todaysIntakes.maxOf { it.timestampMs } + intervalMs
+    }
+
+    fun isRegimenActive(substance: SubstancePlan, date: LocalDate): Boolean {
+        if (substance.archived || date.toEpochDay() < substance.startEpochDay) return false
+        if (!substance.forever && substance.endEpochDay?.let { date.toEpochDay() > it } == true) return false
+        val bit = 1 shl (date.dayOfWeek.value - 1)
+        return substance.prn || substance.daysMask and bit != 0
+    }
+
+    fun scheduledTimesMs(substance: SubstancePlan, date: LocalDate, zoneId: ZoneId): List<Long> =
+        substance.doseTimesCsv.split(',').mapNotNull { value ->
+            runCatching { java.time.LocalTime.parse(value.trim()) }.getOrNull()
+        }.distinct().sorted().map { date.atTime(it).atZone(zoneId).toInstant().toEpochMilli() }
+
+    fun depletionDate(remainingDoses: Int, frequencyCount: Int, frequencyPeriod: String, today: LocalDate): LocalDate? {
+        if (remainingDoses < 0 || frequencyCount <= 0 || frequencyPeriod !in setOf("DAY", "WEEK")) return null
+        val days = if (frequencyPeriod == "DAY") {
+            ceil(remainingDoses / frequencyCount.toDouble()).toLong()
+        } else {
+            ceil(remainingDoses / frequencyCount.toDouble()).toLong() * 7L
+        }
+        return today.plusDays(days)
     }
 
     fun applyIntakeStock(stock: Double, dose: Double): Double =
@@ -159,7 +192,15 @@ object SostanzeEngine {
         rules: List<InteractionRulePlan>,
         allSubstances: List<SubstancePlan>,
         nowMs: Long,
-    ): InteractionBlock? {
+    ): InteractionBlock? = activeInteractionBlocks(target, intakes, rules, allSubstances, nowMs).firstOrNull()
+
+    fun activeInteractionBlocks(
+        target: SubstancePlan,
+        intakes: List<IntakeRecord>,
+        rules: List<InteractionRulePlan>,
+        allSubstances: List<SubstancePlan>,
+        nowMs: Long,
+    ): List<InteractionBlock> {
         val namesById = allSubstances.associateBy({ it.id }, { it.name })
         val afterBlocks = rules.asSequence()
             .filter { it.targets(target.id) && it.avoidAfterHours > 0.0 }
@@ -184,8 +225,6 @@ object SostanzeEngine {
             }
             .sortedBy { it.untilMs }
             .toList()
-        if (afterBlocks.isNotEmpty()) return afterBlocks.first()
-
         val beforeBlocks = rules.asSequence()
             .filter { it.sourceSubstanceId == target.id && it.avoidBeforeHours > 0.0 }
             .flatMap { rule ->
@@ -210,17 +249,16 @@ object SostanzeEngine {
             }
             .sortedBy { it.untilMs }
             .toList()
-        return beforeBlocks.firstOrNull()
+        return (afterBlocks + beforeBlocks)
+            .distinctBy { Triple(it.ruleId, it.sourceSubstanceId, it.untilMs) }
+            .sortedWith(compareBy<InteractionBlock> { it.warningOnly }.thenBy { it.untilMs })
     }
 
     fun interactionEndNotifications(states: List<DoseButtonState>): List<NotificationPlan> =
-        states.mapNotNull { state ->
-            val block = state.block?.takeIf { !it.warningOnly } ?: return@mapNotNull null
-            NotificationPlan(
-                kind = "interaction_end",
-                entityId = state.substance.id,
-                scheduledForMs = block.untilMs,
-            )
+        states.flatMap { state ->
+            state.blocks.filter { !it.warningOnly }.map { block ->
+                NotificationPlan("interaction_end", state.substance.id, block.untilMs)
+            }
         }.distinctBy { Triple(it.kind, it.entityId, it.scheduledForMs) }
 
     fun missedDoseNotifications(states: List<DoseButtonState>, nowMs: Long): List<NotificationPlan> =

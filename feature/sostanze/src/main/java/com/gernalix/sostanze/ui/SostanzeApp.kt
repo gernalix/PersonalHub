@@ -51,7 +51,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -77,6 +77,11 @@ import com.gernalix.sostanze.BuildConfig
 import com.gernalix.sostanze.R
 import com.gernalix.sostanze.data.SubstanceEntity
 import com.gernalix.sostanze.data.SubstanceTypes
+import com.gernalix.sostanze.data.IntakeOutcome
+import com.gernalix.sostanze.data.SubstanceSaveOutcome
+import com.gernalix.sostanze.data.PrescriptionEntity
+import com.gernalix.sostanze.data.PrescriptionDraft
+import com.gernalix.sostanze.data.InteractionRuleEntity
 import com.gernalix.sostanze.domain.DoseButtonState
 import com.gernalix.sostanze.domain.DoseSection
 import com.gernalix.sostanze.domain.SostanzeEngine
@@ -99,18 +104,32 @@ private enum class AppTab {
 @Composable
 fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         withFrameNanos { }
         viewModel.loadSecondaryState()
     }
-    var tab by rememberSaveable { mutableStateOf(AppTab.Home) }
-    var query by rememberSaveable { mutableStateOf("") }
+    val tabPreferences = remember(context) { context.getSharedPreferences("sostanze_ui", android.content.Context.MODE_PRIVATE) }
+    var tab by rememberSaveable {
+        mutableStateOf(
+            runCatching { AppTab.valueOf(tabPreferences.getString("last_tab", AppTab.Home.name)!!) }
+                .getOrDefault(AppTab.Home)
+        )
+    }
+    var homeQuery by rememberSaveable { mutableStateOf("") }
+    var stockQuery by rememberSaveable { mutableStateOf("") }
+    var historyQuery by rememberSaveable { mutableStateOf("") }
     var editingSubstance by remember { mutableStateOf<SubstanceEntity?>(null) }
     var deleteSubstance by remember { mutableStateOf<SubstanceEntity?>(null) }
     var historySubstanceId by rememberSaveable { mutableStateOf<Long?>(null) }
     var stockDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
-    var prescriptionDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
+    var creatingPrescription by remember { mutableStateOf(false) }
+    var prescriptionInitialName by remember { mutableStateOf("") }
+    var editingPrescription by remember { mutableStateOf<PrescriptionUi?>(null) }
+    var editingHistory by remember { mutableStateOf<HistoryUi?>(null) }
+    var deletingHistory by remember { mutableStateOf<HistoryUi?>(null) }
     var interactionDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
+    var interactionRuleDraft by remember { mutableStateOf<InteractionRuleEntity?>(null) }
     var pendingImport by remember { mutableStateOf<android.net.Uri?>(null) }
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -124,6 +143,12 @@ fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
     val undoLabel = stringResource(R.string.undo)
     val recordedMessage = stringResource(R.string.recorded)
     val macroRecordedMessage = stringResource(R.string.macro_recorded)
+    val blockedMessage = stringResource(R.string.intake_blocked)
+    val earlyMessage = stringResource(R.string.intake_early)
+    val stockMessage = stringResource(R.string.intake_insufficient_stock)
+    val duplicateMessage = stringResource(R.string.intake_duplicate)
+    val duplicateNameMessage = stringResource(R.string.duplicate_name)
+    val restoreNameMessage = stringResource(R.string.restore_existing_name)
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -145,11 +170,11 @@ fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
                         }
                     }
                 )
-                TabRow(selectedTabIndex = tab.ordinal) {
+                ScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 8.dp) {
                     AppTab.values().forEach { item ->
                         Tab(
                             selected = tab == item,
-                            onClick = { tab = item },
+                            onClick = { tab = item; tabPreferences.edit().putString("last_tab", item.name).apply() },
                             text = { Text(tabTitle(item), maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         )
                     }
@@ -158,55 +183,88 @@ fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { editingSubstance = viewModel.defaultNewSubstance() }) {
-                Text("+", style = MaterialTheme.typography.titleLarge)
+            if (tab != AppTab.History) {
+                FloatingActionButton(onClick = {
+                    when (tab) {
+                        AppTab.Home -> editingSubstance = viewModel.defaultNewSubstance()
+                        AppTab.Stock -> state.substances.firstOrNull { !it.archived }?.let { stockDialog = it }
+                        AppTab.Prescriptions -> { prescriptionInitialName = ""; creatingPrescription = true }
+                        AppTab.Interactions -> state.substances.firstOrNull { !it.archived }?.let { interactionRuleDraft = null; interactionDialog = it }
+                        AppTab.History -> Unit
+                    }
+                }) { Text("+", style = MaterialTheme.typography.titleLarge) }
             }
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (tab) {
                 AppTab.Home -> HomeScreen(
-                    states = state.doseStates.filter { it.substance.name.contains(query, true) },
+                    states = state.doseStates.filter { it.substance.name.contains(homeQuery, true) },
                     macros = state.macros,
-                    query = query,
-                    onQueryChange = { query = it },
+                    query = homeQuery,
+                    onQueryChange = { homeQuery = it },
                     onRecord = { substanceId ->
-                        viewModel.recordIntake(substanceId) { token ->
+                        viewModel.recordIntake(substanceId) { outcome, token ->
                             scope.launch {
-                                val result = snackbarHostState.showSnackbar(recordedMessage, actionLabel = undoLabel)
-                                if (result == SnackbarResult.ActionPerformed) viewModel.undoToken(token)
+                                val message = when (outcome) {
+                                    is IntakeOutcome.Recorded -> recordedMessage
+                                    is IntakeOutcome.Blocked -> blockedMessage
+                                    is IntakeOutcome.Early -> earlyMessage
+                                    is IntakeOutcome.Warning -> blockedMessage
+                                    IntakeOutcome.InsufficientStock, IntakeOutcome.UnsupportedUnits -> stockMessage
+                                    IntakeOutcome.InvalidQuantity -> stockMessage
+                                    IntakeOutcome.Duplicate -> duplicateMessage
+                                    IntakeOutcome.Archived, IntakeOutcome.NotFound -> blockedMessage
+                                }
+                                val result = snackbarHostState.showSnackbar(message, actionLabel = if (token != null) undoLabel else null)
+                                if (result == SnackbarResult.ActionPerformed && token != null) viewModel.undoToken(token)
                             }
                         }
                     },
                     onMacro = { macroId ->
-                        viewModel.recordMacro(macroId) { token ->
+                        viewModel.recordMacro(macroId) { outcomes, token ->
                             scope.launch {
-                                val result = snackbarHostState.showSnackbar(macroRecordedMessage, actionLabel = undoLabel)
-                                if (result == SnackbarResult.ActionPerformed) viewModel.undoToken(token)
+                                val result = snackbarHostState.showSnackbar("$macroRecordedMessage ${outcomes.count { it is IntakeOutcome.Recorded }}/${outcomes.size}", actionLabel = if (token != null) undoLabel else null)
+                                if (result == SnackbarResult.ActionPerformed && token != null) viewModel.undoToken(token)
                             }
                         }
                     },
                     onUndo = viewModel::undoLastIntake,
                     onEdit = { editingSubstance = it },
+                    onRestore = viewModel::restoreSubstance,
                     onStock = { stockDialog = it },
                     onHistory = { historySubstanceId = it.id },
                 )
-                AppTab.History -> HistoryScreen(rows = state.history)
+                AppTab.History -> HistoryScreen(
+                    rows = state.history.filter { it.substanceName.contains(historyQuery, true) },
+                    query = historyQuery,
+                    onQueryChange = { historyQuery = it },
+                    onEdit = { editingHistory = it },
+                    onDelete = { deletingHistory = it },
+                )
                 AppTab.Stock -> StockScreen(
-                    rows = state.stockRows.filter { it.substance.name.contains(query, true) },
-                    query = query,
-                    onQueryChange = { query = it },
+                    rows = state.stockRows.filter { it.substance.name.contains(stockQuery, true) },
+                    query = stockQuery,
+                    onQueryChange = { stockQuery = it },
                     onAdjust = { stockDialog = it },
                 )
                 AppTab.Prescriptions -> PrescriptionScreen(
                     substances = state.substances.filter { !it.archived },
                     rows = state.prescriptions,
-                    onAdd = { prescriptionDialog = it },
+                    onAdd = { prescriptionInitialName = it.name; creatingPrescription = true },
+                    onEdit = { editingPrescription = it },
+                    onDelete = { viewModel.deletePrescription(it.prescription.id) },
                 )
                 AppTab.Interactions -> InteractionScreen(
                     substances = state.substances.filter { !it.archived },
                     states = state.doseStates,
-                    onAddRule = { interactionDialog = it },
+                    rules = state.interactionRules,
+                    onAddRule = { interactionRuleDraft = null; interactionDialog = it },
+                    onEditRule = { rule ->
+                        interactionRuleDraft = rule
+                        interactionDialog = state.substances.firstOrNull { it.id == rule.sourceSubstanceId }
+                    },
+                    onDeleteRule = viewModel::deleteInteraction,
                 )
             }
         }
@@ -218,8 +276,16 @@ fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
             onDismiss = { editingSubstance = null },
             onDelete = if (draft.id == 0L) null else ({ deleteSubstance = draft }),
             onSave = {
-                viewModel.saveSubstance(it)
-                editingSubstance = null
+                viewModel.saveSubstance(it) { outcome ->
+                    scope.launch {
+                        when (outcome) {
+                            is SubstanceSaveOutcome.Saved -> editingSubstance = null
+                            is SubstanceSaveOutcome.Duplicate -> snackbarHostState.showSnackbar(duplicateNameMessage)
+                            is SubstanceSaveOutcome.RestoreRequired -> snackbarHostState.showSnackbar(restoreNameMessage)
+                            is SubstanceSaveOutcome.Invalid -> snackbarHostState.showSnackbar(duplicateNameMessage)
+                        }
+                    }
+                }
             }
         )
     }
@@ -233,23 +299,44 @@ fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
             }
         )
     }
-    prescriptionDialog?.let { substance ->
-        PrescriptionDialog(
-            substance = substance,
-            onDismiss = { prescriptionDialog = null },
-            onSave = { quantity, months, alert ->
-                viewModel.addPrescription(substance.id, quantity, months, alert)
-                prescriptionDialog = null
-            }
+    if (creatingPrescription) {
+        PrescriptionCreateDialog(
+            initialName = prescriptionInitialName,
+            suggestions = state.substances.map { it.name }.distinct(),
+            onDismiss = { creatingPrescription = false },
+            onSave = { draft -> viewModel.createPrescription(draft) { if (it) creatingPrescription = false } },
+        )
+    }
+    editingPrescription?.let { row ->
+        PrescriptionEditDialog(
+            row = row,
+            onDismiss = { editingPrescription = null },
+            onSave = { value -> viewModel.savePrescription(value) { if (it) editingPrescription = null } },
+        )
+    }
+    editingHistory?.let { row ->
+        IntakeEditDialog(row, { editingHistory = null }) { timestamp, quantity ->
+            viewModel.editIntake(row.id, timestamp, quantity) { editingHistory = null }
+        }
+    }
+    deletingHistory?.let { row ->
+        AlertDialog(
+            onDismissRequest = { deletingHistory = null },
+            title = { Text(stringResource(R.string.delete)) },
+            text = { Text(row.substanceName) },
+            confirmButton = { Button(onClick = { viewModel.deleteIntake(row.id); deletingHistory = null }) { Text(stringResource(R.string.delete)) } },
+            dismissButton = { TextButton(onClick = { deletingHistory = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
     interactionDialog?.let { source ->
         InteractionRuleDialog(
             source = source,
-            onDismiss = { interactionDialog = null },
+            initial = interactionRuleDraft,
+            onDismiss = { interactionDialog = null; interactionRuleDraft = null },
             onSave = { before, after ->
-                viewModel.addAllFutureInteraction(source.id, before, after)
+                viewModel.saveAllFutureInteraction(interactionRuleDraft?.id ?: 0, source.id, before, after)
                 interactionDialog = null
+                interactionRuleDraft = null
             }
         )
     }
@@ -330,6 +417,7 @@ private fun HomeScreen(
     onMacro: (Long) -> Unit,
     onUndo: (Long) -> Unit,
     onEdit: (SubstanceEntity) -> Unit,
+    onRestore: (Long) -> Unit,
     onStock: (SubstanceEntity) -> Unit,
     onHistory: (SubstanceEntity) -> Unit,
 ) {
@@ -338,6 +426,7 @@ private fun HomeScreen(
         DoseSection.LATER to stringResource(R.string.section_later),
         DoseSection.BLOCKED to stringResource(R.string.section_blocked),
         DoseSection.PRN to stringResource(R.string.section_prn),
+        DoseSection.ARCHIVED to stringResource(R.string.archive),
     )
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -378,6 +467,7 @@ private fun HomeScreen(
                         onRecord = { onRecord(state.substance.id) },
                         onUndo = { onUndo(state.substance.id) },
                         onEdit = { onEdit(entity) },
+                        onRestore = { onRestore(state.substance.id) },
                         onStock = { onStock(entity) },
                         onHistory = { onHistory(entity) },
                     )
@@ -402,6 +492,8 @@ private fun DoseButtonState.toEntity(): SubstanceEntity =
         forever = substance.forever,
         archived = substance.archived,
         prn = substance.prn,
+        doseTimesCsv = substance.doseTimesCsv,
+        daysMask = substance.daysMask,
     )
 
 @Composable
@@ -410,6 +502,7 @@ private fun DoseActionButton(
     onRecord: () -> Unit,
     onUndo: () -> Unit,
     onEdit: () -> Unit,
+    onRestore: () -> Unit,
     onStock: () -> Unit,
     onHistory: () -> Unit,
 ) {
@@ -465,6 +558,9 @@ private fun DoseActionButton(
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(text = { Text(stringResource(R.string.edit)) }, onClick = { menuOpen = false; onEdit() })
+                        if (state.section == DoseSection.ARCHIVED) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.restore)) }, onClick = { menuOpen = false; onRestore() })
+                        }
                         DropdownMenuItem(text = { Text(stringResource(R.string.stock)) }, onClick = { menuOpen = false; onStock() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.history)) }, onClick = { menuOpen = false; onHistory() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.undo_last_tap)) }, onClick = { menuOpen = false; onUndo() })
@@ -476,15 +572,17 @@ private fun DoseActionButton(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (state.block != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("!")
-                    Text(
-                        "${state.block.sourceName} ${SostanzeEngine.countdownText(state.block.remainingMs)}",
+            if (state.blocks.isNotEmpty()) {
+                state.blocks.take(2).forEach { active ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("!")
+                        Text(
+                        "${active.sourceName} ${SostanzeEngine.countdownText(active.remainingMs)}",
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    }
                 }
             } else {
                 Text(
@@ -547,14 +645,21 @@ private fun StockScreen(
 }
 
 @Composable
-private fun HistoryScreen(rows: List<HistoryUi>) {
+private fun HistoryScreen(
+    rows: List<HistoryUi>,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onEdit: (HistoryUi) -> Unit,
+    onDelete: (HistoryUi) -> Unit,
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
         contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(rows, key = { index, row -> "${row.substanceName}:${row.timestampMs}:${row.ghost}:$index" }) { _, row ->
-            HistoryRow(row)
+        item { SearchBox(query, onQueryChange) }
+        items(rows, key = { it.id }) { row ->
+            HistoryRow(row, { onEdit(row) }, { onDelete(row) })
         }
     }
 }
@@ -579,7 +684,7 @@ private fun SubstanceHistoryDialog(title: String, rows: List<HistoryUi>, onDismi
 }
 
 @Composable
-private fun HistoryRow(row: HistoryUi) {
+private fun HistoryRow(row: HistoryUi, onEdit: (() -> Unit)? = null, onDelete: (() -> Unit)? = null) {
     val color = if (row.ghost) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerLow
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -593,6 +698,8 @@ private fun HistoryRow(row: HistoryUi) {
             Text(row.substanceName, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(row.doseText, maxLines = 1)
             Text(formatDateTime(row.timestampMs), maxLines = 1)
+            onEdit?.let { IconButton(onClick = it, modifier = Modifier.size(48.dp)) { Text("✎") } }
+            onDelete?.let { IconButton(onClick = it, modifier = Modifier.size(48.dp)) { Text("🗑") } }
         }
     }
 }
@@ -602,6 +709,8 @@ private fun PrescriptionScreen(
     substances: List<SubstanceEntity>,
     rows: List<PrescriptionUi>,
     onAdd: (SubstanceEntity) -> Unit,
+    onEdit: (PrescriptionUi) -> Unit,
+    onDelete: (PrescriptionUi) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -619,10 +728,15 @@ private fun PrescriptionScreen(
         item { SectionTitle(stringResource(R.string.prescription_history)) }
         items(rows, key = { it.prescription.id }) { row ->
             ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(row.substanceName, fontWeight = FontWeight.SemiBold)
-                    Text("${row.prescription.quantityPrescribed.clean()} mg")
-                    Text(formatDateOnly(LocalDate.ofEpochDay(row.prescription.prescriptionEpochDay)))
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(row.substanceName, fontWeight = FontWeight.SemiBold)
+                        Text("${row.prescription.remainingDoses}/${row.prescription.packageDoseCount} × ${row.prescription.doseMg.clean()} mg")
+                        Text("${row.prescription.frequencyCount} / ${if (row.prescription.frequencyPeriod == "WEEK") "week" else "day"}")
+                        Text(formatDateOnly(LocalDate.ofEpochDay(row.prescription.prescriptionEpochDay)))
+                    }
+                    IconButton(onClick = { onEdit(row) }, modifier = Modifier.size(48.dp)) { Text("✎") }
+                    IconButton(onClick = { onDelete(row) }, modifier = Modifier.size(48.dp)) { Text("🗑") }
                 }
             }
         }
@@ -633,7 +747,10 @@ private fun PrescriptionScreen(
 private fun InteractionScreen(
     substances: List<SubstanceEntity>,
     states: List<DoseButtonState>,
+    rules: List<InteractionRuleEntity>,
     onAddRule: (SubstanceEntity) -> Unit,
+    onEditRule: (InteractionRuleEntity) -> Unit,
+    onDeleteRule: (Long) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -643,6 +760,16 @@ private fun InteractionScreen(
         item {
             SectionTitle(stringResource(R.string.rules))
             Text(stringResource(R.string.user_rules_only), style = MaterialTheme.typography.bodySmall)
+        }
+        items(rules, key = { "rule-${it.id}" }) { rule ->
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(substances.firstOrNull { it.id == rule.sourceSubstanceId }?.name.orEmpty(), Modifier.weight(1f))
+                    Text("${rule.avoidBeforeHours.clean()}h / ${rule.avoidAfterHours.clean()}h")
+                    IconButton(onClick = { onEditRule(rule) }, modifier = Modifier.size(48.dp)) { Text("✎") }
+                    IconButton(onClick = { onDeleteRule(rule.id) }, modifier = Modifier.size(48.dp)) { Text("🗑") }
+                }
+            }
         }
         items(substances, key = { "interaction-substance-${it.id}" }) { substance ->
             ElevatedCard(Modifier.fillMaxWidth().combinedClickable(onClick = { onAddRule(substance) }, onLongClick = { onAddRule(substance) })) {
@@ -782,25 +909,43 @@ private fun StockAdjustDialog(substance: SubstanceEntity, onDismiss: () -> Unit,
 }
 
 @Composable
-private fun PrescriptionDialog(substance: SubstanceEntity, onDismiss: () -> Unit, onSave: (Double, Int, Boolean) -> Unit) {
-    var quantity by remember { mutableStateOf("") }
-    var months by remember { mutableStateOf("1") }
-    var alert by remember { mutableStateOf(true) }
+private fun PrescriptionCreateDialog(initialName: String, suggestions: List<String>, onDismiss: () -> Unit, onSave: (PrescriptionDraft) -> Unit) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    var packages by remember { mutableStateOf("") }
+    var dose by remember { mutableStateOf("") }
+    var frequency by remember { mutableStateOf("1") }
+    var weekly by remember { mutableStateOf(false) }
+    var doctorId by remember { mutableStateOf("") }
+    var costId by remember { mutableStateOf("") }
+    val today = LocalDate.now().toEpochDay()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.prescription_for, substance.name)) },
+        title = { Text(stringResource(R.string.new_prescription)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(quantity, { quantity = it.numberText() }, label = { Text(stringResource(R.string.prescribed_quantity_mg)) }, singleLine = true)
-                OutlinedTextField(months, { months = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.refill_months)) }, singleLine = true)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.refill_alert))
-                    Switch(alert, { alert = it })
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) })
+                suggestions.filter { it.contains(name, true) && !it.equals(name, true) }.take(4).forEach { suggestion ->
+                    TextButton(onClick = { name = suggestion }) { Text(suggestion) }
                 }
+                OutlinedTextField(packages, { packages = it.filter(Char::isDigit) }, label = { Text("Package doses / remaining") })
+                OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) })
+                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") })
+                Row(verticalAlignment = Alignment.CenterVertically) { Text(if (weekly) "X per week" else "X per day"); Switch(weekly, { weekly = it }) }
+                Text("Order date: ${formatDateOnly(LocalDate.ofEpochDay(today))}")
+                Text("Prescription date: ${formatDateOnly(LocalDate.ofEpochDay(today))}")
+                val projected = SostanzeEngine.depletionDate(packages.toIntOrNull() ?: -1, frequency.toIntOrNull() ?: 0, if (weekly) "WEEK" else "DAY", LocalDate.now())
+                Text("Estimated depletion: ${projected?.let(::formatDateOnly) ?: "-"}")
+                OutlinedTextField(doctorId, { doctorId = it.filter(Char::isDigit) }, label = { Text("Doctor (People ID)") })
+                OutlinedTextField(costId, { costId = it.filter(Char::isDigit) }, label = { Text("Cost (Soldi transaction ID)") })
             }
         },
         confirmButton = {
-            Button(enabled = quantity.toDoubleOrNull() != null, onClick = { onSave(quantity.toDoubleOrNull() ?: 0.0, months.toIntOrNull() ?: 1, alert) }) {
+            val packageCount = packages.toIntOrNull()
+            val mg = dose.toDoubleOrNull()
+            val count = frequency.toIntOrNull()
+            Button(enabled = name.isNotBlank() && packageCount != null && packageCount > 0 && mg != null && mg > 0 && count != null && count > 0, onClick = {
+                onSave(PrescriptionDraft(name.trim(), packageCount!!, packageCount, mg!!, if (weekly) "WEEK" else "DAY", count!!, today, today, doctorId.toLongOrNull(), costId.toLongOrNull()))
+            }) {
                 Text(stringResource(R.string.save))
             }
         },
@@ -809,9 +954,81 @@ private fun PrescriptionDialog(substance: SubstanceEntity, onDismiss: () -> Unit
 }
 
 @Composable
-private fun InteractionRuleDialog(source: SubstanceEntity, onDismiss: () -> Unit, onSave: (Double, Double) -> Unit) {
-    var before by remember { mutableStateOf("2") }
-    var after by remember { mutableStateOf("2") }
+private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, onSave: (PrescriptionEntity) -> Unit) {
+    val initial = row.prescription
+    var packages by remember(initial.id) { mutableStateOf(initial.packageDoseCount.toString()) }
+    var remaining by remember(initial.id) { mutableStateOf(initial.remainingDoses.toString()) }
+    var dose by remember(initial.id) { mutableStateOf(initial.doseMg.clean()) }
+    var frequency by remember(initial.id) { mutableStateOf(initial.frequencyCount.toString()) }
+    var weekly by remember(initial.id) { mutableStateOf(initial.frequencyPeriod == "WEEK") }
+    var orderDate by remember(initial.id) { mutableStateOf(initial.orderEpochDay.toString()) }
+    var prescriptionDate by remember(initial.id) { mutableStateOf(initial.prescriptionEpochDay.toString()) }
+    var doctorId by remember(initial.id) { mutableStateOf(initial.doctorContactId?.toString().orEmpty()) }
+    var costId by remember(initial.id) { mutableStateOf(initial.financeTransactionId?.toString().orEmpty()) }
+    val depletion = SostanzeEngine.depletionDate(
+        remaining.toIntOrNull() ?: -1,
+        frequency.toIntOrNull() ?: 0,
+        if (weekly) "WEEK" else "DAY",
+        LocalDate.now(),
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(row.substanceName) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(packages, { packages = it.filter(Char::isDigit) }, label = { Text("Package doses") })
+                OutlinedTextField(remaining, { remaining = it.filter(Char::isDigit) }, label = { Text("Remaining doses") })
+                OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) })
+                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") })
+                Row(verticalAlignment = Alignment.CenterVertically) { Text("Weekly"); Switch(weekly, { weekly = it }) }
+                OutlinedTextField(orderDate, { orderDate = it.filter { c -> c.isDigit() || c == '-' } }, label = { Text("Order epoch day") })
+                OutlinedTextField(prescriptionDate, { prescriptionDate = it.filter { c -> c.isDigit() || c == '-' } }, label = { Text("Prescription epoch day") })
+                Text("Estimated depletion: ${depletion?.let(::formatDateOnly) ?: "-"}")
+                OutlinedTextField(doctorId, { doctorId = it.filter(Char::isDigit) }, label = { Text("People contact ID") })
+                OutlinedTextField(costId, { costId = it.filter(Char::isDigit) }, label = { Text("Soldi transaction ID") })
+            }
+        },
+        confirmButton = {
+            val packageCount = packages.toIntOrNull()
+            val left = remaining.toIntOrNull()
+            val mg = dose.toDoubleOrNull()
+            val count = frequency.toIntOrNull()
+            Button(enabled = packageCount != null && packageCount > 0 && left != null && left in 0..packageCount && mg != null && mg > 0 && count != null && count > 0,
+                onClick = {
+                    onSave(initial.copy(
+                        packageDoseCount = packageCount!!, remainingDoses = left!!, doseMg = mg!!,
+                        frequencyCount = count!!, frequencyPeriod = if (weekly) "WEEK" else "DAY",
+                        orderEpochDay = orderDate.toLongOrNull() ?: initial.orderEpochDay,
+                        prescriptionEpochDay = prescriptionDate.toLongOrNull() ?: initial.prescriptionEpochDay,
+                        doctorContactId = doctorId.toLongOrNull(), financeTransactionId = costId.toLongOrNull(),
+                    ))
+                }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun IntakeEditDialog(row: HistoryUi, onDismiss: () -> Unit, onSave: (Long, Double) -> Unit) {
+    var timestamp by remember(row.id) { mutableStateOf(row.timestampMs.toString()) }
+    var quantity by remember(row.id) { mutableStateOf("1") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit)) },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(row.substanceName)
+            OutlinedTextField(timestamp, { timestamp = it.filter(Char::isDigit) }, label = { Text("Timestamp ms") })
+            OutlinedTextField(quantity, { quantity = it.numberText() }, label = { Text("Quantity") })
+        } },
+        confirmButton = { Button(onClick = { onSave(timestamp.toLongOrNull() ?: row.timestampMs, quantity.toDoubleOrNull() ?: 1.0) }) { Text(stringResource(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun InteractionRuleDialog(source: SubstanceEntity, initial: InteractionRuleEntity?, onDismiss: () -> Unit, onSave: (Double, Double) -> Unit) {
+    var before by remember(initial?.id) { mutableStateOf(initial?.avoidBeforeHours?.clean() ?: "2") }
+    var after by remember(initial?.id) { mutableStateOf(initial?.avoidAfterHours?.clean() ?: "2") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.interaction_for, source.name)) },

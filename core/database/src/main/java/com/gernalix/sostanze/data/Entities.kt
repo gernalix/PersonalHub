@@ -23,11 +23,12 @@ object InteractionEnforcement {
 
 @Entity(
     tableName = "substances",
-    indices = [Index("name"), Index("archived"), Index("type")]
+    indices = [Index("name"), Index(value = ["canonical_name"], unique = true), Index("archived"), Index("type")]
 )
 data class SubstanceEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
+    @ColumnInfo(name = "canonical_name", defaultValue = "''") val canonicalName: String = "",
     val type: String,
     @ColumnInfo(name = "stock_current") val stockCurrent: Double,
     @ColumnInfo(name = "stock_unit") val stockUnit: String,
@@ -39,6 +40,8 @@ data class SubstanceEntity(
     val forever: Boolean = true,
     val archived: Boolean = false,
     val prn: Boolean = false,
+    @ColumnInfo(name = "dose_times_csv", defaultValue = "''") val doseTimesCsv: String = "",
+    @ColumnInfo(name = "days_mask", defaultValue = "127") val daysMask: Int = 127,
 )
 
 @Entity(
@@ -51,7 +54,7 @@ data class SubstanceEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("substance_id"), Index("timestamp_ms")]
+    indices = [Index("substance_id"), Index("timestamp_ms"), Index("prescription_id")]
 )
 data class IntakeEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -61,6 +64,9 @@ data class IntakeEventEntity(
     val dose: Double,
     @ColumnInfo(name = "dose_unit") val doseUnit: String,
     @ColumnInfo(name = "tap_group_id") val tapGroupId: String? = null,
+    @ColumnInfo(name = "quantity", defaultValue = "1.0") val quantity: Double = 1.0,
+    @ColumnInfo(name = "applied_stock_delta", defaultValue = "0.0") val appliedStockDelta: Double = 0.0,
+    @ColumnInfo(name = "prescription_id") val prescriptionId: Long? = null,
 )
 
 @Entity(
@@ -95,7 +101,7 @@ data class StockAdjustmentEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("substance_id"), Index("prescription_epoch_day")]
+    indices = [Index("substance_id"), Index("prescription_epoch_day"), Index("order_epoch_day"), Index("doctor_contact_id"), Index("finance_transaction_id")]
 )
 data class PrescriptionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -105,6 +111,14 @@ data class PrescriptionEntity(
     @ColumnInfo(name = "quantity_prescribed") val quantityPrescribed: Double,
     @ColumnInfo(name = "refill_every_months") val refillEveryMonths: Int,
     @ColumnInfo(name = "alert_refill") val alertRefill: Boolean = false,
+    @ColumnInfo(name = "order_epoch_day", defaultValue = "0") val orderEpochDay: Long = 0,
+    @ColumnInfo(name = "package_dose_count", defaultValue = "0") val packageDoseCount: Int = 0,
+    @ColumnInfo(name = "remaining_doses", defaultValue = "0") val remainingDoses: Int = 0,
+    @ColumnInfo(name = "dose_mg", defaultValue = "0.0") val doseMg: Double = 0.0,
+    @ColumnInfo(name = "frequency_period", defaultValue = "'DAY'") val frequencyPeriod: String = "DAY",
+    @ColumnInfo(name = "frequency_count", defaultValue = "1") val frequencyCount: Int = 1,
+    @ColumnInfo(name = "doctor_contact_id") val doctorContactId: Long? = null,
+    @ColumnInfo(name = "finance_transaction_id") val financeTransactionId: Long? = null,
 )
 
 @Entity(

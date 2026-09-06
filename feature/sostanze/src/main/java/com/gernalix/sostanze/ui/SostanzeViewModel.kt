@@ -7,11 +7,18 @@ import androidx.lifecycle.viewModelScope
 import com.gernalix.sostanze.capsules.importexport.ExportResult
 import com.gernalix.sostanze.capsules.importexport.SostanzeImportExportCapsule
 import com.gernalix.sostanze.data.IntakeUndoToken
+import com.gernalix.sostanze.data.IntakeOutcome
+import com.gernalix.sostanze.data.IntakeEditOutcome
 import com.gernalix.sostanze.data.MacroEntity
 import com.gernalix.sostanze.data.InteractionTargetKinds
+import com.gernalix.sostanze.data.InteractionRuleEntity
+import com.gernalix.sostanze.data.InteractionTargetEntity
 import com.gernalix.sostanze.data.PrescriptionEntity
+import com.gernalix.sostanze.data.PrescriptionDraft
 import com.gernalix.sostanze.data.SostanzeDatabase
 import com.gernalix.sostanze.data.SostanzeRepository
+import com.gernalix.sostanze.data.StockOutcome
+import com.gernalix.sostanze.data.SubstanceSaveOutcome
 import com.gernalix.sostanze.data.SubstanceEntity
 import com.gernalix.sostanze.data.SubstanceTypes
 import com.gernalix.sostanze.data.UtcDateCodec
@@ -47,6 +54,8 @@ data class StockUi(
 )
 
 data class HistoryUi(
+    val id: Long,
+    val substanceId: Long,
     val substanceName: String,
     val doseText: String,
     val timestampMs: Long,
@@ -71,6 +80,8 @@ data class SostanzeUiState(
     val prescriptions: List<PrescriptionUi> = emptyList(),
     val history: List<HistoryUi> = emptyList(),
     val macros: List<MacroUi> = emptyList(),
+    val interactionRules: List<InteractionRuleEntity> = emptyList(),
+    val interactionTargets: List<InteractionTargetEntity> = emptyList(),
     val notificationPlans: List<NotificationPlan> = emptyList(),
     val nowMs: Long = System.currentTimeMillis(),
     val lastExportResult: ExportResult = ExportResult.Skipped,
@@ -137,6 +148,8 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             .mapNotNull { intake ->
                 val substance = substanceById[intake.substanceId] ?: return@mapNotNull null
                 HistoryUi(
+                    id = intake.id,
+                    substanceId = intake.substanceId,
                     substanceName = substance.name,
                     doseText = "${intake.dose.clean()} ${intake.doseUnit}",
                     timestampMs = intake.timestampMs,
@@ -157,6 +170,8 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             prescriptions = prescriptions,
             history = history,
             macros = macros,
+            interactionRules = snapshot.interactionRules,
+            interactionTargets = snapshot.interactionTargets,
             notificationPlans = SostanzeEngine.interactionEndNotifications(doseStates) +
                 SostanzeEngine.missedDoseNotifications(doseStates, now) +
                 refillPlans,
@@ -170,7 +185,7 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
 
     init {
         viewModelScope.launch {
-            repository.seedIfEmpty()
+            repository.initialize()
         }
         viewModelScope.launch { tickClock() }
     }
@@ -203,19 +218,20 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun recordIntake(substanceId: Long, onRecorded: (IntakeUndoToken) -> Unit = {}) {
+    fun recordIntake(substanceId: Long, onResult: (IntakeOutcome, IntakeUndoToken?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
-            val id = repository.recordIntake(substanceId)
-            refreshExport()
-            if (id > 0) onRecorded(IntakeUndoToken(listOf(id)))
+            val outcome = repository.recordIntake(substanceId)
+            if (outcome is IntakeOutcome.Recorded) refreshExport()
+            onResult(outcome, (outcome as? IntakeOutcome.Recorded)?.let { IntakeUndoToken(listOf(it.id)) })
         }
     }
 
-    fun recordMacro(macroId: Long, onRecorded: (IntakeUndoToken) -> Unit = {}) {
+    fun recordMacro(macroId: Long, onRecorded: (List<IntakeOutcome>, IntakeUndoToken?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
-            val ids = repository.recordMacro(macroId)
-            refreshExport()
-            if (ids.isNotEmpty()) onRecorded(IntakeUndoToken(ids))
+            val outcomes = repository.recordMacro(macroId)
+            val ids = outcomes.mapNotNull { (it as? IntakeOutcome.Recorded)?.id }
+            if (ids.isNotEmpty()) refreshExport()
+            onRecorded(outcomes, ids.takeIf { it.isNotEmpty() }?.let(::IntakeUndoToken))
         }
     }
 
@@ -233,17 +249,59 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun adjustStock(substanceId: Long, delta: Double, note: String?) {
+    fun editIntake(id: Long, timestampMs: Long, quantity: Double, onResult: (IntakeEditOutcome) -> Unit = {}) {
         viewModelScope.launch {
-            repository.adjustStock(substanceId, delta, note)
-            refreshExport()
+            val result = repository.editIntake(id, timestampMs, quantity)
+            if (result == IntakeEditOutcome.Updated) refreshExport()
+            onResult(result)
         }
     }
 
-    fun saveSubstance(entity: SubstanceEntity) {
+    fun deleteIntake(id: Long) {
+        viewModelScope.launch { if (repository.deleteIntake(id)) refreshExport() }
+    }
+
+    fun savePrescription(value: PrescriptionEntity, onSaved: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
-            repository.saveSubstance(entity)
-            refreshExport()
+            val saved = runCatching { repository.savePrescription(value) }.isSuccess
+            if (saved) refreshExport()
+            onSaved(saved)
+        }
+    }
+
+    fun createPrescription(value: PrescriptionDraft, onSaved: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val saved = runCatching { repository.createPrescription(value) }.isSuccess
+            if (saved) refreshExport()
+            onSaved(saved)
+        }
+    }
+
+    fun deletePrescription(id: Long) {
+        viewModelScope.launch { repository.deletePrescription(id); refreshExport() }
+    }
+
+    fun adjustStock(substanceId: Long, delta: Double, note: String?, onResult: (StockOutcome) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.adjustStock(substanceId, delta, note)
+            if (result is StockOutcome.Applied) refreshExport()
+            onResult(result)
+        }
+    }
+
+    fun setStock(substanceId: Long, target: Double, onResult: (StockOutcome) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.setStock(substanceId, target)
+            if (result is StockOutcome.Applied) refreshExport()
+            onResult(result)
+        }
+    }
+
+    fun saveSubstance(entity: SubstanceEntity, onResult: (SubstanceSaveOutcome) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = repository.saveSubstance(entity)
+            if (result is SubstanceSaveOutcome.Saved) refreshExport()
+            onResult(result)
         }
     }
 
@@ -252,6 +310,10 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             repository.archiveSubstance(id)
             refreshExport()
         }
+    }
+
+    fun restoreSubstance(id: Long) {
+        viewModelScope.launch { repository.restoreSubstance(id); refreshExport() }
     }
 
     fun addPrescription(substanceId: Long, quantity: Double, refillMonths: Int, alert: Boolean) {
@@ -264,16 +326,21 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                     quantityPrescribed = quantity,
                     refillEveryMonths = refillMonths,
                     alertRefill = alert,
+                    orderEpochDay = LocalDate.now().toEpochDay(),
+                    packageDoseCount = quantity.toInt().coerceAtLeast(1),
+                    remainingDoses = quantity.toInt().coerceAtLeast(1),
+                    doseMg = uiState.value.substances.firstOrNull { it.id == substanceId }?.dosePerIntake ?: 1.0,
                 )
             )
             refreshExport()
         }
     }
 
-    fun addAllFutureInteraction(sourceSubstanceId: Long, beforeHours: Double, afterHours: Double) {
+    fun saveAllFutureInteraction(ruleId: Long = 0, sourceSubstanceId: Long, beforeHours: Double, afterHours: Double) {
         viewModelScope.launch {
             repository.saveInteractionRule(
                 rule = com.gernalix.sostanze.data.InteractionRuleEntity(
+                    id = ruleId,
                     sourceSubstanceId = sourceSubstanceId,
                     avoidBeforeHours = beforeHours,
                     avoidAfterHours = afterHours,
@@ -283,6 +350,10 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             )
             refreshExport()
         }
+    }
+
+    fun deleteInteraction(ruleId: Long) {
+        viewModelScope.launch { repository.deleteInteractionRule(ruleId); refreshExport() }
     }
 
     fun defaultNewSubstance(): SubstanceEntity =
@@ -299,10 +370,7 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         )
 
     fun historyFor(substanceId: Long, state: SostanzeUiState = uiState.value): List<HistoryUi> {
-        val substance = state.substances.firstOrNull { it.id == substanceId } ?: return emptyList()
-        val realRows = state.history.filter { it.substanceName == substance.name }
-        val ghosts = missedGhostRows(substance, state)
-        return (realRows + ghosts).sortedByDescending { it.timestampMs }
+        return state.history.filter { it.substanceId == substanceId }.sortedByDescending { it.timestampMs }
     }
 
     fun setExportFolder(uri: Uri) {
@@ -314,9 +382,8 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
 
     fun importDatabase(uri: Uri) {
         viewModelScope.launch {
-            val result = importExport.importFrom(uri)
-            lastImportError.value = result.exceptionOrNull()?.message
-            lastExportResult.value = importExport.exportStatusNow()
+            runCatching { importExport.importDatabase(uri) }
+                .onFailure { lastImportError.value = it.message }
         }
     }
 
@@ -339,31 +406,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         is ExportResult.Failure -> ExportStatusUi.Error
     }
 
-    private fun missedGhostRows(substance: SubstanceEntity, state: SostanzeUiState): List<HistoryUi> {
-        if (substance.prn || substance.dailyFrequency <= 0) return emptyList()
-        val zone = ZoneId.systemDefault()
-        val today = Instant.ofEpochMilli(state.nowMs).atZone(zone).toLocalDate()
-        val end = substance.endEpochDay?.let(LocalDate::ofEpochDay) ?: today
-        val start = LocalDate.ofEpochDay(substance.startEpochDay)
-        val real = state.history.filter { it.substanceName == substance.name }
-        return generateSequence(start) { it.plusDays(1) }
-            .takeWhile { !it.isAfter(end) }
-            .flatMap { date ->
-                val count = real.count { row ->
-                    Instant.ofEpochMilli(row.timestampMs).atZone(zone).toLocalDate() == date
-                }
-                val missing = (substance.dailyFrequency - count).coerceAtLeast(0)
-                List(missing) {
-                    HistoryUi(
-                        substanceName = substance.name,
-                        doseText = "${substance.dosePerIntake.clean()} ${substance.doseUnit}",
-                        timestampMs = date.atStartOfDay(zone).toInstant().toEpochMilli(),
-                        ghost = true,
-                    )
-                }.asSequence()
-            }
-            .toList()
-    }
 }
 
 private fun Double.clean(): String =

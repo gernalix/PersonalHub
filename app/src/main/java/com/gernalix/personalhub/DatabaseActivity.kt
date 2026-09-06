@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 class DatabaseActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { PersonalHubTheme { TransferScreen() } }
+        setContent { PersonalHubTheme { TransferScreen(intent?.data) } }
     }
 
     private fun restartGraph(rolledBack: Boolean) {
@@ -31,7 +31,7 @@ class DatabaseActivity : ComponentActivity() {
         android.os.Process.killProcess(android.os.Process.myPid())
     }
 
-    @Composable private fun TransferScreen() {
+    @Composable private fun TransferScreen(initialImport: android.net.Uri?) {
         val scope = rememberCoroutineScope()
         var busy by remember { mutableStateOf(false) }
         var message by remember { mutableStateOf<String?>(null) }
@@ -50,6 +50,13 @@ class DatabaseActivity : ComponentActivity() {
                     if (error is com.gernalix.personalhub.core.database.ImportRolledBack) restartGraph(true)
                 }
                 finally { busy = false }
+            }
+        }
+        LaunchedEffect(initialImport) {
+            if (initialImport != null) operation {
+                withContext(Dispatchers.IO) { DatabaseVault.importDatabase(this@DatabaseActivity, initialImport) }
+                message = imported
+                restartGraph(false)
             }
         }
         val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->

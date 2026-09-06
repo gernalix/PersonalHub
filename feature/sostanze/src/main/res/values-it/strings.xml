@@ -11,6 +11,12 @@
     <string name="undo">ANNULLA</string>
     <string name="recorded">Registrato</string>
     <string name="macro_recorded">Macro registrata</string>
+    <string name="intake_blocked">Assunzione bloccata da un’interazione attiva</string>
+    <string name="intake_early">Troppo presto: controlla l’orario consigliato</string>
+    <string name="intake_insufficient_stock">Scorta insufficiente o unità incompatibile</string>
+    <string name="intake_duplicate">Questa assunzione è già stata registrata</string>
+    <string name="duplicate_name">Esiste già una sostanza con questo nome</string>
+    <string name="restore_existing_name">Una sostanza archiviata ha questo nome: ripristinala</string>
     <string name="section_due_today">Da prendere oggi</string>
     <string name="section_later">Piu tardi</string>
     <string name="section_blocked">Bloccate da interazione</string>
@@ -68,6 +74,7 @@
     <string name="delete_substance_title">Archivia sostanza</string>
     <string name="delete_substance_message">Archiviare %1$s? Lo storico resta disponibile e nessun record viene eliminato.</string>
     <string name="archive">Archivia</string>
+    <string name="restore">Ripristina</string>
     <string name="import_confirm_title">Import database</string>
     <string name="import_confirm_message">L\'import sostituisce i dati attuali dopo validazione dello schema.</string>
     <string name="export_status_not_configured">Export non configurato</string>

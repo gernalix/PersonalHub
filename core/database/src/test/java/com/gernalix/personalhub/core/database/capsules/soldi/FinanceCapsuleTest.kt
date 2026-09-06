@@ -88,7 +88,7 @@ class FinanceCapsuleTest {
         assertEquals(42, DatabaseVault.validate(context, file))
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
-            assertEquals(5, owner.openHelper.writableDatabase.version)
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, owner.openHelper.writableDatabase.version)
             assertEquals(44, scalar(owner, "SELECT generation FROM hub_generation"))
             owner.openHelper.writableDatabase.query("SELECT title,start_ms,end_ms FROM sessions").use { assertTrue(it.moveToFirst()); assertEquals("keep exactly", it.getString(0)); assertEquals(1000, it.getInt(1)); assertEquals(2000, it.getInt(2)) }
             owner.openHelper.writableDatabase.query("SELECT json FROM hub_preferences").use { assertTrue(it.moveToFirst()); assertEquals("{\"preserve\":true}", it.getString(0)) }

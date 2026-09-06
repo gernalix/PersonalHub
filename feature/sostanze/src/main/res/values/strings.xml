@@ -11,6 +11,12 @@
     <string name="undo">UNDO</string>
     <string name="recorded">Recorded</string>
     <string name="macro_recorded">Macro recorded</string>
+    <string name="intake_blocked">Intake blocked by an active interaction</string>
+    <string name="intake_early">Too early: check the recommended time</string>
+    <string name="intake_insufficient_stock">Insufficient stock or incompatible unit</string>
+    <string name="intake_duplicate">This intake was already recorded</string>
+    <string name="duplicate_name">A substance with this name already exists</string>
+    <string name="restore_existing_name">An archived substance has this name: restore it instead</string>
     <string name="section_due_today">Due today</string>
     <string name="section_later">Later</string>
     <string name="section_blocked">Blocked by interaction</string>
@@ -68,6 +74,7 @@
     <string name="delete_substance_title">Archive substance</string>
     <string name="delete_substance_message">Archive %1$s? History stays available and no records are deleted.</string>
     <string name="archive">Archive</string>
+    <string name="restore">Restore</string>
     <string name="import_confirm_title">Import database</string>
     <string name="import_confirm_message">Importing replaces the current app data after schema validation.</string>
     <string name="export_status_not_configured">Export not configured</string>

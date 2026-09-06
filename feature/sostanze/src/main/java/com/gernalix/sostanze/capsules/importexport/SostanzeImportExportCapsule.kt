@@ -9,6 +9,12 @@ import com.gernalix.sostanze.data.SostanzeDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+sealed class ExportResult {
+    data object Skipped : ExportResult()
+    data object Success : ExportResult()
+    data class Failure(val message: String) : ExportResult()
+}
+
 class SostanzeImportExportCapsule(private val context: Context, private val db: SostanzeDatabase) : ImportExportCapsuleApi {
     override suspend fun setExportDestination(treeUri: Uri): CapsuleResult = withContext(Dispatchers.IO) {
         DatabaseVault.configureFolder(context, treeUri)
@@ -23,6 +29,9 @@ class SostanzeImportExportCapsule(private val context: Context, private val db: 
         runCatching { if (DatabaseVault.exportNow(context)) ExportResult.Success else ExportResult.Skipped }
             .getOrElse { ExportResult.Failure(it.message ?: it.javaClass.simpleName) }
     }
-    override suspend fun importDatabase(sourceUri: Uri): CapsuleResult { DatabaseNavigation.open(context); return CapsuleResult.Skipped }
-    suspend fun importFrom(source: Uri): Result<Unit> = runCatching { DatabaseNavigation.open(context) }
+    override suspend fun importDatabase(sourceUri: Uri): CapsuleResult {
+        DatabaseNavigation.openImport(context, sourceUri)
+        // Completion is reported only by DatabaseActivity after DatabaseVault has validated and replaced.
+        return CapsuleResult.Skipped
+    }
 }

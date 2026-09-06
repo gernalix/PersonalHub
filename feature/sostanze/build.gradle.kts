@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val personalHubVersion = rootProject.file("version.txt").readText().trim().toInt()
+
 android {
     namespace = "com.gernalix.sostanze"
     compileSdk = 37
@@ -12,8 +14,8 @@ android {
         minSdk = 29
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "APPLICATION_ID", "\"com.gernalix.sostanze\"")
-        buildConfigField("int", "VERSION_CODE", "4")
-        buildConfigField("String", "VERSION_NAME", "\"4\"")
+        buildConfigField("int", "VERSION_CODE", personalHubVersion.toString())
+        buildConfigField("String", "VERSION_NAME", "\"$personalHubVersion\"")
     }
 
     compileOptions {
@@ -24,6 +26,7 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
@@ -42,6 +45,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
