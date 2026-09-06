@@ -407,10 +407,11 @@ fun SuperContactsApp(
         isViewingGlobalInitiatives = false
     }
 
-    LaunchedEffect(launchIntent?.dataString) {
+    LaunchedEffect(launchIntent?.dataString, dataLayerGeneration) {
         val dataString = launchIntent?.dataString ?: return@LaunchedEffect
-        if (handledDeepLink == dataString) return@LaunchedEffect
-        handledDeepLink = dataString
+        val deepLinkGeneration = "$dataLayerGeneration:$dataString"
+        if (handledDeepLink == deepLinkGeneration) return@LaunchedEffect
+        handledDeepLink = deepLinkGeneration
         val savedSearchPublicId = ContactDeepLink.parseSavedSearch(dataString)
         if (savedSearchPublicId != null) {
             viewModel.findSavedSearchByPublicId(savedSearchPublicId) { savedSearch ->
@@ -2320,6 +2321,7 @@ private fun ContactDetailScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .semantics { detail?.publicId?.let { contentDescription = "hub-detail-people/person/$it" } }
                 .padding(innerPadding)
                 .imePadding()
                 .verticalScroll(rememberScrollState())

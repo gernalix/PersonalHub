@@ -14,9 +14,8 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter {
     override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let(sessions::readSessionById) != null
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
     override suspend fun summaries(canonicalIds: Set<String>) = canonicalIds.mapNotNull { id -> id.toLongOrNull()?.let(sessions::readSessionById)?.let { id to it.summary() } }.toMap()
-    override suspend fun search(query: String, limit: Int) = sessions.readAllSessions().asSequence()
-        .filter { query.isBlank() || it.title.contains(query, true) || it.id.toString() == query }
-        .take(limit.coerceIn(1, 100)).map { it.summary() }.toList()
+    override suspend fun search(query: String, limit: Int) =
+        sessions.searchSessions(query, limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/timer?sessionId=$canonicalId", "com.example.multitimetracker.MainActivity")
 
     private fun SessionUi.summary() = HubEntitySummary(

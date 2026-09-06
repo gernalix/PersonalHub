@@ -38,9 +38,9 @@ class HubContextMigrationTest {
         val database = PersonalHubDatabase.openTemporary(context, name)
         try {
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(8, sqlite.version)
+            assertEquals(9, sqlite.version)
             assertEquals("{\"kept\":true}", scalarText(sqlite, "SELECT json FROM hub_preferences WHERE namespace='migration-proof'"))
-            assertEquals(43L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(44L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
             assertEquals(5L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('hub_entity_bindings','hub_contexts','hub_context_members','hub_context_types','hub_context_type_fields')"))
             assertTrue(scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='index' AND name='index_hub_context_members_entity_id_context_id'") == 1L)
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='hub_resources'"))
@@ -49,6 +49,44 @@ class HubContextMigrationTest {
                 sqlite.execSQL("INSERT INTO hub_context_members VALUES('ctx','missing','',0)")
                 fail("Expected binding foreign-key failure")
             } catch (_: Exception) { }
+        } finally {
+            database.close()
+            context.deleteDatabase(name)
+        }
+    }
+
+
+    @Test fun versionEightLocksSystemTypeWithoutChangingUserContextsOrResources() {
+        val name = "hub-context-lock-migration-${UUID.randomUUID()}.db"
+        val file = context.getDatabasePath(name).also { it.parentFile!!.mkdirs() }
+        val entities = JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/8.json").bufferedReader().use { it.readText() })
+            .getJSONObject("database").getJSONArray("entities")
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
+            old.execSQL("PRAGMA foreign_keys=ON")
+            for (i in 0 until entities.length()) {
+                val entity = entities.getJSONObject(i)
+                val table = entity.getString("tableName")
+                old.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
+                val indices = entity.optJSONArray("indices") ?: JSONArray()
+                for (j in 0 until indices.length()) old.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", table))
+            }
+            old.execSQL("INSERT INTO hub_generation VALUES(1,8)")
+            old.execSQL("INSERT INTO hub_context_types VALUES('timer_activity','Timer activity','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
+            old.execSQL("INSERT INTO hub_context_types VALUES('user_type','User type','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
+            old.execSQL("INSERT INTO hub_contexts VALUES('ctx','user_type','Kept','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
+            old.execSQL("INSERT INTO hub_resources VALUES('res','NOTE','Kept resource','body',0,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
+            old.version = 8
+        }
+
+        val database = PersonalHubDatabase.openTemporary(context, name)
+        try {
+            val sqlite = database.openHelper.writableDatabase
+            assertEquals(9, sqlite.version)
+            assertEquals(1L, scalarLong(sqlite, "SELECT locked FROM hub_context_types WHERE id='timer_activity'"))
+            assertEquals(0L, scalarLong(sqlite, "SELECT locked FROM hub_context_types WHERE id='user_type'"))
+            assertEquals("Kept", scalarText(sqlite, "SELECT title FROM hub_contexts WHERE id='ctx'"))
+            assertEquals("Kept resource", scalarText(sqlite, "SELECT title FROM hub_resources WHERE id='res'"))
+            assertEquals(9L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
         } finally {
             database.close()
             context.deleteDatabase(name)

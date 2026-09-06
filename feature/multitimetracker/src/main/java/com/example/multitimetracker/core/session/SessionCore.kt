@@ -19,6 +19,7 @@ interface SessionCore {
     // --- Reads ---
     fun readSessionById(sessionId: Long): SessionUi?
     fun readAllSessions(): List<SessionUi>
+    fun searchSessions(query: String, limit: Int): List<SessionUi>
     fun readRunningSessions(): List<SessionUi>
 
     // --- Writes ---

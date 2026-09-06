@@ -123,6 +123,40 @@ internal class SessionRepository(private val context: Context) {
         }
     }
 
+    fun searchSessions(query: String, limit: Int): List<SessionUi> {
+        SnapshotSqlite.ensureSessionTables(context)
+        val boundedLimit = limit.coerceIn(1, 100)
+        val normalized = query.trim()
+        val db = SnapshotSqlite.openReadableDb(context)
+        try {
+            val sql = """
+                SELECT s.id,s.title,s.start_ms,s.end_ms,s.expected_end_ms,s.deleted_at_ms,st.tag_id
+                FROM ${SnapshotSqlite.SESSIONS_TABLE} s
+                LEFT JOIN ${SnapshotSqlite.SESSION_TAGS_TABLE} st ON st.session_id=s.id
+                WHERE s.id IN (
+                    SELECT id FROM ${SnapshotSqlite.SESSIONS_TABLE}
+                    WHERE deleted_at_ms IS NULL
+                      AND (? = '' OR instr(lower(title), lower(?)) > 0 OR CAST(id AS TEXT) = ?)
+                    ORDER BY start_ms DESC,id DESC LIMIT ?
+                )
+                ORDER BY s.start_ms DESC,s.id DESC
+            """.trimIndent()
+            val sessions = LinkedHashMap<Long, SessionAccumulator>()
+            db.rawQuery(sql, arrayOf(normalized, normalized, normalized, boundedLimit.toString())).use { c ->
+                while (c.moveToNext()) {
+                    val id = c.getLong(0)
+                    val value = sessions.getOrPut(id) {
+                        SessionAccumulator(id, c.getString(1), c.getLong(2), if (c.isNull(3)) null else c.getLong(3), if (c.isNull(4)) null else c.getLong(4), if (c.isNull(5)) null else c.getLong(5))
+                    }
+                    if (!c.isNull(6)) value.tagIds.add(c.getLong(6))
+                }
+            }
+            return sessions.values.map { it.toUi() }
+        } finally {
+            db.close()
+        }
+    }
+
     /** Returns sessions where end_ms IS NULL (running sessions). */
     fun readRunningSessions(): List<SessionUi> {
         SnapshotSqlite.ensureSessionTables(context)

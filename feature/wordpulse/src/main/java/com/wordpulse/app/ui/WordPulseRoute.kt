@@ -18,7 +18,7 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 @Composable
-fun WordPulseRoute(viewModel: WordPulseViewModel) {
+fun WordPulseRoute(viewModel: WordPulseViewModel, initialSessionId: String? = null) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val captureFieldValue by viewModel.captureFieldState.collectAsStateWithLifecycle()
     val typingAlert by viewModel.typingAlertState.collectAsStateWithLifecycle()
@@ -85,5 +85,6 @@ fun WordPulseRoute(viewModel: WordPulseViewModel) {
                 .format(Instant.now())
             exportLauncher.launch("wordpulse-$stamp.csv")
         },
+        initialSessionId = initialSessionId,
     )
 }

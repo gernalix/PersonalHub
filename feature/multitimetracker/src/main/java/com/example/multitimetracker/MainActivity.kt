@@ -32,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +43,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.multitimetracker.capsules.now.state.NowUiState
 import com.example.multitimetracker.capsules.alerts.state.AlertsUiState
+import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.export.BackupFolderStore
 import com.example.multitimetracker.model.TimeFenceDelivery
 import com.example.multitimetracker.model.TimeFenceTrigger
@@ -71,10 +73,12 @@ internal fun shouldRenderFirstRunSetupPrompt(
 
 @OptIn(CapsuleWriteApi::class)
 class MainActivity : ComponentActivity() {
+    private var hubSessionId by mutableStateOf<Long?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         StartupPerfTrace.activityOnCreateStart()
         super.onCreate(savedInstanceState)
+        hubSessionId = intent.hubSessionId()
 
         StartupPerfTrace.section("main_activity_on_create") {
             // v138 Capsule Audit Engine: emit known capsule boundary leaks in Logcat (debug only)
@@ -82,15 +86,27 @@ class MainActivity : ComponentActivity() {
             enableEdgeToEdge()
             setContent {
                 MultiTimeTrackerTheme {
-                    MultiTimeTrackerApp()
+                    MultiTimeTrackerApp(hubSessionId = hubSessionId, onHubSessionDismiss = { hubSessionId = null })
                 }
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        hubSessionId = intent.hubSessionId()
+    }
 }
+
+private fun Intent?.hubSessionId(): Long? = this?.data
+    ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/timer" }
+    ?.getQueryParameter("sessionId")?.toLongOrNull()
 
 @Composable
 private fun MultiTimeTrackerApp(
+    hubSessionId: Long?,
+    onHubSessionDismiss: () -> Unit,
     vm: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -218,7 +234,8 @@ private fun MultiTimeTrackerApp(
         val hasSnapshot = StartupPerfTrace.section("startup_internal_data_probe") {
             vm.hasPersistedInternalDataFast(context)
         }
-        continuationMode.value = if (hasSnapshot) {
+        val hasRequestedHubSession = hubSessionId?.let { DefaultSessionCore(context).readSessionById(it) != null } == true
+        continuationMode.value = if (hasSnapshot || hasRequestedHubSession) {
             FirstRunContinuationMode.CURRENT_DATA
         } else {
             FirstRunContinuationMode.EMPTY_SETUP
@@ -228,7 +245,7 @@ private fun MultiTimeTrackerApp(
         }
         val isCloneBenchmark = BuildConfig.APPLICATION_ID.endsWith(".devicetest")
         val allowPersonalHubLocalDataWithoutSaf =
-            appContext.packageName == "com.gernalix.personalhub" &&
+            appContext.packageName in setOf("com.gernalix.personalhub", "com.gernalix.personalhub.qa") &&
                 continuationMode.value == FirstRunContinuationMode.CURRENT_DATA
         if (isCloneBenchmark && hasSnapshot) {
             setupDone.value = true
@@ -624,7 +641,9 @@ DisposableEffect(Unit) {
     }
 
     AppRoot(
-        vm = vm
+        vm = vm,
+        hubSessionId = hubSessionId,
+        onHubSessionDismiss = onHubSessionDismiss,
     )
 }
 

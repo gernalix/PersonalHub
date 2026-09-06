@@ -21,10 +21,8 @@ class PlacesHubAdapter(private val context: Context) : HubEntityAdapter {
     }
     override suspend fun summaries(canonicalIds: Set<String>) =
         if (canonicalIds.isEmpty()) emptyMap() else dao.placesByUuids(canonicalIds.toList()).associate { it.uuid to it.summary() }
-    override suspend fun search(query: String, limit: Int) = dao.listPlaces()
-        .asSequence()
-        .filter { query.isBlank() || it.nickname.contains(query, true) || it.address.orEmpty().contains(query, true) }
-        .take(limit.coerceIn(1, 100)).map { it.summary() }.toList()
+    override suspend fun search(query: String, limit: Int) =
+        dao.searchForHub(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/places?placeId=${android.net.Uri.encode(canonicalId)}", "com.gernalix.luoghi.MainActivity")
     override suspend fun create(request: HubCreateRequest): HubEntitySummary? {
         val name = request.suggestedLabel?.trim().orEmpty()

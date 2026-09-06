@@ -146,6 +146,40 @@ class HubContextRepositoryTest {
         assertTrue("Indexed 300-context query took ${elapsedMs}ms", elapsedMs < 2_000)
     }
 
+    @Test fun multipleContextViewsResolveBindingsInOneBatch() = runBlocking {
+        val batches = mutableListOf<Int>()
+        val graph = HubContextRepository(database, HubAdapterRegistry(listOf(adapter))) { batches += it }
+        val anchor = graph.bind(ref("anchor"))
+        val b = graph.bind(ref("b"))
+        val c = graph.bind(ref("c"))
+        graph.createContext(listOf(draft(anchor), draft(b)))
+        graph.createContext(listOf(draft(anchor), draft(c)))
+        batches.clear()
+
+        val views = graph.viewsFor(ref("anchor"))
+
+        assertEquals(2, views.size)
+        assertEquals(listOf(3), batches)
+    }
+
+    @Test fun systemTypesAreLockedWhileUserTypesRemainEditableAndDeletable() = runBlocking {
+        val now = Instant.now().toString()
+        val system = HubContextType("system", "System", now, now, locked = true)
+        val fields = listOf(HubContextTypeField("system", "item", 0, "Item", acceptedModuleId = "fake", acceptedEntityKind = "item"))
+        repository.saveSystemType(system, fields)
+        assertTrue(repository.type("system")!!.first.locked)
+        assertFails { repository.saveType(system.copy(name = "Overwritten", locked = false), fields) }
+        assertFails { repository.deleteType("system") }
+
+        val user = HubContextType("user", "User", now, now)
+        val userFields = fields.map { it.copy(contextTypeId = "user") }
+        repository.saveType(user, userFields)
+        repository.saveType(user.copy(name = "User updated"), userFields)
+        assertEquals("User updated", repository.type("user")!!.first.name)
+        repository.deleteType("user")
+        assertNull(repository.type("user"))
+    }
+
     private fun ref(id: String) = HubEntityRef("fake", "item", id)
     private fun draft(binding: HubEntityBinding) = HubContextMemberDraft(binding.id)
     private suspend fun assertFails(block: suspend () -> Unit) {

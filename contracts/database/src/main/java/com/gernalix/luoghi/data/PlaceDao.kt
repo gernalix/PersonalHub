@@ -18,6 +18,15 @@ interface PlaceDao {
     @Query("SELECT * FROM places WHERE archived = 0 ORDER BY updated_at DESC, nickname COLLATE NOCASE ASC")
     suspend fun listPlaces(): List<PlaceEntity>
 
+    @Query("""
+        SELECT * FROM places
+        WHERE archived = 0
+          AND (:query = '' OR instr(lower(nickname), lower(:query)) > 0 OR instr(lower(COALESCE(address, '')), lower(:query)) > 0)
+        ORDER BY updated_at DESC, nickname COLLATE NOCASE ASC, uuid ASC
+        LIMIT :limit
+    """)
+    suspend fun searchForHub(query: String, limit: Int): List<PlaceEntity>
+
     @Query("SELECT * FROM places WHERE archived = 0 ORDER BY updated_at DESC, nickname COLLATE NOCASE ASC")
     fun listPlacesBlocking(): List<PlaceEntity>
 

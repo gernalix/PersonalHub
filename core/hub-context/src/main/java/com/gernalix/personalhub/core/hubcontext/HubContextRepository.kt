@@ -20,6 +20,7 @@ data class HubExplorerResult(val scope: List<HubEntitySummary>, val facets: List
 class HubContextRepository(
     private val database: PersonalHubDatabase,
     private val adapters: HubAdapterRegistry,
+    private val onBindingBatch: ((Int) -> Unit)? = null,
 ) {
     private val dao = database.hubContextDao()
 
@@ -63,7 +64,7 @@ class HubContextRepository(
 
     suspend fun context(contextId: String): HubContextView? {
         val context = dao.context(contextId) ?: return null
-        return view(context)
+        return views(listOf(context)).single()
     }
 
     suspend fun removeMember(contextId: String, member: HubContextMemberDraft) = database.withTransaction {
@@ -105,7 +106,15 @@ class HubContextRepository(
         else dao.setLifecycle(bindingId, HubEntityLifecycle.DELETED, now())
     }
 
-    suspend fun saveType(type: HubContextType, fields: List<HubContextTypeField>) = database.withTransaction {
+    suspend fun saveType(type: HubContextType, fields: List<HubContextTypeField>) = saveType(type, fields, systemWrite = false)
+
+    suspend fun saveSystemType(type: HubContextType, fields: List<HubContextTypeField>) =
+        saveType(type.copy(locked = true), fields, systemWrite = true)
+
+    private suspend fun saveType(type: HubContextType, fields: List<HubContextTypeField>, systemWrite: Boolean) = database.withTransaction {
+        val existing = dao.type(type.id)
+        require(systemWrite || (existing?.locked != true && !type.locked)) { "System Context Types are locked" }
+        require(!systemWrite || type.locked)
         require(type.name.isNotBlank())
         require(fields.map { it.fieldId }.distinct().size == fields.size)
         require(fields.map { it.position }.toSet() == fields.indices.toSet())
@@ -119,6 +128,12 @@ class HubContextRepository(
         dao.upsertType(type)
         dao.deleteTypeFields(type.id)
         dao.insertTypeFields(fields)
+    }
+
+    suspend fun deleteType(typeId: String) = database.withTransaction {
+        val type = requireNotNull(dao.type(typeId)) { "Context Type not found" }
+        require(!type.locked) { "System Context Types are locked" }
+        require(dao.deleteType(typeId) == 1)
     }
 
     suspend fun types(): List<HubContextType> = dao.types()
@@ -150,10 +165,10 @@ class HubContextRepository(
 
     suspend fun viewsFor(ref: HubEntityRef): List<HubContextView> {
         val anchor = binding(ref) ?: return emptyList()
-        return dao.contextsForEntity(anchor.id).map { view(it) }
+        return views(dao.contextsForEntity(anchor.id))
     }
 
-    suspend fun viewsByType(typeId: String): List<HubContextView> = dao.contextsByType(typeId).map { view(it) }
+    suspend fun viewsByType(typeId: String): List<HubContextView> = views(dao.contextsByType(typeId))
 
     fun changes() = dao.observeContextIds()
 
@@ -177,7 +192,7 @@ class HubContextRepository(
         require(limit in 1..200 && offset >= 0)
         val scopedBindings = scope.distinct().map { bind(it) }
         val counts = dao.candidatesRelatedToAll(scopedBindings.map { it.id }, scopedBindings.size, limit, offset)
-        val candidates = dao.bindings(counts.map { it.entityId })
+        val candidates = bindings(counts.map { it.entityId })
         val summariesByRef = summaries(candidates).associateBy { it.ref }
         val countByBinding = counts.associate { it.entityId to it.contextCount }
         val facets = candidates.groupBy { it.moduleId to it.entityKind }.map { (kind, bindings) ->
@@ -193,7 +208,8 @@ class HubContextRepository(
     private suspend fun validateMembers(members: List<HubContextMemberDraft>, typeId: String?) {
         require(members.size >= 2) { "A Context requires at least two members" }
         require(members.map { it.bindingId to it.role.trim() }.distinct().size == members.size) { "Duplicate member role" }
-        val bindings = members.associateWith { requireNotNull(dao.binding(it.bindingId)) { "Unknown Hub entity binding" } }
+        val found = bindings(members.map { it.bindingId }).associateBy { it.id }
+        val bindings = members.associateWith { requireNotNull(found[it.bindingId]) { "Unknown Hub entity binding" } }
         if (typeId == null) return
         val fields = requireNotNull(type(typeId)) { "Unknown Context Type" }.second
         fields.forEach { field ->
@@ -210,17 +226,23 @@ class HubContextRepository(
         return acceptedCapability == null || acceptedCapability in adapters.adapter(HubEntityRef(binding.moduleId, binding.entityKind, binding.canonicalId)).capabilities
     }
 
-    private suspend fun view(context: HubContext): HubContextView {
-        val storedMembers = dao.members(context.id)
-        val bindings = storedMembers.mapNotNull { dao.binding(it.entityId) }
+    private suspend fun views(contexts: List<HubContext>): List<HubContextView> {
+        if (contexts.isEmpty()) return emptyList()
+        val storedMembers = dao.membersForContexts(contexts.map { it.id })
+        val bindings = bindings(storedMembers.map { it.entityId })
         val bindingIdByRef = bindings.associate {
             HubEntityRef(it.moduleId, it.entityKind, it.canonicalId) to it.id
         }
         val byBinding = summaries(bindings).mapNotNull { summary ->
             bindingIdByRef[summary.ref]?.let { bindingId -> bindingId to summary }
         }.toMap()
-        val resolved = storedMembers.mapNotNull { member -> byBinding[member.entityId]?.let { HubResolvedContextMember(member, it) } }
-        return HubContextView(context, resolved.map { it.summary }, resolved)
+        val resolvedByContext = storedMembers.mapNotNull { member ->
+            byBinding[member.entityId]?.let { member.contextId to HubResolvedContextMember(member, it) }
+        }.groupBy({ it.first }, { it.second })
+        return contexts.map { context ->
+            val resolved = resolvedByContext[context.id].orEmpty()
+            HubContextView(context, resolved.map { it.summary }, resolved)
+        }
     }
     private suspend fun summaries(bindings: List<HubEntityBinding>): List<HubEntitySummary> =
         bindings.groupBy { it.moduleId to it.entityKind }.flatMap { (_, group) ->
@@ -236,5 +258,11 @@ class HubContextRepository(
                     )
             }
         }
+    private suspend fun bindings(ids: List<String>): List<HubEntityBinding> {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) return emptyList()
+        onBindingBatch?.invoke(distinctIds.size)
+        return dao.bindings(distinctIds)
+    }
     private fun now() = Instant.now().toString()
 }

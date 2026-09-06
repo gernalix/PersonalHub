@@ -37,7 +37,7 @@ class SyncJournalTest {
             val db = owner.openHelper.writableDatabase
             assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
             db.query("SELECT title,start_ms,end_ms FROM sessions").use { assertTrue(it.moveToFirst()); assertEquals("preserved", it.getString(0)); assertEquals(1000L, it.getLong(1)); assertEquals(2000L, it.getLong(2)) }
-            db.query("SELECT generation FROM hub_generation").use { it.moveToFirst(); assertEquals(46L, it.getLong(0)) }
+            db.query("SELECT generation FROM hub_generation").use { it.moveToFirst(); assertEquals(47L, it.getLong(0)) }
             db.execSQL("UPDATE sessions SET title='changed'")
             db.query("SELECT count(*) FROM hub_sync_pending WHERE table_name='sessions'").use { it.moveToFirst(); assertEquals(1, it.getInt(0)) }
         } finally { owner.close(); context.deleteDatabase("sync-upgrade-test.db") }

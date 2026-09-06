@@ -78,6 +78,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
@@ -208,6 +210,7 @@ internal fun WordPulseScreen(
     onClearSelectedWord: () -> Unit,
     onImportCsv: () -> Unit,
     onExportCsv: () -> Unit,
+    initialSessionId: String? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -216,6 +219,9 @@ internal fun WordPulseScreen(
     var selectedTab by remember { mutableStateOf(WordPulseTab.Today) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var textFieldPlaced by remember { mutableStateOf(false) }
+    LaunchedEffect(initialSessionId) {
+        if (initialSessionId != null) selectedTab = WordPulseTab.Sessions
+    }
     fun restoreTypingFocus() {
         scope.launch {
             if (textFieldPlaced) {
@@ -337,6 +343,7 @@ internal fun WordPulseScreen(
                         WordPulseTab.Sessions -> SessionsTab(
                             sessions = uiState.sessions,
                             currentSessionId = uiState.currentSessionId,
+                            initialSessionId = initialSessionId,
                         )
                     }
                 }
@@ -2361,14 +2368,19 @@ private fun BaselineBlock(baselines: List<BaselineComparison>) {
 private fun SessionsTab(
     sessions: List<SessionSummaryRow>,
     currentSessionId: String?,
+    initialSessionId: String? = null,
 ) {
-    var relatedSessionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var relatedSessionId by rememberSaveable { mutableStateOf(initialSessionId) }
+    LaunchedEffect(initialSessionId) { if (initialSessionId != null) relatedSessionId = initialSessionId }
     Section("Session History") {
         if (sessions.isEmpty()) {
             EmptyText()
         } else {
             sessions.forEach { session ->
                 ListItem(
+                    modifier = Modifier.semantics {
+                        if (relatedSessionId == session.id) contentDescription = "hub-detail-wordpulse/word_session/${session.id}"
+                    },
                     headlineContent = {
                         Text(
                             text = if (session.id == currentSessionId) {

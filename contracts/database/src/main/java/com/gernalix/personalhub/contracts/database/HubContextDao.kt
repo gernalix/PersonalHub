@@ -67,6 +67,9 @@ interface HubContextDao {
     @Query("SELECT * FROM hub_context_type_fields WHERE context_type_id=:typeId ORDER BY position")
     suspend fun typeFields(typeId: String): List<HubContextTypeField>
 
+    @Query("DELETE FROM hub_context_types WHERE id=:typeId")
+    suspend fun deleteType(typeId: String): Int
+
     @Query("DELETE FROM hub_context_type_fields WHERE context_type_id=:typeId")
     suspend fun deleteTypeFields(typeId: String)
 
@@ -81,6 +84,9 @@ interface HubContextDao {
 
     @Query("SELECT * FROM hub_context_members WHERE context_id=:contextId ORDER BY position,role,entity_id")
     suspend fun members(contextId: String): List<HubContextMember>
+
+    @Query("SELECT * FROM hub_context_members WHERE context_id IN (:contextIds) ORDER BY context_id,position,role,entity_id")
+    suspend fun membersForContexts(contextIds: List<String>): List<HubContextMember>
 
     @Query("SELECT id FROM hub_contexts ORDER BY id")
     fun observeContextIds(): Flow<List<String>>

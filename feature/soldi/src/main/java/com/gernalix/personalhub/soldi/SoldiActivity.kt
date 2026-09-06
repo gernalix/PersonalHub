@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,16 +31,29 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 class SoldiActivity : ComponentActivity() {
+    private var hubTransactionUuid by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        hubTransactionUuid = intent.hubTransactionUuid()
         enableEdgeToEdge()
         val capsule = FinanceCapsule(applicationContext)
-        setContent { MaterialTheme { Surface { SoldiScreen(capsule, ::finish) } } }
+        setContent { MaterialTheme { Surface { SoldiScreen(capsule, ::finish, hubTransactionUuid) } } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        hubTransactionUuid = intent.hubTransactionUuid()
     }
 }
 
+private fun Intent?.hubTransactionUuid(): String? = this?.data
+    ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/soldi" }
+    ?.getQueryParameter("transactionUuid")?.takeIf(String::isNotBlank)
+
 @Composable
-private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
+private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransactionUuid: String? = null) {
     val accounts by capsule.accounts.collectAsState(emptyList())
     val transactions by capsule.transactions.collectAsState(emptyList())
     val products by capsule.products.collectAsState(emptyList())
@@ -57,6 +71,18 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
     var error by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var deletion by remember { mutableStateOf<Pair<Int, Long>?>(null) }
+    var handledHubTransactionUuid by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(hubTransactionUuid, transactions) {
+        val uuid = hubTransactionUuid ?: return@LaunchedEffect
+        if (handledHubTransactionUuid == uuid) return@LaunchedEffect
+        val row = transactions.firstOrNull { it.value.uuid == uuid } ?: return@LaunchedEffect
+        transaction = TransactionDraft(
+            row.value.id, row.title, row.value.productId != null, row.value.amount, row.value.currency,
+            row.chain.orEmpty(), row.value.placeId, row.value.notes, capsule.tags(row.value.id).joinToString(", "),
+            row.value.fromReceipt, row.value.occurredAt, row.value.accountId, row.value.productId,
+        )
+        handledHubTransactionUuid = uuid
+    }
     fun action(block: suspend () -> Unit) {
         if (busy) return
         busy = true; error = false
@@ -68,7 +94,12 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
     fun back() { transaction = null; product = null; account = null; reconcile = null; settings = false; error = false }
     val editing = transaction != null || product != null || account != null || reconcile != null || settings
     BackHandler(editing && !busy) { back() }
-    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        Modifier.fillMaxSize()
+            .semantics { if (transaction != null && hubTransactionUuid != null) contentDescription = "hub-detail-soldi/transaction/$hubTransactionUuid" }
+            .windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(stringResource(when {
                 transaction != null -> R.string.transaction

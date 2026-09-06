@@ -60,12 +60,15 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.DisposableEffect
 import com.example.multitimetracker.AppPatchVersion
 import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.MainViewModel
+import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.model.UiState
 import com.example.multitimetracker.model.TimeMachinePeriodSelection
 import com.example.multitimetracker.model.TimeMachineTagComparisonRow
@@ -154,7 +157,9 @@ private const val TRACE_TAB_QUICK_EVENTS = "mtt_bench_tab_quick_events"
     // === FEATURE CAPSULE: AppRoot+Navigation+Settings (UI) START ===
 @Composable
 fun AppRoot(
-    vm: MainViewModel
+    vm: MainViewModel,
+    hubSessionId: Long? = null,
+    onHubSessionDismiss: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -201,6 +206,26 @@ fun AppRoot(
             AppRootSystemPrefs.setKeepScreenOn(context, it)
         }
     )
+    val hubSession by produceState<com.example.multitimetracker.model.SessionUi?>(null, hubSessionId) {
+        value = hubSessionId?.let { id -> withContext(Dispatchers.IO) { DefaultSessionCore(context).readSessionById(id) } }
+    }
+    hubSession?.let { session ->
+        AlertDialog(
+            modifier = Modifier.semantics { contentDescription = "hub-detail-timer/session/${session.id}" },
+            onDismissRequest = onHubSessionDismiss,
+            title = { Text(stringResource(R.string.modifica_sessione)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(session.title, style = MaterialTheme.typography.titleMedium)
+                    Text("#${session.id}")
+                    com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                        com.gernalix.personalhub.contracts.database.HubEntityRef("timer", "session", session.id.toString()),
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = onHubSessionDismiss) { Text(stringResource(R.string.annulla)) } },
+        )
+    }
 }
     // === FEATURE CAPSULE: AppRoot+Navigation+Settings (UI) END ===
 

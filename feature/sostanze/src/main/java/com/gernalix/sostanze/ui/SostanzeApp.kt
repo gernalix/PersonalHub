@@ -68,6 +68,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -104,7 +106,7 @@ private enum class AppTab {
 }
 
 @Composable
-fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
+fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -133,6 +135,15 @@ fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
     var interactionDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
     var interactionRuleDraft by remember { mutableStateOf<InteractionRuleEntity?>(null) }
     var pendingImport by remember { mutableStateOf<android.net.Uri?>(null) }
+    var handledInitialSubstanceId by rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(initialSubstanceId, state.substances) {
+        val id = initialSubstanceId ?: return@LaunchedEffect
+        if (handledInitialSubstanceId == id) return@LaunchedEffect
+        state.substances.firstOrNull { it.id == id }?.let {
+            editingSubstance = it
+            handledInitialSubstanceId = id
+        }
+    }
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -829,6 +840,7 @@ private fun SubstanceDialog(initial: SubstanceEntity, onDismiss: () -> Unit, onD
     var prn by remember(initial) { mutableStateOf(initial.prn) }
     var forever by remember(initial) { mutableStateOf(initial.forever) }
     AlertDialog(
+        modifier = Modifier.semantics { if (initial.id != 0L) contentDescription = "hub-detail-substances/substance/${initial.id}" },
         onDismissRequest = onDismiss,
         title = { Text(if (initial.id == 0L) stringResource(R.string.new_substance) else stringResource(R.string.edit_substance)) },
         text = {

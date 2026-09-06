@@ -49,13 +49,14 @@ object HubContextRuntime {
     suspend fun contextTypes() = requireNotNull(repository).types()
     suspend fun contextType(typeId: String) = requireNotNull(repository).type(typeId)
     suspend fun saveContextType(type: HubContextType, fields: List<HubContextTypeField>) = requireNotNull(repository).saveType(type, fields)
+    suspend fun deleteContextType(typeId: String) = requireNotNull(repository).deleteType(typeId)
     suspend fun saveCombinationAsType(contextId: String, name: String) = requireNotNull(repository).saveCombinationAsType(contextId, name)
     suspend fun explore(scope: List<HubEntityRef>, limit: Int = 100, offset: Int = 0) = requireNotNull(repository).explore(scope, limit, offset)
 
     suspend fun ensureTimerActivityType() {
         val now = Instant.now().toString()
-        requireNotNull(repository).saveType(
-            HubContextType(TIMER_ACTIVITY_TYPE, "Timer activity", now, now),
+        requireNotNull(repository).saveSystemType(
+            HubContextType(TIMER_ACTIVITY_TYPE, "Timer activity", now, now, locked = true),
             listOf(
                 HubContextTypeField(TIMER_ACTIVITY_TYPE, "session", 0, "Session", "anchor", "timer", "session", minCardinality = 1, maxCardinality = 1),
                 HubContextTypeField(TIMER_ACTIVITY_TYPE, "people", 1, "People", "participant", "people", "person", minCardinality = 0, maxCardinality = null),

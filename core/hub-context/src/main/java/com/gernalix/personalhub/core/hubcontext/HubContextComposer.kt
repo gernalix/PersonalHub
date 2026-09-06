@@ -61,7 +61,7 @@ internal class HubComposerState(
             typeId = editingContextId?.let { HubContextRuntime.context(it)?.context?.contextTypeId } ?: typeId
             initialized = true
         }
-        types = HubContextRuntime.contextTypes()
+        types = HubContextRuntime.contextTypes().filterNot { it.locked }
         loadFields()
         refresh()
     }
@@ -277,7 +277,7 @@ private fun HubContextTypeEditorDialog(onDismiss: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     val adapters = HubContextRuntime.adapters()
     val choices = adapters.flatMap { adapter -> listOf("kind:${adapter.moduleId}/${adapter.entityKind}") + adapter.capabilities.map { "cap:$it" } }.distinct()
-    LaunchedEffect(Unit) { types = HubContextRuntime.contextTypes() }
+    LaunchedEffect(Unit) { types = HubContextRuntime.contextTypes().filterNot { it.locked } }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.hub_templates_title)) },

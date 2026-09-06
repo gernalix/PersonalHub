@@ -36,6 +36,7 @@ data class HubContextType(
     val name: String,
     @ColumnInfo(name = "created_at") val createdAt: String,
     @ColumnInfo(name = "updated_at") val updatedAt: String,
+    val locked: Boolean = false,
 )
 
 @Entity(

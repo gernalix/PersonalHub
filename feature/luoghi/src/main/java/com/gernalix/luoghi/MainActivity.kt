@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -55,20 +56,33 @@ import com.gernalix.luoghi.ui.settings.SettingsScreen
 import com.gernalix.luoghi.ui.theme.LuoghiTheme
 
 class MainActivity : ComponentActivity() {
+    private var hubPlaceId by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        hubPlaceId = intent.hubPlaceId()
         setContent {
             LuoghiTheme {
-                Surface(modifier = Modifier.fillMaxSize()) { LuoghiHome() }
+                Surface(modifier = Modifier.fillMaxSize()) { LuoghiHome(hubPlaceId) }
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        hubPlaceId = intent.hubPlaceId()
+    }
 }
+
+private fun Intent?.hubPlaceId(): String? = this?.data
+    ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/places" }
+    ?.getQueryParameter("placeId")?.takeIf(String::isNotBlank)
 
 private enum class AppDestination { HOME, PLACE_DETAIL, HISTORY, SETTINGS }
 
 @Composable
-fun LuoghiHome() {
+fun LuoghiHome(initialPlaceId: String? = null) {
     val context = LocalContext.current
     val vm: LuoghiHomeViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -126,7 +140,7 @@ fun LuoghiHome() {
         }
     }
     val allowPersonalHubLocalDataWithoutSaf =
-        context.packageName == "com.gernalix.personalhub" && state.dataLoaded
+        context.packageName in setOf("com.gernalix.personalhub", "com.gernalix.personalhub.qa") && state.dataLoaded
 
     when {
         state.safGate.loading && !allowPersonalHubLocalDataWithoutSaf -> LoadingGate()
@@ -138,6 +152,7 @@ fun LuoghiHome() {
         else -> LuoghiNavigation(
             state = state,
             vm = vm,
+            initialPlaceId = initialPlaceId,
             onCheckAction = onCheckAction,
             onChooseSafFolder = {
                 folderLauncher.launch(openDocumentTreeIntent())
@@ -159,6 +174,7 @@ fun LuoghiHome() {
 private fun LuoghiNavigation(
     state: HomeUiState,
     vm: LuoghiHomeViewModel,
+    initialPlaceId: String?,
     onCheckAction: () -> Unit,
     onChooseSafFolder: () -> Unit,
     onChooseBackupFile: () -> Unit,
@@ -175,6 +191,13 @@ private fun LuoghiNavigation(
     val destination = runCatching { AppDestination.valueOf(destinationName) }.getOrDefault(AppDestination.HOME)
     val selectedItem = selectedPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
     val pendingDelete = pendingDeletePlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
+
+    LaunchedEffect(initialPlaceId, state.dataLoaded) {
+        if (state.dataLoaded && initialPlaceId != null && state.placeItems.any { it.place.uuid == initialPlaceId }) {
+            selectedPlaceId = initialPlaceId
+            destinationName = AppDestination.PLACE_DETAIL.name
+        }
+    }
 
     fun openHome() {
         destinationName = AppDestination.HOME.name

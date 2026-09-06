@@ -73,7 +73,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class,
-], version = 8, exportSchema = true)
+], version = 9, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -90,7 +90,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 8
+        const val SCHEMA_VERSION = 9
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -176,6 +176,13 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                 .addMigrations(object : androidx.room.migration.Migration(7, 8) {
                     override fun migrate(db: SupportSQLiteDatabase) {
                         db.execSQL("CREATE TABLE IF NOT EXISTS `hub_resources` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `title` TEXT, `value` TEXT NOT NULL, `persistedPermission` INTEGER NOT NULL, `createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`))")
+                        db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(8, 9) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE hub_context_types ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("UPDATE hub_context_types SET locked=1 WHERE id='timer_activity'")
                         db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                     }
                 })
