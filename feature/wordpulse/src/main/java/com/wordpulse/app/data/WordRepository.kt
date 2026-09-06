@@ -235,14 +235,22 @@ class WordRepository(
         ).mapNotNull(TypingPerformanceRow::toPerformanceSample)
     }
 
-    suspend fun deleteAllData(): WordSession =
-        database.withTransaction {
+    suspend fun deleteAllData(): WordSession {
+        val formerSessionIds = dao.getSessions().map { it.id }
+        val created = database.withTransaction {
             dao.deleteCorrectionEvents()
             dao.deleteWords()
             dao.deleteSessions()
             dao.deleteAppState()
             createSessionInsideTransaction(endPrevious = false)
         }
+        formerSessionIds.filter { it != created.id }.forEach {
+            com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalDeletedIfInitialized(
+                com.gernalix.personalhub.contracts.database.HubEntityRef("wordpulse", "word_session", it),
+            )
+        }
+        return created
+    }
 
     suspend fun correctSubmittedWord(
         wordEntryId: Long,

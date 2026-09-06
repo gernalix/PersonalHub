@@ -2,6 +2,7 @@ package com.gernalix.luoghi.data
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
 import com.gernalix.luoghi.capsules.checkin.HistoryMutationResult
 import com.gernalix.luoghi.capsules.checkin.HistorySessionAnomaly
 import com.gernalix.luoghi.capsules.checkin.HistorySessionCalculator
@@ -27,6 +28,7 @@ class PlaceRepository(
     private val context: Context,
     private val database: LuoghiDatabase = LuoghiDatabase.get(context),
     private val dao: PlaceDao = database.placeDao(),
+    private val placeReferences: PlaceReferenceReader = database,
 ) {
     val places: Flow<List<PlaceEntity>> = dao.observePlaces()
     val events: Flow<List<PlaceEventEntity>> = dao.observeEvents()
@@ -74,10 +76,7 @@ class PlaceRepository(
         val result = DatabaseMutationCoordinator.mutex.withLock {
             database.withTransaction {
                 val place = dao.getPlace(uuid) ?: return@withTransaction PlaceDeleteResult.NotFound
-                val financeReferences =
-                    database.financeDao().transactionCountForPlace(uuid) +
-                        database.financeDao().storeCountForPlace(uuid)
-                if (financeReferences > 0) {
+                if (placeReferences.referenceCount(uuid) > 0) {
                     dao.setPlaceArchived(uuid, archived = true, updatedAt = System.currentTimeMillis())
                     PlaceDeleteResult.ArchivedBecauseReferenced
                 } else if (dao.deletePlaceByUuid(place.uuid) > 0) {
@@ -88,7 +87,12 @@ class PlaceRepository(
             }
         }
         when (result) {
-            PlaceDeleteResult.Deleted -> PersistentMutationTracker.record(context, "places.delete")
+            PlaceDeleteResult.Deleted -> {
+                PersistentMutationTracker.record(context, "places.delete")
+                com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalDeletedIfInitialized(
+                    com.gernalix.personalhub.contracts.database.HubEntityRef("places", "place", uuid),
+                )
+            }
             PlaceDeleteResult.ArchivedBecauseReferenced -> PersistentMutationTracker.record(context, "places.archive")
             PlaceDeleteResult.NotFound -> Unit
         }

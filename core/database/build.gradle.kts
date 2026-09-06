@@ -13,9 +13,9 @@ android {
     }
 }
 dependencies {
+    implementation(project(":contracts:database"))
     api(libs.androidx.room.runtime)
     api(libs.androidx.room.ktx)
-    implementation("org.eclipse.jgit:org.eclipse.jgit:6.10.1.202505221210-r")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.work.runtime.ktx)

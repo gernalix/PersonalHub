@@ -6,6 +6,7 @@ import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceRepository
 import kotlinx.coroutines.flow.Flow
+import com.gernalix.luoghi.capsules.visits.VisitUiModel
 
 data class PlaceStatsUi(
     val place: PlaceEntity,
@@ -41,9 +42,22 @@ class StatsCapsule(
         events: List<PlaceEventEntity>,
         globalState: GlobalStatsStateEntity?,
         nowMs: Long,
-    ): StatsSnapshot = calculate(places, events, globalState?.firstCheckInAtGlobal, nowMs)
+        visits: List<VisitUiModel>? = null,
+    ): StatsSnapshot = visits?.let { calculateFromVisits(places, it, globalState?.firstCheckInAtGlobal, nowMs) }
+        ?: calculate(places, events, globalState?.firstCheckInAtGlobal, nowMs)
 
     companion object {
+        fun calculateFromVisits(places: List<PlaceEntity>, visits: List<VisitUiModel>, firstCheckInAtGlobal: Long?, nowMs: Long): StatsSnapshot {
+            val totalByPlace = visits.groupBy { it.placeId }.mapValues { (_, rows) -> rows.sumOf { it.durationMs } }
+            val globalTotalMs = totalByPlace.values.sum()
+            return StatsSnapshot(
+                places.map { place ->
+                    val total = totalByPlace[place.uuid] ?: 0L
+                    PlaceStatsUi(place, total, percent(total, firstCheckInAtGlobal, nowMs), percent(total, place.firstCheckInAtPlace, nowMs))
+                },
+                GlobalStatsUi(globalTotalMs, percent(globalTotalMs, firstCheckInAtGlobal, nowMs), visits.size, firstCheckInAtGlobal),
+            )
+        }
         fun calculate(
             places: List<PlaceEntity>,
             events: List<PlaceEventEntity>,

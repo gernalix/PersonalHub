@@ -149,7 +149,9 @@ tasks.configureEach {
 }
 
 dependencies {
+    implementation(project(":contracts:database"))
     implementation(project(":core:database"))
+    implementation(project(":core:hub-context"))
     implementation(project(":feature:luoghi"))
     implementation(project(":feature:multitimetracker"))
     implementation(project(":feature:sostanze"))
@@ -171,9 +173,12 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.documentfile)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.uiautomator)
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.7.0")
 }

@@ -4,7 +4,17 @@ PersonalHub contains People, Timer, Places, Substances and WordPulse. The applic
 
 ## Database capsule
 
-`:core:database` owns the single canonical data file `personalhub.db`. `PersonalHubDatabase` is the only Room schema owner and declares all domain entities and the sync journal and all feature DAOs. Entity/DAO packages remain stable for source compatibility. Feature database names are type aliases to this owner, not independent Room builders. The timer compatibility adapter borrows the same Room connection; it does not create, version or close another canonical database.
+`:core:database` owns the single canonical data file `personalhub.db`. `PersonalHubDatabase` is the only Room schema owner and assembles the sync journal plus the deliberately exported Room entities and DAOs from `:contracts:database`. Entity/DAO packages remain stable for source and schema compatibility, while their source ownership is no longer hidden inside generic core. Feature database names are type aliases to this owner, not independent Room builders. The timer compatibility adapter borrows the same Room connection; it does not create, version or close another canonical database.
+
+`:contracts:database` is a compile-time boundary only: it contains stable Room entities, DAOs and narrow cross-module query contracts, but no database builder, singleton, repository, UI or feature workflow. Feature implementations depend on this contract and on `:core:database`; `:core:database` depends only on the contract and never on a feature implementation. Soldi workflow/Git code belongs to `:feature:soldi`, and People photo staging belongs to `:feature:supercontacts`. Places protects referenced rows through `PlaceReferenceReader` rather than accessing the Soldi DAO. The root `checkArchitectureBoundaries` task rejects feature-to-feature Gradle dependencies, feature persistence source placed back in generic core and app imports of feature-private data/repository/implementation packages.
+
+## Hub Context Graph foundation
+
+The neutral Hub layer stores stable bindings to canonical module records and N-ary Context membership; it never copies canonical labels or domain records. A Context has at least two members and may contain any number of members, including multiple records of one kind. The `(context, entity, role)` key prevents accidental duplicates while permitting the same record in distinct semantic roles. Optional Context Types and their ordered fields are user data with module/kind or capability constraints and bounded or unbounded cardinality; an ad-hoc Context has no type.
+
+`:core:hub-context` owns the registry and query/repository behavior and imports no feature implementation. Modules later implement the batched `HubEntityAdapter` contract for existence, lifecycle, summaries, search, navigation and optional creation; the app composition root supplies adapters. Indexed queries cover forward/reverse lookup, all-members intersection, related entities and facets without loading the full graph or resolving labels one by one.
+
+Deleting a Context cascades only its membership rows. Removing a member that would leave fewer than two is rejected. Canonical archives update binding lifecycle without removing history. Canonical deletion removes an unused binding, but a referenced binding becomes an explicit `DELETED` tombstone so historical Contexts never disappear silently.
 
 Original identifiers, relationships, epoch timestamps, UTC strings, timer snapshots/history, configuration rows, and the remote-sync outbox are retained. WordPulse's session table is `wordpulse_sessions` to avoid collision with timer `sessions`. WorkManager's own scheduling database is operational metadata, not a feature data store.
 

@@ -8,6 +8,9 @@ import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.TimedTagNotificationType
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.persistence.SessionRepository
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
+import kotlinx.coroutines.runBlocking
 
 /**
  * Default implementation backed by [SessionRepository].
@@ -51,6 +54,7 @@ class DefaultSessionCore(private val context: Context) : SessionCore {
     override fun softDeleteSession(sessionId: Long) {
         repo.softDeleteSession(sessionId = sessionId)
         TimeFenceTimerScheduler.cancelTimedSession(context, sessionId)
+        runBlocking { HubContextRuntime.canonicalDeletedIfInitialized(HubEntityRef("timer", "session", sessionId.toString())) }
     }
 
     override fun ensureRunningSessionRow(title: String, startMs: Long, tagIds: Set<Long>, nowMs: Long): Long {

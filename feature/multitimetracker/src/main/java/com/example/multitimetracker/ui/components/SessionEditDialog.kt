@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -69,6 +70,9 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.hubcontext.HubContextLinks
 
 private enum class SessionTimePickTarget {
     START,
@@ -120,6 +124,8 @@ fun SessionEditDialog(
     var isSavingMeta by remember { mutableStateOf(false) }
     var isSavingTimes by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
+    val saveScope = rememberCoroutineScope()
+    val contextEditor = rememberSessionContextEditorState(session.id)
 
 
     var name by remember { mutableStateOf(session.title) }
@@ -226,8 +232,17 @@ fun SessionEditDialog(
                             }
                             isSavingMeta = true
                             dismissKeyboard()
-                            onSaveMeta(session.id, name, selectedEffective)
-                            onDismiss()
+                            saveScope.launch {
+                                runCatching { contextEditor.save(session.id) }
+                                    .onSuccess {
+                                        onSaveMeta(session.id, name, selectedEffective)
+                                        onDismiss()
+                                    }
+                                    .onFailure {
+                                        isSavingMeta = false
+                                        Toast.makeText(context, it.message ?: context.getString(R.string.hub_context_save_failed), Toast.LENGTH_SHORT).show()
+                                    }
+                            }
                         },
                         enabled = !isSavingMeta && !readOnly
                     ) {
@@ -293,6 +308,9 @@ fun SessionEditDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    SessionContextEditor(contextEditor, readOnly)
+                    HubContextLinks(HubEntityRef("timer", "session", session.id.toString()))
 
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerLow,

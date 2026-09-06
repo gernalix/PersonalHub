@@ -10,6 +10,14 @@ import com.gernalix.personalhub.core.database.HubAutoExport
 import com.example.multitimetracker.perf.StartupPerfTrace
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.wordpulse.app.WordPulseApplication
+import com.example.multitimetracker.hub.TimerSessionHubAdapter
+import com.gernalix.luoghi.hub.PlacesHubAdapter
+import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
+import com.gernalix.personalhub.core.hubcontext.ResourceHubAdapter
+import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
+import com.gernalix.sostanze.hub.SubstanceHubAdapter
+import com.supercontacts.app.hub.PeopleHubAdapter
+import com.wordpulse.app.hub.WordSessionHubAdapter
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -22,6 +30,11 @@ class PersonalHubApplication : WordPulseApplication(), Configuration.Provider {
         StartupPerfTrace.applicationOnCreate()
         DatabaseVault.recoverInterruptedImport(this)
         super.onCreate()
+        HubContextRuntime.initialize(this, listOf(
+            PeopleHubAdapter(this), TimerSessionHubAdapter(this), PlacesHubAdapter(this),
+            SoldiTransactionHubAdapter(this), SubstanceHubAdapter(this), WordSessionHubAdapter(this),
+            ResourceHubAdapter(this),
+        ))
         PostFirstFrameStartup.install(this)
     }
 }

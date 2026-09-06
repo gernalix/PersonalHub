@@ -71,6 +71,9 @@ object AppContainer {
         }
     }
 
+    /** Releases process caches for isolated database tests. */
+    fun resetForTests() = closeDataLayer()
+
     private fun notifyDataLayerChanged() {
         dataLayerGeneration.value += 1
     }

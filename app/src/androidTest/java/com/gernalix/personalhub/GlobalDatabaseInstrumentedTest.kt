@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.ExistingWorkPolicy
 import com.gernalix.personalhub.core.database.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -26,11 +27,12 @@ class GlobalDatabaseInstrumentedTest {
         val export = AtomicInteger(0)
         override fun cancelLegacyWork(context: Context) { cancelledLegacy.incrementAndGet() }
         override fun enqueuePeriodicRecovery(context: Context) { recovery.incrementAndGet() }
-        override fun enqueueAutoExport(context: Context) { export.incrementAndGet() }
+        override fun enqueueAutoExport(context: Context, policy: ExistingWorkPolicy) { export.incrementAndGet() }
     }
     private class MemoryExportPublisher : DatabaseVault.ExportPublisher {
         val files = mutableMapOf<String, MemoryExportFile>()
-        override fun createTemporary(name: String): DatabaseVault.ExportFile = MemoryExportFile(name, this).also { files[name] = it }
+        override fun create(name: String): DatabaseVault.ExportFile = MemoryExportFile(name, this).also { files[name] = it }
+        override fun open(identity: String): DatabaseVault.ExportFile? = files[identity]
         override fun find(name: String): DatabaseVault.ExportFile? = files[name]
         override fun writeFrom(source: File, target: DatabaseVault.ExportFile) {
             (target as MemoryExportFile).bytes = source.readBytes()
@@ -39,15 +41,10 @@ class GlobalDatabaseInstrumentedTest {
             target.writeBytes((source as MemoryExportFile).bytes)
         }
     }
-    private class MemoryExportFile(private var displayName: String, private val owner: MemoryExportPublisher) : DatabaseVault.ExportFile {
+    private class MemoryExportFile(private val displayName: String, private val owner: MemoryExportPublisher) : DatabaseVault.ExportFile {
         var bytes = ByteArray(0)
+        override val identity: String get() = displayName
         override val name: String get() = displayName
-        override fun renameTo(displayName: String): Boolean {
-            owner.files.remove(this.displayName)
-            this.displayName = displayName
-            owner.files[displayName] = this
-            return true
-        }
         override fun delete(): Boolean {
             owner.files.remove(displayName)
             return true

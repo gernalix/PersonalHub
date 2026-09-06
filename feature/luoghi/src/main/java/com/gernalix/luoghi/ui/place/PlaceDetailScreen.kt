@@ -44,6 +44,8 @@ import com.gernalix.luoghi.ui.common.localizedPercent
 import com.gernalix.luoghi.ui.common.localizedTime
 import com.gernalix.luoghi.ui.common.rememberMinuteNow
 import com.gernalix.luoghi.ui.common.visitCount
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.hubcontext.HubContextLinks
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,6 +132,9 @@ fun PlaceDetailScreen(
                         ),
                     )
                 )
+            }
+            item(key = "hub-context") {
+                HubContextLinks(HubEntityRef("places", "place", place.uuid))
             }
             item(key = "actions") {
                 SectionTitle(stringResource(R.string.actions))

@@ -135,6 +135,8 @@ import com.supercontacts.app.data.repository.AddressSuggestion
 import com.supercontacts.app.data.repository.AppContainer
 import com.supercontacts.app.data.repository.ContactDetail
 import com.supercontacts.app.data.repository.ContactDeepLink
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.hubcontext.HubContextLinks
 import com.supercontacts.app.data.repository.ContactDuplicateCandidate
 import com.supercontacts.app.data.repository.ContactDuplicateReason
 import com.supercontacts.app.data.repository.ContactEvent
@@ -2373,6 +2375,8 @@ private fun ContactDetailScreen(
                     onHistory = onInitiativeHistory,
                     onInitiativeClick = onInitiativeClick,
                 )
+
+                HubContextLinks(HubEntityRef("people", "person", detail.publicId))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

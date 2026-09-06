@@ -208,6 +208,11 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit) {
 @Composable
 private fun TransactionEditor(d: TransactionDraft, products: List<FinanceProduct>, places: List<PlaceChoice>, accounts: List<FinanceAccount>, transactions: List<TransactionView>, tags: List<String>, selectTitle: (String) -> Unit, change: (TransactionDraft) -> Unit, busy: Boolean, save: () -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        transactions.firstOrNull { it.value.id == d.id }?.let { stored -> item {
+            com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                com.gernalix.personalhub.contracts.database.HubEntityRef("soldi", "transaction", stored.value.uuid),
+            )
+        } }
         item { AccountPicker(accounts,d.accountId) { change(d.copy(accountId = it.id,currency = it.currency)) } }
         item { Field(R.string.title, d.title, readOnly = d.productId != null, suggestions = transactions.filter { it.value.productId == null }.map { it.title }, selectSuggestion = selectTitle) { change(d.copy(title = it)) } }
         item { Row { Checkbox(d.isProduct, { change(d.copy(isProduct = it,productId = if(it) d.productId else null)) }); Text(stringResource(R.string.is_product)) } }

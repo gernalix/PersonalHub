@@ -1,4 +1,5 @@
 <resources>
+    <string name="hub_unnamed_contact">Contatto senza nome</string>
     <string name="app_name">SuperContacts</string>
     <string name="app_title">Super Contacts</string>
     <string name="new_contact">Nuovo contatto</string>

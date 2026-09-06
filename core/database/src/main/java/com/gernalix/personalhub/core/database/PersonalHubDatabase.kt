@@ -1,6 +1,8 @@
 package com.gernalix.personalhub.core.database
 
 import android.content.Context
+import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
+import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.capsules.sync.*
 import androidx.room.Database
 import androidx.room.Room
@@ -69,19 +71,26 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.personalhub.core.database.TimerSyncQueue::class,
     com.gernalix.personalhub.core.database.TimerSyncShadow::class,
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
-], version = 6, exportSchema = true)
-abstract class PersonalHubDatabase : RoomDatabase() {
+    HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
+    HubResource::class,
+], version = 8, exportSchema = true)
+abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
     abstract fun dao(): com.gernalix.sostanze.data.SostanzeDao
     abstract fun wordPulseDao(): com.wordpulse.app.data.WordPulseDao
     abstract fun financeDao(): com.gernalix.personalhub.core.database.capsules.soldi.FinanceDao
     abstract fun photoDao(): PeoplePhotoDao
+    abstract fun hubContextDao(): HubContextDao
+    abstract fun hubResourceDao(): HubResourceDao
+
+    final override suspend fun referenceCount(placeId: String): Int =
+        financeDao().transactionCountForPlace(placeId) + financeDao().storeCountForPlace(placeId)
 
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 6
+        const val SCHEMA_VERSION = 8
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -142,6 +151,32 @@ abstract class PersonalHubDatabase : RoomDatabase() {
                         db.execSQL("CREATE INDEX IF NOT EXISTS index_prescriptions_order_epoch_day ON prescriptions(order_epoch_day)")
                         db.execSQL("CREATE INDEX IF NOT EXISTS index_prescriptions_doctor_contact_id ON prescriptions(doctor_contact_id)")
                         db.execSQL("CREATE INDEX IF NOT EXISTS index_prescriptions_finance_transaction_id ON prescriptions(finance_transaction_id)")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(6, 7) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_entity_bindings` (`id` TEXT NOT NULL, `module_id` TEXT NOT NULL, `entity_kind` TEXT NOT NULL, `canonical_id` TEXT NOT NULL, `lifecycle` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY(`id`))")
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_hub_entity_bindings_module_id_entity_kind_canonical_id` ON `hub_entity_bindings` (`module_id`, `entity_kind`, `canonical_id`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_entity_bindings_lifecycle` ON `hub_entity_bindings` (`lifecycle`)")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_context_types` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY(`id`))")
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_hub_context_types_name` ON `hub_context_types` (`name`)")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_context_type_fields` (`context_type_id` TEXT NOT NULL, `field_id` TEXT NOT NULL, `position` INTEGER NOT NULL, `label` TEXT NOT NULL, `role` TEXT NOT NULL, `accepted_module_id` TEXT, `accepted_entity_kind` TEXT, `accepted_capability` TEXT, `min_cardinality` INTEGER NOT NULL, `max_cardinality` INTEGER, PRIMARY KEY(`context_type_id`, `field_id`), FOREIGN KEY(`context_type_id`) REFERENCES `hub_context_types`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_hub_context_type_fields_context_type_id_position` ON `hub_context_type_fields` (`context_type_id`, `position`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_context_type_fields_accepted_module_id_accepted_entity_kind` ON `hub_context_type_fields` (`accepted_module_id`, `accepted_entity_kind`)")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_contexts` (`id` TEXT NOT NULL, `context_type_id` TEXT, `title` TEXT, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`context_type_id`) REFERENCES `hub_context_types`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_contexts_context_type_id` ON `hub_contexts` (`context_type_id`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_contexts_updated_at` ON `hub_contexts` (`updated_at`)")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_context_members` (`context_id` TEXT NOT NULL, `entity_id` TEXT NOT NULL, `role` TEXT NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`context_id`, `entity_id`, `role`), FOREIGN KEY(`context_id`) REFERENCES `hub_contexts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`entity_id`) REFERENCES `hub_entity_bindings`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_context_members_entity_id` ON `hub_context_members` (`entity_id`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_context_members_context_id_role` ON `hub_context_members` (`context_id`, `role`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_context_members_entity_id_context_id` ON `hub_context_members` (`entity_id`, `context_id`)")
+                        db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(7, 8) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_resources` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `title` TEXT, `value` TEXT NOT NULL, `persistedPermission` INTEGER NOT NULL, `createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`))")
+                        db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                     }
                 })
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)

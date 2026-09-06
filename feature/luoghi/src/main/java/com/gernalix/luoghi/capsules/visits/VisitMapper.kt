@@ -3,6 +3,7 @@ package com.gernalix.luoghi.capsules.visits
 import com.gernalix.luoghi.capsules.checkin.PlaceEventTypes
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
+import com.gernalix.personalhub.core.hubcontext.HubTemporalFact
 
 /**
  * Builds immutable visit presentation models before Compose renders them.
@@ -16,10 +17,13 @@ object VisitMapper {
         events: List<PlaceEventEntity>,
         places: List<PlaceEntity>,
         nowMs: Long,
+        hubFacts: List<HubTemporalFact> = emptyList(),
     ): List<VisitUiModel> {
         val placesById = places.associateBy { it.uuid }
+        val hubSessionIds = hubFacts.map { it.sessionId }.toSet()
         val explicitGroups = events
             .filter { it.sessionUuid.isNotBlank() }
+            .filter { it.sessionUuid !in hubSessionIds }
             .groupBy { it.sessionUuid }
             .toSortedMap()
             .map { (sessionUuid, sessionEvents) ->
@@ -37,7 +41,19 @@ object VisitMapper {
             nowMs = nowMs,
         )
 
-        return markGlobalAnomalies(explicitGroups + legacyVisits, nowMs)
+        val hubVisits = hubFacts.mapNotNull { fact ->
+            val place = placesById[fact.placeId] ?: return@mapNotNull null
+            val duration = ((fact.endMs ?: nowMs) - fact.startMs).coerceAtLeast(0L)
+            VisitUiModel(
+                stableId = "hub:${fact.contextId}", sessionUuid = fact.sessionId, placeId = fact.placeId,
+                placeName = place.nickname, address = place.address, checkInEventId = null, checkOutEventId = null,
+                checkInEventUuid = null, checkOutEventUuid = null, startedAt = fact.startMs, endedAt = fact.endMs,
+                durationMs = duration, isActive = fact.endMs == null,
+                pairingStatus = if (fact.endMs == null) VisitPairingStatus.ACTIVE else VisitPairingStatus.PAIRED,
+                anomalies = emptySet(), underlyingEventIds = emptyList(), relatedPeople = fact.people.map { it.label },
+            )
+        }
+        return markGlobalAnomalies(explicitGroups + legacyVisits + hubVisits, nowMs)
             .sortedWith(
                 compareByDescending<VisitUiModel> { it.isActive }
                     .thenByDescending { it.sortTimestamp }

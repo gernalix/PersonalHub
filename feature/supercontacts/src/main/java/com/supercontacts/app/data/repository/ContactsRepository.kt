@@ -766,6 +766,7 @@ class ContactsRepository(
 
     suspend fun deleteContact(contactId: Long) {
         var changed = false
+        var deletedPublicId: String? = null
         database.withTransaction {
             val contact = dao.getContactEntity(contactId) ?: return@withTransaction
             if (contact.deletedAt != null) return@withTransaction
@@ -783,10 +784,16 @@ class ContactsRepository(
                     deletedAt = now,
                 ),
             )
+            deletedPublicId = contact.publicId
             changed = true
         }
         if (changed) {
             backupManager.notifyDatabaseChanged()
+            deletedPublicId?.let {
+                com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalDeletedIfInitialized(
+                    com.gernalix.personalhub.contracts.database.HubEntityRef("people", "person", it),
+                )
+            }
         }
     }
 

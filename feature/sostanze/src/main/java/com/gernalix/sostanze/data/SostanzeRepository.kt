@@ -373,9 +373,17 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
 
     suspend fun archiveSubstance(substanceId: Long) {
         dao.archiveSubstance(substanceId)
+        com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalLifecycleChangedIfInitialized(
+            com.gernalix.personalhub.contracts.database.HubEntityRef("substances", "substance", substanceId.toString()),
+        )
     }
 
-    suspend fun restoreSubstance(substanceId: Long) = db.withTransaction { dao.restoreSubstance(substanceId) }
+    suspend fun restoreSubstance(substanceId: Long) {
+        db.withTransaction { dao.restoreSubstance(substanceId) }
+        com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalLifecycleChangedIfInitialized(
+            com.gernalix.personalhub.contracts.database.HubEntityRef("substances", "substance", substanceId.toString()),
+        )
+    }
 }
 
 data class IntakeUndoToken(val intakeIds: List<Long>)

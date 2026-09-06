@@ -6,3 +6,14 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.ksp) apply false
 }
+
+val checkArchitectureBoundaries = tasks.register<Exec>("checkArchitectureBoundaries") {
+    group = "verification"
+    description = "Checks module dependency and database ownership boundaries."
+    commandLine("python3", "tools/check_architecture_boundaries.py")
+}
+
+tasks.register("check") {
+    group = "verification"
+    dependsOn(checkArchitectureBoundaries)
+}

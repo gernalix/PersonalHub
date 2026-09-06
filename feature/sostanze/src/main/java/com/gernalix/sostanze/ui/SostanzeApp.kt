@@ -833,6 +833,11 @@ private fun SubstanceDialog(initial: SubstanceEntity, onDismiss: () -> Unit, onD
         title = { Text(if (initial.id == 0L) stringResource(R.string.new_substance) else stringResource(R.string.edit_substance)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (initial.id != 0L) {
+                    com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                        com.gernalix.personalhub.contracts.database.HubEntityRef("substances", "substance", initial.id.toString()),
+                    )
+                }
                 OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = type == SubstanceTypes.FARMACO, onClick = { type = SubstanceTypes.FARMACO }, label = { Text(stringResource(R.string.drug)) })

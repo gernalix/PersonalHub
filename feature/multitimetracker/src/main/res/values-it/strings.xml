@@ -1,5 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <string name="hub_session_fallback">Sessione %1$d</string>
     <string name="exact_alarm_permission_title">Le notifiche temporizzate richiedono accesso agli allarmi esatti</string>
     <string name="exact_alarm_permission_body">MultiTimeTracker usa gli allarmi esatti solo per le sessioni temporizzate. Senza questo accesso, i relativi promemoria locali possono arrivare in ritardo o solo quando riapri l’app.</string>
     <string name="cd_filters">Filtri</string>
@@ -850,4 +851,13 @@
     <string name="audit_quick_event_entry_created">Evento rapido registrato: %1$s</string>
     <string name="audit_quick_event_entry_updated">Evento rapido aggiornato: %1$s</string>
     <string name="audit_quick_event_entry_deleted">Evento rapido eliminato: %1$s</string>
+    <string name="hub_context_title">Persone e luogo</string>
+    <string name="hub_context_people">Persone</string>
+    <string name="hub_context_place">Luogo</string>
+    <string name="hub_context_new_person_name">Nome nuova persona</string>
+    <string name="hub_context_new_person">+ Nuova persona</string>
+    <string name="hub_context_new_place_name">Nome nuovo luogo</string>
+    <string name="hub_context_new_place">+ Nuovo luogo</string>
+    <string name="hub_context_place_radius_hint">I nuovi luoghi usano un raggio di 75 m.</string>
+    <string name="hub_context_save_failed">Impossibile salvare il contesto.</string>
 </resources>

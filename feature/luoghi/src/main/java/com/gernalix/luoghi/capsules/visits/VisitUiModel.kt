@@ -38,6 +38,7 @@ data class VisitUiModel(
     val pairingStatus: VisitPairingStatus,
     val anomalies: Set<VisitAnomaly>,
     val underlyingEventIds: List<Long>,
+    val relatedPeople: List<String> = emptyList(),
 ) {
     val sortTimestamp: Long = startedAt ?: endedAt ?: Long.MIN_VALUE
     val isAnomalous: Boolean = anomalies.isNotEmpty()

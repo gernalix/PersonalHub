@@ -19,6 +19,7 @@ import com.gernalix.luoghi.capsules.places.PlaceListUiModel
 import com.gernalix.luoghi.capsules.routedistance.RouteDistanceStatsUi
 import com.gernalix.luoghi.capsules.stats.StatsSnapshot
 import com.gernalix.luoghi.capsules.visits.VisitMapper
+import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
 import com.gernalix.luoghi.backup.BackupValidationCode
 import com.gernalix.luoghi.backup.BackupValidationException
@@ -239,10 +240,11 @@ class LuoghiHomeViewModel(
         container.checkIns.events,
         container.stats.globalStatsState,
         mutableState,
-    ) { places, events, globalStatsState, state ->
+        HubContextRuntime.contextChanges(),
+    ) { places, events, globalStatsState, state, _ ->
         val nowMs = maxOf(state.nowMs, System.currentTimeMillis())
-        val visits = VisitMapper.map(events, places, nowMs)
-        val stats = container.stats.snapshot(places, events, globalStatsState, nowMs)
+        val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
+        val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
         state.copy(
             dataLoaded = true,
             places = places,
