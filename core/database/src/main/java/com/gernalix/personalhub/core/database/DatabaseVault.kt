@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
+import android.os.SystemClock
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONObject
 import java.io.File
@@ -22,6 +24,8 @@ object DatabaseVault {
     private val operations = ReentrantLock(true)
     private const val PRE_IMPORT_BACKUP_PREFIX = "personalhub-pre-import-"
     private const val PRE_IMPORT_BACKUP_SUFFIX = ".db"
+    internal const val CANONICAL_DOCUMENT_URI = "canonical_document_uri"
+    internal const val BACKUP_DOCUMENT_URI = "backup_document_uri"
     private val noTransferHooks = object : TransferHooks {}
     private var transferHooks: TransferHooks = noTransferHooks
     private var exportPublisherFactory: (Context, Uri) -> ExportPublisher = { context, uri -> DocumentFileExportPublisher(context, uri) }
@@ -237,7 +241,12 @@ object DatabaseVault {
     fun configureFolder(context: Context, uri: Uri) {
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         require(DocumentFile.fromTreeUri(context, uri)?.canWrite() == true) { "Export folder is not writable" }
-        preferences(context).edit().putString("tree_uri", uri.toString()).putLong("exported_generation", -1).commit()
+        preferences(context).edit()
+            .putString("tree_uri", uri.toString())
+            .putLong("exported_generation", -1)
+            .remove(CANONICAL_DOCUMENT_URI)
+            .remove(BACKUP_DOCUMENT_URI)
+            .commit()
         HubAutoExport.request(context)
     }
 
@@ -257,6 +266,74 @@ object DatabaseVault {
         File(context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile, "personalhub-backup-${UUID.randomUUID()}.db").also { snapshot(context, it) }
     }
 
+    private fun verifyExportFile(
+        context: Context,
+        publisher: ExportPublisher,
+        source: File,
+        exported: ExportFile,
+        generation: Long,
+    ) {
+        val verify = File(context.cacheDir, "personalhub-verify-${UUID.randomUUID()}.db")
+        try {
+            publisher.readTo(exported, verify)
+            require(
+                validate(context, verify) == generation &&
+                    source.length() == verify.length() &&
+                    fileHash(source) == fileHash(verify)
+            ) { "Export readback differs" }
+        } finally {
+            verify.delete()
+        }
+    }
+
+    private fun documentUriPreference(name: String) = when (name) {
+        PersonalHubDatabase.DB_NAME -> CANONICAL_DOCUMENT_URI
+        "personalhub.db.bak" -> BACKUP_DOCUMENT_URI
+        else -> error("Unsupported stable export name: $name")
+    }
+
+    private fun existingStableExportFile(
+        prefs: android.content.SharedPreferences,
+        publisher: ExportPublisher,
+        name: String,
+    ): ExportFile? {
+        val preference = documentUriPreference(name)
+        prefs.getString(preference, null)?.let { identity ->
+            publisher.open(identity)?.let { stored ->
+                require(stored.name == name) { "Stored $name identity now names ${stored.name}" }
+                return stored
+            }
+            require(prefs.edit().remove(preference).commit()) { "Cannot retire missing $name identity" }
+        }
+        val found = publisher.find(name) ?: return null
+        require(found.name == name) { "Provider resolved ${found.name} instead of $name" }
+        require(prefs.edit().putString(preference, found.identity).commit()) { "Cannot persist $name identity" }
+        return found
+    }
+
+    private fun stableExportFile(
+        prefs: android.content.SharedPreferences,
+        publisher: ExportPublisher,
+        name: String,
+    ): ExportFile {
+        existingStableExportFile(prefs, publisher, name)?.let { return it }
+        val created = publisher.create(name)
+        if (created.name != name) {
+            runCatching { created.delete() }
+            error("Provider created ${created.name ?: "an unnamed document"} instead of $name")
+        }
+        require(prefs.edit().putString(documentUriPreference(name), created.identity).commit()) {
+            "Cannot persist $name identity"
+        }
+        return created
+    }
+
+    private fun refreshedStableExportFile(publisher: ExportPublisher, file: ExportFile, name: String): ExportFile {
+        val refreshed = requireNotNull(publisher.open(file.identity)) { "Provider lost $name identity" }
+        require(refreshed.name == name) { "Provider renamed $name to ${refreshed.name}" }
+        return refreshed
+    }
+
     fun exportNow(context: Context): Boolean = operations.withLock {
         val uri = folder(context)?.let(Uri::parse) ?: return false
         val prefs = preferences(context)
@@ -264,38 +341,31 @@ object DatabaseVault {
         try {
             val generation = snapshot(context, stage)
             val publisher = exportPublisherFactory(context, uri)
-            val temporary = publisher.createTemporary("personalhub-${UUID.randomUUID()}.tmp")
-            val previous = publisher.find(PersonalHubDatabase.DB_NAME)
-            var movedPrevious: ExportFile? = null
-            try {
-                publisher.writeFrom(stage, temporary)
-                val verify = File(context.cacheDir, "personalhub-verify-${UUID.randomUUID()}.db")
+            val previous = existingStableExportFile(prefs, publisher, PersonalHubDatabase.DB_NAME)
+            if (previous != null) {
+                val previousSnapshot = File(context.cacheDir, "personalhub-previous-${UUID.randomUUID()}.db")
                 try {
-                    publisher.readTo(temporary, verify)
-                    require(validate(context, verify) == generation && stage.length() == verify.length() && fileHash(stage) == fileHash(verify)) { "Export readback differs" }
-                } finally { verify.delete() }
-                if (previous != null) {
-                    val backup = publisher.find("personalhub.db.bak")
-                    require(backup == null || backup.delete()) { "Cannot rotate export backup" }
-                    require(previous.renameTo("personalhub.db.bak")) { "Provider cannot safely rotate export" }
-                    movedPrevious = previous
-                }
-                require(temporary.renameTo(PersonalHubDatabase.DB_NAME)) { "Provider cannot publish export" }
-                prefs.edit().putLong("exported_generation", generation).putLong("exported_at", System.currentTimeMillis()).remove("error").commit()
-                true
-            } catch (error: Throwable) {
-                val moved = movedPrevious
-                if (moved != null) {
-                    val restored = runCatching { moved.renameTo(PersonalHubDatabase.DB_NAME) }.getOrDefault(false)
-                    if (!restored) {
-                        throw IllegalStateException(
-                            "Export failed; previous SAF copy remains recoverable as personalhub.db.bak but could not be restored",
-                            error,
-                        )
+                    publisher.readTo(previous, previousSnapshot)
+                    val previousGeneration = runCatching { validate(context, previousSnapshot) }.getOrNull()
+                    if (previousGeneration != null) {
+                        val backup = stableExportFile(prefs, publisher, "personalhub.db.bak")
+                        publisher.writeFrom(previousSnapshot, backup)
+                        val actualBackup = refreshedStableExportFile(publisher, backup, "personalhub.db.bak")
+                        verifyExportFile(context, publisher, previousSnapshot, actualBackup, previousGeneration)
                     }
+                } finally {
+                    previousSnapshot.delete()
                 }
-                throw error
-            } finally { if (temporary.name != PersonalHubDatabase.DB_NAME) temporary.delete() }
+            }
+            val canonical = stableExportFile(prefs, publisher, PersonalHubDatabase.DB_NAME)
+            publisher.writeFrom(stage, canonical)
+            val actualCanonical = refreshedStableExportFile(publisher, canonical, PersonalHubDatabase.DB_NAME)
+            verifyExportFile(context, publisher, stage, actualCanonical, generation)
+            require(
+                prefs.edit().putLong("exported_generation", generation)
+                    .putLong("exported_at", System.currentTimeMillis()).remove("error").commit()
+            ) { "Cannot persist successful export state" }
+            true
         } catch (error: Throwable) {
             prefs.edit().putString("error", error.message ?: error.javaClass.simpleName).commit()
             throw error
@@ -379,43 +449,95 @@ object DatabaseVault {
     }
 
     interface ExportFile {
+        val identity: String
         val name: String?
-        fun renameTo(displayName: String): Boolean
         fun delete(): Boolean
     }
 
     interface ExportPublisher {
-        fun createTemporary(name: String): ExportFile
+        fun create(name: String): ExportFile
+        fun open(identity: String): ExportFile?
         fun find(name: String): ExportFile?
         fun writeFrom(source: File, target: ExportFile)
         fun readTo(source: ExportFile, target: File)
     }
 
-    private class DocumentFileExportPublisher(private val context: Context, uri: Uri) : ExportPublisher {
-        private val dir = requireNotNull(DocumentFile.fromTreeUri(context, uri)) { "Export folder unavailable" }
-        override fun createTemporary(name: String) = DocumentExportFile(requireNotNull(dir.createFile("application/octet-stream", name)))
-        override fun find(name: String) = dir.findFile(name)?.let(::DocumentExportFile)
+    private class DocumentFileExportPublisher(private val context: Context, private val treeUri: Uri) : ExportPublisher {
+        private val resolver = context.contentResolver
+        private val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+        private val rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId)
+        private val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocumentId)
+        private val metadataColumns = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        )
+
+        private fun queryDocument(uri: Uri): DocumentExportFile? {
+            repeat(2) { attempt ->
+                resolver.query(uri, metadataColumns, null, null, null).use { cursor ->
+                    if (cursor != null && cursor.moveToFirst()) {
+                        val id = cursor.getString(0)
+                        val name = if (cursor.isNull(1)) null else cursor.getString(1)
+                        return DocumentExportFile(uri, id, name)
+                    }
+                }
+                if (attempt == 0) SystemClock.sleep(50)
+            }
+            return null
+        }
+
+        override fun create(name: String): ExportFile {
+            val uri = requireNotNull(
+                DocumentsContract.createDocument(resolver, rootUri, "application/octet-stream", name)
+            ) { "Provider returned no URI for $name" }
+            return requireNotNull(queryDocument(uri)) { "Provider returned an unreadable URI for $name" }
+        }
+
+        override fun open(identity: String): ExportFile? = queryDocument(Uri.parse(identity))
+
+        override fun find(name: String): ExportFile? {
+            if (treeUri.authority == "com.android.externalstorage.documents") {
+                val directId = "$rootDocumentId/$name"
+                val directUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, directId)
+                runCatching { queryDocument(directUri) }.getOrNull()?.let { direct ->
+                    if (direct.name == name) return direct
+                }
+            }
+            resolver.query(childrenUri, metadataColumns, null, null, null).use { cursor ->
+                if (cursor == null) return null
+                while (cursor.moveToNext()) {
+                    if (!cursor.isNull(1) && cursor.getString(1) == name) {
+                        val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, cursor.getString(0))
+                        return queryDocument(uri)
+                    }
+                }
+            }
+            return null
+        }
+
         override fun writeFrom(source: File, target: ExportFile) {
             val file = target as DocumentExportFile
-            context.contentResolver.openOutputStream(file.document.uri, "wt").use { out ->
+            resolver.openOutputStream(file.uri, "wt").use { out ->
                 source.inputStream().use { it.copyTo(requireNotNull(out)) }
             }
         }
         override fun readTo(source: ExportFile, target: File) {
             val file = source as DocumentExportFile
-            context.contentResolver.openInputStream(file.document.uri).use { input ->
+            resolver.openInputStream(file.uri).use { input ->
                 FileOutputStream(target).use { out ->
                     requireNotNull(input).copyTo(out)
                     out.fd.sync()
                 }
             }
         }
-    }
-
-    private class DocumentExportFile(val document: DocumentFile) : ExportFile {
-        override val name: String? get() = document.name
-        override fun renameTo(displayName: String) = document.renameTo(displayName)
-        override fun delete() = document.delete()
+        private inner class DocumentExportFile(
+            val uri: Uri,
+            @Suppress("unused") val documentId: String,
+            override val name: String?,
+        ) : ExportFile {
+            override val identity: String get() = uri.toString()
+            override fun delete() = DocumentsContract.deleteDocument(resolver, uri)
+        }
     }
 }
 

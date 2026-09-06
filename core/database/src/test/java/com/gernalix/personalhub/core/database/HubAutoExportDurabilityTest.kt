@@ -1,7 +1,11 @@
 package com.gernalix.personalhub.core.database
 
 import android.content.Context
+import androidx.work.ExistingWorkPolicy
 import androidx.test.core.app.ApplicationProvider
+import com.wordpulse.app.data.WordEntry
+import com.wordpulse.app.data.WordSession
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -102,12 +106,50 @@ class HubAutoExportDurabilityTest {
             arrayOf("start_test", "{}"),
         )
         scheduler.autoExportRequests = 0
+        scheduler.activeAutoExports = 0
 
         HubAutoExport.start(context)
-        HubAutoExport.request(context)
 
         assertEquals(1, scheduler.periodicRecoveryRequests)
         assertEquals(1, scheduler.autoExportRequests)
+        assertEquals(1, scheduler.activeAutoExports)
+        assertEquals(ExistingWorkPolicy.REPLACE, scheduler.lastPolicy)
+    }
+
+    @Test
+    fun rapidWordPulseWritesCoalesceAndWorkerExportsLatestGeneration() = runBlocking {
+        configureFolderPreference()
+        val database = PersonalHubDatabase.get(context)
+        val dao = database.wordPulseDao()
+        val before = DatabaseVault.currentGeneration(context)
+        dao.insertSession(WordSession(id = "rapid-session", startedAtUtcMs = 1L))
+        repeat(20) { index ->
+            dao.insertWord(
+                WordEntry(
+                    originalWord = "rapid$index",
+                    normalizedWord = "rapid$index",
+                    createdAtUtcMs = index + 2L,
+                    sessionId = "rapid-session",
+                )
+            )
+        }
+        val latest = DatabaseVault.currentGeneration(context)
+        val publisher = RecordingExportPublisher()
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+
+        assertEquals(before + 21, latest)
+        assertEquals(1, scheduler.activeAutoExports)
+        assertEquals(ExistingWorkPolicy.REPLACE, scheduler.lastPolicy)
+        assertTrue(HubAutoExport.exportUntilClean(context) { false })
+        assertEquals(latest, DatabaseVault.exportedGeneration(context))
+        assertFalse(HubAutoExport.dirty(context))
+        val exported = File(context.cacheDir, "rapid-wordpulse-export.db")
+        exported.writeBytes(requireNotNull(publisher.files[PersonalHubDatabase.DB_NAME]))
+        try {
+            assertEquals(latest, DatabaseVault.validate(context, exported))
+        } finally {
+            exported.delete()
+        }
     }
 
     @Test
@@ -231,38 +273,101 @@ class HubAutoExportDurabilityTest {
     }
 
     @Test
-    fun publishFailureRestoresPreviousSafCopyWithoutMarkingSuccess() {
+    fun canonicalWriteFailureKeepsValidBackupWithoutMarkingSuccess() {
         configureFolderPreference()
-        val publisher = RecordingExportPublisher(failPublish = true)
-        publisher.files[PersonalHubDatabase.DB_NAME] = ByteArray(12) { 7 }
+        val oldSnapshot = DatabaseVault.backupCurrent(context)
+        val oldBytes = oldSnapshot.readBytes()
+        oldSnapshot.delete()
+        PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)",
+            arrayOf("failed_publish_test", "{}"),
+        )
+        val publisher = RecordingExportPublisher(failCanonicalWrite = true)
+        publisher.files[PersonalHubDatabase.DB_NAME] = oldBytes
         DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
 
         val error = runCatching { DatabaseVault.exportNow(context) }.exceptionOrNull()
 
         assertNotNull(error)
-        assertTrue(publisher.files.containsKey(PersonalHubDatabase.DB_NAME))
-        assertFalse(publisher.files.containsKey("personalhub.db.bak"))
+        assertEquals(oldBytes.toList(), requireNotNull(publisher.files["personalhub.db.bak"]).toList())
         assertEquals(-1, DatabaseVault.exportedGeneration(context))
-        assertEquals("Provider cannot publish export", DatabaseVault.error(context))
+        assertEquals("simulated canonical write failure", DatabaseVault.error(context))
     }
 
     @Test
-    fun rollbackRenameFailureKeepsRecoverableBackupAndPersistentError() {
+    fun canonicalReadbackFailureCannotAdvanceSuccessMarker() {
         configureFolderPreference()
-        val publisher = RecordingExportPublisher(failPublish = true, failRestore = true)
-        publisher.files[PersonalHubDatabase.DB_NAME] = ByteArray(12) { 9 }
+        val publisher = RecordingExportPublisher(corruptCanonicalReadback = true)
         DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
 
         val error = runCatching { DatabaseVault.exportNow(context) }.exceptionOrNull()
 
         assertNotNull(error)
-        assertEquals(
-            "Export failed; previous SAF copy remains recoverable as personalhub.db.bak but could not be restored",
-            DatabaseVault.error(context),
-        )
-        assertFalse(publisher.files.containsKey(PersonalHubDatabase.DB_NAME))
-        assertTrue(publisher.files.containsKey("personalhub.db.bak"))
+        assertEquals("Invalid SQLite file", DatabaseVault.error(context))
         assertEquals(-1, DatabaseVault.exportedGeneration(context))
+    }
+
+    @Test
+    fun providerRenamedFirstCanonicalIsRejected() {
+        configureFolderPreference()
+        val publisher = RecordingExportPublisher(createdCanonicalName = "personalhub (1).db")
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+
+        val error = runCatching { DatabaseVault.exportNow(context) }.exceptionOrNull()
+
+        assertNotNull(error)
+        assertEquals(-1, DatabaseVault.exportedGeneration(context))
+        assertFalse(publisher.files.containsKey("personalhub (1).db"))
+        assertEquals("Provider created personalhub (1).db instead of personalhub.db", DatabaseVault.error(context))
+    }
+
+    @Test
+    fun invalidCanonicalIsRegeneratedWithoutOverwritingValidBackup() {
+        configureFolderPreference()
+        val oldSnapshot = DatabaseVault.backupCurrent(context)
+        val oldBytes = oldSnapshot.readBytes()
+        oldSnapshot.delete()
+        PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)",
+            arrayOf("recovery_test", "{}"),
+        )
+        val current = DatabaseVault.currentGeneration(context)
+        val publisher = RecordingExportPublisher()
+        publisher.files[PersonalHubDatabase.DB_NAME] = byteArrayOf(0)
+        publisher.files["personalhub.db.bak"] = oldBytes
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+
+        assertTrue(DatabaseVault.exportNow(context))
+
+        assertEquals(current, DatabaseVault.exportedGeneration(context))
+        assertEquals(oldBytes.toList(), requireNotNull(publisher.files["personalhub.db.bak"]).toList())
+        val exported = File(context.cacheDir, "recovered-canonical.db")
+        exported.writeBytes(requireNotNull(publisher.files[PersonalHubDatabase.DB_NAME]))
+        try {
+            assertEquals(current, DatabaseVault.validate(context, exported))
+        } finally {
+            exported.delete()
+        }
+    }
+
+    @Test
+    fun secondExportUsesPersistedDocumentIdentityWithoutDirectoryListing() {
+        configureFolderPreference()
+        val publisher = RecordingExportPublisher()
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+        assertTrue(DatabaseVault.exportNow(context))
+        assertEquals(PersonalHubDatabase.DB_NAME, DatabaseVault.preferences(context).getString(DatabaseVault.CANONICAL_DOCUMENT_URI, null))
+
+        publisher.listingsVisible = false
+        PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)",
+            arrayOf("second_identity_export", "{}"),
+        )
+        val latest = DatabaseVault.currentGeneration(context)
+
+        assertTrue(DatabaseVault.exportNow(context))
+        assertEquals(latest, DatabaseVault.exportedGeneration(context))
+        assertEquals(PersonalHubDatabase.DB_NAME, DatabaseVault.preferences(context).getString(DatabaseVault.CANONICAL_DOCUMENT_URI, null))
     }
 
     private fun configureFolderPreference() {
@@ -275,6 +380,8 @@ class HubAutoExportDurabilityTest {
     private class RecordingScheduler : HubAutoExport.Scheduler {
         var periodicRecoveryRequests = 0
         var autoExportRequests = 0
+        var activeAutoExports = 0
+        var lastPolicy: ExistingWorkPolicy? = null
         var failure: RuntimeException? = null
 
         override fun cancelLegacyWork(context: Context) = Unit
@@ -283,32 +390,49 @@ class HubAutoExportDurabilityTest {
             periodicRecoveryRequests += 1
         }
 
-        override fun enqueueAutoExport(context: Context) {
+        override fun enqueueAutoExport(context: Context, policy: ExistingWorkPolicy) {
             failure?.let { throw it }
             autoExportRequests += 1
+            lastPolicy = policy
+            if (policy == ExistingWorkPolicy.REPLACE || activeAutoExports == 0) activeAutoExports = 1
         }
     }
 
     private class RecordingExportPublisher(
-        private val failPublish: Boolean = false,
-        private val failRestore: Boolean = false,
+        private val failCanonicalWrite: Boolean = false,
+        private val corruptCanonicalReadback: Boolean = false,
+        private val createdCanonicalName: String? = null,
     ) : DatabaseVault.ExportPublisher {
         val files = linkedMapOf<String, ByteArray>()
+        var listingsVisible = true
 
-        override fun createTemporary(name: String): DatabaseVault.ExportFile {
-            files[name] = ByteArray(0)
-            return RecordingExportFile(this, name)
+        override fun create(name: String): DatabaseVault.ExportFile {
+            val actualName = if (name == PersonalHubDatabase.DB_NAME) createdCanonicalName ?: name else name
+            files[actualName] = ByteArray(0)
+            return RecordingExportFile(this, actualName)
         }
 
-        override fun find(name: String): DatabaseVault.ExportFile? = if (files.containsKey(name)) RecordingExportFile(this, name) else null
+        override fun open(identity: String): DatabaseVault.ExportFile? =
+            if (files.containsKey(identity)) RecordingExportFile(this, identity) else null
+
+        override fun find(name: String): DatabaseVault.ExportFile? =
+            if (listingsVisible && files.containsKey(name)) RecordingExportFile(this, name) else null
 
         override fun writeFrom(source: File, target: DatabaseVault.ExportFile) {
+            if (target.name == PersonalHubDatabase.DB_NAME && failCanonicalWrite) {
+                files[PersonalHubDatabase.DB_NAME] = byteArrayOf(0)
+                error("simulated canonical write failure")
+            }
             files[requireNotNull(target.name)] = source.readBytes()
         }
 
         override fun readTo(source: DatabaseVault.ExportFile, target: File) {
             target.outputStream().use { out ->
-                out.write(requireNotNull(files[requireNotNull(source.name)]))
+                if (source.name == PersonalHubDatabase.DB_NAME && corruptCanonicalReadback) {
+                    out.write(byteArrayOf(0))
+                } else {
+                    out.write(requireNotNull(files[requireNotNull(source.name)]))
+                }
                 out.fd.sync()
             }
         }
@@ -317,16 +441,8 @@ class HubAutoExportDurabilityTest {
             private val publisher: RecordingExportPublisher,
             private var currentName: String,
         ) : DatabaseVault.ExportFile {
+            override val identity: String get() = currentName
             override val name: String? get() = currentName
-
-            override fun renameTo(displayName: String): Boolean {
-                if (displayName == PersonalHubDatabase.DB_NAME && currentName.endsWith(".tmp") && publisher.failPublish) return false
-                if (displayName == PersonalHubDatabase.DB_NAME && currentName == "personalhub.db.bak" && publisher.failRestore) return false
-                val content = publisher.files.remove(currentName) ?: return false
-                publisher.files[displayName] = content
-                currentName = displayName
-                return true
-            }
 
             override fun delete(): Boolean {
                 publisher.files.remove(currentName)

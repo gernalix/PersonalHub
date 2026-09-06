@@ -10,11 +10,12 @@ object HubAutoExport {
     internal const val AUTO_EXPORT_WORK = "personalhub-autoexport"
     internal const val RECOVERY_WORK = "personalhub-export-recovery"
     internal const val EXPORT_DELAY_MS = 1200L
+    internal val AUTO_EXPORT_POLICY = ExistingWorkPolicy.REPLACE
 
     interface Scheduler {
         fun cancelLegacyWork(context: Context)
         fun enqueuePeriodicRecovery(context: Context)
-        fun enqueueAutoExport(context: Context)
+        fun enqueueAutoExport(context: Context, policy: ExistingWorkPolicy)
     }
 
     private object WorkManagerScheduler : Scheduler {
@@ -29,9 +30,9 @@ object HubAutoExport {
             )
         }
 
-        override fun enqueueAutoExport(context: Context) {
+        override fun enqueueAutoExport(context: Context, policy: ExistingWorkPolicy) {
             WorkManager.getInstance(context).enqueueUniqueWork(
-                AUTO_EXPORT_WORK, ExistingWorkPolicy.APPEND_OR_REPLACE,
+                AUTO_EXPORT_WORK, policy,
                 OneTimeWorkRequestBuilder<HubExportWorker>().setInitialDelay(EXPORT_DELAY_MS, TimeUnit.MILLISECONDS)
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS).build(),
             )
@@ -67,7 +68,7 @@ object HubAutoExport {
     fun request(context: Context) {
         if (DatabaseVault.folder(context) == null) return
         try {
-            scheduler.enqueueAutoExport(context.applicationContext)
+            scheduler.enqueueAutoExport(context.applicationContext, AUTO_EXPORT_POLICY)
         } catch (error: Throwable) {
             DatabaseVault.recordAutoExportFailure(context, error)
             throw error
@@ -76,16 +77,20 @@ object HubAutoExport {
     fun requestIfDirty(context: Context) {
         if (dirty(context)) request(context)
     }
+
+    internal fun exportUntilClean(context: Context, isStopped: () -> Boolean): Boolean {
+        do {
+            if (isStopped()) return false
+            DatabaseVault.exportNow(context)
+        } while (dirty(context))
+        return true
+    }
 }
 
 class HubExportWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
     override fun doWork(): Result { return try {
         if (!HubAutoExport.dirty(applicationContext)) return Result.success()
-        do {
-            if (isStopped) return Result.retry()
-            DatabaseVault.exportNow(applicationContext)
-        } while (HubAutoExport.dirty(applicationContext))
-        Result.success()
+        if (HubAutoExport.exportUntilClean(applicationContext) { isStopped }) Result.success() else Result.retry()
     } catch (error: Exception) {
         DatabaseVault.recordAutoExportFailure(applicationContext, error)
         Result.retry()
