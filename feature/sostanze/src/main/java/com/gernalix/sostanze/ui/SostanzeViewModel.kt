@@ -13,6 +13,8 @@ import com.gernalix.sostanze.data.MacroEntity
 import com.gernalix.sostanze.data.InteractionTargetKinds
 import com.gernalix.sostanze.data.InteractionRuleEntity
 import com.gernalix.sostanze.data.InteractionTargetEntity
+import com.gernalix.sostanze.data.DoctorChoice
+import com.gernalix.sostanze.data.CostChoice
 import com.gernalix.sostanze.data.PrescriptionEntity
 import com.gernalix.sostanze.data.PrescriptionDraft
 import com.gernalix.sostanze.data.SostanzeDatabase
@@ -46,6 +48,8 @@ data class PrescriptionUi(
     val prescription: PrescriptionEntity,
     val substanceName: String,
     val nextRefillDate: LocalDate,
+    val doctorName: String? = null,
+    val costAmount: String? = null,
 )
 
 data class StockUi(
@@ -124,7 +128,8 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             .sortedBy { it.coverage.daysCovered ?: Double.MAX_VALUE }
         val nameById = substances.associateBy({ it.id }, { it.name })
         val substanceById = substances.associateBy { it.id }
-        val prescriptions = snapshot.prescriptions.map { prescription ->
+        val prescriptions = snapshot.prescriptionDetails.map { detail ->
+            val prescription = detail.prescription
             PrescriptionUi(
                 prescription = prescription,
                 substanceName = nameById[prescription.substanceId].orEmpty(),
@@ -132,6 +137,8 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                     prescription.prescriptionEpochDay,
                     prescription.refillEveryMonths
                 ),
+                doctorName = detail.doctorName,
+                costAmount = detail.costAmount,
             )
         }
         val refillPlans = prescriptions
@@ -275,6 +282,18 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             if (saved) refreshExport()
             onSaved(saved)
         }
+    }
+
+    fun prescriptionPrefill(name: String, onResult: (PrescriptionEntity?) -> Unit) {
+        viewModelScope.launch { onResult(repository.prescriptionPrefill(name)) }
+    }
+
+    fun doctorChoices(query: String, onResult: (List<DoctorChoice>) -> Unit) {
+        viewModelScope.launch { onResult(repository.doctorChoices(query)) }
+    }
+
+    fun costChoices(name: String, onResult: (List<CostChoice>) -> Unit) {
+        viewModelScope.launch { onResult(repository.recentMatchingCosts(name)) }
     }
 
     fun deletePrescription(id: Long) {

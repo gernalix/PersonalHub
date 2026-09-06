@@ -16,6 +16,7 @@ data class SostanzeSnapshot(
     val intakes: List<IntakeEventEntity> = emptyList(),
     val stockAdjustments: List<StockAdjustmentEntity> = emptyList(),
     val prescriptions: List<PrescriptionEntity> = emptyList(),
+    val prescriptionDetails: List<PrescriptionDetail> = emptyList(),
     val interactionRules: List<InteractionRuleEntity> = emptyList(),
     val interactionTargets: List<InteractionTargetEntity> = emptyList(),
     val notifications: List<NotificationStateEntity> = emptyList(),
@@ -49,7 +50,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
         dao.observeSubstances(),
         dao.observeRecentIntakes(),
         dao.observeStockAdjustments(),
-        dao.observePrescriptions(),
+        dao.observePrescriptionDetails(),
         dao.observeInteractionRules(),
         dao.observeInteractionTargets(),
         dao.observeNotificationState(),
@@ -61,7 +62,8 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             substances = values[0] as List<SubstanceEntity>,
             intakes = values[1] as List<IntakeEventEntity>,
             stockAdjustments = values[2] as List<StockAdjustmentEntity>,
-            prescriptions = values[3] as List<PrescriptionEntity>,
+            prescriptionDetails = values[3] as List<PrescriptionDetail>,
+            prescriptions = (values[3] as List<PrescriptionDetail>).map { it.prescription },
             interactionRules = values[4] as List<InteractionRuleEntity>,
             interactionTargets = values[5] as List<InteractionTargetEntity>,
             notifications = values[6] as List<NotificationStateEntity>,
@@ -312,6 +314,8 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
     }
 
     suspend fun prescriptionPrefill(substanceId: Long): PrescriptionEntity? = dao.latestPrescription(substanceId)
+    suspend fun prescriptionPrefill(name: String): PrescriptionEntity? =
+        dao.substancesByCanonicalName(canonicalName(name)).firstOrNull()?.let { dao.latestPrescription(it.id) }
     suspend fun doctorChoices(query: String): List<DoctorChoice> = dao.doctorChoices(query.trim())
     suspend fun doctorName(contactId: Long): String? = dao.doctorName(contactId)
     suspend fun recentMatchingCosts(name: String): List<CostChoice> = dao.recentMatchingCosts(name)

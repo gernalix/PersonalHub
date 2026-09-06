@@ -82,6 +82,8 @@ import com.gernalix.sostanze.data.SubstanceSaveOutcome
 import com.gernalix.sostanze.data.PrescriptionEntity
 import com.gernalix.sostanze.data.PrescriptionDraft
 import com.gernalix.sostanze.data.InteractionRuleEntity
+import com.gernalix.sostanze.data.DoctorChoice
+import com.gernalix.sostanze.data.CostChoice
 import com.gernalix.sostanze.domain.DoseButtonState
 import com.gernalix.sostanze.domain.DoseSection
 import com.gernalix.sostanze.domain.SostanzeEngine
@@ -303,6 +305,7 @@ fun SostanzeApp(viewModel: SostanzeViewModel = viewModel()) {
         PrescriptionCreateDialog(
             initialName = prescriptionInitialName,
             suggestions = state.substances.map { it.name }.distinct(),
+            viewModel = viewModel,
             onDismiss = { creatingPrescription = false },
             onSave = { draft -> viewModel.createPrescription(draft) { if (it) creatingPrescription = false } },
         )
@@ -734,6 +737,8 @@ private fun PrescriptionScreen(
                         Text("${row.prescription.remainingDoses}/${row.prescription.packageDoseCount} × ${row.prescription.doseMg.clean()} mg")
                         Text("${row.prescription.frequencyCount} / ${if (row.prescription.frequencyPeriod == "WEEK") "week" else "day"}")
                         Text(formatDateOnly(LocalDate.ofEpochDay(row.prescription.prescriptionEpochDay)))
+                        row.doctorName?.let { Text(it) }
+                        row.costAmount?.let { Text(it) }
                     }
                     IconButton(onClick = { onEdit(row) }, modifier = Modifier.size(48.dp)) { Text("✎") }
                     IconButton(onClick = { onDelete(row) }, modifier = Modifier.size(48.dp)) { Text("🗑") }
@@ -909,15 +914,25 @@ private fun StockAdjustDialog(substance: SubstanceEntity, onDismiss: () -> Unit,
 }
 
 @Composable
-private fun PrescriptionCreateDialog(initialName: String, suggestions: List<String>, onDismiss: () -> Unit, onSave: (PrescriptionDraft) -> Unit) {
+private fun PrescriptionCreateDialog(initialName: String, suggestions: List<String>, viewModel: SostanzeViewModel, onDismiss: () -> Unit, onSave: (PrescriptionDraft) -> Unit) {
     var name by remember(initialName) { mutableStateOf(initialName) }
     var packages by remember { mutableStateOf("") }
     var dose by remember { mutableStateOf("") }
     var frequency by remember { mutableStateOf("1") }
     var weekly by remember { mutableStateOf(false) }
-    var doctorId by remember { mutableStateOf("") }
-    var costId by remember { mutableStateOf("") }
+    var doctorQuery by remember { mutableStateOf("") }
+    var doctorId by remember { mutableStateOf<Long?>(null) }
+    var doctorChoices by remember { mutableStateOf<List<DoctorChoice>>(emptyList()) }
+    var costId by remember { mutableStateOf<Long?>(null) }
+    var costChoices by remember { mutableStateOf<List<CostChoice>>(emptyList()) }
     val today = LocalDate.now().toEpochDay()
+    LaunchedEffect(doctorQuery) {
+        if (doctorQuery.length >= 2) viewModel.doctorChoices(doctorQuery) { doctorChoices = it }
+        else doctorChoices = emptyList()
+    }
+    LaunchedEffect(name) {
+        if (name.isNotBlank()) viewModel.costChoices(name) { costChoices = it } else costChoices = emptyList()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.new_prescription)) },
@@ -925,7 +940,19 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) })
                 suggestions.filter { it.contains(name, true) && !it.equals(name, true) }.take(4).forEach { suggestion ->
-                    TextButton(onClick = { name = suggestion }) { Text(suggestion) }
+                    TextButton(onClick = {
+                        name = suggestion
+                        viewModel.prescriptionPrefill(suggestion) { latest ->
+                            latest?.let {
+                                packages = it.packageDoseCount.toString()
+                                dose = it.doseMg.clean()
+                                frequency = it.frequencyCount.toString()
+                                weekly = it.frequencyPeriod == "WEEK"
+                                doctorId = it.doctorContactId
+                                costId = it.financeTransactionId
+                            }
+                        }
+                    }) { Text(suggestion) }
                 }
                 OutlinedTextField(packages, { packages = it.filter(Char::isDigit) }, label = { Text("Package doses / remaining") })
                 OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) })
@@ -935,8 +962,18 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
                 Text("Prescription date: ${formatDateOnly(LocalDate.ofEpochDay(today))}")
                 val projected = SostanzeEngine.depletionDate(packages.toIntOrNull() ?: -1, frequency.toIntOrNull() ?: 0, if (weekly) "WEEK" else "DAY", LocalDate.now())
                 Text("Estimated depletion: ${projected?.let(::formatDateOnly) ?: "-"}")
-                OutlinedTextField(doctorId, { doctorId = it.filter(Char::isDigit) }, label = { Text("Doctor (People ID)") })
-                OutlinedTextField(costId, { costId = it.filter(Char::isDigit) }, label = { Text("Cost (Soldi transaction ID)") })
+                OutlinedTextField(doctorQuery, { doctorQuery = it; doctorId = null }, label = { Text("Doctor") })
+                doctorChoices.take(5).forEach { choice ->
+                    FilterChip(selected = doctorId == choice.id, onClick = { doctorId = choice.id; doctorQuery = choice.name }, label = { Text(choice.name) })
+                }
+                if (costChoices.isEmpty()) Text("No matching Soldi entries")
+                costChoices.take(5).forEach { choice ->
+                    FilterChip(
+                        selected = costId == choice.id,
+                        onClick = { costId = choice.id },
+                        label = { Column { Text(choice.title); Text(choice.occurredAt, style = MaterialTheme.typography.labelSmall) } },
+                    )
+                }
             }
         },
         confirmButton = {
@@ -944,7 +981,7 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
             val mg = dose.toDoubleOrNull()
             val count = frequency.toIntOrNull()
             Button(enabled = name.isNotBlank() && packageCount != null && packageCount > 0 && mg != null && mg > 0 && count != null && count > 0, onClick = {
-                onSave(PrescriptionDraft(name.trim(), packageCount!!, packageCount, mg!!, if (weekly) "WEEK" else "DAY", count!!, today, today, doctorId.toLongOrNull(), costId.toLongOrNull()))
+                onSave(PrescriptionDraft(name.trim(), packageCount!!, packageCount, mg!!, if (weekly) "WEEK" else "DAY", count!!, today, today, doctorId, costId))
             }) {
                 Text(stringResource(R.string.save))
             }

@@ -4,8 +4,13 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount
+import com.gernalix.personalhub.core.database.capsules.soldi.FinanceTitle
+import com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransaction
 import com.gernalix.sostanze.data.*
 import com.gernalix.sostanze.domain.*
+import com.supercontacts.app.data.local.ContactEntity
+import com.supercontacts.app.data.local.ContactFieldEntity
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -86,6 +91,73 @@ class SostanzeCampaignTest {
         repository.deletePrescription(first)
         assertNotNull(db.dao().prescriptionById(second))
         assertTrue(repository.recentMatchingCosts("aspirin").size <= 5)
+    }
+
+    @Test fun prescriptionPrefillUsesStablePeopleAndRecentSoldiIdentities() = database { db, repository ->
+        val now = System.currentTimeMillis()
+        val contactId = db.contactsDao().insertContact(ContactEntity(createdAt = now, updatedAt = now))
+        val nameFieldId = db.contactsDao().insertField(
+            ContactFieldEntity(
+                contactId = contactId,
+                fieldType = "name",
+                value = "Dr Alice",
+                addedAt = now,
+                isPrimary = true,
+            )
+        )
+        assertEquals(contactId, repository.doctorChoices("Alice").single().id)
+        db.contactsDao().updateField(
+            db.contactsDao().getFieldById(nameFieldId)!!.copy(value = "Dr Alice Renamed", editedAt = now + 1)
+        )
+        assertEquals("Dr Alice Renamed", repository.doctorChoices("Renamed").single().name)
+
+        val finance = db.financeDao()
+        finance.add(FinanceAccount(id = "qa-account", name = "QA", currency = "EUR"))
+        val titleId = finance.add(FinanceTitle(name = "Aspirin"))
+        val costIds = (1..6).map { index ->
+            finance.add(
+                FinanceTransaction(
+                    accountId = "qa-account",
+                    uuid = "qa-aspirin-$index",
+                    titleId = titleId,
+                    productId = null,
+                    amount = "-${index}.00",
+                    currency = "EUR",
+                    chainId = null,
+                    placeId = null,
+                    notes = "",
+                    occurredAt = "2026-09-0${index}T12:00:00Z",
+                    createdAt = "2026-09-0${index}T12:00:00Z",
+                    updatedAt = "2026-09-0${index}T12:00:00Z",
+                )
+            )
+        }
+        val choices = repository.recentMatchingCosts(" aspirin ")
+        assertEquals(5, choices.size)
+        assertEquals(costIds.last(), choices.first().id)
+        assertFalse(choices.any { it.id == costIds.first() })
+
+        val today = LocalDate.now().toEpochDay()
+        repository.createPrescription(
+            PrescriptionDraft(
+                name = "Aspirin",
+                packageDoseCount = 24,
+                doseMg = 150.0,
+                frequencyPeriod = "WEEK",
+                frequencyCount = 3,
+                orderEpochDay = today - 2,
+                prescriptionEpochDay = today - 3,
+                doctorContactId = contactId,
+                financeTransactionId = choices.first().id,
+            )
+        )
+        val prefill = repository.prescriptionPrefill(" ASPIRIN ")!!
+        assertEquals(24, prefill.packageDoseCount)
+        assertEquals(150.0, prefill.doseMg, 0.0)
+        assertEquals("WEEK", prefill.frequencyPeriod)
+        assertEquals(3, prefill.frequencyCount)
+        assertEquals(contactId, prefill.doctorContactId)
+        assertEquals(choices.first().id, prefill.financeTransactionId)
     }
 
     @Test fun editingSameInteractionTwicePersistsNewestValues() = database { db, repository ->

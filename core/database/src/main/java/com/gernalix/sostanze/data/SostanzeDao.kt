@@ -6,10 +6,17 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Embedded
+import androidx.room.ColumnInfo
 import kotlinx.coroutines.flow.Flow
 
 data class DoctorChoice(val id: Long, val name: String)
 data class CostChoice(val id: Long, val title: String, val amount: String, val occurredAt: String)
+data class PrescriptionDetail(
+    @Embedded val prescription: PrescriptionEntity,
+    @ColumnInfo(name = "doctor_name") val doctorName: String?,
+    @ColumnInfo(name = "cost_amount") val costAmount: String?,
+)
 
 @Dao
 interface SostanzeDao {
@@ -44,6 +51,9 @@ interface SostanzeDao {
 
     @Query("SELECT * FROM prescriptions ORDER BY prescription_epoch_day DESC, id DESC")
     fun observePrescriptions(): Flow<List<PrescriptionEntity>>
+
+    @Query("SELECT p.*, (SELECT value FROM contact_fields WHERE contact_id=p.doctor_contact_id AND field_type='name' ORDER BY is_primary DESC,position,id LIMIT 1) AS doctor_name, t.amount AS cost_amount FROM prescriptions p LEFT JOIN finance_transactions t ON t.id=p.finance_transaction_id ORDER BY p.prescription_epoch_day DESC,p.id DESC")
+    fun observePrescriptionDetails(): Flow<List<PrescriptionDetail>>
 
     @Query("SELECT * FROM interaction_rules ORDER BY id ASC")
     fun observeInteractionRules(): Flow<List<InteractionRuleEntity>>
