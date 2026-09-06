@@ -13,11 +13,22 @@ import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(AndroidJUnit4::class)
 class DatasetteSyncInstrumentedTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private fun emulator() = check(android.os.Build.MODEL.contains("sdk_gphone"))
+    private class CountingSyncScheduler : DatasetteSync.Scheduler {
+        val cancelledLegacy = AtomicInteger(0)
+        val recovery = AtomicInteger(0)
+        val sync = AtomicInteger(0)
+        val cancelledSync = AtomicInteger(0)
+        override fun cancelLegacyWork(context: Context) { cancelledLegacy.incrementAndGet() }
+        override fun enqueuePeriodicRecovery(context: Context) { recovery.incrementAndGet() }
+        override fun enqueueSync(context: Context) { sync.incrementAndGet() }
+        override fun cancelSync(context: Context) { cancelledSync.incrementAndGet() }
+    }
 
     /** Staged through private run-as stdin; no credentials in instrumentation arguments or output. */
     @Test fun configureFromPrivateRuntimeFile() {
@@ -29,6 +40,41 @@ class DatasetteSyncInstrumentedTest {
             assertTrue(DatasetteSettings.configuration(context).hasToken)
             assertFalse(File(context.noBackupFilesDir, "datasette.enc").readBytes().toString(Charsets.UTF_8).contains(value.getString("token")))
         } finally { file.delete() }
+    }
+
+    @Test fun journalMutationTriggersDatasetteWorkAndRecoveryWithoutPolling() {
+        emulator()
+        DatasetteSync.pauseUploads {
+            val scheduler = CountingSyncScheduler()
+            DatasetteSync.setSchedulerForTests(scheduler)
+            val preferences = DatabasePreferences(context, "datasette_trigger_qa")
+            val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+            fun pendingForNamespace(): Long = db.query(
+                "SELECT count(*) FROM hub_sync_pending WHERE table_name='hub_preferences' AND row_key=(SELECT ${SyncJournal.keyExpression(listOf("namespace"))} FROM hub_preferences WHERE namespace='datasette_trigger_qa')"
+            ).use { it.moveToFirst(); it.getLong(0) }
+            try {
+                db.execSQL("DELETE FROM hub_preferences WHERE namespace='datasette_trigger_qa'")
+                DatasetteSettings.setEnabled(context, false)
+                DatasetteSync.start(context)
+                assertEquals(1, scheduler.cancelledLegacy.get())
+                assertEquals(1, scheduler.recovery.get())
+                assertEquals(0, scheduler.sync.get())
+
+                DatasetteSync.save(context, "https://example.com", "personalhub", "changes", "qa-token")
+                DatasetteSettings.setEnabled(context, true)
+                preferences.edit().putInt("value", 1).commit()
+                assertEquals(1L, pendingForNamespace())
+                assertEquals(1, scheduler.sync.get())
+
+                repeat(20) { preferences.edit().putInt("value", it + 2).commit() }
+                assertEquals("Only one pending journal row should remain for the coalesced preference namespace", 1L, pendingForNamespace())
+                assertTrue("Each mutation may request work, but WorkManager KEEP owns job coalescing", scheduler.sync.get() <= 21)
+            } finally {
+                db.execSQL("DELETE FROM hub_preferences WHERE namespace='datasette_trigger_qa'")
+                DatasetteSettings.setEnabled(context, false)
+                DatasetteSync.resetSchedulerForTests()
+            }
+        }
     }
 
     @Test fun localFirstFullReplicaAllTypesConcurrentMutationRetryAndDeletion() {

@@ -2,7 +2,6 @@ package com.gernalix.personalhub.core.database
 
 import android.content.Context
 import androidx.work.*
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /** Durable generation tracking, coalesced WorkManager jobs, and process/reboot recovery. */
@@ -12,7 +11,7 @@ object HubAutoExport {
     internal const val RECOVERY_WORK = "personalhub-export-recovery"
     internal const val EXPORT_DELAY_MS = 1200L
 
-    internal interface Scheduler {
+    interface Scheduler {
         fun cancelLegacyWork(context: Context)
         fun enqueuePeriodicRecovery(context: Context)
         fun enqueueAutoExport(context: Context)
@@ -41,12 +40,12 @@ object HubAutoExport {
 
     @Volatile private var scheduler: Scheduler = WorkManagerScheduler
 
-    internal fun setSchedulerForTests(testScheduler: Scheduler) {
+    fun setSchedulerForTests(testScheduler: Scheduler) {
         scheduler = testScheduler
         started = false
     }
 
-    internal fun resetSchedulerForTests() {
+    fun resetSchedulerForTests() {
         scheduler = WorkManagerScheduler
         started = false
     }
@@ -57,10 +56,8 @@ object HubAutoExport {
         val app = context.applicationContext
         scheduler.cancelLegacyWork(app)
         scheduler.enqueuePeriodicRecovery(app)
-        // Raw timer commits and Room commits share persistent triggers. Polling also closes
-        // the commit-before-enqueue crash/race window; the periodic worker survives process death.
-        Executors.newSingleThreadScheduledExecutor { Thread(it, "personalhub-dirty-check").apply { isDaemon = true } }
-            .scheduleWithFixedDelay({ runCatching { if (dirty(app)) request(app); com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync.checkForChanges(app) } }, 0, 2, TimeUnit.SECONDS)
+        requestIfDirty(app)
+        com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync.checkForChanges(app)
     }
     fun dirty(context: Context): Boolean {
         if (DatabaseVault.folder(context) == null) return false

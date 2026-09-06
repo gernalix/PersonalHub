@@ -2,6 +2,7 @@ package com.gernalix.personalhub.core.database
 
 import android.content.ContentValues
 import android.content.Context
+import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import androidx.sqlite.db.*
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import java.util.concurrent.locks.ReentrantLock
@@ -24,7 +25,10 @@ object DatabaseGate {
         block()
     }
     fun afterMutation() {
-        if (privileged.get() != true) autoExportContext?.let { HubAutoExport.requestIfDirty(it) }
+        if (privileged.get() != true) autoExportContext?.let {
+            HubAutoExport.requestIfDirty(it)
+            DatasetteSync.checkForChanges(it)
+        }
     }
     fun begin(mutating: Boolean = true, block: () -> Unit) {
         lock.lock()

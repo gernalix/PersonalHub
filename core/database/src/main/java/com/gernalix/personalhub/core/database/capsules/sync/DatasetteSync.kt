@@ -16,9 +16,43 @@ import kotlin.concurrent.withLock
 /** One uploader; HTTP never holds the database writer gate. Pending rows survive retries/restarts. */
 object DatasetteSync {
     private const val WORK = "personalhub-datasette"
+    internal const val RECOVERY_WORK = "personalhub-datasette-recovery"
     private val uploads = ReentrantLock(true)
     // The short request-start gate makes OFF linearizable with starting a network request.
     private val requests = ReentrantLock(true)
+    interface Scheduler {
+        fun cancelLegacyWork(context: Context)
+        fun enqueuePeriodicRecovery(context: Context)
+        fun enqueueSync(context: Context)
+        fun cancelSync(context: Context)
+    }
+    private object WorkManagerScheduler : Scheduler {
+        override fun cancelLegacyWork(context: Context) {
+            listOf("mtt-remote-sync-immediate", "mtt-remote-sync-periodic").forEach { WorkManager.getInstance(context).cancelUniqueWork(it) }
+        }
+        override fun enqueuePeriodicRecovery(context: Context) {
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(RECOVERY_WORK, ExistingPeriodicWorkPolicy.KEEP,
+                PeriodicWorkRequestBuilder<DatasetteSyncWorker>(15, TimeUnit.MINUTES).setConstraints(network()).build())
+        }
+        override fun enqueueSync(context: Context) {
+            WorkManager.getInstance(context).enqueueUniqueWork(WORK, ExistingWorkPolicy.KEEP,
+                OneTimeWorkRequestBuilder<DatasetteSyncWorker>().setConstraints(network())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
+        }
+        override fun cancelSync(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(WORK)
+        }
+    }
+    @Volatile private var scheduler: Scheduler = WorkManagerScheduler
+
+    fun setSchedulerForTests(testScheduler: Scheduler) {
+        scheduler = testScheduler
+    }
+
+    fun resetSchedulerForTests() {
+        scheduler = WorkManagerScheduler
+    }
+
     fun <T> pauseUploads(block: () -> T): T = uploads.withLock(block)
     private fun db(context: Context) = PersonalHubDatabase.get(context).openHelper.writableDatabase
     private fun statusPrefs(context: Context) = context.getSharedPreferences("personalhub_sync_status", Context.MODE_PRIVATE)
@@ -28,7 +62,7 @@ object DatasetteSync {
     fun setEnabled(context: Context, enabled: Boolean) {
         requests.withLock { DatasetteSettings.setEnabled(context, enabled) }
         if (enabled) request(context) else {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK)
+            scheduler.cancelSync(context.applicationContext)
             statusPrefs(context).edit().putString("state", "idle").apply()
         }
     }
@@ -37,16 +71,14 @@ object DatasetteSync {
         request(context)
     }
     fun start(context: Context) {
-        listOf("mtt-remote-sync-immediate", "mtt-remote-sync-periodic").forEach { WorkManager.getInstance(context).cancelUniqueWork(it) }
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork("personalhub-datasette-recovery", ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<DatasetteSyncWorker>(15, TimeUnit.MINUTES).setConstraints(network()).build())
+        val app = context.applicationContext
+        scheduler.cancelLegacyWork(app)
+        scheduler.enqueuePeriodicRecovery(app)
         request(context)
     }
     fun request(context: Context) {
         if (!runCatching { DatasetteSettings.configuration(context).enabled }.getOrDefault(false)) return
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK, ExistingWorkPolicy.KEEP,
-            OneTimeWorkRequestBuilder<DatasetteSyncWorker>().setConstraints(network())
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
+        scheduler.enqueueSync(context.applicationContext)
     }
     fun checkForChanges(context: Context) {
         if (DatasetteSettings.configuration(context).enabled && (DatasetteSettings.needsFull(context) || pending(context) > 0)) request(context)

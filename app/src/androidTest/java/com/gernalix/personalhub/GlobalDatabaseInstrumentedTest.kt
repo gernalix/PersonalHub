@@ -14,11 +14,45 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Runs only on an emulator with an imported real-data copy and an explicit SAF test folder. */
 @RunWith(AndroidJUnit4::class)
 class GlobalDatabaseInstrumentedTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
+    private class CountingExportScheduler : HubAutoExport.Scheduler {
+        val cancelledLegacy = AtomicInteger(0)
+        val recovery = AtomicInteger(0)
+        val export = AtomicInteger(0)
+        override fun cancelLegacyWork(context: Context) { cancelledLegacy.incrementAndGet() }
+        override fun enqueuePeriodicRecovery(context: Context) { recovery.incrementAndGet() }
+        override fun enqueueAutoExport(context: Context) { export.incrementAndGet() }
+    }
+    private class MemoryExportPublisher : DatabaseVault.ExportPublisher {
+        val files = mutableMapOf<String, MemoryExportFile>()
+        override fun createTemporary(name: String): DatabaseVault.ExportFile = MemoryExportFile(name, this).also { files[name] = it }
+        override fun find(name: String): DatabaseVault.ExportFile? = files[name]
+        override fun writeFrom(source: File, target: DatabaseVault.ExportFile) {
+            (target as MemoryExportFile).bytes = source.readBytes()
+        }
+        override fun readTo(source: DatabaseVault.ExportFile, target: File) {
+            target.writeBytes((source as MemoryExportFile).bytes)
+        }
+    }
+    private class MemoryExportFile(private var displayName: String, private val owner: MemoryExportPublisher) : DatabaseVault.ExportFile {
+        var bytes = ByteArray(0)
+        override val name: String get() = displayName
+        override fun renameTo(displayName: String): Boolean {
+            owner.files.remove(this.displayName)
+            this.displayName = displayName
+            owner.files[displayName] = this
+            return true
+        }
+        override fun delete(): Boolean {
+            owner.files.remove(displayName)
+            return true
+        }
+    }
     private fun requireEmulatorOnly() {
         check(android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("sdk_gphone")) { "Mutation QA must run on the emulator" }
     }
@@ -35,6 +69,61 @@ class GlobalDatabaseInstrumentedTest {
     }
     private fun scalar(sql: String): Long = PersonalHubDatabase.get(context).openHelper.readableDatabase.query(sql).use { c -> assertTrue(c.moveToFirst()); c.getLong(0) }
     private fun generation() = scalar("SELECT generation FROM hub_generation WHERE id=1")
+    @Test fun roomAndTimerWritesScheduleAndProduceExportWithoutPolling() = runBlocking {
+        val scheduler = CountingExportScheduler()
+        val publisher = MemoryExportPublisher()
+        HubAutoExport.setSchedulerForTests(scheduler)
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+        val prefs = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
+        val previousFolder = DatabaseVault.folder(context)
+        val previousExportedGeneration = DatabaseVault.exportedGeneration(context)
+        val previousError = DatabaseVault.error(context)
+        val owner = PersonalHubDatabase.get(context)
+        val db = owner.openHelper.writableDatabase
+        prefs.edit().putString("tree_uri", "content://personalhub.test/export").putLong("exported_generation", generation()).remove("error").commit()
+        var contactId = 0L
+        try {
+            owner.withTransaction {
+                contactId = owner.contactsDao().insertContact(com.supercontacts.app.data.local.ContactEntity(publicId = "qa-export-trigger", createdAt = 1, updatedAt = 1))
+            }
+            val roomGeneration = generation()
+            assertEquals(1, scheduler.export.get())
+            assertTrue(DatabaseVault.exportNow(context))
+            assertEquals(roomGeneration, DatabaseVault.exportedGeneration(context))
+            assertTrue(publisher.files.getValue(PersonalHubDatabase.DB_NAME).bytes.isNotEmpty())
+
+            val beforeTimerExportRequests = scheduler.export.get()
+            DatabasePreferences(context, "qa_timer_export_trigger").edit().putInt("value", 1).commit()
+            assertTrue(scheduler.export.get() > beforeTimerExportRequests)
+            assertTrue(DatabaseVault.exportNow(context))
+            assertEquals(generation(), DatabaseVault.exportedGeneration(context))
+        } finally {
+            if (contactId != 0L) db.execSQL("DELETE FROM contacts WHERE id=?", arrayOf(contactId))
+            db.execSQL("DELETE FROM hub_preferences WHERE namespace='qa_timer_export_trigger'")
+            prefs.edit().apply {
+                if (previousFolder == null) remove("tree_uri") else putString("tree_uri", previousFolder)
+                putLong("exported_generation", previousExportedGeneration)
+                if (previousError == null) remove("error") else putString("error", previousError)
+            }.commit()
+            DatabaseVault.setExportPublisherFactoryForTests(null)
+            HubAutoExport.resetSchedulerForTests()
+        }
+    }
+    @Test fun cleanIdleStartupHasRecoveryButNoDirtyPollingThread() {
+        val scheduler = CountingExportScheduler()
+        HubAutoExport.setSchedulerForTests(scheduler)
+        try {
+            val before = Thread.getAllStackTraces().keys.count { it.name == "personalhub-dirty-check" }
+            HubAutoExport.start(context)
+            Thread.sleep(2500)
+            val after = Thread.getAllStackTraces().keys.count { it.name == "personalhub-dirty-check" }
+            assertEquals(1, scheduler.cancelledLegacy.get())
+            assertEquals(1, scheduler.recovery.get())
+            assertEquals(before, after)
+        } finally {
+            HubAutoExport.resetSchedulerForTests()
+        }
+    }
     private fun waitForExport(expectedGeneration: Long, label: String) {
         val deadline = System.currentTimeMillis() + 45_000
         var actual = -1L

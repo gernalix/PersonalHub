@@ -30,7 +30,7 @@ object DatabaseVault {
     internal fun setTransferHooksForTests(hooks: TransferHooks?) {
         transferHooks = hooks ?: noTransferHooks
     }
-    internal fun setExportPublisherFactoryForTests(factory: ((Context, Uri) -> ExportPublisher)?) {
+    fun setExportPublisherFactoryForTests(factory: ((Context, Uri) -> ExportPublisher)?) {
         exportPublisherFactory = factory ?: { context, uri -> DocumentFileExportPublisher(context, uri) }
     }
     internal fun setDirectorySyncForTests(sync: ((File) -> Unit)?) {
@@ -378,13 +378,13 @@ object DatabaseVault {
         fun beforeImportMarkerPublish(temp: File, final: File) = Unit
     }
 
-    internal interface ExportFile {
+    interface ExportFile {
         val name: String?
         fun renameTo(displayName: String): Boolean
         fun delete(): Boolean
     }
 
-    internal interface ExportPublisher {
+    interface ExportPublisher {
         fun createTemporary(name: String): ExportFile
         fun find(name: String): ExportFile?
         fun writeFrom(source: File, target: ExportFile)
