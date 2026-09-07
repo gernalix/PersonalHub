@@ -88,6 +88,7 @@ import com.example.multitimetracker.capsules.tags.ui.TagsScreen
 import com.example.multitimetracker.capsules.tags.state.TagsUiState
 import com.example.multitimetracker.capsules.now.ui.NowScreen
 import com.example.multitimetracker.capsules.quickevents.ui.QuickEventsScreen
+import com.example.multitimetracker.core.quickevent.QuickEventTarget
 import com.example.multitimetracker.capsules.chains.ui.ChainsScreen
 import com.example.multitimetracker.capsules.auditlog.ui.AuditLogScreen
 import com.example.multitimetracker.capsules.timeline.ui.TimelineScreen
@@ -160,6 +161,8 @@ fun AppRoot(
     vm: MainViewModel,
     hubSessionId: Long? = null,
     onHubSessionDismiss: () -> Unit = {},
+    pendingQuickEventTarget: QuickEventTarget? = null,
+    onPendingQuickEventTargetConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -204,7 +207,9 @@ fun AppRoot(
             if (state.isReadOnly) return@VarTabScaffold
             keepScreenOn.value = it
             AppRootSystemPrefs.setKeepScreenOn(context, it)
-        }
+        },
+        pendingQuickEventTarget = pendingQuickEventTarget,
+        onPendingQuickEventTargetConsumed = onPendingQuickEventTargetConsumed,
     )
     val hubSession by produceState<com.example.multitimetracker.model.SessionUi?>(null, hubSessionId) {
         value = hubSessionId?.let { id -> withContext(Dispatchers.IO) { DefaultSessionCore(context).readSessionById(id) } }
@@ -242,7 +247,9 @@ private fun VarTabScaffold(
     hideHoursIfZero: Boolean,
     onHideHoursIfZeroChange: (Boolean) -> Unit,
     keepScreenOn: Boolean,
-    onKeepScreenOnChange: (Boolean) -> Unit
+    onKeepScreenOnChange: (Boolean) -> Unit,
+    pendingQuickEventTarget: QuickEventTarget?,
+    onPendingQuickEventTargetConsumed: () -> Unit,
 ) {
     val tabState = remember { mutableStateOf(Tab.NOW) }
     var showSettings by remember { mutableStateOf(false) }
@@ -261,6 +268,9 @@ private fun VarTabScaffold(
 
     val focusTagIdState = rememberSaveable { mutableStateOf<Long?>(null) }
     val tab = tabState.value
+    LaunchedEffect(pendingQuickEventTarget) {
+        if (pendingQuickEventTarget != null) tabState.value = Tab.QUICK_EVENTS
+    }
     val isCloneBenchmark = remember { BuildConfig.APPLICATION_ID.endsWith(".devicetest") }
     val pendingTrace = remember { mutableStateOf<String?>(null) }
     val stateHolder = rememberSaveableStateHolder()
@@ -923,7 +933,9 @@ if (developerSurfaceEnabled && showDevReport) {
                             },
                             onAddLifePeriod = vm.sinceWhenCapsule::addLifePeriod,
                             showSeconds = showSeconds,
-                            hideHoursIfZero = hideHoursIfZero
+                            hideHoursIfZero = hideHoursIfZero,
+                            pendingWidgetTarget = pendingQuickEventTarget,
+                            onPendingWidgetTargetConsumed = onPendingQuickEventTargetConsumed,
                         )
                     }
                     Tab.TAGS -> stateHolder.SaveableStateProvider("tags") {

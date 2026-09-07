@@ -113,6 +113,19 @@
             android:theme="@style/Theme.MultiTimeTracker.Transparent" />
 
         <activity
+            android:name="com.example.multitimetracker.widget.QuickEventWidgetClickActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.MultiTimeTracker.Transparent" />
+
+        <activity
+            android:name="com.example.multitimetracker.widget.QuickEventWidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MultiTimeTracker" />
+
+        <activity
             android:name="com.gernalix.luoghi.MainActivity"
             android:exported="false"
             android:launchMode="singleTop"
@@ -235,6 +248,17 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/quick_task_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.example.multitimetracker.widget.QuickEventWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_event_widget_info" />
         </receiver>
 
         <receiver

@@ -348,6 +348,14 @@
     <string name="vuoi_eliminare_t_name">Eliminare il tag "%1$s"?</string>
     <string name="widget_quick_task_desc">Avvia una sessione rapida dalla home</string>
     <string name="widget_quick_task_name">Sessione rapida</string>
+    <string name="widget_quick_event_desc">Esegui un pulsante evento Timer scelto dalla home</string>
+    <string name="widget_quick_event_name">Evento Timer</string>
+    <string name="widget_quick_event_choose">Scegli un pulsante evento</string>
+    <string name="widget_quick_event_save">Salva widget</string>
+    <string name="widget_quick_event_empty">Nessun pulsante evento disponibile.</string>
+    <string name="widget_quick_event_configure">Scegli evento</string>
+    <string name="widget_quick_event_unavailable">Evento non disponibile. Riconfigura il widget.</string>
+    <string name="widget_quick_event_untitled">Evento senza titolo</string>
     <string name="diagnostics_compare_tag_totals">Diagnostica: confronta totali tag</string>
     <string name="diagnostics_title">Report app</string>
     <string name="diagnostics_copy_and_close">Copia e chiudi</string>

@@ -84,6 +84,7 @@ import com.example.multitimetracker.capsules.quickevents.controller.QuickEventsC
 import com.example.multitimetracker.capsules.quickevents.core.quickEventSinceWhenActionEnabled
 import com.example.multitimetracker.capsules.quickevents.core.quickEventSinceWhenDraft
 import com.example.multitimetracker.capsules.quickevents.state.QuickEventsUiState
+import com.example.multitimetracker.core.quickevent.QuickEventTarget
 import com.example.multitimetracker.capsules.sincewhen.public.LifePeriodEditorDialog
 import com.example.multitimetracker.model.LifePeriodDisplayUnit
 import com.example.multitimetracker.model.QuickEventDefaults
@@ -115,6 +116,8 @@ fun QuickEventsScreen(
     onAddLifePeriod: (String, String, Long, Long?, Long, Set<Long>, Set<LifePeriodDisplayUnit>) -> Unit,
     showSeconds: Boolean,
     hideHoursIfZero: Boolean,
+    pendingWidgetTarget: QuickEventTarget? = null,
+    onPendingWidgetTargetConsumed: () -> Unit = {},
 ) {
     val state by capsule.uiState.collectAsState()
     val context = LocalContext.current
@@ -149,6 +152,24 @@ fun QuickEventsScreen(
     var creatingLifePeriodFromEntry by remember { mutableStateOf<QuickEventEntry?>(null) }
     var customTemplate by remember { mutableStateOf<QuickEventTemplate?>(null) }
     var customMacro by remember { mutableStateOf<QuickEventMacro?>(null) }
+
+    LaunchedEffect(pendingWidgetTarget, state.quickEventTemplates, state.quickEventMacros) {
+        when (val target = pendingWidgetTarget) {
+            is QuickEventTarget.Template -> {
+                state.quickEventTemplates.firstOrNull { it.id == target.templateId && it.deletedAtMs == null && !it.isArchived }?.let {
+                    customTemplate = it
+                    onPendingWidgetTargetConsumed()
+                }
+            }
+            is QuickEventTarget.Macro -> {
+                state.quickEventMacros.firstOrNull { it.id == target.macroId && it.deletedAtMs == null && !it.isArchived }?.let {
+                    customMacro = it
+                    onPendingWidgetTargetConsumed()
+                }
+            }
+            null -> Unit
+        }
+    }
 
     val templates = remember(state.quickEventTemplates, searchQuery, filterTagIds, visibleTags, showArchived) {
         QuickEventFilters.filterTemplates(state.quickEventTemplates, visibleTags, searchQuery, filterTagIds, showArchived)

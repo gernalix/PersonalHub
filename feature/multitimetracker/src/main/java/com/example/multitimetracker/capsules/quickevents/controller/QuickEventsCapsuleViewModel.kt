@@ -10,6 +10,9 @@ import com.example.multitimetracker.capsules.quickevents.state.QuickEventsUiStat
 import com.example.multitimetracker.capsules.system.CapsuleRuntimeChange
 import com.example.multitimetracker.capsules.system.CapsuleRuntimeParticipant
 import com.example.multitimetracker.capsules.system.QuickEventsCapsuleAccess
+import com.example.multitimetracker.core.quickevent.QuickEventExecutionResult
+import com.example.multitimetracker.core.quickevent.QuickEventExecutor
+import com.example.multitimetracker.core.quickevent.QuickEventTarget
 import com.example.multitimetracker.model.QuickEventDefaults
 import com.example.multitimetracker.model.QuickEventFieldDefinition
 import com.example.multitimetracker.model.QuickEventFieldValue
@@ -180,30 +183,11 @@ class QuickEventsCapsuleViewModel(
         val ctx = access.appContextOrNull() ?: return
         access.launchIo("create quick event from templateId=$templateId") {
             runCatching {
-                val quickEvents = access.quickEventCore(ctx)
-                val template = quickEvents.readTemplateById(templateId) ?: return@runCatching
-                val eventTs = timestampMs ?: System.currentTimeMillis()
-                val fieldDefinitions = quickEvents.readFieldDefinitionsForTemplate(template.id)
-                val entryId = quickEvents.insertEntry(
-                    templateId = template.id,
-                    macroId = null,
-                    title = template.title,
-                    timestampMs = eventTs,
-                    tagIds = template.tagIds,
-                    fieldValues = QuickEventDefaults.defaultValuesFor(0L, fieldDefinitions),
-                )
-                access.logUserEvent(
-                    action = "QUICK_EVENT_ENTRY_CREATE",
-                    entityType = "QUICK_EVENT_ENTRY",
-                    entityId = entryId,
-                    summary = ctx.getString(R.string.audit_quick_event_entry_created, template.title.ifBlank { entryId.toString() }),
-                    payload = JSONObject().put("templateId", templateId).put("entryId", entryId).put("timestampMs", eventTs),
-                    undoable = true
-                )
-                refreshFromDb(ctx)
-                access.persist()
-                access.scheduleAutoBackup()
-                access.showEntryRecorded(ctx)
+                val result = quickEventExecutor(ctx).execute(QuickEventTarget.Template(templateId), timestampMs ?: System.currentTimeMillis())
+                if (result is QuickEventExecutionResult.Executed) {
+                    refreshFromDb(ctx)
+                    access.showEntryRecorded(ctx)
+                }
             }.onFailure { err ->
                 Log.e("QuickEventsCapsule", "createEntryFromTemplate failed (templateId=$templateId)", err)
                 access.showWriteFailed(ctx)
@@ -489,44 +473,29 @@ class QuickEventsCapsuleViewModel(
         val ctx = access.appContextOrNull() ?: return
         access.launchIo("create quick event macro entries macroId=$macroId") {
             runCatching {
-                val quickEvents = access.quickEventCore(ctx)
-                val macro = quickEvents.readMacroById(macroId) ?: return@runCatching
-                val actions = quickEvents.readMacroActionsForMacro(macroId)
-                val templateIds = actions.map { it.templateId }.toSet()
-                val byTemplateId = quickEvents.readTemplatesByIds(templateIds).associateBy { it.id }
-                val fieldsByTemplate = quickEvents.readFieldDefinitionsForTemplates(templateIds).groupBy { it.templateId }
-                val eventTs = timestampMs ?: System.currentTimeMillis()
-                var created = 0
-                actions.forEach { action ->
-                    val template = byTemplateId[action.templateId] ?: return@forEach
-                    quickEvents.insertEntry(
-                        templateId = template.id,
-                        macroId = macroId,
-                        title = template.title,
-                        timestampMs = eventTs,
-                        tagIds = template.tagIds + macro.tagIds,
-                        fieldValues = QuickEventDefaults.defaultValuesFor(0L, fieldsByTemplate[template.id].orEmpty())
-                    )
-                    created += 1
+                val result = quickEventExecutor(ctx).execute(QuickEventTarget.Macro(macroId), timestampMs ?: System.currentTimeMillis())
+                if (result is QuickEventExecutionResult.Executed) {
+                    refreshFromDb(ctx)
+                    access.showMacroRecorded(ctx, result.entryIds.size)
                 }
-                access.logUserEvent(
-                    action = "QUICK_EVENT_MACRO_RUN",
-                    entityType = "QUICK_EVENT_MACRO",
-                    entityId = macroId,
-                    summary = macro.title.ifBlank { macroId.toString() },
-                    payload = JSONObject().put("macroId", macroId).put("entries", created).put("timestampMs", eventTs),
-                    undoable = true
-                )
-                refreshFromDb(ctx)
-                access.persist()
-                access.scheduleAutoBackup()
-                access.showMacroRecorded(ctx, created)
             }.onFailure { err ->
                 Log.e("QuickEventsCapsule", "createEntriesFromMacro failed (macroId=$macroId)", err)
                 access.showWriteFailed(ctx)
             }
         }
     }
+
+    private fun quickEventExecutor(ctx: android.content.Context): QuickEventExecutor =
+        QuickEventExecutor(
+            core = access.quickEventCore(ctx),
+            audit = { action, entityType, entityId, summary, payload ->
+                access.logUserEvent(action, entityType, entityId, summary, payload, true)
+            },
+            afterSuccessfulWrite = {
+                access.persist()
+                access.scheduleAutoBackup()
+            }
+        )
 
     fun addTag(name: String) = access.addTag(name)
 

@@ -53,6 +53,8 @@ import com.example.multitimetracker.persistence.SnapshotSqlite
 import com.example.multitimetracker.perf.StartupPerfTrace
 import com.example.multitimetracker.ui.AppRoot
 import com.example.multitimetracker.ui.theme.MultiTimeTrackerTheme
+import com.example.multitimetracker.core.quickevent.QuickEventTarget
+import com.example.multitimetracker.widget.QuickEventWidgetDeepLink
 import com.example.multitimetracker.widget.QuickSessionWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,11 +76,13 @@ internal fun shouldRenderFirstRunSetupPrompt(
 @OptIn(CapsuleWriteApi::class)
 class MainActivity : ComponentActivity() {
     private var hubSessionId by mutableStateOf<Long?>(null)
+    private var pendingQuickEventTarget by mutableStateOf<QuickEventTarget?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         StartupPerfTrace.activityOnCreateStart()
         super.onCreate(savedInstanceState)
         hubSessionId = intent.hubSessionId()
+        pendingQuickEventTarget = QuickEventWidgetDeepLink.requestFrom(intent)
 
         StartupPerfTrace.section("main_activity_on_create") {
             // v138 Capsule Audit Engine: emit known capsule boundary leaks in Logcat (debug only)
@@ -86,7 +90,12 @@ class MainActivity : ComponentActivity() {
             enableEdgeToEdge()
             setContent {
                 MultiTimeTrackerTheme {
-                    MultiTimeTrackerApp(hubSessionId = hubSessionId, onHubSessionDismiss = { hubSessionId = null })
+                    MultiTimeTrackerApp(
+                        hubSessionId = hubSessionId,
+                        onHubSessionDismiss = { hubSessionId = null },
+                        pendingQuickEventTarget = pendingQuickEventTarget,
+                        onPendingQuickEventTargetConsumed = { pendingQuickEventTarget = null }
+                    )
                 }
             }
         }
@@ -96,6 +105,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         hubSessionId = intent.hubSessionId()
+        pendingQuickEventTarget = QuickEventWidgetDeepLink.requestFrom(intent)
     }
 }
 
@@ -107,6 +117,8 @@ private fun Intent?.hubSessionId(): Long? = this?.data
 private fun MultiTimeTrackerApp(
     hubSessionId: Long?,
     onHubSessionDismiss: () -> Unit,
+    pendingQuickEventTarget: QuickEventTarget?,
+    onPendingQuickEventTargetConsumed: () -> Unit,
     vm: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -644,6 +656,8 @@ DisposableEffect(Unit) {
         vm = vm,
         hubSessionId = hubSessionId,
         onHubSessionDismiss = onHubSessionDismiss,
+        pendingQuickEventTarget = pendingQuickEventTarget,
+        onPendingQuickEventTargetConsumed = onPendingQuickEventTargetConsumed,
     )
 }
 

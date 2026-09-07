@@ -352,6 +352,14 @@
     <string name="vuoi_eliminare_t_name">Delete tag “%1$s”?</string>
     <string name="widget_quick_task_desc">Start a quick session from the home screen</string>
     <string name="widget_quick_task_name">Quick session</string>
+    <string name="widget_quick_event_desc">Run a selected Timer event button from the home screen</string>
+    <string name="widget_quick_event_name">Timer event</string>
+    <string name="widget_quick_event_choose">Choose an event button</string>
+    <string name="widget_quick_event_save">Save widget</string>
+    <string name="widget_quick_event_empty">No event buttons are available.</string>
+    <string name="widget_quick_event_configure">Choose event</string>
+    <string name="widget_quick_event_unavailable">Event unavailable. Reconfigure widget.</string>
+    <string name="widget_quick_event_untitled">Untitled event</string>
     <string name="diagnostics_compare_tag_totals">Diagnostics: compare tag totals</string>
     <string name="diagnostics_title">App report</string>
     <string name="diagnostics_copy_and_close">Copy &amp; close</string>
