@@ -72,6 +72,14 @@ class SessionContextEditorState internal constructor(
     }
 }
 
+internal suspend fun saveContextForCreatedTimerSession(
+    createdSession: com.example.multitimetracker.model.SessionUi,
+    saveContext: suspend (Long) -> Unit,
+) {
+    require(createdSession.id > 0L) { "Timer session must be persisted before saving Context" }
+    saveContext(createdSession.id)
+}
+
 @Composable
 fun rememberSessionContextEditorState(sessionId: Long): SessionContextEditorState {
     val state = rememberSaveable(sessionId, saver = SessionContextEditorState.Saver) { SessionContextEditorState(emptySet(), null, "", "") }

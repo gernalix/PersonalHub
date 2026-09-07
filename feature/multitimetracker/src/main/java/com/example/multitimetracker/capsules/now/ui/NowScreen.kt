@@ -225,13 +225,13 @@ fun NowScreen(
                     referenceNowMs = effectiveTime.nowMs,
                     readOnly = state.isReadOnly,
                     onSaveMeta = { id, newTitle, newTagIds ->
-                        if (editingSessionIsNew) {
-                            val draft = editingSession ?: s
-                            capsule.createNewSession(newTitle, draft.startMs, newTagIds)
-                        } else {
+                        if (!editingSessionIsNew) {
                             capsule.updateSession(id, newTitle, newTagIds)
                         }
                         editingSession = null
+                    },
+                    onCreateNewSession = { newTitle, startMs, newTagIds, onCreated ->
+                        capsule.createNewSession(newTitle, startMs, newTagIds, onCreated)
                     },
                     onSaveTimes = { id, startMs, endMsOrNull ->
                         if (editingSessionIsNew) {

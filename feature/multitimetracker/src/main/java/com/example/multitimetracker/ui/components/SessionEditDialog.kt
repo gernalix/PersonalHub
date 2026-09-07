@@ -104,6 +104,7 @@ fun SessionEditDialog(
     readOnly: Boolean = false,
     onAddTag: (String) -> Unit,
     onSaveMeta: (Long, String, Set<Long>) -> Unit,
+    onCreateNewSession: (String, Long, Set<Long>, (SessionUi) -> Unit) -> Unit = { _, _, _, _ -> },
     onSaveTimes: (Long, Long, Long?) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit
@@ -233,15 +234,30 @@ fun SessionEditDialog(
                             isSavingMeta = true
                             dismissKeyboard()
                             saveScope.launch {
-                                runCatching { contextEditor.save(session.id) }
-                                    .onSuccess {
-                                        onSaveMeta(session.id, name, selectedEffective)
-                                        onDismiss()
+                                if (isNewSession) {
+                                    onCreateNewSession(name, session.startMs, selectedEffective) { createdSession ->
+                                        saveScope.launch {
+                                            runCatching {
+                                                saveContextForCreatedTimerSession(createdSession, contextEditor::save)
+                                            }.onSuccess {
+                                                onDismiss()
+                                            }.onFailure {
+                                                isSavingMeta = false
+                                                Toast.makeText(context, it.message ?: context.getString(R.string.hub_context_save_failed), Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     }
-                                    .onFailure {
-                                        isSavingMeta = false
-                                        Toast.makeText(context, it.message ?: context.getString(R.string.hub_context_save_failed), Toast.LENGTH_SHORT).show()
-                                    }
+                                } else {
+                                    runCatching { contextEditor.save(session.id) }
+                                        .onSuccess {
+                                            onSaveMeta(session.id, name, selectedEffective)
+                                            onDismiss()
+                                        }
+                                        .onFailure {
+                                            isSavingMeta = false
+                                            Toast.makeText(context, it.message ?: context.getString(R.string.hub_context_save_failed), Toast.LENGTH_SHORT).show()
+                                        }
+                                }
                             }
                         },
                         enabled = !isSavingMeta && !readOnly
