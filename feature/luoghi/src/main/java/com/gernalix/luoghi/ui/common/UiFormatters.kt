@@ -98,6 +98,20 @@ fun localizedDuration(durationMs: Long): String {
 }
 
 @Composable
+fun localizedDistance(distanceMeters: Long): String {
+    val configuration = LocalConfiguration.current
+    val locale = configuration.locales[0] ?: Locale.getDefault()
+    return remember(distanceMeters, locale) {
+        val format = NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 1 }
+        if (distanceMeters >= 1_000L) {
+            format.format(distanceMeters / 1_000.0) + " km"
+        } else {
+            NumberFormat.getIntegerInstance(locale).format(distanceMeters.coerceAtLeast(0L)) + " m"
+        }
+    }
+}
+
+@Composable
 fun visitCount(count: Int): String = pluralStringResource(R.plurals.visits, count, count)
 
 @Composable

@@ -17,10 +17,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,9 +48,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gernalix.luoghi.capsules.mapviewer.MapViewerCapsule
+import com.gernalix.luoghi.capsules.geofence.PlaceGeofenceAction
 import com.gernalix.luoghi.capsules.places.PlaceListUiModel
 import com.gernalix.luoghi.export.BackupFolderStore
+import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
 import com.gernalix.luoghi.ui.history.HistoryScreen
+import com.gernalix.luoghi.ui.history.formatHistoryTimestampForInput
+import com.gernalix.luoghi.ui.history.parseHistoryTimestampInput
 import com.gernalix.luoghi.ui.backup.RestoreBackupDialog
 import com.gernalix.luoghi.ui.home.HomeScreen
 import com.gernalix.luoghi.ui.place.PlaceDetailScreen
@@ -187,6 +194,8 @@ private fun LuoghiNavigation(
     var editorOpen by rememberSaveable { mutableStateOf(value = false) }
     var globalStatsOpen by rememberSaveable { mutableStateOf(value = false) }
     var pendingDeletePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var manualVisitPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var geofencePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     val historyListState: LazyListState = rememberLazyListState()
     val destination = runCatching { AppDestination.valueOf(destinationName) }.getOrDefault(AppDestination.HOME)
     val selectedItem = selectedPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
@@ -254,6 +263,8 @@ private fun LuoghiNavigation(
             onPlaceHistory = { openHistory(it.place.uuid) },
             onPlaceMap = ::showMap,
             onDeletePlace = { pendingDeletePlaceId = it.place.uuid },
+            onSortPlaces = vm::updatePlaceSort,
+            onRefreshLocation = vm::refreshListLocation,
             onGlobalMap = {
                 context.startActivity(MapViewerCapsule.globalMapIntent(context, state.places))
             },
@@ -280,6 +291,9 @@ private fun LuoghiNavigation(
                 onHistory = {
                     openHistory(item.place.uuid)
                 },
+                onCheckInNow = { vm.manualCheckIn(item.place.uuid) },
+                onAddManualVisit = { manualVisitPlaceId = item.place.uuid },
+                onGeofenceSettings = { geofencePlaceId = item.place.uuid },
             )
         }
         AppDestination.HISTORY -> {
@@ -293,6 +307,7 @@ private fun LuoghiNavigation(
                 isLoading = !state.dataLoaded,
                 filterPlaceId = historyFilterPlaceId,
                 filterPlaceName = filterName,
+                places = state.places,
                 initialVisitId = initialVisitId,
                 listState = historyListState,
                 onBack = {
@@ -379,6 +394,185 @@ private fun LuoghiNavigation(
                 TextButton(onClick = { pendingDeletePlaceId = null }) { Text(stringResource(R.string.cancel)) }
             },
         )
+    }
+    manualVisitPlaceId?.let { placeId ->
+        ManualVisitDialog(
+            onDismiss = { manualVisitPlaceId = null },
+            onSave = { checkInAt, checkOutAt, notes ->
+                vm.addManualVisit(placeId, checkInAt, checkOutAt, notes)
+                manualVisitPlaceId = null
+            },
+        )
+    }
+    geofencePlaceId?.let { placeId ->
+        val place = state.places.firstOrNull { it.uuid == placeId }
+        if (place != null) {
+            GeofenceSettingsDialog(
+                initial = state.geofenceConfigs[placeId] ?: PlaceGeofenceConfigEntity(placeUuid = placeId),
+                onDismiss = { geofencePlaceId = null },
+                onSave = {
+                    vm.saveGeofenceConfig(it)
+                    geofencePlaceId = null
+                },
+            )
+        }
+    }
+    state.geofenceMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = vm::clearGeofenceMessage,
+            title = { Text(stringResource(R.string.geofence_settings)) },
+            text = {
+                Text(
+                    stringResource(
+                        when (message) {
+                            GeofenceMessage.SAVED -> R.string.geofence_saved
+                            GeofenceMessage.PERMISSION_MISSING -> R.string.geofence_permission_missing
+                        }
+                    )
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::clearGeofenceMessage) { Text(stringResource(R.string.close)) } },
+        )
+    }
+}
+
+@Composable
+private fun ManualVisitDialog(
+    onDismiss: () -> Unit,
+    onSave: (Long, Long?, String?) -> Unit,
+) {
+    var checkInText by rememberSaveable {
+        mutableStateOf(formatHistoryTimestampForInput(System.currentTimeMillis()))
+    }
+    var checkOutText by rememberSaveable {
+        mutableStateOf(formatHistoryTimestampForInput(System.currentTimeMillis() + 3_600_000L))
+    }
+    var notesText by rememberSaveable { mutableStateOf("") }
+    var parseFailed by rememberSaveable { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.place_add_past_visit)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = checkInText,
+                    onValueChange = {
+                        checkInText = it
+                        parseFailed = false
+                    },
+                    label = { Text(stringResource(R.string.manual_visit_check_in)) },
+                    supportingText = { Text(stringResource(R.string.history_timestamp_hint)) },
+                    isError = parseFailed,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = checkOutText,
+                    onValueChange = {
+                        checkOutText = it
+                        parseFailed = false
+                    },
+                    label = { Text(stringResource(R.string.manual_visit_check_out)) },
+                    supportingText = { Text(stringResource(R.string.manual_visit_open_hint)) },
+                    isError = parseFailed,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = notesText,
+                    onValueChange = { notesText = it },
+                    label = { Text(stringResource(R.string.notes)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val checkIn = parseHistoryTimestampInput(checkInText)
+                val checkOut = checkOutText.trim().takeIf { it.isNotEmpty() }?.let { parseHistoryTimestampInput(it) }
+                if (checkIn == null || (checkOutText.isNotBlank() && checkOut == null)) {
+                    parseFailed = true
+                } else {
+                    onSave(checkIn, checkOut, notesText)
+                }
+            }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun GeofenceSettingsDialog(
+    initial: PlaceGeofenceConfigEntity,
+    onDismiss: () -> Unit,
+    onSave: (PlaceGeofenceConfigEntity) -> Unit,
+) {
+    var enabled by rememberSaveable(initial.placeUuid) { mutableStateOf(initial.enabled) }
+    var enterEnabled by rememberSaveable(initial.placeUuid) { mutableStateOf(initial.enterEnabled) }
+    var exitEnabled by rememberSaveable(initial.placeUuid) { mutableStateOf(initial.exitEnabled) }
+    var enterAutomatic by rememberSaveable(initial.placeUuid) {
+        mutableStateOf(initial.enterAction == PlaceGeofenceAction.AUTOMATIC_VISIT.name)
+    }
+    var exitAutomatic by rememberSaveable(initial.placeUuid) {
+        mutableStateOf(initial.exitAction == PlaceGeofenceAction.AUTOMATIC_VISIT.name)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.geofence_settings)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                CheckRow(checked = enabled, label = stringResource(R.string.geofence_enabled), onCheckedChange = { enabled = it })
+                Text(
+                    stringResource(R.string.geofence_background_disclosure),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CheckRow(checked = enterEnabled, label = stringResource(R.string.geofence_enter_enabled), onCheckedChange = { enterEnabled = it })
+                ActionRow(
+                    automatic = enterAutomatic,
+                    onAutomaticChange = { enterAutomatic = it },
+                )
+                CheckRow(checked = exitEnabled, label = stringResource(R.string.geofence_exit_enabled), onCheckedChange = { exitEnabled = it })
+                ActionRow(
+                    automatic = exitAutomatic,
+                    onAutomaticChange = { exitAutomatic = it },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(
+                    initial.copy(
+                        enabled = enabled,
+                        enterEnabled = enterEnabled,
+                        exitEnabled = exitEnabled,
+                        enterAction = if (enterAutomatic) PlaceGeofenceAction.AUTOMATIC_VISIT.name else PlaceGeofenceAction.NOTIFY.name,
+                        exitAction = if (exitAutomatic) PlaceGeofenceAction.AUTOMATIC_VISIT.name else PlaceGeofenceAction.NOTIFY.name,
+                    )
+                )
+            }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun CheckRow(checked: Boolean, label: String, onCheckedChange: (Boolean) -> Unit) {
+    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Text(label)
+    }
+}
+
+@Composable
+private fun ActionRow(automatic: Boolean, onAutomaticChange: (Boolean) -> Unit) {
+    Column {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            RadioButton(selected = !automatic, onClick = { onAutomaticChange(false) })
+            Text(stringResource(R.string.geofence_action_notify))
+        }
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            RadioButton(selected = automatic, onClick = { onAutomaticChange(true) })
+            Text(stringResource(R.string.geofence_action_automatic))
+        }
     }
 }
 

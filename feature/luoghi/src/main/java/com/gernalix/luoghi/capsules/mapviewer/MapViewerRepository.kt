@@ -10,6 +10,7 @@ class MapViewerRepository(private val dao: PlaceDao) {
         markerMode: MapMarkerMode,
         uuids: List<String>,
         labels: List<String>,
+        currentLocation: MapCurrentLocation? = null,
     ): MapViewerModel {
         val places = if (uuids.isEmpty()) {
             dao.placesWithCoordinatesBlocking(MAX_MAP_PLACES)
@@ -28,6 +29,7 @@ class MapViewerRepository(private val dao: PlaceDao) {
             markerMode = markerMode,
             markers = markers,
             missingCoordinateCount = missing,
+            currentLocation = currentLocation,
         )
     }
 

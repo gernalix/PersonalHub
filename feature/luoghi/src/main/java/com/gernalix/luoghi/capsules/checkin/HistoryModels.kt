@@ -7,6 +7,7 @@ enum class HistoryValidationError {
     INVALID_TIMESTAMP,
     CHECKOUT_BEFORE_CHECKIN,
     OVERLAP,
+    DUPLICATE,
     ORPHAN_CHECKOUT,
     SESSION_NOT_FOUND,
     NOTHING_TO_UNDO,
@@ -71,11 +72,7 @@ object HistorySessionCalculator {
                 )
             }
 
-        val overlapSessions = sessions
-            .filter { it.checkIn != null }
-            .groupBy { it.placeId }
-            .values
-            .flatMap { markOverlaps(it, nowMs) }
+        val overlapSessions = markOverlaps(sessions.filter { it.checkIn != null }, nowMs)
             .associateBy { it.sessionUuid }
 
         return sessions
@@ -87,6 +84,9 @@ object HistorySessionCalculator {
         sessions(events, nowMs).any {
             it.placeId == placeId && HistorySessionAnomaly.OVERLAP in it.anomalies
         }
+
+    fun hasAnyOverlap(events: List<PlaceEventEntity>, nowMs: Long): Boolean =
+        sessions(events, nowMs).any { HistorySessionAnomaly.OVERLAP in it.anomalies }
 
     private fun markOverlaps(sessions: List<PlaceHistorySession>, nowMs: Long): List<PlaceHistorySession> {
         val mutable = sessions.associateBy { it.sessionUuid }.toMutableMap()

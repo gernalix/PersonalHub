@@ -212,3 +212,48 @@ data class PlaceLinkEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
 )
+
+@Entity(
+    tableName = "place_geofence_configs",
+    foreignKeys = [
+        ForeignKey(
+            entity = PlaceEntity::class,
+            parentColumns = ["uuid"],
+            childColumns = ["place_uuid"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("place_uuid", unique = true),
+        Index("enabled"),
+        Index("updated_at")
+    ]
+)
+data class PlaceGeofenceConfigEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "place_uuid") val placeUuid: String,
+    val enabled: Boolean = false,
+    @ColumnInfo(name = "enter_enabled") val enterEnabled: Boolean = true,
+    @ColumnInfo(name = "exit_enabled") val exitEnabled: Boolean = true,
+    @ColumnInfo(name = "enter_action") val enterAction: String = "NOTIFY",
+    @ColumnInfo(name = "exit_action") val exitAction: String = "NOTIFY",
+    @ColumnInfo(name = "last_enter_at") val lastEnterAt: Long? = null,
+    @ColumnInfo(name = "last_exit_at") val lastExitAt: Long? = null,
+    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "place_geofence_transition_log",
+    indices = [
+        Index(value = ["place_uuid", "transition", "bucket"], unique = true),
+        Index("created_at")
+    ]
+)
+data class PlaceGeofenceTransitionLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "place_uuid") val placeUuid: String,
+    val transition: String,
+    val bucket: Long,
+    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
+)

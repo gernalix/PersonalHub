@@ -171,7 +171,7 @@ fun HistoryEventEditDialog(
     onDismiss: () -> Unit,
     onSave: (Long, String?) -> Unit,
 ) {
-    var timestampText by rememberSaveable(event.id) { mutableStateOf(formatHistoryTimestamp(event.timestamp)) }
+    var timestampText by rememberSaveable(event.id) { mutableStateOf(formatHistoryTimestampForInput(event.timestamp)) }
     var notesText by rememberSaveable(event.id) { mutableStateOf(event.notes.orEmpty()) }
     var parseFailed by rememberSaveable(event.id) { mutableStateOf(false) }
 
@@ -206,7 +206,7 @@ fun HistoryEventEditDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                val timestamp = parseHistoryTimestamp(timestampText)
+                val timestamp = parseHistoryTimestampInput(timestampText)
                 if (timestamp == null) parseFailed = true else onSave(timestamp, notesText)
             }) { Text(stringResource(R.string.save)) }
         },
@@ -257,12 +257,15 @@ fun historyMessageText(message: HistoryMessage): String = when (message) {
     HistoryMessage.EVENT_UPDATED -> stringResource(R.string.history_message_event_updated)
     HistoryMessage.EVENT_DELETED -> stringResource(R.string.history_message_event_deleted)
     HistoryMessage.SESSION_DELETED -> stringResource(R.string.history_message_session_deleted)
+    HistoryMessage.CHECKED_IN -> stringResource(R.string.history_message_checked_in)
+    HistoryMessage.VISIT_CREATED -> stringResource(R.string.history_message_visit_created)
     HistoryMessage.UNDONE -> stringResource(R.string.history_message_undone)
     HistoryMessage.REDONE -> stringResource(R.string.history_message_redone)
     HistoryMessage.EVENT_NOT_FOUND -> stringResource(R.string.history_error_event_not_found)
     HistoryMessage.INVALID_TIMESTAMP -> stringResource(R.string.history_error_invalid_timestamp)
     HistoryMessage.CHECKOUT_BEFORE_CHECKIN -> stringResource(R.string.history_error_checkout_before_checkin)
     HistoryMessage.OVERLAP -> stringResource(R.string.history_error_overlap)
+    HistoryMessage.DUPLICATE -> stringResource(R.string.history_error_duplicate)
     HistoryMessage.ORPHAN_CHECKOUT -> stringResource(R.string.history_error_orphan_checkout)
     HistoryMessage.SESSION_NOT_FOUND -> stringResource(R.string.history_error_session_not_found)
     HistoryMessage.NOTHING_TO_UNDO -> stringResource(R.string.history_error_nothing_to_undo)
@@ -309,10 +312,10 @@ private fun anomalyList(anomalies: Set<VisitAnomaly>): String {
     return remember(labels, locale) { ListFormatter.getInstance(locale).format(labels) }
 }
 
-private fun formatHistoryTimestamp(timestamp: Long): String =
+fun formatHistoryTimestampForInput(timestamp: Long): String =
     HISTORY_EDIT_FORMATTER.format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
 
-private fun parseHistoryTimestamp(value: String): Long? = try {
+fun parseHistoryTimestampInput(value: String): Long? = try {
     LocalDateTime.parse(value.trim(), HISTORY_EDIT_FORMATTER)
         .atZone(ZoneId.systemDefault())
         .toInstant()

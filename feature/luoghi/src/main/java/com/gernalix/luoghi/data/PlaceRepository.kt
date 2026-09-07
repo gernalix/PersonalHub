@@ -32,6 +32,7 @@ class PlaceRepository(
 ) {
     val places: Flow<List<PlaceEntity>> = dao.observePlaces()
     val events: Flow<List<PlaceEventEntity>> = dao.observeEvents()
+    val geofenceConfigs: Flow<List<PlaceGeofenceConfigEntity>> = dao.observeGeofenceConfigs()
     val globalStatsState: Flow<GlobalStatsStateEntity?> = dao.observeGlobalStatsState()
     val latestUndoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestUndoableAction()
     val latestRedoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestRedoableAction()
@@ -107,6 +108,21 @@ class PlaceRepository(
         return updated
     }
 
+    suspend fun saveGeofenceConfig(config: PlaceGeofenceConfigEntity): Long {
+        val now = System.currentTimeMillis()
+        val existing = dao.geofenceConfig(config.placeUuid)
+        val saved = config.copy(
+            id = existing?.id ?: config.id,
+            createdAt = existing?.createdAt ?: now,
+            updatedAt = now,
+        )
+        val id = DatabaseMutationCoordinator.mutex.withLock {
+            dao.upsertGeofenceConfig(saved)
+        }
+        PersistentMutationTracker.record(context, "place_geofence_configs.save")
+        return id
+    }
+
     suspend fun recordPlaceEvent(
         placeUuid: String,
         eventType: String,
@@ -153,6 +169,190 @@ class PlaceRepository(
         }
         PersistentMutationTracker.record(context, mutationSource)
         return inserted
+    }
+
+    suspend fun recordManualCheckIn(
+        placeUuid: String,
+        timestamp: Long = System.currentTimeMillis(),
+        location: LocationSample? = null,
+        source: String = "Luoghi manual",
+        notes: String? = null,
+    ): HistoryMutationResult =
+        recordCanonicalVisit(
+            placeUuid = placeUuid,
+            checkInAt = timestamp,
+            checkOutAt = null,
+            checkInLocation = location,
+            checkOutLocation = null,
+            source = source,
+            notes = notes,
+            mutationSource = "place_events.manual_check_in",
+        )
+
+    suspend fun recordManualVisit(
+        placeUuid: String,
+        checkInAt: Long,
+        checkOutAt: Long?,
+        source: String = "Luoghi manual",
+        notes: String? = null,
+    ): HistoryMutationResult =
+        recordCanonicalVisit(
+            placeUuid = placeUuid,
+            checkInAt = checkInAt,
+            checkOutAt = checkOutAt,
+            checkInLocation = null,
+            checkOutLocation = null,
+            source = source,
+            notes = notes,
+            mutationSource = "place_events.manual_visit",
+        )
+
+    suspend fun closeCanonicalVisit(
+        placeUuid: String,
+        timestamp: Long = System.currentTimeMillis(),
+        location: LocationSample? = null,
+        source: String = "Luoghi manual",
+        notes: String? = null,
+    ): HistoryMutationResult {
+        val result = DatabaseMutationCoordinator.mutex.withLock {
+            database.withTransaction {
+                val active = dao.getActiveVisitEvent()
+                    ?.takeIf { it.placeId == placeUuid }
+                    ?: return@withTransaction HistoryMutationResult.Failure(HistoryValidationError.SESSION_NOT_FOUND)
+                if (timestamp <= active.timestamp) {
+                    return@withTransaction HistoryMutationResult.Failure(HistoryValidationError.CHECKOUT_BEFORE_CHECKIN)
+                }
+                val checkout = PlaceEventEntity(
+                    sessionUuid = active.sessionUuid,
+                    placeId = placeUuid,
+                    eventType = PlaceEventTypes.CHECK_OUT,
+                    timestamp = timestamp,
+                    lat = location?.latitude,
+                    lon = location?.longitude,
+                    accuracyM = location?.accuracyM,
+                    source = source,
+                    notes = notes.cleanNullable(),
+                )
+                validateNewEvents(listOf(checkout))?.let { return@withTransaction HistoryMutationResult.Failure(it) }
+                val id = dao.insertEvent(checkout)
+                val saved = checkout.copy(id = id)
+                dao.recalculateStatsBaselines()
+                dao.insertAuditLog(
+                    HistoryAuditLogEntity(
+                        action = AUDIT_EVENT_CREATED,
+                        entityType = ENTITY_EVENT,
+                        entityId = saved.eventUuid,
+                        sessionUuid = saved.sessionUuid,
+                        afterJson = eventJson(saved).toString(),
+                        source = saved.source,
+                    )
+                )
+                HistoryMutationResult.Success
+            }
+        }
+        if (result is HistoryMutationResult.Success) {
+            PersistentMutationTracker.record(context, "place_events.manual_check_out")
+        }
+        return result
+    }
+
+    private suspend fun recordCanonicalVisit(
+        placeUuid: String,
+        checkInAt: Long,
+        checkOutAt: Long?,
+        checkInLocation: LocationSample?,
+        checkOutLocation: LocationSample?,
+        source: String,
+        notes: String?,
+        mutationSource: String,
+    ): HistoryMutationResult {
+        if (checkInAt <= 0L) return HistoryMutationResult.Failure(HistoryValidationError.INVALID_TIMESTAMP)
+        if (checkOutAt != null && checkOutAt <= checkInAt) {
+            return HistoryMutationResult.Failure(HistoryValidationError.CHECKOUT_BEFORE_CHECKIN)
+        }
+        val result = DatabaseMutationCoordinator.mutex.withLock {
+            database.withTransaction {
+                dao.getPlace(placeUuid)
+                    ?: return@withTransaction HistoryMutationResult.Failure(HistoryValidationError.EVENT_NOT_FOUND)
+                val sessionUuid = UUID.randomUUID().toString()
+                val checkIn = PlaceEventEntity(
+                    sessionUuid = sessionUuid,
+                    placeId = placeUuid,
+                    eventType = PlaceEventTypes.CHECK_IN,
+                    timestamp = checkInAt,
+                    lat = checkInLocation?.latitude,
+                    lon = checkInLocation?.longitude,
+                    accuracyM = checkInLocation?.accuracyM,
+                    source = source,
+                    notes = notes.cleanNullable(),
+                )
+                val newEvents = buildList {
+                    add(checkIn)
+                    if (checkOutAt != null) {
+                        add(
+                            PlaceEventEntity(
+                                sessionUuid = sessionUuid,
+                                placeId = placeUuid,
+                                eventType = PlaceEventTypes.CHECK_OUT,
+                                timestamp = checkOutAt,
+                                lat = checkOutLocation?.latitude,
+                                lon = checkOutLocation?.longitude,
+                                accuracyM = checkOutLocation?.accuracyM,
+                                source = source,
+                                notes = notes.cleanNullable(),
+                            )
+                        )
+                    }
+                }
+                validateNewEvents(newEvents)?.let { return@withTransaction HistoryMutationResult.Failure(it) }
+                val saved = newEvents.map { event ->
+                    val id = dao.insertEvent(event)
+                    event.copy(id = id)
+                }
+                dao.recalculateStatsBaselines()
+                saved.forEach { event ->
+                    dao.insertAuditLog(
+                        HistoryAuditLogEntity(
+                            action = AUDIT_EVENT_CREATED,
+                            entityType = ENTITY_EVENT,
+                            entityId = event.eventUuid,
+                            sessionUuid = event.sessionUuid,
+                            afterJson = eventJson(event).toString(),
+                            source = event.source,
+                        )
+                    )
+                }
+                HistoryMutationResult.Success
+            }
+        }
+        if (result is HistoryMutationResult.Success) PersistentMutationTracker.record(context, mutationSource)
+        return result
+    }
+
+    private suspend fun validateNewEvents(newEvents: List<PlaceEventEntity>): HistoryValidationError? {
+        val existing = dao.listEvents()
+        val now = System.currentTimeMillis()
+        val existingSessions = HistorySessionCalculator.sessions(existing, now)
+        val newCheckIn = newEvents.firstOrNull { it.eventType == PlaceEventTypes.CHECK_IN }
+        val newCheckOut = newEvents.firstOrNull { it.eventType == PlaceEventTypes.CHECK_OUT }
+        if (newCheckIn != null) {
+            val duplicate = existingSessions.any { session ->
+                session.placeId == newCheckIn.placeId &&
+                    session.startMs == newCheckIn.timestamp &&
+                    session.endMs == newCheckOut?.timestamp
+            }
+            if (duplicate) return HistoryValidationError.DUPLICATE
+        }
+        val candidateEvents = existing + newEvents
+        val candidateSessions = HistorySessionCalculator.sessions(candidateEvents, now)
+        if (candidateSessions.any { HistorySessionAnomaly.NEGATIVE_DURATION in it.anomalies }) {
+            return HistoryValidationError.CHECKOUT_BEFORE_CHECKIN
+        }
+        if (candidateSessions.count { it.startMs != null && it.endMs == null } > 1) {
+            return HistoryValidationError.OVERLAP
+        }
+        if (HistorySessionCalculator.hasAnyOverlap(candidateEvents, now)) return HistoryValidationError.OVERLAP
+        return null
     }
 
     suspend fun editHistoryEvent(
@@ -405,7 +605,7 @@ class PlaceRepository(
         if (HistorySessionAnomaly.NEGATIVE_DURATION in anomalies) {
             return HistoryValidationError.CHECKOUT_BEFORE_CHECKIN
         }
-        if (HistorySessionCalculator.hasOverlap(candidateEvents, after.placeId, now)) {
+        if (HistorySessionCalculator.hasAnyOverlap(candidateEvents, now)) {
             return HistoryValidationError.OVERLAP
         }
         return null

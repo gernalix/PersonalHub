@@ -1,5 +1,7 @@
 package com.gernalix.luoghi
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.gernalix.luoghi.capsules.mapviewer.MapCallerMode
+import com.gernalix.luoghi.capsules.location.FusedLocationCapsule
+import com.gernalix.luoghi.capsules.mapviewer.MapCurrentLocation
 import com.gernalix.luoghi.capsules.mapviewer.MapMarkerMode
 import com.gernalix.luoghi.capsules.mapviewer.MapOverlayMarker
 import com.gernalix.luoghi.capsules.mapviewer.MapViewerModel
@@ -58,8 +62,15 @@ class MapViewerActivity : ComponentActivity() {
                     LaunchedEffect(title, callerMode, markerMode, uuids, labels) {
                         state = runCatching {
                             withContext(Dispatchers.IO) {
+                                val currentLocation = if (callerMode == MapCallerMode.GLOBAL) {
+                                    FusedLocationCapsule(applicationContext).currentLocation()?.let {
+                                        MapCurrentLocation(it.latitude, it.longitude)
+                                    }
+                                } else {
+                                    null
+                                }
                                 MapViewerRepository(LuoghiDatabase.get(applicationContext).placeDao())
-                                    .load(title, callerMode, markerMode, uuids, labels)
+                                    .load(title, callerMode, markerMode, uuids, labels, currentLocation)
                             }
                         }.fold(
                             onSuccess = { MapViewerUiState.Ready(it) },
@@ -181,17 +192,25 @@ private fun MapFallback(title: String, reason: String) {
 }
 
 private fun MapView.renderMarkers(model: MapViewerModel) {
+    val signature = model.markers.joinToString("|") { it.uuid } + "@${model.currentLocation}"
+    if (tag == signature) return
+    tag = signature
     overlays.clear()
     val overlayMarkers = model.overlays
     overlayMarkers.forEach { markerModel ->
         overlays.add(markerFor(markerModel, model.markerMode))
     }
-    val center = GeoPoint(
-        overlayMarkers.map { it.latitude }.average(),
-        overlayMarkers.map { it.longitude }.average(),
-    )
+    val current = model.currentLocation
+    val center = if (current != null) {
+        GeoPoint(current.latitude, current.longitude)
+    } else {
+        GeoPoint(
+            overlayMarkers.map { it.latitude }.average(),
+            overlayMarkers.map { it.longitude }.average(),
+        )
+    }
     controller.setCenter(center)
-    controller.setZoom(if (overlayMarkers.size == 1) 16.0 else 12.0)
+    controller.setZoom(if (current != null || overlayMarkers.size == 1) 16.0 else 12.0)
     if (model.markerMode == MapMarkerMode.BALLOON_ALL && overlayMarkers.size <= MAX_PERMANENT_BALLOONS) {
         overlays.filterIsInstance<Marker>().forEach { it.showInfoWindow() }
     }
@@ -206,6 +225,14 @@ private fun MapView.markerFor(markerModel: MapOverlayMarker, markerMode: MapMark
         snippet = markerModel.snippet
         setOnMarkerClickListener { marker, _ ->
             if (markerMode != MapMarkerMode.SIMPLE) marker.showInfoWindow()
+            markerModel.uuid?.let { uuid ->
+                context.startActivity(
+                    Intent(context, MainActivity::class.java).apply {
+                        data = Uri.parse("personalhub://module/places?placeId=$uuid")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    }
+                )
+            }
             true
         }
     }

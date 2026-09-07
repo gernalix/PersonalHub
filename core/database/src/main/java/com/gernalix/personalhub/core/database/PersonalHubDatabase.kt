@@ -36,6 +36,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.luoghi.data.RouteDistanceCacheEntity::class,
     com.gernalix.luoghi.data.HistoryAuditLogEntity::class,
     com.gernalix.luoghi.data.HistoryActionEntity::class,
+    com.gernalix.luoghi.data.PlaceGeofenceConfigEntity::class,
+    com.gernalix.luoghi.data.PlaceGeofenceTransitionLogEntity::class,
     com.gernalix.sostanze.data.SubstanceEntity::class,
     com.gernalix.sostanze.data.IntakeEventEntity::class,
     com.gernalix.sostanze.data.StockAdjustmentEntity::class,
@@ -73,7 +75,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class,
-], version = 9, exportSchema = true)
+], version = 10, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -90,7 +92,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 9
+        const val SCHEMA_VERSION = 10
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -183,6 +185,18 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                     override fun migrate(db: SupportSQLiteDatabase) {
                         db.execSQL("ALTER TABLE hub_context_types ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")
                         db.execSQL("UPDATE hub_context_types SET locked=1 WHERE id='timer_activity'")
+                        db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
+                    }
+                })
+                .addMigrations(object : androidx.room.migration.Migration(9, 10) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `place_geofence_configs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `place_uuid` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `enter_enabled` INTEGER NOT NULL, `exit_enabled` INTEGER NOT NULL, `enter_action` TEXT NOT NULL, `exit_action` TEXT NOT NULL, `last_enter_at` INTEGER, `last_exit_at` INTEGER, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, FOREIGN KEY(`place_uuid`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_place_geofence_configs_place_uuid` ON `place_geofence_configs` (`place_uuid`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_geofence_configs_enabled` ON `place_geofence_configs` (`enabled`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_geofence_configs_updated_at` ON `place_geofence_configs` (`updated_at`)")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `place_geofence_transition_log` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `place_uuid` TEXT NOT NULL, `transition` TEXT NOT NULL, `bucket` INTEGER NOT NULL, `created_at` INTEGER NOT NULL)")
+                        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_place_geofence_transition_log_place_uuid_transition_bucket` ON `place_geofence_transition_log` (`place_uuid`, `transition`, `bucket`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_geofence_transition_log_created_at` ON `place_geofence_transition_log` (`created_at`)")
                         db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                     }
                 })

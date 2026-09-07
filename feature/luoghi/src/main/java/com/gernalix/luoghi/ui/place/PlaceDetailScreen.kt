@@ -15,6 +15,8 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +60,9 @@ fun PlaceDetailScreen(
     onEdit: () -> Unit,
     onMap: () -> Unit,
     onHistory: () -> Unit,
+    onCheckInNow: () -> Unit,
+    onAddManualVisit: () -> Unit,
+    onGeofenceSettings: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     val place = item.place
@@ -150,9 +155,21 @@ fun PlaceDetailScreen(
                         Icon(Icons.Outlined.History, contentDescription = null)
                         Text(stringResource(R.string.place_history), modifier = Modifier.padding(start = 8.dp))
                     }
+                    FilledTonalButton(onClick = onCheckInNow, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Outlined.PlayArrow, contentDescription = null)
+                        Text(stringResource(R.string.place_check_in_now), modifier = Modifier.padding(start = 8.dp))
+                    }
+                    FilledTonalButton(onClick = onAddManualVisit, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Outlined.History, contentDescription = null)
+                        Text(stringResource(R.string.place_add_past_visit), modifier = Modifier.padding(start = 8.dp))
+                    }
                     FilledTonalButton(onClick = onMap, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Outlined.Map, contentDescription = null)
                         Text(stringResource(R.string.show_on_map), modifier = Modifier.padding(start = 8.dp))
+                    }
+                    FilledTonalButton(onClick = onGeofenceSettings, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Outlined.Settings, contentDescription = null)
+                        Text(stringResource(R.string.geofence_settings), modifier = Modifier.padding(start = 8.dp))
                     }
                 }
             }

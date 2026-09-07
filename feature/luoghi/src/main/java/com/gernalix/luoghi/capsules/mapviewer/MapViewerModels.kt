@@ -52,6 +52,7 @@ data class MapMarkerModel(
 }
 
 data class MapOverlayMarker(
+    val uuid: String?,
     val latitude: Double,
     val longitude: Double,
     val title: String,
@@ -65,10 +66,16 @@ data class MapViewerModel(
     val markerMode: MapMarkerMode,
     val markers: List<MapMarkerModel>,
     val missingCoordinateCount: Int,
+    val currentLocation: MapCurrentLocation? = null,
 ) {
     val overlays: List<MapOverlayMarker> = MapMarkerClusterer.overlays(markers)
     val usesPerformanceClusterFallback: Boolean = markers.size > MapMarkerClusterer.MAX_DIRECT_MARKERS
 }
+
+data class MapCurrentLocation(
+    val latitude: Double,
+    val longitude: Double,
+)
 
 object MapMarkerClusterer {
     const val MAX_DIRECT_MARKERS = 500
@@ -78,6 +85,7 @@ object MapMarkerClusterer {
         if (markers.size <= MAX_DIRECT_MARKERS) {
             return markers.map { marker ->
                 MapOverlayMarker(
+                    uuid = marker.uuid,
                     latitude = marker.latitude,
                     longitude = marker.longitude,
                     title = marker.title,
@@ -97,6 +105,7 @@ object MapMarkerClusterer {
                 if (bucket.size == 1) {
                     val marker = bucket.single()
                     MapOverlayMarker(
+                        uuid = marker.uuid,
                         latitude = marker.latitude,
                         longitude = marker.longitude,
                         title = marker.title,
@@ -104,6 +113,7 @@ object MapMarkerClusterer {
                     )
                 } else {
                     MapOverlayMarker(
+                        uuid = null,
                         latitude = bucket.map { it.latitude }.average(),
                         longitude = bucket.map { it.longitude }.average(),
                         title = "${bucket.size} places",

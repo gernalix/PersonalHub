@@ -5,6 +5,7 @@ import com.gernalix.luoghi.capsules.addressautocomplete.AddressAutocompleteRepos
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressAutocompleteSource
 import com.gernalix.luoghi.capsules.aliases.AliasesCapsule
 import com.gernalix.luoghi.capsules.checkin.CheckInCapsule
+import com.gernalix.luoghi.capsules.geofence.PlaceGeofenceCapsule
 import com.gernalix.luoghi.capsules.links.LinksCapsule
 import com.gernalix.luoghi.capsules.location.FusedLocationCapsule
 import com.gernalix.luoghi.capsules.location.LocationSource
@@ -29,6 +30,7 @@ class LuoghiAppContainer(context: Context) {
     val aliases = AliasesCapsule(placeRepository)
     val links = LinksCapsule(placeRepository)
     val checkIns = CheckInCapsule(placeRepository)
+    val geofences = PlaceGeofenceCapsule(appContext, placeRepository)
     val stats = StatsCapsule(placeRepository)
     val routeDistances by lazy {
         RouteDistanceCapsule(

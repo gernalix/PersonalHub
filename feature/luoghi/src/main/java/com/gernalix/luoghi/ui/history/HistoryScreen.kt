@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,10 +25,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,8 +47,12 @@ import androidx.compose.ui.unit.dp
 import com.gernalix.luoghi.HistoryMessage
 import com.gernalix.luoghi.HistoryUiState
 import com.gernalix.luoghi.R
+import com.gernalix.luoghi.capsules.checkin.WhereWasIQuery
+import com.gernalix.luoghi.capsules.checkin.WhereWasIResult
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
+import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
+import com.gernalix.luoghi.ui.common.localizedDateTime
 import com.gernalix.luoghi.ui.common.localizedDayHeading
 import java.time.Instant
 import java.time.LocalDate
@@ -62,6 +69,7 @@ fun HistoryScreen(
     isLoading: Boolean,
     filterPlaceId: String?,
     filterPlaceName: String?,
+    places: List<PlaceEntity>,
     initialVisitId: String?,
     listState: LazyListState,
     onBack: () -> Unit,
@@ -90,6 +98,7 @@ fun HistoryScreen(
     var editingEventId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingEventId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingVisitId by rememberSaveable { mutableStateOf<String?>(null) }
+    var whereWasIOpen by rememberSaveable { mutableStateOf(false) }
     val selectedVisit = selectedVisitId?.let { id -> filteredVisits.firstOrNull { it.stableId == id } }
     val editingEvent = editingEventId?.let { id -> events.firstOrNull { it.id == id } }
     val deletingEvent = deletingEventId?.let { id -> events.firstOrNull { it.id == id } }
@@ -158,6 +167,7 @@ fun HistoryScreen(
                             state = historyState,
                             onUndo = onUndo,
                             onRedo = onRedo,
+                            onWhereWasI = { whereWasIOpen = true },
                             onClearMessage = onClearMessage,
                         )
                     }
@@ -235,6 +245,13 @@ fun HistoryScreen(
             onDismiss = { deletingVisitId = null },
         )
     }
+    if (whereWasIOpen) {
+        WhereWasIDialog(
+            visits = visits,
+            places = places,
+            onDismiss = { whereWasIOpen = false },
+        )
+    }
 }
 
 @Composable
@@ -257,18 +274,31 @@ private fun HistoryActions(
     state: HistoryUiState,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onWhereWasI: () -> Unit,
     onClearMessage: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(enabled = state.canUndo, onClick = onUndo) {
+            OutlinedButton(
+                enabled = state.canUndo,
+                onClick = onUndo,
+                modifier = Modifier.weight(1f),
+            ) {
                 Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = null)
                 Text(stringResource(R.string.undo), modifier = Modifier.padding(start = 8.dp))
             }
-            OutlinedButton(enabled = state.canRedo, onClick = onRedo) {
+            OutlinedButton(
+                enabled = state.canRedo,
+                onClick = onRedo,
+                modifier = Modifier.weight(1f),
+            ) {
                 Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = null)
                 Text(stringResource(R.string.redo), modifier = Modifier.padding(start = 8.dp))
             }
+        }
+        OutlinedButton(onClick = onWhereWasI, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Outlined.Place, contentDescription = null)
+            Text(stringResource(R.string.where_was_i), modifier = Modifier.padding(start = 8.dp))
         }
         state.message?.let { message: HistoryMessage ->
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -282,6 +312,59 @@ private fun HistoryActions(
             }
         }
     }
+}
+
+@Composable
+private fun WhereWasIDialog(
+    visits: List<VisitUiModel>,
+    places: List<PlaceEntity>,
+    onDismiss: () -> Unit,
+) {
+    var timestampText by rememberSaveable {
+        mutableStateOf(formatHistoryTimestampForInput(System.currentTimeMillis()))
+    }
+    var parseFailed by rememberSaveable { mutableStateOf(false) }
+    val instant = parseHistoryTimestampInput(timestampText)
+    val result = instant?.let { WhereWasIQuery.at(visits, places, it) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.where_was_i)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = timestampText,
+                    onValueChange = {
+                        timestampText = it
+                        parseFailed = false
+                    },
+                    label = { Text(stringResource(R.string.history_timestamp)) },
+                    supportingText = { Text(stringResource(R.string.history_timestamp_hint)) },
+                    isError = parseFailed,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(whereWasIText(result))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (instant == null) parseFailed = true else onDismiss()
+            }) { Text(stringResource(R.string.close)) }
+        },
+    )
+}
+
+@Composable
+private fun whereWasIText(result: WhereWasIResult?): String = when (result) {
+    null -> stringResource(R.string.where_was_i_invalid)
+    is WhereWasIResult.Inside -> stringResource(R.string.where_was_i_inside_format, result.place.nickname)
+    is WhereWasIResult.Between -> stringResource(
+        R.string.where_was_i_between_format,
+        result.previous.nickname,
+        result.next.nickname,
+    )
+    is WhereWasIResult.OnlyPrevious -> stringResource(R.string.where_was_i_only_previous_format, result.previous.nickname)
+    is WhereWasIResult.OnlyNext -> stringResource(R.string.where_was_i_only_next_format, result.next.nickname)
+    WhereWasIResult.NoData -> stringResource(R.string.where_was_i_no_data)
 }
 
 @Composable

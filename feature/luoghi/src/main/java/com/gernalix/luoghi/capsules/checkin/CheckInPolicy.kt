@@ -7,7 +7,6 @@ import com.gernalix.luoghi.data.PlaceEventEntity
 
 object CheckInPolicy {
     const val DEFAULT_RADIUS_M = 75.0
-    private const val AMBIGUOUS_DISTANCE_MARGIN_M = 10.0
     private const val MAX_AMBIGUOUS_CHOICES = 5
 
     fun choosePlace(
@@ -30,14 +29,7 @@ object CheckInPolicy {
 
         if (candidates.isEmpty()) return CheckInMatchDecision.UnknownPlace
         if (candidates.size == 1) return CheckInMatchDecision.Matched(candidates.single())
-
-        val first = candidates[0]
-        val second = candidates[1]
-        return if ((second.distanceM - first.distanceM) <= AMBIGUOUS_DISTANCE_MARGIN_M) {
-            CheckInMatchDecision.Ambiguous(candidates.take(MAX_AMBIGUOUS_CHOICES))
-        } else {
-            CheckInMatchDecision.Matched(first)
-        }
+        return CheckInMatchDecision.Ambiguous(candidates.take(MAX_AMBIGUOUS_CHOICES))
     }
 
     fun activeVisit(events: List<PlaceEventEntity>): PlaceEventEntity? {

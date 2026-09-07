@@ -64,6 +64,9 @@ fun PlaceListItem(
     val totalDuration = localizedDuration(item.totalTimeMs)
     val visits = visitCount(item.visitCount)
     val radius = stringResource(R.string.radius_compact_format, CheckInPolicy.effectiveRadiusM(place))
+    val distance = item.distanceMeters?.let {
+        stringResource(R.string.place_distance_format, com.gernalix.luoghi.ui.common.localizedDistance(it))
+    }
     val metadata = if (item.activeStartedAt != null) {
         stringResource(
             R.string.place_active_meta_format,
@@ -71,7 +74,9 @@ fun PlaceListItem(
             activeDuration.orEmpty(),
         )
     } else {
-        stringResource(R.string.place_meta_format, totalDuration, visits, radius)
+        listOf(stringResource(R.string.place_meta_format, totalDuration, visits, radius), distance)
+            .filterNotNull()
+            .joinToString(" · ")
     }
     val accessibility = if (item.activeStartedAt != null) {
         stringResource(R.string.place_accessibility_active_format, displayName, address, metadata)

@@ -25,6 +25,14 @@ class CheckInCapsule(
             source = source,
         )
 
+    suspend fun manualCheckIn(
+        placeUuid: String,
+        timestamp: Long = System.currentTimeMillis(),
+        location: LocationSample? = null,
+        source: String = "Luoghi manual",
+    ): HistoryMutationResult =
+        repository.recordManualCheckIn(placeUuid, timestamp, location, source)
+
     suspend fun checkOut(placeUuid: String, location: LocationSample?, source: String = "Luoghi"): Long =
         repository.recordPlaceEvent(
             placeUuid = placeUuid,
@@ -32,6 +40,22 @@ class CheckInCapsule(
             location = location,
             source = source,
         )
+
+    suspend fun manualCheckOut(
+        placeUuid: String,
+        timestamp: Long = System.currentTimeMillis(),
+        location: LocationSample? = null,
+        source: String = "Luoghi manual",
+    ): HistoryMutationResult =
+        repository.closeCanonicalVisit(placeUuid, timestamp, location, source)
+
+    suspend fun manualVisit(
+        placeUuid: String,
+        checkInAt: Long,
+        checkOutAt: Long?,
+        notes: String? = null,
+    ): HistoryMutationResult =
+        repository.recordManualVisit(placeUuid, checkInAt, checkOutAt, notes = notes)
 
     suspend fun checkInNewPlace(mutation: PlaceMutation, location: LocationSample): String {
         val uuid = repository.savePlace(

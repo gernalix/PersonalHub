@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Map
@@ -41,6 +42,9 @@ import com.gernalix.luoghi.HomeUiState
 import com.gernalix.luoghi.R
 import com.gernalix.luoghi.capsules.checkin.CheckInCandidate
 import com.gernalix.luoghi.capsules.places.PlaceListUiModel
+import com.gernalix.luoghi.capsules.places.PlaceSortCriterion
+import com.gernalix.luoghi.capsules.places.PlaceSortDirection
+import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
 import com.gernalix.luoghi.ui.history.VisitTimelineItem
 import com.gernalix.luoghi.ui.places.PlaceListItem
@@ -57,6 +61,8 @@ fun HomeScreen(
     onPlaceHistory: (PlaceListUiModel) -> Unit,
     onPlaceMap: (PlaceListUiModel) -> Unit,
     onDeletePlace: (PlaceListUiModel) -> Unit,
+    onSortPlaces: (PlaceSortCriterion, PlaceSortDirection) -> Unit,
+    onRefreshLocation: () -> Unit,
     onGlobalMap: () -> Unit,
     onGlobalStats: () -> Unit,
     onOpenHistory: (String?) -> Unit,
@@ -116,6 +122,14 @@ fun HomeScreen(
                 SectionHeader(
                     title = stringResource(R.string.places),
                     action = stringResource(R.string.places_count_format, state.placeItems.size),
+                )
+            }
+            item(key = "places-sort") {
+                PlacesSortBar(
+                    sort = state.placeSort,
+                    locationUnavailable = state.listLocationUnavailable,
+                    onSortPlaces = onSortPlaces,
+                    onRefreshLocation = onRefreshLocation,
                 )
             }
             if (state.placeItems.isEmpty()) {
@@ -180,6 +194,72 @@ fun HomeScreen(
         }
     }
 }
+
+@Composable
+private fun PlacesSortBar(
+    sort: PlaceSortState,
+    locationUnavailable: Boolean,
+    onSortPlaces: (PlaceSortCriterion, PlaceSortDirection) -> Unit,
+    onRefreshLocation: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            SortChip(R.string.sort_distance, sort, PlaceSortCriterion.DISTANCE, onSortPlaces, Modifier.weight(1f))
+            SortChip(R.string.sort_last_visit, sort, PlaceSortCriterion.LAST_VISIT, onSortPlaces, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            SortChip(R.string.sort_total_time, sort, PlaceSortCriterion.TOTAL_TIME, onSortPlaces, Modifier.weight(1f))
+            SortChip(R.string.sort_visit_count, sort, PlaceSortCriterion.VISIT_COUNT, onSortPlaces, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = {
+                onSortPlaces(sort.criterion, sort.direction.toggle())
+            }) {
+                Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = null)
+                Text(
+                    stringResource(if (sort.direction == PlaceSortDirection.ASC) R.string.sort_ascending else R.string.sort_descending),
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            TextButton(onClick = onRefreshLocation) {
+                Text(stringResource(R.string.sort_refresh_location))
+            }
+        }
+        if (locationUnavailable && sort.criterion == PlaceSortCriterion.DISTANCE) {
+            Text(
+                stringResource(R.string.sort_distance_unavailable),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SortChip(
+    labelRes: Int,
+    sort: PlaceSortState,
+    criterion: PlaceSortCriterion,
+    onSortPlaces: (PlaceSortCriterion, PlaceSortDirection) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selected = sort.criterion == criterion
+    val onClick = {
+        val direction = if (selected) sort.direction.toggle() else defaultDirection(criterion)
+        onSortPlaces(criterion, direction)
+    }
+    if (selected) {
+        FilledTonalButton(onClick = onClick, modifier = modifier) { Text(stringResource(labelRes)) }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = modifier) { Text(stringResource(labelRes)) }
+    }
+}
+
+private fun PlaceSortDirection.toggle(): PlaceSortDirection =
+    if (this == PlaceSortDirection.ASC) PlaceSortDirection.DESC else PlaceSortDirection.ASC
+
+private fun defaultDirection(criterion: PlaceSortCriterion): PlaceSortDirection =
+    if (criterion == PlaceSortCriterion.DISTANCE) PlaceSortDirection.ASC else PlaceSortDirection.DESC
 
 @Composable
 private fun SectionHeader(title: String, action: String?) {

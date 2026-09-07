@@ -280,6 +280,12 @@ interface PlaceDao {
     @Query("SELECT * FROM history_actions ORDER BY id ASC")
     suspend fun listHistoryActionsForBackup(): List<HistoryActionEntity>
 
+    @Query("SELECT * FROM place_geofence_configs ORDER BY id ASC")
+    suspend fun listGeofenceConfigsForBackup(): List<PlaceGeofenceConfigEntity>
+
+    @Query("SELECT * FROM place_geofence_transition_log ORDER BY id ASC")
+    suspend fun listGeofenceTransitionLogForBackup(): List<PlaceGeofenceTransitionLogEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun restorePlaces(rows: List<PlaceEntity>)
 
@@ -304,6 +310,12 @@ interface PlaceDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun restoreHistoryActions(rows: List<HistoryActionEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun restoreGeofenceConfigs(rows: List<PlaceGeofenceConfigEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun restoreGeofenceTransitionLog(rows: List<PlaceGeofenceTransitionLogEntity>)
+
     @Query("DELETE FROM route_distance_cache")
     suspend fun clearRouteDistanceCacheForRestore()
 
@@ -312,6 +324,30 @@ interface PlaceDao {
 
     @Query("DELETE FROM place_links")
     suspend fun clearLinksForRestore()
+
+    @Query("SELECT * FROM place_geofence_configs ORDER BY place_uuid ASC")
+    fun observeGeofenceConfigs(): Flow<List<PlaceGeofenceConfigEntity>>
+
+    @Query("SELECT * FROM place_geofence_configs WHERE place_uuid = :placeUuid LIMIT 1")
+    suspend fun geofenceConfig(placeUuid: String): PlaceGeofenceConfigEntity?
+
+    @Query("SELECT * FROM place_geofence_configs WHERE enabled = 1 ORDER BY updated_at DESC")
+    suspend fun enabledGeofenceConfigs(): List<PlaceGeofenceConfigEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertGeofenceConfig(config: PlaceGeofenceConfigEntity): Long
+
+    @Query("DELETE FROM place_geofence_configs WHERE place_uuid = :placeUuid")
+    suspend fun deleteGeofenceConfig(placeUuid: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertGeofenceTransitionLog(log: PlaceGeofenceTransitionLogEntity): Long
+
+    @Query("UPDATE place_geofence_configs SET last_enter_at = :timestamp, updated_at = :timestamp WHERE place_uuid = :placeUuid")
+    suspend fun markGeofenceEnter(placeUuid: String, timestamp: Long): Int
+
+    @Query("UPDATE place_geofence_configs SET last_exit_at = :timestamp, updated_at = :timestamp WHERE place_uuid = :placeUuid")
+    suspend fun markGeofenceExit(placeUuid: String, timestamp: Long): Int
 
     @Query("DELETE FROM place_events")
     suspend fun clearEventsForRestore()
@@ -324,6 +360,12 @@ interface PlaceDao {
 
     @Query("DELETE FROM history_actions")
     suspend fun clearHistoryActionsForRestore()
+
+    @Query("DELETE FROM place_geofence_configs")
+    suspend fun clearGeofenceConfigsForRestore()
+
+    @Query("DELETE FROM place_geofence_transition_log")
+    suspend fun clearGeofenceTransitionLogForRestore()
 
     @Query("DELETE FROM places")
     suspend fun clearPlacesForRestore()
@@ -338,6 +380,8 @@ interface PlaceDao {
         routeDistanceCache = listRouteDistanceCacheForBackup(),
         historyAuditLog = listHistoryAuditLogForBackup(),
         historyActions = listHistoryActionsForBackup(),
+        geofenceConfigs = listGeofenceConfigsForBackup(),
+        geofenceTransitionLog = listGeofenceTransitionLogForBackup(),
     )
 
     @Transaction
@@ -349,6 +393,8 @@ interface PlaceDao {
         clearGlobalStatsForRestore()
         clearHistoryAuditLogForRestore()
         clearHistoryActionsForRestore()
+        clearGeofenceTransitionLogForRestore()
+        clearGeofenceConfigsForRestore()
         clearPlacesForRestore()
 
         restorePlaces(snapshot.places)
@@ -359,6 +405,8 @@ interface PlaceDao {
         restoreRouteDistanceCache(snapshot.routeDistanceCache)
         restoreHistoryAuditLog(snapshot.historyAuditLog)
         restoreHistoryActions(snapshot.historyActions)
+        restoreGeofenceConfigs(snapshot.geofenceConfigs)
+        restoreGeofenceTransitionLog(snapshot.geofenceTransitionLog)
     }
 
     @Query("INSERT OR IGNORE INTO global_stats_state(id, first_check_in_at_global) VALUES(1, :timestamp)")

@@ -15,6 +15,10 @@ import com.gernalix.luoghi.capsules.checkin.HistoryValidationError
 import com.gernalix.luoghi.capsules.location.LocationSample
 import com.gernalix.luoghi.capsules.places.PlaceMutation
 import com.gernalix.luoghi.capsules.places.PlaceListUiMapper
+import com.gernalix.luoghi.capsules.places.PlaceListLocation
+import com.gernalix.luoghi.capsules.places.PlaceSortCriterion
+import com.gernalix.luoghi.capsules.places.PlaceSortDirection
+import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.places.PlaceListUiModel
 import com.gernalix.luoghi.capsules.routedistance.RouteDistanceStatsUi
 import com.gernalix.luoghi.capsules.stats.StatsSnapshot
@@ -29,6 +33,7 @@ import com.gernalix.luoghi.backup.ValidatedBackup
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.PlaceEventEntity
+import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
 import com.gernalix.luoghi.export.BackupFolderStore
 import androidx.core.content.edit
 import kotlinx.coroutines.CancellationException
@@ -104,16 +109,24 @@ enum class HistoryMessage {
     EVENT_UPDATED,
     EVENT_DELETED,
     SESSION_DELETED,
+    CHECKED_IN,
+    VISIT_CREATED,
     UNDONE,
     REDONE,
     EVENT_NOT_FOUND,
     INVALID_TIMESTAMP,
     CHECKOUT_BEFORE_CHECKIN,
     OVERLAP,
+    DUPLICATE,
     ORPHAN_CHECKOUT,
     SESSION_NOT_FOUND,
     NOTHING_TO_UNDO,
     NOTHING_TO_REDO,
+}
+
+enum class GeofenceMessage {
+    SAVED,
+    PERMISSION_MISSING,
 }
 
 enum class PlaceDeleteMessage {
@@ -206,6 +219,11 @@ data class HomeUiState(
     val stats: StatsSnapshot = StatsSnapshot(),
     val routeDistances: RouteDistanceStatsUi = RouteDistanceStatsUi(),
     val history: HistoryUiState = HistoryUiState(),
+    val placeSort: PlaceSortState = PlaceSortState(),
+    val currentListLocation: PlaceListLocation? = null,
+    val listLocationUnavailable: Boolean = false,
+    val geofenceConfigs: Map<String, PlaceGeofenceConfigEntity> = emptyMap(),
+    val geofenceMessage: GeofenceMessage? = null,
     val restore: RestoreUiState = RestoreUiState(),
     val placeDeleteMessage: PlaceDeleteMessage? = null,
 )
@@ -237,23 +255,31 @@ class LuoghiHomeViewModel(
 
     val state: StateFlow<HomeUiState> = combine(
         container.places.places,
-        container.checkIns.events,
+        combine(container.checkIns.events, container.geofences.configs) { events, geofenceConfigs -> events to geofenceConfigs },
         container.stats.globalStatsState,
         mutableState,
         HubContextRuntime.contextChanges(),
-    ) { places, events, globalStatsState, state, _ ->
+    ) { places, eventAndGeofenceConfigs, globalStatsState, state, _ ->
+        val (events, geofenceConfigs) = eventAndGeofenceConfigs
         val nowMs = maxOf(state.nowMs, System.currentTimeMillis())
         val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
         val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
         state.copy(
             dataLoaded = true,
             places = places,
-            placeItems = PlaceListUiMapper.map(places, stats.places, visits),
+            geofenceConfigs = geofenceConfigs.associateBy { it.placeUuid },
             visits = visits,
             checkIn = state.checkIn.withDerivedVisit(places, events, visits),
             nowMs = nowMs,
             stats = stats,
             routeDistances = state.routeDistances,
+            placeItems = PlaceListUiMapper.map(
+                places = places,
+                stats = stats.places,
+                visits = visits,
+                sort = state.placeSort,
+                currentLocation = state.currentListLocation,
+            ),
         )
     }.stateIn(
         scope = viewModelScope,
@@ -855,6 +881,25 @@ class LuoghiHomeViewModel(
         }
     }
 
+    fun updatePlaceSort(criterion: PlaceSortCriterion, direction: PlaceSortDirection) {
+        mutableState.update { it.copy(placeSort = PlaceSortState(criterion, direction)) }
+        if (criterion == PlaceSortCriterion.DISTANCE) refreshListLocation()
+    }
+
+    fun refreshListLocation() {
+        viewModelScope.launch {
+            val location = runCatching { container.location.currentLocation() }.getOrNull()
+            mutableState.update {
+                it.copy(
+                    currentListLocation = location?.let { sample ->
+                        PlaceListLocation(sample.latitude, sample.longitude)
+                    },
+                    listLocationUnavailable = location == null,
+                )
+            }
+        }
+    }
+
     fun onLocationPermissionDenied() {
         mutableState.update {
             it.copy(checkIn = it.checkIn.copy(message = CheckInMessage.LOCATION_PERMISSION_DENIED, messagePlaceName = null))
@@ -941,6 +986,39 @@ class LuoghiHomeViewModel(
         mutableState.update { it.copy(history = it.history.copy(message = null)) }
     }
 
+    fun manualCheckIn(placeUuid: String) {
+        viewModelScope.launch {
+            val result = container.checkIns.manualCheckIn(placeUuid)
+            applyHistoryResult(result, HistoryMessage.CHECKED_IN)
+        }
+    }
+
+    fun addManualVisit(placeUuid: String, checkInAt: Long, checkOutAt: Long?, notes: String?) {
+        viewModelScope.launch {
+            val result = container.checkIns.manualVisit(placeUuid, checkInAt, checkOutAt, notes)
+            applyHistoryResult(result, HistoryMessage.VISIT_CREATED)
+        }
+    }
+
+    fun saveGeofenceConfig(config: PlaceGeofenceConfigEntity) {
+        viewModelScope.launch {
+            val result = container.geofences.save(config)
+            mutableState.update {
+                it.copy(
+                    geofenceMessage = if (result is com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.PermissionMissing) {
+                        GeofenceMessage.PERMISSION_MISSING
+                    } else {
+                        GeofenceMessage.SAVED
+                    }
+                )
+            }
+        }
+    }
+
+    fun clearGeofenceMessage() {
+        mutableState.update { it.copy(geofenceMessage = null) }
+    }
+
     private fun checkInAtCurrentLocation() {
         viewModelScope.launch {
             mutableState.update {
@@ -964,7 +1042,12 @@ class LuoghiHomeViewModel(
 
             when (val decision = container.checkIns.choosePlace(state.value.places, location)) {
                 is CheckInMatchDecision.Matched -> {
-                    container.checkIns.checkIn(decision.candidate.place.uuid, location)
+                    val result = container.checkIns.manualCheckIn(decision.candidate.place.uuid, location = location)
+                    if (result is HistoryMutationResult.Failure) {
+                        applyHistoryResult(result, HistoryMessage.CHECKED_IN)
+                        mutableState.update { it.copy(checkIn = it.checkIn.copy(working = false)) }
+                        return@launch
+                    }
                     mutableState.update {
                         it.copy(
                             checkIn = it.checkIn.copy(
@@ -1057,6 +1140,7 @@ class LuoghiHomeViewModel(
             HistoryValidationError.INVALID_TIMESTAMP -> HistoryMessage.INVALID_TIMESTAMP
             HistoryValidationError.CHECKOUT_BEFORE_CHECKIN -> HistoryMessage.CHECKOUT_BEFORE_CHECKIN
             HistoryValidationError.OVERLAP -> HistoryMessage.OVERLAP
+            HistoryValidationError.DUPLICATE -> HistoryMessage.DUPLICATE
             HistoryValidationError.ORPHAN_CHECKOUT -> HistoryMessage.ORPHAN_CHECKOUT
             HistoryValidationError.SESSION_NOT_FOUND -> HistoryMessage.SESSION_NOT_FOUND
             HistoryValidationError.NOTHING_TO_UNDO -> HistoryMessage.NOTHING_TO_UNDO

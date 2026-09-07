@@ -395,6 +395,8 @@ class BackupValidator(private val context: Context) {
             "route_distance_cache",
             "history_audit_log",
             "history_actions",
+            "place_geofence_configs",
+            "place_geofence_transition_log",
         )
     }
 }

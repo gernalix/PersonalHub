@@ -9,6 +9,8 @@ data class LuoghiSnapshot(
     val routeDistanceCache: List<RouteDistanceCacheEntity>,
     val historyAuditLog: List<HistoryAuditLogEntity>,
     val historyActions: List<HistoryActionEntity>,
+    val geofenceConfigs: List<PlaceGeofenceConfigEntity> = emptyList(),
+    val geofenceTransitionLog: List<PlaceGeofenceTransitionLogEntity> = emptyList(),
 ) {
     val tableCounts: Map<String, Int>
         get() = linkedMapOf(
@@ -20,6 +22,8 @@ data class LuoghiSnapshot(
             "route_distance_cache" to routeDistanceCache.size,
             "history_audit_log" to historyAuditLog.size,
             "history_actions" to historyActions.size,
+            "place_geofence_configs" to geofenceConfigs.size,
+            "place_geofence_transition_log" to geofenceTransitionLog.size,
         )
 
     val isEmpty: Boolean
