@@ -351,8 +351,10 @@
     <string name="widget_quick_event_desc">Esegui un pulsante evento Timer scelto dalla home</string>
     <string name="widget_quick_event_name">Evento Timer</string>
     <string name="widget_quick_event_choose">Scegli un pulsante evento</string>
+    <string name="widget_quick_event_search">Cerca</string>
     <string name="widget_quick_event_save">Salva widget</string>
     <string name="widget_quick_event_empty">Nessun pulsante evento disponibile.</string>
+    <string name="widget_quick_event_no_results">Nessun pulsante evento corrispondente.</string>
     <string name="widget_quick_event_configure">Scegli evento</string>
     <string name="widget_quick_event_unavailable">Evento non disponibile. Riconfigura il widget.</string>
     <string name="widget_quick_event_untitled">Evento senza titolo</string>
@@ -486,6 +488,7 @@
     <string name="timeline_date_from_fmt">%1$s: %2$s</string>
     <string name="timeline_date_to_fmt">%1$s: %2$s</string>
     <string name="quick_session_started">Sessione rapida avviata</string>
+    <string name="quick_session_start_failed">Impossibile avviare la sessione rapida.</string>
     <string name="quick_session_title_prefix">Quick-%1$s</string>
 
     <string name="audit_session_start_new_widget">Sessione avviata dal widget: %1$s</string>

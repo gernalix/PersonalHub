@@ -48,21 +48,21 @@ class QuickSessionWidgetClickActivity : Activity() {
 
         val appCtx = applicationContext
 
-        // Feedback first.
-        vibrateStrong(appCtx)
-        Toast.makeText(appCtx, getString(R.string.quick_session_started), Toast.LENGTH_SHORT).show()
-
         // Start a new running session immediately.
-        val ok = runCatching { QuickSessionRunner.run(appCtx) }.isSuccess
+        val result = QuickSessionRunner.run(appCtx)
 
         // Open the app (user can immediately see/stop the running session).
-        if (ok) {
+        if (result is QuickSessionRunner.Result.Success) {
+            vibrateStrong(appCtx)
+            Toast.makeText(appCtx, getString(R.string.quick_session_started), Toast.LENGTH_SHORT).show()
             startActivity(
                 Intent(appCtx, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
             )
+        } else {
+            Toast.makeText(appCtx, getString(R.string.quick_session_start_failed), Toast.LENGTH_SHORT).show()
         }
 
         // Close immediately (no UI).
@@ -76,5 +76,4 @@ class QuickSessionWidgetClickActivity : Activity() {
         }
     }
 }
-
 

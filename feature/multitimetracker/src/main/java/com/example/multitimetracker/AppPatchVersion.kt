@@ -3,6 +3,8 @@ package com.example.multitimetracker
 import android.content.Context
 
 object AppPatchVersion {
+    const val AUTO_CONSISTENCY_REVISION = 1L
+
     private const val PATCH_VERSION_ASSET = "patch-version.txt"
     private const val FALLBACK_VALUE = "unknown"
 

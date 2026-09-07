@@ -355,8 +355,10 @@
     <string name="widget_quick_event_desc">Run a selected Timer event button from the home screen</string>
     <string name="widget_quick_event_name">Timer event</string>
     <string name="widget_quick_event_choose">Choose an event button</string>
+    <string name="widget_quick_event_search">Search</string>
     <string name="widget_quick_event_save">Save widget</string>
     <string name="widget_quick_event_empty">No event buttons are available.</string>
+    <string name="widget_quick_event_no_results">No matching event buttons.</string>
     <string name="widget_quick_event_configure">Choose event</string>
     <string name="widget_quick_event_unavailable">Event unavailable. Reconfigure widget.</string>
     <string name="widget_quick_event_untitled">Untitled event</string>
@@ -487,6 +489,7 @@
     <string name="timeline_date_from_fmt">%1$s: %2$s</string>
     <string name="timeline_date_to_fmt">%1$s: %2$s</string>
     <string name="quick_session_started">Quick session started</string>
+    <string name="quick_session_start_failed">Could not start quick session.</string>
     <string name="quick_session_title_prefix">Quick-%1$s</string>
 
     <string name="audit_session_start_new_widget">Started session from widget: %1$s</string>

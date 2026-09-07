@@ -128,9 +128,6 @@ class MainViewModel : ViewModel() {
         com.example.multitimetracker.core.quickevent.DefaultQuickEventCore(ctx)
 
 
-    // v239: version code available across init paths (avoid scope bugs)
-    private val currentAppVersionCodeLong: Long = BuildConfig.VERSION_CODE.toLong()
-
     private fun buildAuthoritativeExportPayload(context: Context? = appContext): AuthoritativeExportPayload {
         requireSessionOnlyMode(true)
         val cur = _state.value
@@ -150,8 +147,9 @@ class MainViewModel : ViewModel() {
 // v201
 // === FEATURE CAPSULE: AppVersionAudit (ViewModel) START ===
 private fun logAppVersionIfNeeded(context: Context) {
-    val currentCode = BuildConfig.VERSION_CODE.toLong()
-    val currentName = BuildConfig.VERSION_NAME
+    val hostVersion = HostAppVersion.current(context)
+    val currentCode = hostVersion.code
+    val currentName = hostVersion.name
     val lastLogged = UiPrefsStore.getLastLoggedAppVersionCode(context)
 
     if (lastLogged != null && lastLogged == currentCode) return
@@ -830,7 +828,8 @@ private var initialized = false
 
     private val snapshotCoordinator by lazy {
         MainViewModelSnapshotCoordinator(
-            currentAppVersionCodeLong = currentAppVersionCodeLong,
+            currentAppVersionCodeLong = { context -> HostAppVersion.current(context).code },
+            autoConsistencyRevision = AppPatchVersion.AUTO_CONSISTENCY_REVISION,
             viewModelScope = viewModelScope,
             appContext = { appContext },
             readState = { _state.value },

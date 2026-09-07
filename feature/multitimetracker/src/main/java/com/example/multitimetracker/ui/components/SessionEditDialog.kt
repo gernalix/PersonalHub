@@ -434,16 +434,16 @@ fun SessionEditDialog(
                         )
                     }
 
-                    val selectedTags = tags.filter { it.id in selectedEffective }
+                    val selectedTags = SessionTagPickerRules.selectedTags(tags, selectedEffective)
                     if (selectedTags.isEmpty()) {
                         Text(stringResource(R.string.nessun_tag))
                     } else {
-                        Text(
-                            text = selectedTags.joinToString(", ") { it.name },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                        TagSelectionFlow(
+                            tags = selectedTags,
+                            selectedIds = selectedEffective,
+                            enabled = !readOnly,
+                            emphasizeTimedDuration = true,
+                            onToggle = ::toggleTagSelection,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -604,15 +604,14 @@ private fun SessionTagPickerDialog(
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
-    val q = query.trim()
-    val base = if (q.isEmpty()) tags else tags.filter { it.name.contains(q, ignoreCase = true) }
+    val q = SessionTagPickerRules.cleanQuery(query)
+    val base = SessionTagPickerRules.filterByQuery(tags, q)
     val ordered = TagSelectionOrder.sortForPicker(
         tags = base,
         selectedIds = selectedIds,
         lastUsedMsByTagId = lastUsedMsByTagId
     )
-    val canAddTagFromQuery = q.isNotEmpty() && tags.none { it.name.equals(q, ignoreCase = true) }
-    val showAddTagAction = canAddTagFromQuery && ordered.isEmpty()
+    val showAddTagAction = SessionTagPickerRules.canCreateExactName(q, tags)
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()

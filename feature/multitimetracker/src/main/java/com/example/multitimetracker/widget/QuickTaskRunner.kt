@@ -19,6 +19,14 @@ import kotlin.random.Random
  */
 @OptIn(CapsuleWriteApi::class)
 object QuickSessionRunner {
+    sealed class Result {
+        data class Success(val sessionId: Long, val title: String) : Result()
+        data class Failure(val error: Throwable) : Result()
+    }
+
+    interface SessionStarter {
+        fun ensureRunningSessionRow(title: String, startMs: Long, tagIds: Set<Long>, nowMs: Long): Long
+    }
 
     private fun randomTitleSuffix(): String {
         val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no 0/O/1/I
@@ -45,7 +53,41 @@ object QuickSessionRunner {
         )
     }
 
-    fun run(context: Context) {
+    fun run(
+        context: Context,
+        sessionStarter: SessionStarter = object : SessionStarter {
+            override fun ensureRunningSessionRow(title: String, startMs: Long, tagIds: Set<Long>, nowMs: Long): Long =
+                com.example.multitimetracker.core.session.DefaultSessionCore(context)
+                    .ensureRunningSessionRow(title = title, startMs = startMs, tagIds = tagIds, nowMs = nowMs)
+        },
+        auditInsert: (String, Long, Long) -> Unit = { title, tempTagId, now ->
+            AuditLogSqlite.insert(
+                context = context,
+                isSystem = false,
+                action = "SESSION_START_NEW",
+                entityType = "SESSION",
+                entityId = null,
+                summary = context.getString(R.string.audit_session_start_new_widget, title),
+                payload = JSONObject()
+                    .put("startTs", now)
+                    .put("title", title)
+                    .put("tagIds", org.json.JSONArray().apply { put(tempTagId) })
+                    .put("fromWidget", true)
+                    .put("undoable", true)
+            )
+        },
+        notifyChanged: (Context) -> Unit = ::notifySnapshotChanged,
+    ): Result {
+        return runCatching { runOrThrow(context, sessionStarter, auditInsert, notifyChanged) }
+            .fold(onSuccess = { it }, onFailure = { Result.Failure(it) })
+    }
+
+    private fun runOrThrow(
+        context: Context,
+        sessionStarter: SessionStarter,
+        auditInsert: (String, Long, Long) -> Unit,
+        notifyChanged: (Context) -> Unit,
+    ): Result.Success {
         val snapshot = SnapshotStore.load(context)
 
         val appUsageMs = snapshot?.appUsageMs ?: 0L
@@ -98,36 +140,17 @@ object QuickSessionRunner {
 
         // v110 ARCH: write directly to session tables (source of truth), avoid replace-all mirroring.
         val title = context.getString(R.string.quick_session_title_prefix, randomTitleSuffix())
-        runCatching {
-            com.example.multitimetracker.core.session.DefaultSessionCore(context)
-                .ensureRunningSessionRow(
-                    title = title.trim(),
-                    startMs = now,
-                    tagIds = setOf(tempTagId),
-                    nowMs = now
-                )
-        }
+        val sessionId = sessionStarter.ensureRunningSessionRow(
+            title = title.trim(),
+            startMs = now,
+            tagIds = setOf(tempTagId),
+            nowMs = now
+        )
 
         // Audit log: session started from widget.
-        runCatching {
-            AuditLogSqlite.insert(
-                context = context,
-                isSystem = false,
-                action = "SESSION_START_NEW",
-                entityType = "SESSION",
-                entityId = null,
-                summary = context.getString(R.string.audit_session_start_new_widget, title),
-                payload = JSONObject()
-                    .put("startTs", now)
-                    .put("title", title)
-                    .put("tagIds", org.json.JSONArray().apply { put(tempTagId) })
-                    .put("fromWidget", true)
-                    .put("undoable", true)
-            )
-        }
-        notifySnapshotChanged(context)
+        auditInsert(title, tempTagId, now)
+        notifyChanged(context)
+        return Result.Success(sessionId, title)
     }
 }
-
-
 

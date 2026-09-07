@@ -43,7 +43,8 @@ import kotlinx.coroutines.withContext
 
 @OptIn(CapsuleWriteApi::class)
 internal class MainViewModelSnapshotCoordinator(
-    private val currentAppVersionCodeLong: Long,
+    private val currentAppVersionCodeLong: (Context) -> Long,
+    private val autoConsistencyRevision: Long,
     private val viewModelScope: CoroutineScope,
     private val appContext: () -> Context?,
     private val readState: () -> UiState,
@@ -730,7 +731,7 @@ internal class MainViewModelSnapshotCoordinator(
                 tags,
                 legacyClosedSessionRecords,
                 System.currentTimeMillis(),
-                currentAppVersionCodeLong,
+                currentAppVersionCodeLong(context),
             )
             scheduleSessionsRefresh(context, System.currentTimeMillis())
 
@@ -739,7 +740,7 @@ internal class MainViewModelSnapshotCoordinator(
             val auto = AutoConsistencyCore.runIfNeeded(
                 context = context,
                 nowMs = System.currentTimeMillis(),
-                currentPatch = currentAppVersionCodeLong,
+                currentPatch = autoConsistencyRevision,
             )
             if (auto.changed) {
                 withContext(Dispatchers.Main) {
