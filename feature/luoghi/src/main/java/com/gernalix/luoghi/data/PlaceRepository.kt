@@ -351,7 +351,10 @@ class PlaceRepository(
         if (candidateSessions.count { it.startMs != null && it.endMs == null } > 1) {
             return HistoryValidationError.OVERLAP
         }
-        if (HistorySessionCalculator.hasAnyOverlap(candidateEvents, now)) return HistoryValidationError.OVERLAP
+        val newSessionUuids = newEvents.map { it.sessionUuid }.toSet()
+        if (overlapScoreForSessions(candidateSessions, newSessionUuids, now) > 0L) {
+            return HistoryValidationError.OVERLAP
+        }
         return null
     }
 
@@ -596,8 +599,8 @@ class PlaceRepository(
         before: PlaceEventEntity,
         after: PlaceEventEntity,
     ): HistoryValidationError? {
-        val candidateEvents = dao.listEvents()
-            .map { if (it.eventUuid == before.eventUuid) after else it }
+        val existingEvents = dao.listEvents()
+        val candidateEvents = existingEvents.map { if (it.eventUuid == before.eventUuid) after else it }
         val now = System.currentTimeMillis()
         val candidateSession = HistorySessionCalculator.sessions(candidateEvents, now)
             .firstOrNull { it.sessionUuid == after.sessionUuid }
@@ -605,11 +608,39 @@ class PlaceRepository(
         if (HistorySessionAnomaly.NEGATIVE_DURATION in anomalies) {
             return HistoryValidationError.CHECKOUT_BEFORE_CHECKIN
         }
-        if (HistorySessionCalculator.hasAnyOverlap(candidateEvents, now)) {
+        val affectedSessions = setOf(before.sessionUuid, after.sessionUuid)
+        val beforeScore = overlapScoreForSessions(
+            sessions = HistorySessionCalculator.sessions(existingEvents, now),
+            sessionUuids = affectedSessions,
+            nowMs = now,
+        )
+        val afterScore = overlapScoreForSessions(
+            sessions = HistorySessionCalculator.sessions(candidateEvents, now),
+            sessionUuids = affectedSessions,
+            nowMs = now,
+        )
+        if (afterScore > beforeScore) {
             return HistoryValidationError.OVERLAP
         }
         return null
     }
+
+    private fun overlapScoreForSessions(
+        sessions: List<com.gernalix.luoghi.capsules.checkin.PlaceHistorySession>,
+        sessionUuids: Set<String>,
+        nowMs: Long,
+    ): Long {
+        val targetSessions = sessions.filter { it.sessionUuid in sessionUuids && it.startMs != null }
+        if (targetSessions.isEmpty()) return 0L
+        return targetSessions.sumOf { target ->
+            sessions
+                .filter { it.sessionUuid != target.sessionUuid && it.startMs != null }
+                .sumOf { other -> overlapDuration(target.startMs!!, target.endMs ?: nowMs, other.startMs!!, other.endMs ?: nowMs) }
+        }
+    }
+
+    private fun overlapDuration(startA: Long, endA: Long, startB: Long, endB: Long): Long =
+        (minOf(endA, endB) - maxOf(startA, startB)).coerceAtLeast(0L)
 
     private fun HistoryActionEntity.entityTypeForAudit(): String =
         if (actionType == ACTION_SESSION_DELETE) ENTITY_SESSION else ENTITY_EVENT

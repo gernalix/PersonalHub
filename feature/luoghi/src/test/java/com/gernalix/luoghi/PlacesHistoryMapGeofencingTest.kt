@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.luoghi.capsules.checkin.CheckInMatchDecision
 import com.gernalix.luoghi.capsules.checkin.CheckInPolicy
+import com.gernalix.luoghi.capsules.checkin.HistoryMutationResult
+import com.gernalix.luoghi.capsules.checkin.HistoryValidationError
 import com.gernalix.luoghi.capsules.checkin.PlaceEventTypes
 import com.gernalix.luoghi.capsules.checkin.WhereWasIQuery
 import com.gernalix.luoghi.capsules.checkin.WhereWasIResult
@@ -193,6 +195,95 @@ class PlacesHistoryMapGeofencingTest {
     }
 
     @Test
+    fun unrelatedHistoricalOverlapDoesNotPoisonIndependentMutations() = runBlocking {
+        val db = LuoghiDatabase.get(context)
+        val dao = db.placeDao()
+        val repository = com.gernalix.luoghi.data.PlaceRepository(context)
+        dao.upsertPlace(place("legacy-a", "Legacy A"))
+        dao.upsertPlace(place("legacy-b", "Legacy B"))
+        dao.upsertPlace(place("candidate", "Candidate"))
+        dao.upsertPlace(place("active", "Active"))
+        dao.upsertPlace(place("edit", "Edit"))
+        dao.upsertPlace(place("geofence", "Geofence", 45.0, 9.0))
+        seedVisit(dao, "legacy-a", 1_000L, 5_000L, "legacy-a-session")
+        seedVisit(dao, "legacy-b", 3_000L, 7_000L, "legacy-b-session")
+        seedVisit(dao, "edit", 20_000L, 22_000L, "edit-session")
+        val unrelatedBefore = legacyEvents(dao)
+
+        assertEquals(
+            HistoryMutationResult.Success,
+            repository.recordManualVisit("candidate", 10_000L, 12_000L, source = "QA"),
+        )
+
+        assertEquals(
+            HistoryMutationResult.Success,
+            repository.recordManualCheckIn("active", 30_000L, source = "QA"),
+        )
+        assertEquals(
+            HistoryMutationResult.Success,
+            repository.closeCanonicalVisit("active", 32_000L, source = "QA"),
+        )
+
+        val editCheckOut = dao.eventsForSession("edit-session").first { it.eventType == PlaceEventTypes.CHECK_OUT }
+        assertEquals(
+            HistoryMutationResult.Success,
+            repository.editHistoryEvent(editCheckOut.id, 23_000L, notes = null, source = "QA"),
+        )
+
+        assertEquals(
+            HistoryMutationResult.Failure(HistoryValidationError.OVERLAP),
+            repository.recordManualVisit("candidate", 11_000L, 13_000L, source = "QA"),
+        )
+        assertEquals(
+            HistoryMutationResult.Failure(HistoryValidationError.OVERLAP),
+            repository.editHistoryEvent(editCheckOut.id, 31_000L, notes = null, source = "QA"),
+        )
+        assertEquals(unrelatedBefore, legacyEvents(dao))
+
+        val legacyBCheckOut = dao.eventsForSession("legacy-b-session").first { it.eventType == PlaceEventTypes.CHECK_OUT }
+        assertEquals(
+            HistoryMutationResult.Success,
+            repository.editHistoryEvent(legacyBCheckOut.id, 6_000L, notes = null, source = "QA"),
+        )
+    }
+
+    @Test
+    fun automaticGeofenceMutationsAllowUnrelatedHistoricalOverlapButRejectIntroducedOverlap() = runBlocking {
+        val db = LuoghiDatabase.get(context)
+        val dao = db.placeDao()
+        dao.upsertPlace(place("legacy-a", "Legacy A"))
+        dao.upsertPlace(place("legacy-b", "Legacy B"))
+        dao.upsertPlace(place("conflict", "Conflict"))
+        dao.upsertPlace(place("geofence", "Geofence", 45.0, 9.0))
+        seedVisit(dao, "legacy-a", 1_000L, 5_000L, "legacy-a-session")
+        seedVisit(dao, "legacy-b", 3_000L, 7_000L, "legacy-b-session")
+        dao.upsertGeofenceConfig(
+            PlaceGeofenceConfigEntity(
+                placeUuid = "geofence",
+                enabled = true,
+                enterEnabled = true,
+                exitEnabled = true,
+                enterAction = PlaceGeofenceAction.AUTOMATIC_VISIT.name,
+                exitAction = PlaceGeofenceAction.AUTOMATIC_VISIT.name,
+            )
+        )
+
+        assertEquals(
+            PlaceGeofenceResult.Success,
+            PlaceGeofenceReceiver.handleTransition(context, "geofence", PlaceGeofenceTransition.ENTER, 10_000L),
+        )
+        assertEquals(
+            PlaceGeofenceResult.Success,
+            PlaceGeofenceReceiver.handleTransition(context, "geofence", PlaceGeofenceTransition.EXIT, 12_000L),
+        )
+        seedVisit(dao, "conflict", 200_000L, 300_000L, "conflict-session")
+        assertEquals(
+            PlaceGeofenceResult.VisitRejected("OVERLAP"),
+            PlaceGeofenceReceiver.handleTransition(context, "geofence", PlaceGeofenceTransition.ENTER, 220_000L),
+        )
+    }
+
+    @Test
     fun geofenceReconcileReturnsPermissionMissingWhenBackgroundLocationIsUnavailable() = runBlocking {
         val db = LuoghiDatabase.get(context)
         val dao = db.placeDao()
@@ -224,4 +315,22 @@ class PlacesHistoryMapGeofencingTest {
 
     private fun event(placeId: String, eventType: String, timestamp: Long, sessionUuid: String) =
         PlaceEventEntity(placeId = placeId, eventType = eventType, timestamp = timestamp, sessionUuid = sessionUuid)
+
+    private suspend fun seedVisit(
+        dao: com.gernalix.luoghi.data.PlaceDao,
+        placeId: String,
+        checkInAt: Long,
+        checkOutAt: Long,
+        sessionUuid: String,
+    ) {
+        dao.insertEvent(event(placeId, PlaceEventTypes.CHECK_IN, checkInAt, sessionUuid))
+        dao.insertEvent(event(placeId, PlaceEventTypes.CHECK_OUT, checkOutAt, sessionUuid))
+    }
+
+    private suspend fun legacyEvents(
+        dao: com.gernalix.luoghi.data.PlaceDao,
+    ): Map<String, List<PlaceEventEntity>> =
+        listOf("legacy-a-session", "legacy-b-session").associateWith { sessionUuid ->
+            dao.eventsForSession(sessionUuid).map { it.copy(id = 0) }
+        }
 }
