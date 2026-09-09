@@ -89,6 +89,7 @@ import com.gernalix.sostanze.data.CostChoice
 import com.gernalix.sostanze.domain.DoseButtonState
 import com.gernalix.sostanze.domain.DoseSection
 import com.gernalix.sostanze.domain.SostanzeEngine
+import com.gernalix.sostanze.domain.SubstancePlan
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -155,7 +156,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     }
     val undoLabel = stringResource(R.string.undo)
     val recordedMessage = stringResource(R.string.recorded)
-    val macroRecordedMessage = stringResource(R.string.macro_recorded)
     val blockedMessage = stringResource(R.string.intake_blocked)
     val earlyMessage = stringResource(R.string.intake_early)
     val stockMessage = stringResource(R.string.intake_insufficient_stock)
@@ -216,11 +216,12 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                     macros = state.macros,
                     query = homeQuery,
                     onQueryChange = { homeQuery = it },
-                    onRecord = { substanceId ->
-                        viewModel.recordIntake(substanceId) { outcome, token ->
+                    onRecord = { substance ->
+                        val successMessage = successRecordedMessage(recordedMessage, substance.name)
+                        viewModel.recordIntake(substance.id) { outcome, token ->
                             scope.launch {
                                 val message = when (outcome) {
-                                    is IntakeOutcome.Recorded -> recordedMessage
+                                    is IntakeOutcome.Recorded -> successMessage
                                     is IntakeOutcome.Blocked -> blockedMessage
                                     is IntakeOutcome.Early -> earlyMessage
                                     is IntakeOutcome.Warning -> blockedMessage
@@ -234,10 +235,11 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                             }
                         }
                     },
-                    onMacro = { macroId ->
-                        viewModel.recordMacro(macroId) { outcomes, token ->
+                    onMacro = { macro ->
+                        val successMessage = successRecordedMessage(recordedMessage, macro.macro.name)
+                        viewModel.recordMacro(macro.macro.id) { outcomes, token ->
                             scope.launch {
-                                val result = snackbarHostState.showSnackbar("$macroRecordedMessage ${outcomes.count { it is IntakeOutcome.Recorded }}/${outcomes.size}", actionLabel = if (token != null) undoLabel else null)
+                                val result = snackbarHostState.showSnackbar(successMessage, actionLabel = if (token != null) undoLabel else null)
                                 if (result == SnackbarResult.ActionPerformed && token != null) viewModel.undoToken(token)
                             }
                         }
@@ -427,8 +429,8 @@ private fun HomeScreen(
     macros: List<MacroUi>,
     query: String,
     onQueryChange: (String) -> Unit,
-    onRecord: (Long) -> Unit,
-    onMacro: (Long) -> Unit,
+    onRecord: (SubstancePlan) -> Unit,
+    onMacro: (MacroUi) -> Unit,
     onUndo: (Long) -> Unit,
     onEdit: (SubstanceEntity) -> Unit,
     onRestore: (Long) -> Unit,
@@ -457,7 +459,7 @@ private fun HomeScreen(
                 SectionTitle(stringResource(R.string.section_macros))
             }
             items(macros, key = { "macro-${it.macro.id}" }) { macro ->
-                MacroButton(macro = macro, onClick = { onMacro(macro.macro.id) })
+                MacroButton(macro = macro, onClick = { onMacro(macro) })
             }
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
@@ -478,7 +480,7 @@ private fun HomeScreen(
                     val entity = state.toEntity()
                     DoseActionButton(
                         state = state,
-                        onRecord = { onRecord(state.substance.id) },
+                        onRecord = { onRecord(state.substance) },
                         onUndo = { onUndo(state.substance.id) },
                         onEdit = { onEdit(entity) },
                         onRestore = { onRestore(state.substance.id) },
@@ -509,6 +511,8 @@ private fun DoseButtonState.toEntity(): SubstanceEntity =
         doseTimesCsv = substance.doseTimesCsv,
         daysMask = substance.daysMask,
     )
+
+internal fun successRecordedMessage(pattern: String, title: String): String = pattern.format(title)
 
 @Composable
 private fun DoseActionButton(

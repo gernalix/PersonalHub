@@ -829,8 +829,7 @@
     <string name="quick_event_unarchive_template">Restore button</string>
     <string name="quick_event_delete_template">Delete button</string>
     <string name="quick_event_record">Save</string>
-    <string name="quick_event_recorded">Event recorded</string>
-    <string name="quick_event_macro_recorded">%1$d events recorded</string>
+    <string name="quick_event_recorded">%1$s added</string>
     <string name="quick_event_write_failed">Could not save event.</string>
     <string name="quick_event_delete_failed">Could not delete event.</string>
     <string name="quick_event_tap_to_record">Tap to record now. Long press to customize.</string>

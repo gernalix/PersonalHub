@@ -9,6 +9,7 @@ import com.gernalix.personalhub.core.database.capsules.soldi.FinanceTitle
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransaction
 import com.gernalix.sostanze.data.*
 import com.gernalix.sostanze.domain.*
+import com.gernalix.sostanze.ui.successRecordedMessage
 import com.supercontacts.app.data.local.ContactEntity
 import com.supercontacts.app.data.local.ContactFieldEntity
 import java.time.LocalDate
@@ -26,6 +27,11 @@ import org.robolectric.annotation.SQLiteMode
 @Config(sdk = [35])
 @SQLiteMode(SQLiteMode.Mode.NATIVE)
 class SostanzeCampaignTest {
+    @Test fun successRecordedMessageUsesCurrentTappedTitle() {
+        assertEquals("Pregabalin added", successRecordedMessage("%1\$s added", "Pregabalin"))
+        assertEquals("Coffee added", successRecordedMessage("%1\$s added", "Coffee"))
+    }
+
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     private fun database(block: suspend (PersonalHubDatabase, SostanzeRepository) -> Unit) = runBlocking {

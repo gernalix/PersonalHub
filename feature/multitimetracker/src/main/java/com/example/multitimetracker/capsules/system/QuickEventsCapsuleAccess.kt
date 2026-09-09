@@ -20,7 +20,6 @@ interface QuickEventsCapsuleAccess {
     fun scheduleAutoBackup()
     fun showWriteFailed(context: Context)
     fun showDeleteFailed(context: Context)
-    fun showEntryRecorded(context: Context)
-    fun showMacroRecorded(context: Context, count: Int)
+    fun showTargetRecorded(context: Context, title: String)
     fun addTag(name: String)
 }

@@ -514,14 +514,9 @@ private fun logAppVersionIfNeeded(context: Context) {
                     Toast.makeText(context, context.getString(R.string.quick_event_delete_failed), Toast.LENGTH_SHORT).show()
                 }
             }
-            override fun showEntryRecorded(context: Context) {
+            override fun showTargetRecorded(context: Context, title: String) {
                 viewModelScope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.quick_event_recorded), Toast.LENGTH_SHORT).show()
-                }
-            }
-            override fun showMacroRecorded(context: Context, count: Int) {
-                viewModelScope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.quick_event_macro_recorded, count), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.quick_event_recorded, title), Toast.LENGTH_SHORT).show()
                 }
             }
             override fun addTag(name: String) {

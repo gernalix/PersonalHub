@@ -48,9 +48,7 @@ class QuickEventWidgetClickActivity : Activity() {
 
         when (result) {
             is QuickEventExecutionResult.Executed -> {
-                val message = if (result.entryIds.size == 1) getString(R.string.quick_event_recorded)
-                else getString(R.string.quick_event_macro_recorded, result.entryIds.size)
-                Toast.makeText(appCtx, message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(appCtx, getString(R.string.quick_event_recorded, result.title), Toast.LENGTH_SHORT).show()
                 QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
             }
             is QuickEventExecutionResult.NeedsInput -> openTimerForCompletion(result.target)

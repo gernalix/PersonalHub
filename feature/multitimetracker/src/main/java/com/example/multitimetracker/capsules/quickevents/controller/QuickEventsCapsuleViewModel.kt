@@ -186,7 +186,7 @@ class QuickEventsCapsuleViewModel(
                 val result = quickEventExecutor(ctx).execute(QuickEventTarget.Template(templateId), timestampMs ?: System.currentTimeMillis())
                 if (result is QuickEventExecutionResult.Executed) {
                     refreshFromDb(ctx)
-                    access.showEntryRecorded(ctx)
+                    access.showTargetRecorded(ctx, result.title)
                 }
             }.onFailure { err ->
                 Log.e("QuickEventsCapsule", "createEntryFromTemplate failed (templateId=$templateId)", err)
@@ -297,7 +297,7 @@ class QuickEventsCapsuleViewModel(
                 refreshFromDb(ctx)
                 access.persist()
                 access.scheduleAutoBackup()
-                access.showEntryRecorded(ctx)
+                access.showTargetRecorded(ctx, cleanTitle)
             }.onFailure { err ->
                 Log.e("QuickEventsCapsule", "createStandaloneEntry failed", err)
                 access.showWriteFailed(ctx)
@@ -476,7 +476,7 @@ class QuickEventsCapsuleViewModel(
                 val result = quickEventExecutor(ctx).execute(QuickEventTarget.Macro(macroId), timestampMs ?: System.currentTimeMillis())
                 if (result is QuickEventExecutionResult.Executed) {
                     refreshFromDb(ctx)
-                    access.showMacroRecorded(ctx, result.entryIds.size)
+                    access.showTargetRecorded(ctx, result.title)
                 }
             }.onFailure { err ->
                 Log.e("QuickEventsCapsule", "createEntriesFromMacro failed (macroId=$macroId)", err)

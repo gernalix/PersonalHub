@@ -9,8 +9,7 @@
     <string name="import_action">Import</string>
     <string name="notifications_short">!</string>
     <string name="undo">UNDO</string>
-    <string name="recorded">Recorded</string>
-    <string name="macro_recorded">Macro recorded</string>
+    <string name="recorded">%1$s added</string>
     <string name="intake_blocked">Intake blocked by an active interaction</string>
     <string name="intake_early">Too early: check the recommended time</string>
     <string name="intake_insufficient_stock">Insufficient stock or incompatible unit</string>

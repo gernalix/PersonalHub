@@ -24,6 +24,7 @@ class QuickEventExecutorTest {
         val result = executor(core).execute(QuickEventTarget.Template(1L), timestampMs = 1000L)
 
         assertTrue(result is QuickEventExecutionResult.Executed)
+        assertEquals("Coffee", (result as QuickEventExecutionResult.Executed).title)
         assertEquals(listOf("Coffee"), core.inserted.map { it.title })
         assertEquals(listOf(1L), core.inserted.map { it.templateId })
         assertEquals(1, core.afterWriteCount)
@@ -48,6 +49,7 @@ class QuickEventExecutorTest {
         val result = executor(core).execute(QuickEventTarget.Macro(5L), timestampMs = 1000L)
 
         assertTrue(result is QuickEventExecutionResult.Executed)
+        assertEquals("Morning", (result as QuickEventExecutionResult.Executed).title)
         assertEquals(listOf("First", "Second"), core.inserted.map { it.title })
         assertEquals(listOf(5L, 5L), core.inserted.map { it.macroId })
         assertEquals(setOf(1L, 9L), core.inserted.first().tagIds)
