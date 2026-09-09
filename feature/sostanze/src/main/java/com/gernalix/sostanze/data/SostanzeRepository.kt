@@ -105,7 +105,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             val requestedUnit = unit ?: substance.doseUnit
             if (!substance.stockUnit.equals(substance.doseUnit, ignoreCase = true) || !requestedUnit.equals(substance.doseUnit, ignoreCase = true)) return@withTransaction IntakeOutcome.UnsupportedUnits
             val appliedDose = substance.dosePerIntake * quantity
-            if (substance.dosePerIntake <= 0.0 || substance.stockCurrent < appliedDose) return@withTransaction IntakeOutcome.InsufficientStock
+            if (substance.dosePerIntake <= 0.0) return@withTransaction IntakeOutcome.InvalidQuantity
             val plans = dao.allSubstances().map { it.toPlan() }
             val intakes = dao.recentIntakes().map { it.toRecord() }
             val rules = dao.allInteractionRules().map { it.toPlan(dao.allInteractionTargets()) }
@@ -118,6 +118,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             }
             if (state.dosesPlannedToday > 0 && state.dosesDoneToday >= state.dosesPlannedToday) return@withTransaction IntakeOutcome.Duplicate
             val prescription = dao.currentPrescription(substanceId)
+            val appliedStockDelta = -minOf(substance.stockCurrent, appliedDose)
             val eventId = dao.insertIntake(
                 IntakeEventEntity(
                     substanceId = substanceId,
@@ -127,18 +128,18 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                     doseUnit = substance.doseUnit,
                     tapGroupId = idempotencyKey,
                     quantity = quantity,
-                    appliedStockDelta = -appliedDose,
+                    appliedStockDelta = appliedStockDelta,
                     prescriptionId = prescription?.id,
                 )
             )
-            val newStock = substance.stockCurrent - appliedDose
+            val newStock = substance.stockCurrent + appliedStockDelta
             dao.updateStock(substanceId, newStock)
             dao.insertStockAdjustment(
                 StockAdjustmentEntity(
                     substanceId = substanceId,
                     timestampMs = timestampMs,
                     timestampUtc = UtcDateCodec.isoUtc(timestampMs),
-                    delta = -appliedDose,
+                    delta = appliedStockDelta,
                     note = "intake",
                     resultingStock = newStock,
                 )

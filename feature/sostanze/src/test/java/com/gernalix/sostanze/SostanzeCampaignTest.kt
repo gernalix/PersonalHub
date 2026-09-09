@@ -32,6 +32,19 @@ class SostanzeCampaignTest {
         assertEquals("Coffee added", successRecordedMessage("%1\$s added", "Coffee"))
     }
 
+    @Test fun zeroStockStillRecordsIntakeWithoutMakingStockNegative() = database { db, repository ->
+        val id = (repository.saveSubstance(substance("Pregabalin", stock = 0.0)) as SubstanceSaveOutcome.Saved).id
+
+        val outcome = repository.recordIntake(id, idempotencyKey = "zero-stock")
+
+        assertTrue(outcome is IntakeOutcome.Recorded)
+        assertEquals(0.0, db.dao().substanceById(id)!!.stockCurrent, 0.0)
+        val intake = db.dao().intakeById((outcome as IntakeOutcome.Recorded).id)!!
+        assertEquals(0.0, intake.appliedStockDelta, 0.0)
+        assertTrue(repository.undoLastIntake(id))
+        assertEquals(0.0, db.dao().substanceById(id)!!.stockCurrent, 0.0)
+    }
+
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     private fun database(block: suspend (PersonalHubDatabase, SostanzeRepository) -> Unit) = runBlocking {
