@@ -7,6 +7,7 @@ package com.gernalix.sostanze.ui
 
 import android.Manifest
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -47,7 +48,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
@@ -154,7 +154,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         pendingImport = uri
     }
-    val undoLabel = stringResource(R.string.undo)
     val recordedMessage = stringResource(R.string.recorded)
     val blockedMessage = stringResource(R.string.intake_blocked)
     val earlyMessage = stringResource(R.string.intake_early)
@@ -219,28 +218,30 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                     onRecord = { substance ->
                         val successMessage = successRecordedMessage(recordedMessage, substance.name)
                         viewModel.recordIntake(substance.id) { outcome, token ->
-                            scope.launch {
-                                val message = when (outcome) {
-                                    is IntakeOutcome.Recorded -> successMessage
-                                    is IntakeOutcome.Blocked -> blockedMessage
-                                    is IntakeOutcome.Early -> earlyMessage
-                                    is IntakeOutcome.Warning -> blockedMessage
-                                    IntakeOutcome.InsufficientStock, IntakeOutcome.UnsupportedUnits -> stockMessage
-                                    IntakeOutcome.InvalidQuantity -> stockMessage
-                                    IntakeOutcome.Duplicate -> duplicateMessage
-                                    IntakeOutcome.Archived, IntakeOutcome.NotFound -> blockedMessage
+                            if (outcome is IntakeOutcome.Recorded) {
+                                Toast.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
+                            } else {
+                                scope.launch {
+                                    val message = when (outcome) {
+                                        is IntakeOutcome.Blocked -> blockedMessage
+                                        is IntakeOutcome.Early -> earlyMessage
+                                        is IntakeOutcome.Warning -> blockedMessage
+                                        IntakeOutcome.InsufficientStock, IntakeOutcome.UnsupportedUnits -> stockMessage
+                                        IntakeOutcome.InvalidQuantity -> stockMessage
+                                        IntakeOutcome.Duplicate -> duplicateMessage
+                                        IntakeOutcome.Archived, IntakeOutcome.NotFound -> blockedMessage
+                                        is IntakeOutcome.Recorded -> successMessage
+                                    }
+                                    snackbarHostState.showSnackbar(message)
                                 }
-                                val result = snackbarHostState.showSnackbar(message, actionLabel = if (token != null) undoLabel else null)
-                                if (result == SnackbarResult.ActionPerformed && token != null) viewModel.undoToken(token)
                             }
                         }
                     },
                     onMacro = { macro ->
                         val successMessage = successRecordedMessage(recordedMessage, macro.macro.name)
                         viewModel.recordMacro(macro.macro.id) { outcomes, token ->
-                            scope.launch {
-                                val result = snackbarHostState.showSnackbar(successMessage, actionLabel = if (token != null) undoLabel else null)
-                                if (result == SnackbarResult.ActionPerformed && token != null) viewModel.undoToken(token)
+                            if (token != null && outcomes.any { it is IntakeOutcome.Recorded }) {
+                                Toast.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
