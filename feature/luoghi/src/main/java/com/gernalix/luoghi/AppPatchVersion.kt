@@ -2,8 +2,8 @@ package com.gernalix.luoghi
 
 import android.content.Context
 
+/** Compatibility wrapper retained for callers; value is the host PersonalHub version. */
 object AppPatchVersion {
-    private const val PATCH_VERSION_ASSET = "patch-version.txt"
     private const val FALLBACK_VALUE = "unknown"
 
     @Volatile
@@ -16,9 +16,7 @@ object AppPatchVersion {
         }
     }
 
-    private fun load(context: Context): String {
-        return runCatching {
-            context.assets.open(PATCH_VERSION_ASSET).bufferedReader().use { it.readText().trim() }
-        }.getOrNull()?.takeIf { it.isNotEmpty() } ?: FALLBACK_VALUE
-    }
+    private fun load(context: Context): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrNull()?.takeIf { !it.isNullOrBlank() } ?: FALLBACK_VALUE
 }
