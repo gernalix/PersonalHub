@@ -48,6 +48,25 @@ class QuickEventWidgetTapRunnerTest {
         assertEquals(0, core.afterWriteCount)
     }
 
+    @Test
+    fun twoDistinctWidgetTargetsStayDistinct() {
+        val core = FakeQuickEventCore(
+            templates = mutableMapOf(
+                21L to QuickEventTemplate(21L, "Coffee", setOf(3L)),
+                22L to QuickEventTemplate(22L, "Water", setOf(4L))
+            )
+        )
+
+        val first = runner(core).run(QuickEventTarget.Template(21L))
+        val second = runner(core).run(QuickEventTarget.Template(22L))
+
+        assertTrue(first is QuickEventWidgetTapResult.Recorded)
+        assertTrue(second is QuickEventWidgetTapResult.Recorded)
+        assertEquals(listOf(21L, 22L), core.inserted.map { it.templateId })
+        assertEquals(listOf("Coffee", "Water"), core.inserted.map { it.title })
+        assertEquals(2, core.afterWriteCount)
+    }
+
     private fun runner(core: FakeQuickEventCore): QuickEventWidgetTapRunner =
         QuickEventWidgetTapRunner(
             core = core,
