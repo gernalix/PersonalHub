@@ -27,6 +27,7 @@ object HubActivityCapture {
         val reversibleUpdate: Boolean = false,
         val reversibleDelete: Boolean = false,
         val captureDelete: Boolean = true,
+        val capturePayload: Boolean = true,
     )
 
     /*
@@ -129,6 +130,7 @@ object HubActivityCapture {
             insertAction = "setting_changed",
             updateActionSql = "'setting_changed'",
             deleteAction = "setting_removed",
+            capturePayload = false,
         ),
         RowSpec(
             table = "wordpulse_sessions",
@@ -162,6 +164,7 @@ object HubActivityCapture {
             updateActionSql = "'setting_changed'",
             deleteAction = "setting_removed",
             captureDelete = false,
+            capturePayload = false,
         ),
     )
 
@@ -183,8 +186,10 @@ object HubActivityCapture {
         val columns = columns(db, spec.table)
         if (columns.isEmpty()) return
         val columnList = columns.joinToString(",")
-        val afterPayload = encodedPayload(columns, "NEW")
-        val beforePayload = encodedPayload(columns, "OLD")
+        val afterPayload = if (spec.capturePayload) encodedPayload(columns, "NEW") else "NULL"
+        val beforePayload = if (spec.capturePayload) encodedPayload(columns, "OLD") else "NULL"
+        val payloadKind = if (spec.capturePayload) HubActivityPayloadKind.ROW_V1 else null
+        val payloadColumns = if (spec.capturePayload) columnList else null
         val base = "hub_activity_${spec.table}"
         listOf("INSERT", "UPDATE", "DELETE").forEach { db.execSQL("DROP TRIGGER IF EXISTS `${base}_$it`") }
 
@@ -205,8 +210,8 @@ object HubActivityCapture {
                     systemSql = if (spec.system) "1" else "0",
                     sourceTable = spec.table,
                     sourceRowKeySql = spec.entityIdNew,
-                    payloadKind = HubActivityPayloadKind.ROW_V1,
-                    payloadColumns = columnList,
+                    payloadKind = payloadKind,
+                    payloadColumns = payloadColumns,
                     beforePayloadSql = "NULL",
                     afterPayloadSql = afterPayload,
                     reversibleSql = if (spec.reversibleInsert) "1" else "0",
@@ -231,8 +236,8 @@ object HubActivityCapture {
                     systemSql = if (spec.system) "1" else "0",
                     sourceTable = spec.table,
                     sourceRowKeySql = spec.entityIdNew,
-                    payloadKind = HubActivityPayloadKind.ROW_V1,
-                    payloadColumns = columnList,
+                    payloadKind = payloadKind,
+                    payloadColumns = payloadColumns,
                     beforePayloadSql = beforePayload,
                     afterPayloadSql = afterPayload,
                     reversibleSql = if (spec.reversibleUpdate) "1" else "0",
@@ -258,8 +263,8 @@ object HubActivityCapture {
                         systemSql = if (spec.system) "1" else "0",
                         sourceTable = spec.table,
                         sourceRowKeySql = spec.entityIdOld,
-                        payloadKind = HubActivityPayloadKind.ROW_V1,
-                        payloadColumns = columnList,
+                        payloadKind = payloadKind,
+                        payloadColumns = payloadColumns,
                         beforePayloadSql = beforePayload,
                         afterPayloadSql = "NULL",
                         reversibleSql = if (spec.reversibleDelete) "1" else "0",
