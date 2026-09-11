@@ -4,6 +4,10 @@ import android.content.Context
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 
 data class HubTemporalFact(
@@ -34,13 +38,28 @@ object HubContextRuntime {
 
     fun temporalProviders(): List<HubTemporalProvider> = adapters().filterIsInstance<HubTemporalProvider>()
 
-    suspend fun temporal(query: HubTemporalQuery, modules: Set<String> = emptySet()): List<HubTemporalRecord> =
-        mergeTemporalSlices(
-            temporalProviders().filter { modules.isEmpty() || it.moduleId in modules }.map { it.queryTemporal(query).records },
-            query.fromMs,
-            query.toMs,
-            modules,
-        )
+    suspend fun summaries(refs: Collection<HubEntityRef>): Map<HubEntityRef, HubEntitySummary> {
+        val distinctRefs = refs.distinct()
+        if (distinctRefs.isEmpty()) return emptyMap()
+        return coroutineScope {
+            distinctRefs.groupBy { it.moduleId to it.entityKind }.map { (kind, groupedRefs) ->
+                async(Dispatchers.IO) {
+                    val resolved = adapter(kind.first, kind.second).summaries(groupedRefs.map { it.canonicalId }.toSet())
+                    groupedRefs.mapNotNull { ref -> resolved[ref.canonicalId]?.let { ref to it } }
+                }
+            }.awaitAll().flatten().toMap()
+        }
+    }
+
+    suspend fun temporal(query: HubTemporalQuery, modules: Set<String> = emptySet()): List<HubTemporalRecord> {
+        val slices = coroutineScope {
+            temporalProviders()
+                .filter { modules.isEmpty() || it.moduleId in modules }
+                .map { provider -> async(Dispatchers.IO) { provider.queryTemporal(query).records } }
+                .awaitAll()
+        }
+        return mergeTemporalSlices(slices, query.fromMs, query.toMs, modules)
+    }
 
     suspend fun createContext(refs: List<Pair<HubEntityRef, String>>, typeId: String? = null, title: String? = null): String {
         val repo = requireNotNull(repository)

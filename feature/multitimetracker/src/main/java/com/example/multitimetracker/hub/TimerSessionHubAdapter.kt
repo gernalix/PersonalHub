@@ -5,6 +5,8 @@ import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.model.SessionUi
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.hubcontext.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, HubTemporalProvider {
     override val moduleId = "timer"
@@ -19,10 +21,21 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
         sessions.searchSessions(query, limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/timer?sessionId=$canonicalId", "com.example.multitimetracker.MainActivity")
 
-    override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage {
-        val offset = query.cursor?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-        val rows = sessions.readTemporalSessions(query.fromMs, query.toMs, query.limit + 1, offset)
-        return HubTemporalPage(rows.take(query.limit).map { it.temporal() }, if (rows.size > query.limit) (offset + query.limit).toString() else null)
+    override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
+        val cursor = decodeHubTemporalCursor(query.cursor)
+        val cursorId = cursor?.stableId?.toLongOrNull()
+        val rows = sessions.readTemporalSessionsKeyset(
+            query.fromMs,
+            query.toMs,
+            query.limit + 1,
+            if (cursorId != null) cursor.sortMs else null,
+            cursorId,
+        )
+        val page = rows.take(query.limit).map { it.temporal() }
+        HubTemporalPage(
+            page,
+            if (rows.size > query.limit) page.lastOrNull()?.let { encodeHubTemporalCursor(it.startMs, it.stableId) } else null,
+        )
     }
 
     private fun SessionUi.temporal() = HubTemporalRecord(moduleId, entityKind, id.toString(), HubTemporalKind.INTERVAL, startMs, endMs, title.ifBlank { context.getString(com.example.multitimetracker.R.string.hub_session_fallback, id) }, entityRef = HubEntityRef(moduleId, entityKind, id.toString()))

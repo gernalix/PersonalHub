@@ -14,6 +14,13 @@ class HubTemporalProviderTest {
         assertEquals("next", query.cursor)
     }
 
+    @Test
+    fun keysetCursorRoundTripsOpaqueStableIds() {
+        val encoded = encodeHubTemporalCursor(1234L, "uuid:with:punctuation")
+        assertEquals(HubTemporalCursor(1234L, "uuid:with:punctuation"), decodeHubTemporalCursor(encoded))
+        assertEquals(null, decodeHubTemporalCursor("broken"))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsUnboundedLimit() {
         HubTemporalQuery(fromMs = 10, toMs = 20, limit = 201)
@@ -29,10 +36,16 @@ class HubTemporalProviderTest {
             override val moduleId = "test"
             private val rows = listOf(10L, 15L, 19L, 20L).map { HubTemporalRecord(moduleId, "event", it.toString(), HubTemporalKind.POINT, it, title = it.toString()) }
             override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage {
-                val offset = query.cursor?.toInt() ?: 0
-                val bounded = rows.filter { it.overlaps(query.fromMs, query.toMs) }.sortedByDescending { it.startMs }
-                val page = bounded.drop(offset).take(query.limit)
-                return HubTemporalPage(page, if (offset + page.size < bounded.size) (offset + page.size).toString() else null)
+                val cursor = decodeHubTemporalCursor(query.cursor)
+                val candidates = rows
+                    .filter { it.overlaps(query.fromMs, query.toMs) }
+                    .sortedWith(compareByDescending<HubTemporalRecord> { it.startMs }.thenByDescending { it.stableId })
+                    .filter { row -> cursor == null || row.startMs < cursor.sortMs || (row.startMs == cursor.sortMs && row.stableId < cursor.stableId) }
+                val page = candidates.take(query.limit)
+                return HubTemporalPage(
+                    page,
+                    if (candidates.size > query.limit) page.lastOrNull()?.let { encodeHubTemporalCursor(it.startMs, it.stableId) } else null,
+                )
             }
         }
         val first = provider.queryTemporal(HubTemporalQuery(10, 20, limit = 2))

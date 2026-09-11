@@ -16,7 +16,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.contracts.database.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.UUID
 
@@ -49,14 +53,18 @@ internal class HubComposerState(
     var fields by mutableStateOf<List<HubContextTypeField>>(emptyList())
     var error by mutableStateOf<String?>(null)
     var savedContextId by mutableStateOf(editingContextId)
+    private var rankingMembersKey: List<Pair<HubEntityRef, String>>? = null
+    private var rankingCounts: Map<HubEntityRef, Int> = emptyMap()
+    private var rankingPlaceId: String? = null
 
     suspend fun initialize() {
         if (!initialized) {
             members = editingContextId?.let { id ->
                 HubContextRuntime.context(id)?.resolvedMembers?.map { ComposerMember(it.summary, it.member.role) }
-            } ?: initialScope.distinct().groupBy { it.moduleId to it.entityKind }.flatMap { (_, refs) ->
-                val resolved = HubContextRuntime.adapter(refs.first().moduleId, refs.first().entityKind).summaries(refs.map { it.canonicalId }.toSet())
-                refs.mapNotNull { ref -> resolved[ref.canonicalId]?.let(::ComposerMember) }
+            } ?: run {
+                val refs = initialScope.distinct()
+                val resolved = HubContextRuntime.summaries(refs)
+                refs.mapNotNull { ref -> resolved[ref]?.let(::ComposerMember) }
             }
             typeId = editingContextId?.let { HubContextRuntime.context(it)?.context?.contextTypeId } ?: typeId
             initialized = true
@@ -77,13 +85,22 @@ internal class HubComposerState(
     }
 
     suspend fun refresh() {
+        val membersKey = members.map { it.summary.ref to it.role }
+        if (membersKey != rankingMembersKey) {
+            rankingCounts = if (members.isEmpty()) emptyMap() else runCatching {
+                HubContextRuntime.explore(members.map { it.summary.ref }, 200)
+                    .facets
+                    .flatMap { facet -> facet.candidates }
+                    .associate { it.summary.ref to it.compatibleContextCount }
+            }.getOrDefault(emptyMap())
+            rankingPlaceId = members.firstOrNull {
+                it.summary.ref.moduleId == "places" && it.summary.ref.entityKind == "place"
+            }?.summary?.ref?.canonicalId
+            rankingMembersKey = membersKey
+        }
         val adapter = selectedAdapter() ?: run { results = emptyList(); return }
-        val candidates = adapter.search(query, 50)
-        val counts = if (members.isEmpty()) emptyMap() else runCatching {
-            HubContextRuntime.explore(members.map { it.summary.ref }, 200).facets.flatMap { facet -> facet.candidates }.associate { it.summary.ref to it.compatibleContextCount }
-        }.getOrDefault(emptyMap())
-        val placeId = members.firstOrNull { it.summary.ref.moduleId == "places" && it.summary.ref.entityKind == "place" }?.summary?.ref?.canonicalId
-        results = rankComposerCandidates(candidates, counts, placeId).take(5)
+        val candidates = withContext(Dispatchers.IO) { adapter.search(query, 50) }
+        results = rankComposerCandidates(candidates, rankingCounts, rankingPlaceId).take(5)
     }
 
     fun chooseKind(adapter: HubEntityAdapter) {
@@ -106,11 +123,11 @@ internal class HubComposerState(
     suspend fun detect(fromMs: Long, toMs: Long) {
         members = members.filterNot { it.automatic }
         val records = HubContextRuntime.temporal(HubTemporalQuery(fromMs, toMs, 20))
-        records.forEach { record ->
-            val ref = record.entityRef ?: HubEntityRef(record.moduleId, record.source, record.stableId)
-            val adapter = HubContextRuntime.adapters().firstOrNull { it.moduleId == ref.moduleId && it.entityKind == ref.entityKind } ?: return@forEach
-            adapter.summaries(setOf(ref.canonicalId))[ref.canonicalId]?.let { add(it, automatic = true) }
+        val refs = records.map { record ->
+            record.entityRef ?: HubEntityRef(record.moduleId, record.source, record.stableId)
         }
+        val resolved = HubContextRuntime.summaries(refs)
+        refs.forEach { ref -> resolved[ref]?.let { add(it, automatic = true) } }
         refresh()
     }
 
@@ -205,6 +222,7 @@ fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
     val androidContext = LocalContext.current
     val state = rememberSaveable(saver = HubComposerState.Saver) { HubComposerState(null, null) }
     val scope = rememberCoroutineScope()
+    var searchJob by remember { mutableStateOf<Job?>(null) }
     var fromText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() - 60 * 60 * 1000L)) }
     var toText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() + 60_000L)) }
     LaunchedEffect(state) { runCatching { state.initialize(); state.detect(parseHubDateTime(fromText), parseHubDateTime(toText)) }.onFailure { state.error = it.message } }
@@ -240,18 +258,39 @@ fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
                 Text(stringResource(R.string.hub_composer_members), style = MaterialTheme.typography.labelLarge)
                 state.members.forEach { member -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text((if (member.automatic) "• " else "") + member.summary.label, Modifier.weight(1f))
-                    TextButton(onClick = { state.remove(member) }) { Text(stringResource(R.string.hub_remove)) }
+                    TextButton(onClick = {
+                        state.remove(member)
+                        searchJob?.cancel()
+                        searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
+                    }) { Text(stringResource(R.string.hub_remove)) }
                 } }
             }
             item {
                 Text(stringResource(R.string.hub_composer_add_kind), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { HubContextRuntime.adapters().forEach { adapter ->
-                    FilterChip(state.selectedKind == key(adapter.moduleId, adapter.entityKind), { state.chooseKind(adapter); scope.launch { state.refresh() } }, label = { Text(adapter.entityKind.replace('_', ' ').replaceFirstChar(Char::uppercase)) })
+                    FilterChip(state.selectedKind == key(adapter.moduleId, adapter.entityKind), {
+                        searchJob?.cancel()
+                        state.chooseKind(adapter)
+                        searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
+                    }, label = { Text(adapter.entityKind.replace('_', ' ').replaceFirstChar(Char::uppercase)) })
                 } }
             }
             if (state.selectedKind != null) item {
-                OutlinedTextField(state.query, { state.query = it; scope.launch { state.refresh() } }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.hub_search)) })
-                state.results.filter { result -> state.members.none { it.summary.ref == result.ref } }.forEach { result -> TextButton({ state.add(result) }, Modifier.fillMaxWidth()) { Text(result.label) } }
+                OutlinedTextField(state.query, { value ->
+                    state.query = value
+                    searchJob?.cancel()
+                    searchJob = scope.launch {
+                        delay(250)
+                        runCatching { state.refresh() }.onFailure { state.error = it.message }
+                    }
+                }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.hub_search)) })
+                state.results.filter { result -> state.members.none { it.summary.ref == result.ref } }.forEach { result ->
+                    TextButton({
+                        state.add(result)
+                        searchJob?.cancel()
+                        searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
+                    }, Modifier.fillMaxWidth()) { Text(result.label) }
+                }
             }
             state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
         }
@@ -263,6 +302,7 @@ internal fun HubContextComposerDialog(anchor: HubEntityRef, editingContextId: St
     val context = LocalContext.current
     val state = rememberSaveable(anchor, editingContextId, saver = HubComposerState.Saver) { HubComposerState(anchor, editingContextId, initialScope = prefill) }
     val scope = rememberCoroutineScope()
+    var searchJob by remember { mutableStateOf<Job?>(null) }
     var templatesOpen by rememberSaveable { mutableStateOf(false) }
     var templateName by rememberSaveable { mutableStateOf("") }
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -289,7 +329,11 @@ internal fun HubContextComposerDialog(anchor: HubEntityRef, editingContextId: St
                     state.members.forEach { member ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(member.summary.label, Modifier.weight(1f))
-                            if (member.summary.ref != anchor) TextButton(onClick = { state.remove(member) }) { Text(stringResource(R.string.hub_remove)) }
+                            if (member.summary.ref != anchor) TextButton(onClick = {
+                                state.remove(member)
+                                searchJob?.cancel()
+                                searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
+                            }) { Text(stringResource(R.string.hub_remove)) }
                         }
                     }
                 }
@@ -299,7 +343,11 @@ internal fun HubContextComposerDialog(anchor: HubEntityRef, editingContextId: St
                         HubContextRuntime.adapters().forEach { adapter ->
                             FilterChip(
                                 selected = state.selectedKind == key(adapter.moduleId, adapter.entityKind),
-                                onClick = { state.chooseKind(adapter); scope.launch { state.refresh() } },
+                                onClick = {
+                                    searchJob?.cancel()
+                                    state.chooseKind(adapter)
+                                    searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
+                                },
                                 modifier = Modifier.testTag("hub-kind-${key(adapter.moduleId, adapter.entityKind)}"),
                                 label = { Text(adapter.entityKind) },
                             )
@@ -307,9 +355,20 @@ internal fun HubContextComposerDialog(anchor: HubEntityRef, editingContextId: St
                     }
                 }
                 if (state.selectedKind != null) item {
-                    OutlinedTextField(state.query, { state.query = it; scope.launch { state.refresh() } }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.hub_search)) })
+                    OutlinedTextField(state.query, { value ->
+                        state.query = value
+                        searchJob?.cancel()
+                        searchJob = scope.launch {
+                            delay(250)
+                            runCatching { state.refresh() }.onFailure { state.error = it.message }
+                        }
+                    }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.hub_search)) })
                     state.results.filter { candidate -> state.members.none { it.summary.ref == candidate.ref } }.forEach { result ->
-                        TextButton(onClick = { state.add(result) }, Modifier.fillMaxWidth().testTag("hub-result-${key(result.ref.moduleId, result.ref.entityKind)}/${result.ref.canonicalId}")) { Text(result.label) }
+                        TextButton(onClick = {
+                            state.add(result)
+                            searchJob?.cancel()
+                            searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
+                        }, Modifier.fillMaxWidth().testTag("hub-result-${key(result.ref.moduleId, result.ref.entityKind)}/${result.ref.canonicalId}")) { Text(result.label) }
                     }
                     if (state.selectedResource()) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

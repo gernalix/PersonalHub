@@ -11,6 +11,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.hubcontext.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -27,12 +31,35 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
     suspend fun search(append: Boolean) {
         val from = parseHubDateTime(fromText)
         val to = parseHubDateTime(toText)
-        val pages = providers.filter { it.moduleId in selected }.map { provider ->
-            provider.moduleId to provider.queryTemporal(HubTemporalQuery(from, to, 50, if (append) cursors[provider.moduleId] else null))
+        val requestedProviders = providers.filter { provider ->
+            provider.moduleId in selected && (!append || cursors[provider.moduleId] != null)
         }
-        cursors = pages.associate { it.first to it.second.nextCursor }
+        if (requestedProviders.isEmpty()) {
+            if (!append) {
+                records = emptyList()
+                cursors = emptyMap()
+            }
+            return
+        }
+        val pages = coroutineScope {
+            requestedProviders.map { provider ->
+                async(Dispatchers.IO) {
+                    provider.moduleId to provider.queryTemporal(
+                        HubTemporalQuery(from, to, 50, if (append) cursors[provider.moduleId] else null),
+                    )
+                }
+            }.awaitAll()
+        }
+        cursors = if (append) {
+            cursors.toMutableMap().apply { pages.forEach { (moduleId, page) -> put(moduleId, page.nextCursor) } }
+        } else {
+            pages.associate { (moduleId, page) -> moduleId to page.nextCursor }
+        }
         val incoming = mergeTemporalSlices(pages.map { it.second.records }, from, to, selected)
-        records = if (append) mergeTemporalSlices(listOf(records, incoming), from, to, selected).distinctBy { Triple(it.moduleId, it.source, it.stableId) } else incoming
+        records = if (append) {
+            mergeTemporalSlices(listOf(records, incoming), from, to, selected)
+                .distinctBy { Triple(it.moduleId, it.source, it.stableId) }
+        } else incoming
     }
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -58,7 +85,9 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
                     record.subtitle?.let { Text(it) }
                 } }
             }
-            if (cursors.values.any { it != null }) item { TextButton(onClick = { scope.launch { runCatching { search(true) }.onFailure { error = it.message } } }) { Text(stringResource(R.string.temporal_more)) } }
+            if (cursors.any { (moduleId, cursor) -> moduleId in selected && cursor != null }) item {
+                TextButton(onClick = { scope.launch { runCatching { search(true) }.onFailure { error = it.message } } }) { Text(stringResource(R.string.temporal_more)) }
+            }
         }
     }
 }

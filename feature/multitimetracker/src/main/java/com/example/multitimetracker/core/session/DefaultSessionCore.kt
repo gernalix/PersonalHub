@@ -8,6 +8,7 @@ import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.TimedTagNotificationType
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.persistence.SessionRepository
+import com.example.multitimetracker.persistence.TemporalSessionQuery
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import kotlinx.coroutines.runBlocking
@@ -25,6 +26,9 @@ class DefaultSessionCore(private val context: Context) : SessionCore {
     private val repo: SessionRepository by lazy(LazyThreadSafetyMode.NONE) {
         SessionRepository(context)
     }
+    private val temporalQuery: TemporalSessionQuery by lazy(LazyThreadSafetyMode.NONE) {
+        TemporalSessionQuery(context)
+    }
 
     override fun readSessionById(sessionId: Long): SessionUi? =
         repo.readSessionById(sessionId)
@@ -37,6 +41,9 @@ class DefaultSessionCore(private val context: Context) : SessionCore {
 
     override fun readTemporalSessions(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<SessionUi> =
         repo.readTemporalSessions(fromMs, toMs, limit, offset)
+
+    fun readTemporalSessionsKeyset(fromMs: Long, toMs: Long, limit: Int, cursorStartMs: Long?, cursorId: Long?): List<SessionUi> =
+        temporalQuery.read(fromMs, toMs, limit, cursorStartMs, cursorId)
 
     override fun readRunningSessions(): List<SessionUi> =
         repo.readRunningSessions()

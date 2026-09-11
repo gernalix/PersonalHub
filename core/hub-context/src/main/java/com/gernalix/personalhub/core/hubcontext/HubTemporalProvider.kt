@@ -19,6 +19,29 @@ data class HubTemporalPage(
     val nextCursor: String? = null,
 )
 
+data class HubTemporalCursor(val sortMs: Long, val stableId: String)
+
+private const val HUB_TEMPORAL_CURSOR_SEPARATOR = '\u001F'
+
+fun encodeHubTemporalCursor(sortMs: Long, stableId: String): String {
+    require(stableId.isNotBlank())
+    return buildString {
+        append(sortMs)
+        append(HUB_TEMPORAL_CURSOR_SEPARATOR)
+        append(stableId)
+    }
+}
+
+fun decodeHubTemporalCursor(cursor: String?): HubTemporalCursor? {
+    if (cursor.isNullOrBlank()) return null
+    val separator = cursor.indexOf(HUB_TEMPORAL_CURSOR_SEPARATOR)
+    if (separator <= 0 || separator >= cursor.lastIndex) return null
+    val sortMs = cursor.substring(0, separator).toLongOrNull() ?: return null
+    val stableId = cursor.substring(separator + 1)
+    if (stableId.isBlank()) return null
+    return HubTemporalCursor(sortMs, stableId)
+}
+
 /**
  * Module-owned bounded temporal read API. Implementations must filter in their data layer and must
  * not materialize an entire table merely to apply [HubTemporalQuery] in UI code.

@@ -1,11 +1,14 @@
 package com.gernalix.sostanze.hub
 
 import android.content.Context
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.hubcontext.*
 import com.gernalix.sostanze.data.SubstanceEntity
 import com.gernalix.sostanze.data.IntakeHubView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class SubstanceHubAdapter(private val context: Context) : HubEntityAdapter {
     override val moduleId = "substances"
@@ -35,7 +38,8 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
     override val moduleId = "substances"
     override val entityKind = "intake"
     override val capabilities = setOf("health", "intake", "time_point")
-    private val dao get() = PersonalHubDatabase.get(context).dao()
+    private val database get() = PersonalHubDatabase.get(context)
+    private val dao get() = database.dao()
 
     override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let { dao.intakeById(it) } != null
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
@@ -43,12 +47,56 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
     override suspend fun search(query: String, limit: Int) = dao.searchIntakeHubViews(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/substances", "com.gernalix.sostanze.MainActivity")
 
-    override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage {
-        val offset = query.cursor?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-        val rows = dao.temporalIntakeHubViews(query.fromMs, query.toMs, query.limit + 1, offset)
-        return HubTemporalPage(rows.take(query.limit).map { it.temporal() }, if (rows.size > query.limit) (offset + query.limit).toString() else null)
+    override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
+        val decoded = decodeHubTemporalCursor(query.cursor)
+        val cursorId = decoded?.stableId?.toLongOrNull()
+        val cursor = decoded?.takeIf { cursorId != null }
+        val args = mutableListOf<Any?>(query.fromMs, query.toMs)
+        val cursorClause = if (cursor != null) {
+            args += cursor.sortMs
+            args += cursor.sortMs
+            args += cursorId
+            "AND (i.timestamp_ms < ? OR (i.timestamp_ms = ? AND i.id < ?))"
+        } else ""
+        args += query.limit + 1
+        val sql = """
+            SELECT i.id, i.timestamp_ms, s.name, i.dose, i.dose_unit
+            FROM intake_events i
+            JOIN substances s ON s.id = i.substance_id
+            WHERE i.timestamp_ms >= ? AND i.timestamp_ms < ?
+              $cursorClause
+            ORDER BY i.timestamp_ms DESC, i.id DESC
+            LIMIT ?
+        """.trimIndent()
+        val rows = database.openHelper.readableDatabase.query(SimpleSQLiteQuery(sql, args.toTypedArray())).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    val id = c.getLong(0)
+                    val timestampMs = c.getLong(1)
+                    val name = c.getString(2)
+                    val dose = c.getDouble(3)
+                    val unit = c.getString(4)
+                    add(
+                        HubTemporalRecord(
+                            moduleId,
+                            entityKind,
+                            id.toString(),
+                            HubTemporalKind.POINT,
+                            timestampMs,
+                            title = name,
+                            subtitle = "$dose $unit",
+                            entityRef = HubEntityRef(moduleId, entityKind, id.toString()),
+                        ),
+                    )
+                }
+            }
+        }
+        val page = rows.take(query.limit)
+        HubTemporalPage(
+            page,
+            if (rows.size > query.limit) page.lastOrNull()?.let { encodeHubTemporalCursor(it.startMs, it.stableId) } else null,
+        )
     }
 
     private fun IntakeHubView.summary() = HubEntitySummary(HubEntityRef(moduleId, entityKind, intake.id.toString()), substanceName, "${intake.dose} ${intake.doseUnit}", attributes = mapOf("time_ms" to intake.timestampMs.toString()))
-    private fun IntakeHubView.temporal() = HubTemporalRecord(moduleId, entityKind, intake.id.toString(), HubTemporalKind.POINT, intake.timestampMs, title = substanceName, subtitle = "${intake.dose} ${intake.doseUnit}", entityRef = HubEntityRef(moduleId, entityKind, intake.id.toString()))
 }
