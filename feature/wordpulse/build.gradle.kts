@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val personalHubVersion = rootProject.file("version.txt").readText().trim().toInt()
+
 android {
     namespace = "com.wordpulse.app"
     compileSdk = 37
@@ -12,8 +14,8 @@ android {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "APPLICATION_ID", "\"com.wordpulse.app\"")
-        buildConfigField("int", "VERSION_CODE", "2")
-        buildConfigField("String", "VERSION_NAME", "\"2\"")
+        buildConfigField("int", "VERSION_CODE", personalHubVersion.toString())
+        buildConfigField("String", "VERSION_NAME", "\"$personalHubVersion\"")
     }
 
     compileOptions {
