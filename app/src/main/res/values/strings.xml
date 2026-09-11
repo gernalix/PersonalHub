@@ -2,6 +2,7 @@
 <resources>
     <string name="home_context">Context</string>
     <string name="home_search">Search</string>
+    <string name="home_activity_register">Activity</string>
     <string name="temporal_title">Search by time</string>
     <string name="temporal_back">Back</string>
     <string name="temporal_from">From (YYYY-MM-DD HH:MM)</string>
@@ -71,4 +72,34 @@
     <string name="datasette_error">Unable to save. Check the HTTPS address, database, table and access token.</string>
     <string name="module_soldi">Soldi</string>
     <string name="module_soldi_subtitle">Transactions and products</string>
+
+    <string name="activity_title">Activity register</string>
+    <string name="activity_back">Back</string>
+    <string name="activity_filter_all">All</string>
+    <string name="activity_filter_system">System</string>
+    <string name="activity_module_episodes">Episodes</string>
+    <string name="activity_module_other">Other</string>
+    <string name="activity_empty">No recorded changes match these filters.</string>
+    <string name="activity_more">Load more</string>
+    <string name="activity_meta">%1$s · %2$s</string>
+    <string name="activity_action_created">Created %1$s</string>
+    <string name="activity_action_updated">Updated %1$s</string>
+    <string name="activity_action_deleted">Deleted %1$s</string>
+    <string name="activity_action_archived">Archived %1$s</string>
+    <string name="activity_action_restored">Restored %1$s</string>
+    <string name="activity_action_recorded">Recorded %1$s</string>
+    <string name="activity_action_started">Started %1$s</string>
+    <string name="activity_action_completed">Completed %1$s</string>
+    <string name="activity_action_changed">Changed %1$s</string>
+    <string name="activity_status_reverted">Reverted</string>
+    <string name="activity_status_conflict">Conflict</string>
+    <string name="activity_status_non_reversible">Undo unavailable</string>
+    <string name="activity_undo">Undo</string>
+    <string name="activity_undo_success">Change undone. The compensating action was added to the register.</string>
+    <string name="activity_undo_not_found">This activity no longer exists.</string>
+    <string name="activity_undo_not_supported">This change cannot be undone safely.</string>
+    <string name="activity_undo_already_reverted">This change has already been undone.</string>
+    <string name="activity_undo_stale">The data changed later, so this action was not undone.</string>
+    <string name="activity_undo_referenced">Other data depends on this item, so it was not removed.</string>
+    <string name="activity_undo_invalid">The stored undo data is incomplete. Nothing was changed.</string>
 </resources>
