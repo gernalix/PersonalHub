@@ -74,8 +74,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.personalhub.core.database.TimerSyncShadow::class,
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
-    HubResource::class,
-], version = 10, exportSchema = true)
+    HubResource::class, HubActivityEntity::class,
+], version = 11, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -85,6 +85,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun photoDao(): PeoplePhotoDao
     abstract fun hubContextDao(): HubContextDao
     abstract fun hubResourceDao(): HubResourceDao
+    abstract fun activityDao(): HubActivityDao
 
     final override suspend fun referenceCount(placeId: String): Int =
         financeDao().transactionCountForPlace(placeId) + financeDao().storeCountForPlace(placeId)
@@ -92,7 +93,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 10
+        const val SCHEMA_VERSION = 11
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -200,15 +201,34 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                         db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                     }
                 })
+                .addMigrations(object : androidx.room.migration.Migration(10, 11) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_activity_log` (`id` TEXT NOT NULL, `occurred_at` INTEGER NOT NULL, `module_id` TEXT NOT NULL, `action` TEXT NOT NULL, `entity_kind` TEXT, `entity_id` TEXT, `entity_label` TEXT, `detail_key` TEXT, `detail_value` TEXT, `origin` TEXT NOT NULL, `is_system` INTEGER NOT NULL, `source_table` TEXT NOT NULL, `source_row_key` TEXT, `payload_kind` TEXT, `payload_columns` TEXT, `before_payload` TEXT, `after_payload` TEXT, `payload_version` INTEGER NOT NULL, `app_version` INTEGER NOT NULL, `group_id` TEXT, `reversible` INTEGER NOT NULL, `status` TEXT NOT NULL, `reverted_at` INTEGER, `reverts_activity_id` TEXT, PRIMARY KEY(`id`))")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_activity_log_occurred_at_id` ON `hub_activity_log` (`occurred_at`, `id`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_activity_log_module_id_occurred_at` ON `hub_activity_log` (`module_id`, `occurred_at`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_activity_log_module_id_entity_kind_entity_id` ON `hub_activity_log` (`module_id`, `entity_kind`, `entity_id`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_activity_log_status_occurred_at` ON `hub_activity_log` (`status`, `occurred_at`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_activity_log_group_id_occurred_at` ON `hub_activity_log` (`group_id`, `occurred_at`)")
+                        db.execSQL("CREATE INDEX IF NOT EXISTS `index_hub_activity_log_reverts_activity_id` ON `hub_activity_log` (`reverts_activity_id`)")
+                        HubActivityCapture.createInternalTables(db)
+                        db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
+                    }
+                })
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
-                        val tables = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('room_master_table','android_metadata','hub_generation','hub_sync_pending','hub_sync_known')").use { c ->
+                        val tables = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('room_master_table','android_metadata','hub_generation','hub_sync_pending','hub_sync_known','hub_activity_undo_context')").use { c ->
                             buildList { while (c.moveToNext()) add(c.getString(0)) }
                         }
                         SyncJournal.install(db)
+                        val appVersion = runCatching {
+                            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                                context.packageManager.getPackageInfo(context.packageName, 0),
+                            )
+                        }.getOrDefault(0L)
+                        HubActivityCapture.install(db, appVersion)
                         tables.forEach { table ->
                             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
                                 db.execSQL("CREATE TRIGGER IF NOT EXISTS `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END")
