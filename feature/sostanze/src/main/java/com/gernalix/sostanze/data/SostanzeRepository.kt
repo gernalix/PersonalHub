@@ -75,6 +75,8 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
     /** Production databases intentionally start empty. Demo/personal rows are never seeded. */
     suspend fun initialize() = Unit
 
+    suspend fun substanceById(substanceId: Long): SubstanceEntity? = dao.substanceById(substanceId)
+
     suspend fun saveSubstance(substance: SubstanceEntity): SubstanceSaveOutcome = db.withTransaction {
         val canonical = canonicalName(substance.name)
         if (canonical.isEmpty()) return@withTransaction SubstanceSaveOutcome.Invalid("name")

@@ -78,6 +78,17 @@
     <string name="import_confirm_message">Importing replaces the current app data after schema validation.</string>
     <string name="export_status_not_configured">Export not configured</string>
     <string name="export_status_ready">Export active: personalhub.db</string>
+    <string name="widget_substances_desc">Run a selected Substances button from the home screen</string>
+    <string name="widget_substances_name">Substances action</string>
+    <string name="widget_substances_choose">Choose a Substances button</string>
+    <string name="widget_substances_search">Search</string>
+    <string name="widget_substances_save">Save widget</string>
+    <string name="widget_substances_empty">No Substances buttons are available.</string>
+    <string name="widget_substances_no_results">No matching Substances buttons.</string>
+    <string name="widget_substances_configure">Choose substance</string>
+    <string name="widget_substances_unavailable">Substance unavailable. Reconfigure widget.</string>
+    <string name="widget_substances_untitled">Untitled substance</string>
+    <string name="widget_substances_write_failed">Could not save intake.</string>
     <string name="export_status_failed">Export failed: %1$s</string>
     <string name="import_status_failed">Import rejected: %1$s</string>
     <string name="export_folder_hint">Automatic export includes all five PersonalHub modules and contact photos.</string>

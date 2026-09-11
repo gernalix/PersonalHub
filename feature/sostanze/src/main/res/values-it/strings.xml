@@ -78,6 +78,17 @@
     <string name="import_confirm_message">L\'import sostituisce i dati attuali dopo validazione dello schema.</string>
     <string name="export_status_not_configured">Export non configurato</string>
     <string name="export_status_ready">Export attivo: personalhub.db</string>
+    <string name="widget_substances_desc">Esegui un pulsante Substances scelto dalla home</string>
+    <string name="widget_substances_name">Azione Substances</string>
+    <string name="widget_substances_choose">Scegli un pulsante Substances</string>
+    <string name="widget_substances_search">Cerca</string>
+    <string name="widget_substances_save">Salva widget</string>
+    <string name="widget_substances_empty">Nessun pulsante Substances disponibile.</string>
+    <string name="widget_substances_no_results">Nessun pulsante Substances corrispondente.</string>
+    <string name="widget_substances_configure">Scegli sostanza</string>
+    <string name="widget_substances_unavailable">Sostanza non disponibile. Riconfigura il widget.</string>
+    <string name="widget_substances_untitled">Sostanza senza titolo</string>
+    <string name="widget_substances_write_failed">Impossibile salvare assunzione.</string>
     <string name="export_status_failed">Export fallito: %1$s</string>
     <string name="import_status_failed">Import respinto: %1$s</string>
     <string name="export_folder_hint">L’esportazione automatica include tutti i cinque moduli e le foto dei contatti.</string>

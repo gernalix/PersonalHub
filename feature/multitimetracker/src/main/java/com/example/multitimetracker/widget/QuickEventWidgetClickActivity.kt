@@ -9,8 +9,6 @@ import android.widget.Toast
 import com.example.multitimetracker.MainActivity
 import com.example.multitimetracker.R
 import com.example.multitimetracker.core.quickevent.DefaultQuickEventCore
-import com.example.multitimetracker.core.quickevent.QuickEventExecutionResult
-import com.example.multitimetracker.core.quickevent.QuickEventExecutor
 import com.example.multitimetracker.core.quickevent.QuickEventTarget
 import com.example.multitimetracker.persistence.AuditLogSqlite
 import com.example.multitimetracker.persistence.PersistentMutationTracker
@@ -29,31 +27,32 @@ class QuickEventWidgetClickActivity : Activity() {
             return
         }
 
-        val result = runCatching {
-            QuickEventExecutor(
-                core = DefaultQuickEventCore(appCtx),
-                audit = { action, entityType, entityId, summary, payload ->
-                    AuditLogSqlite.insert(appCtx, isSystem = false, action = action, entityType = entityType, entityId = entityId, summary = summary, payload = payload)
-                },
-                afterSuccessfulWrite = {
-                    PersistentMutationTracker.requestExport(appCtx)
-                }
-            ).execute(target)
-        }.getOrElse {
-            Toast.makeText(appCtx, getString(R.string.quick_event_write_failed), Toast.LENGTH_SHORT).show()
-            QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
-            finishWithoutAnimation()
-            return
-        }
+        val result = QuickEventWidgetTapRunner(
+            core = DefaultQuickEventCore(appCtx),
+            audit = { action, entityType, entityId, summary, payload ->
+                AuditLogSqlite.insert(appCtx, isSystem = false, action = action, entityType = entityType, entityId = entityId, summary = summary, payload = payload)
+            },
+            afterSuccessfulWrite = {
+                PersistentMutationTracker.requestExport(appCtx)
+                appCtx.sendBroadcast(
+                    Intent(QuickSessionWidgetProvider.ACTION_SNAPSHOT_CHANGED)
+                        .setPackage(appCtx.packageName)
+                )
+            }
+        ).run(target)
 
         when (result) {
-            is QuickEventExecutionResult.Executed -> {
+            is QuickEventWidgetTapResult.Recorded -> {
                 Toast.makeText(appCtx, getString(R.string.quick_event_recorded, result.title), Toast.LENGTH_SHORT).show()
                 QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
             }
-            is QuickEventExecutionResult.NeedsInput -> openTimerForCompletion(result.target)
-            is QuickEventExecutionResult.Unavailable -> {
+            is QuickEventWidgetTapResult.NeedsInput -> openTimerForCompletion(result.target)
+            QuickEventWidgetTapResult.Unavailable -> {
                 Toast.makeText(appCtx, getString(R.string.widget_quick_event_unavailable), Toast.LENGTH_SHORT).show()
+                QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
+            }
+            QuickEventWidgetTapResult.Failed -> {
+                Toast.makeText(appCtx, getString(R.string.quick_event_write_failed), Toast.LENGTH_SHORT).show()
                 QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
             }
         }
