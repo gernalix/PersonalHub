@@ -34,6 +34,8 @@
     <string name="prn">PRN</string>
     <string name="new_prescription">New prescription</string>
     <string name="prescription_history">Prescription history</string>
+    <string name="order_date">Order date</string>
+    <string name="prescription_date">Prescription date</string>
     <string name="rules">Rules</string>
     <string name="user_rules_only">Rules are entered by the user. No hardcoded medical logic.</string>
     <string name="add_interaction_rule">Add interaction rule</string>
