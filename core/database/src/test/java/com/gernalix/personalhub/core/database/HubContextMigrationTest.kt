@@ -38,12 +38,13 @@ class HubContextMigrationTest {
         val database = PersonalHubDatabase.openTemporary(context, name)
         try {
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(10, sqlite.version)
+            assertEquals(11, sqlite.version)
             assertEquals("{\"kept\":true}", scalarText(sqlite, "SELECT json FROM hub_preferences WHERE namespace='migration-proof'"))
-            assertEquals(45L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(46L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
             assertEquals(5L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('hub_entity_bindings','hub_contexts','hub_context_members','hub_context_types','hub_context_type_fields')"))
             assertTrue(scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='index' AND name='index_hub_context_members_entity_id_context_id'") == 1L)
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='hub_resources'"))
+            assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='hub_activity_log'"))
             sqlite.execSQL("INSERT INTO hub_contexts VALUES('ctx',NULL,NULL,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
             try {
                 sqlite.execSQL("INSERT INTO hub_context_members VALUES('ctx','missing','',0)")
@@ -54,7 +55,6 @@ class HubContextMigrationTest {
             context.deleteDatabase(name)
         }
     }
-
 
     @Test fun versionEightLocksSystemTypeWithoutChangingUserContextsOrResources() {
         val name = "hub-context-lock-migration-${UUID.randomUUID()}.db"
@@ -81,12 +81,13 @@ class HubContextMigrationTest {
         val database = PersonalHubDatabase.openTemporary(context, name)
         try {
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(10, sqlite.version)
+            assertEquals(11, sqlite.version)
             assertEquals(1L, scalarLong(sqlite, "SELECT locked FROM hub_context_types WHERE id='timer_activity'"))
             assertEquals(0L, scalarLong(sqlite, "SELECT locked FROM hub_context_types WHERE id='user_type'"))
             assertEquals("Kept", scalarText(sqlite, "SELECT title FROM hub_contexts WHERE id='ctx'"))
             assertEquals("Kept resource", scalarText(sqlite, "SELECT title FROM hub_resources WHERE id='res'"))
-            assertEquals(10L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(11L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='hub_activity_log'"))
         } finally {
             database.close()
             context.deleteDatabase(name)
