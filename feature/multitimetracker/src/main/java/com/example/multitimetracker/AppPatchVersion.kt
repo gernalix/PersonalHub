@@ -2,10 +2,10 @@ package com.example.multitimetracker
 
 import android.content.Context
 
+/** Compatibility wrapper retained for callers; value is the host PersonalHub version. */
 object AppPatchVersion {
     const val AUTO_CONSISTENCY_REVISION = 1L
 
-    private const val PATCH_VERSION_ASSET = "patch-version.txt"
     private const val FALLBACK_VALUE = "unknown"
 
     @Volatile
@@ -18,9 +18,7 @@ object AppPatchVersion {
         }
     }
 
-    private fun load(context: Context): String {
-        return runCatching {
-            context.assets.open(PATCH_VERSION_ASSET).bufferedReader().use { it.readText().trim() }
-        }.getOrNull()?.takeIf { it.isNotEmpty() } ?: FALLBACK_VALUE
-    }
+    private fun load(context: Context): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrNull()?.takeIf { !it.isNullOrBlank() } ?: FALLBACK_VALUE
 }
