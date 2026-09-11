@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -70,6 +71,10 @@ fun PersonalHubApp() {
         HubTemporalSearchScreen(onBack = { topDestination = null })
         return
     }
+    if (topDestination == "activity") {
+        HubActivityRegisterScreen(onBack = { topDestination = null })
+        return
+    }
     if (showSettings) {
         HubSettings(onBack = { showSettings = false })
         return
@@ -89,13 +94,17 @@ fun PersonalHubApp() {
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { topDestination = "composer" }) { Text(stringResource(R.string.home_context)) }
-                OutlinedButton(onClick = { topDestination = "search" }) { Text(stringResource(R.string.home_search)) }
-                OutlinedButton(onClick = { showSettings = true }) { Text(stringResource(R.string.settings_title)) }
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item { OutlinedButton(onClick = { topDestination = "composer" }) { Text(stringResource(R.string.home_context)) } }
+                item { OutlinedButton(onClick = { topDestination = "search" }) { Text(stringResource(R.string.home_search)) } }
+                item { OutlinedButton(onClick = { topDestination = "activity" }) { Text(stringResource(R.string.home_activity_register)) } }
+                item { OutlinedButton(onClick = { showSettings = true }) { Text(stringResource(R.string.settings_title)) } }
             }
             HomeAutoExportStatusIndicator()
         }
