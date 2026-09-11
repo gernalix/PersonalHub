@@ -21,6 +21,8 @@ interface FinanceDao {
     suspend fun transactionViewsByUuid(uuids: List<String>): List<TransactionView>
     @Query("SELECT t.*, COALESCE(p.name,n.name,'') AS title,c.name AS chain,l.nickname AS place FROM finance_transactions t LEFT JOIN finance_products p ON p.id=t.productId LEFT JOIN finance_titles n ON n.id=t.titleId LEFT JOIN finance_chains c ON c.id=t.chainId LEFT JOIN places l ON l.uuid=t.placeId WHERE COALESCE(p.name,n.name,'') LIKE '%' || :query || '%' OR t.notes LIKE '%' || :query || '%' ORDER BY t.occurredAt DESC,t.id DESC LIMIT :limit")
     suspend fun searchTransactionViews(query: String, limit: Int): List<TransactionView>
+    @Query("SELECT t.*, COALESCE(p.name,n.name,'') AS title,c.name AS chain,l.nickname AS place FROM finance_transactions t LEFT JOIN finance_products p ON p.id=t.productId LEFT JOIN finance_titles n ON n.id=t.titleId LEFT JOIN finance_chains c ON c.id=t.chainId LEFT JOIN places l ON l.uuid=t.placeId WHERE t.occurredAt >= :fromIso AND t.occurredAt < :toIso ORDER BY t.occurredAt DESC,t.uuid DESC LIMIT :limit OFFSET :offset")
+    suspend fun temporalTransactionViews(fromIso: String, toIso: String, limit: Int, offset: Int): List<TransactionView>
     @Query("SELECT name FROM finance_titles WHERE id=:id") suspend fun titleName(id: Long): String?
     @Query("SELECT name FROM finance_chains WHERE id=:id") suspend fun chainName(id: Long): String?
     @Insert suspend fun add(value: FinanceAccount)

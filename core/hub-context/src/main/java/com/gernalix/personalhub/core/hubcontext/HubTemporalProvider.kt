@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import com.gernalix.personalhub.contracts.database.HubEntitySummary
+
 data class HubTemporalQuery(
     val fromMs: Long,
     val toMs: Long,
@@ -24,4 +26,10 @@ data class HubTemporalPage(
 interface HubTemporalProvider {
     val moduleId: String
     suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage
+}
+
+data class HubPlaceSuggestions(val preselect: HubEntitySummary?, val candidates: List<HubEntitySummary>)
+
+interface HubPlaceSuggestionProvider {
+    suspend fun suggestPlaces(latitude: Double?, longitude: Double?, limit: Int = 5): HubPlaceSuggestions
 }

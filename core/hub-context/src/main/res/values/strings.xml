@@ -8,6 +8,10 @@
     <string name="hub_composer_add_kind">+ Add</string>
     <string name="hub_remove">Remove</string>
     <string name="hub_search">Search</string>
+    <string name="hub_time_anchor">Time anchor</string>
+    <string name="hub_from">From (epoch ms)</string>
+    <string name="hub_to">To (epoch ms)</string>
+    <string name="hub_detect">Detect related items</string>
     <string name="hub_new_entity_name">New entity name</string>
     <string name="hub_create">Create</string>
     <string name="hub_create_not_supported">This entity kind does not support inline creation.</string>

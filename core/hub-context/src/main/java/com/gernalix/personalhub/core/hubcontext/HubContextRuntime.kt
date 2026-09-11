@@ -32,6 +32,16 @@ object HubContextRuntime {
 
     fun adapters(): List<HubEntityAdapter> = requireNotNull(registry) { "Hub Context runtime is not initialized" }.all().toList()
 
+    fun temporalProviders(): List<HubTemporalProvider> = adapters().filterIsInstance<HubTemporalProvider>()
+
+    suspend fun temporal(query: HubTemporalQuery, modules: Set<String> = emptySet()): List<HubTemporalRecord> =
+        mergeTemporalSlices(
+            temporalProviders().filter { modules.isEmpty() || it.moduleId in modules }.map { it.queryTemporal(query).records },
+            query.fromMs,
+            query.toMs,
+            modules,
+        )
+
     suspend fun createContext(refs: List<Pair<HubEntityRef, String>>, typeId: String? = null, title: String? = null): String {
         val repo = requireNotNull(repository)
         val drafts = refs.distinct().map { (ref, role) -> HubContextMemberDraft(repo.bind(ref).id, role) }

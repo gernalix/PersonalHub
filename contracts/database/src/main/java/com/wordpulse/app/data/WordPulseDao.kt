@@ -45,6 +45,9 @@ interface WordPulseDao {
     @Query("SELECT * FROM wordpulse_sessions WHERE id LIKE '%' || :query || '%' ORDER BY started_at_utc_ms DESC LIMIT :limit")
     suspend fun searchSessions(query: String, limit: Int): List<WordSession>
 
+    @Query("SELECT * FROM wordpulse_sessions WHERE started_at_utc_ms < :toMs AND (ended_at_utc_ms IS NULL OR ended_at_utc_ms > :fromMs) ORDER BY started_at_utc_ms DESC,id DESC LIMIT :limit OFFSET :offset")
+    suspend fun temporalSessions(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<WordSession>
+
     @Query("SELECT * FROM wordpulse_sessions ORDER BY started_at_utc_ms ASC")
     suspend fun getSessions(): List<WordSession>
 

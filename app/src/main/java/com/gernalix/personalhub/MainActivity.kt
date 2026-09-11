@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 import com.gernalix.personalhub.capsules.settings.HubSettings
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
+import com.gernalix.personalhub.core.hubcontext.HubContextComposerScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +61,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PersonalHubApp() {
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var topDestination by rememberSaveable { mutableStateOf<String?>(null) }
+    if (topDestination == "composer") {
+        HubContextComposerScreen(onBack = { topDestination = null })
+        return
+    }
+    if (topDestination == "search") {
+        HubTemporalSearchScreen(onBack = { topDestination = null })
+        return
+    }
     if (showSettings) {
         HubSettings(onBack = { showSettings = false })
         return
@@ -82,8 +92,10 @@ fun PersonalHubApp() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(onClick = { showSettings = true }) {
-                Text(stringResource(R.string.settings_title))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { topDestination = "composer" }) { Text(stringResource(R.string.home_context)) }
+                OutlinedButton(onClick = { topDestination = "search" }) { Text(stringResource(R.string.home_search)) }
+                OutlinedButton(onClick = { showSettings = true }) { Text(stringResource(R.string.settings_title)) }
             }
             HomeAutoExportStatusIndicator()
         }

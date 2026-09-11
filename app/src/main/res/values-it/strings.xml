@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="home_context">Contesto</string>
+    <string name="home_search">Cerca</string>
+    <string name="temporal_title">Cerca per tempo</string>
+    <string name="temporal_back">Indietro</string>
+    <string name="temporal_from">Da (millisecondi epoch)</string>
+    <string name="temporal_to">A (millisecondi epoch)</string>
+    <string name="temporal_search">Cerca</string>
+    <string name="temporal_more">Carica altro</string>
     <string name="app_name">PersonalHub</string>
     <string name="module_people">Persone</string>
     <string name="module_people_subtitle">Contatti, campi, eventi, tag</string>

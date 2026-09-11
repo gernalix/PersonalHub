@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="home_context">Context</string>
+    <string name="home_search">Search</string>
+    <string name="temporal_title">Search by time</string>
+    <string name="temporal_back">Back</string>
+    <string name="temporal_from">From (epoch ms)</string>
+    <string name="temporal_to">To (epoch ms)</string>
+    <string name="temporal_search">Search</string>
+    <string name="temporal_more">Load more</string>
     <string name="app_name">PersonalHub</string>
     <string name="module_people">People</string>
     <string name="module_people_subtitle">Contacts, fields, events, tags</string>

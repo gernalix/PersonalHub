@@ -35,6 +35,9 @@ class DefaultSessionCore(private val context: Context) : SessionCore {
     override fun searchSessions(query: String, limit: Int): List<SessionUi> =
         repo.searchSessions(query, limit)
 
+    override fun readTemporalSessions(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<SessionUi> =
+        repo.readTemporalSessions(fromMs, toMs, limit, offset)
+
     override fun readRunningSessions(): List<SessionUi> =
         repo.readRunningSessions()
 

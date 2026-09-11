@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+
 enum class HubTemporalKind { POINT, INTERVAL }
 
 data class HubTemporalRecord(
@@ -11,6 +13,7 @@ data class HubTemporalRecord(
     val endMs: Long? = null,
     val title: String,
     val subtitle: String? = null,
+    val entityRef: HubEntityRef? = null,
 ) {
     init {
         require(moduleId.isNotBlank())

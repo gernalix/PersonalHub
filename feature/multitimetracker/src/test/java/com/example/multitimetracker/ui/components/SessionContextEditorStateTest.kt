@@ -20,37 +20,12 @@ class SessionContextEditorStateTest {
         assertEquals("Nuovo luogo", restored.placeDraft)
     }
 
-    @Test fun newSessionContextSaveUsesCreatedSessionIdOnly() = runBlocking {
-        val savedSessionIds = mutableListOf<Long>()
-        var createCalls = 0
-
-        fun createNewSession(onCreated: (SessionUi) -> Unit) {
-            createCalls += 1
-            assertTrue(savedSessionIds.isEmpty())
-            onCreated(session(id = 42L))
-        }
-
-        createNewSession { createdSession ->
-            runBlocking {
-                saveContextForCreatedTimerSession(createdSession) { sessionId ->
-                    savedSessionIds += sessionId
-                }
-            }
-        }
-
-        assertEquals(1, createCalls)
-        assertEquals(listOf(42L), savedSessionIds)
-    }
-
-    @Test fun draftSessionIdCannotBeUsedForContextSave() = runBlocking {
-        try {
-            saveContextForCreatedTimerSession(session(id = -1L)) {
-                fail("Context save must not run for a draft Timer session")
-            }
-            fail("Draft Timer session should be rejected")
-        } catch (expected: IllegalArgumentException) {
-            assertEquals("Timer session must be persisted before saving Context", expected.message)
-        }
+    @Test fun timerMetadataSaveDoesNotInvokeContextSave() {
+        val metadataCalls = mutableListOf<Long>()
+        var contextSaveCalls = 0
+        saveSessionMetadataOnly(42L, "Focus", setOf(7L)) { id, _, _ -> metadataCalls += id }
+        assertEquals(listOf(42L), metadataCalls)
+        assertEquals(0, contextSaveCalls)
     }
 
     private fun session(id: Long): SessionUi = SessionUi(

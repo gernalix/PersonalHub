@@ -1,6 +1,7 @@
 package com.gernalix.luoghi.data
 
 import androidx.room.Dao
+import androidx.room.ColumnInfo
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -9,6 +10,14 @@ import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
+
+data class PlaceVisitHubRow(
+    @ColumnInfo(name = "stable_id") val stableId: String,
+    @ColumnInfo(name = "place_id") val placeId: String,
+    @ColumnInfo(name = "place_name") val placeName: String,
+    @ColumnInfo(name = "start_ms") val startMs: Long,
+    @ColumnInfo(name = "end_ms") val endMs: Long?,
+)
 
 @Dao
 interface PlaceDao {
@@ -94,6 +103,9 @@ interface PlaceDao {
         """,
     )
     fun placesWithCoordinatesBlocking(limit: Int): List<PlaceEntity>
+
+    @Query("SELECT * FROM places WHERE archived=0 AND lat IS NOT NULL AND lon IS NOT NULL ORDER BY updated_at DESC,uuid ASC LIMIT :limit")
+    suspend fun placesWithCoordinates(limit: Int): List<PlaceEntity>
 
     @Upsert
     suspend fun upsertPlace(place: PlaceEntity)
@@ -233,6 +245,19 @@ interface PlaceDao {
 
     @Query("SELECT * FROM place_events WHERE session_uuid = :sessionUuid ORDER BY timestamp ASC, id ASC")
     suspend fun eventsForSession(sessionUuid: String): List<PlaceEventEntity>
+
+    @Query("""
+        SELECT e.session_uuid AS stable_id,e.place_id AS place_id,
+               COALESCE(NULLIF(p.nickname,''),p.address,'Place') AS place_name,
+               MIN(CASE WHEN e.event_type='CHECK_IN' THEN e.timestamp END) AS start_ms,
+               MIN(CASE WHEN e.event_type='CHECK_OUT' THEN e.timestamp END) AS end_ms
+        FROM place_events e JOIN places p ON p.uuid=e.place_id
+        WHERE e.session_uuid != ''
+        GROUP BY e.session_uuid,e.place_id
+        HAVING start_ms IS NOT NULL AND start_ms < :toMs AND (end_ms IS NULL OR end_ms > :fromMs)
+        ORDER BY start_ms DESC,stable_id DESC LIMIT :limit OFFSET :offset
+    """)
+    suspend fun temporalVisits(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<PlaceVisitHubRow>
 
     @Query("DELETE FROM place_events WHERE event_uuid = :eventUuid")
     suspend fun deleteEventByUuid(eventUuid: String): Int

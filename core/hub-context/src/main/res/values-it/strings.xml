@@ -8,6 +8,10 @@
     <string name="hub_composer_add_kind">+ Aggiungi</string>
     <string name="hub_remove">Rimuovi</string>
     <string name="hub_search">Cerca</string>
+    <string name="hub_time_anchor">Riferimento temporale</string>
+    <string name="hub_from">Da (millisecondi epoch)</string>
+    <string name="hub_to">A (millisecondi epoch)</string>
+    <string name="hub_detect">Rileva elementi collegati</string>
     <string name="hub_new_entity_name">Nome nuova entità</string>
     <string name="hub_create">Crea</string>
     <string name="hub_create_not_supported">Questo tipo di entità non supporta la creazione rapida.</string>

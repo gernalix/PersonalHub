@@ -16,6 +16,7 @@ import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.ResourceHubAdapter
 import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
 import com.gernalix.sostanze.hub.SubstanceHubAdapter
+import com.gernalix.sostanze.hub.SubstanceIntakeHubAdapter
 import com.supercontacts.app.hub.PeopleHubAdapter
 import com.wordpulse.app.hub.WordSessionHubAdapter
 import java.util.concurrent.Executors
@@ -32,7 +33,7 @@ class PersonalHubApplication : WordPulseApplication(), Configuration.Provider {
         super.onCreate()
         HubContextRuntime.initialize(this, listOf(
             PeopleHubAdapter(this), TimerSessionHubAdapter(this), PlacesHubAdapter(this),
-            SoldiTransactionHubAdapter(this), SubstanceHubAdapter(this), WordSessionHubAdapter(this),
+            SoldiTransactionHubAdapter(this), SubstanceHubAdapter(this), SubstanceIntakeHubAdapter(this), WordSessionHubAdapter(this),
             ResourceHubAdapter(this),
         ))
         PostFirstFrameStartup.install(this)

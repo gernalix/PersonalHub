@@ -17,6 +17,10 @@ data class PrescriptionDetail(
     @ColumnInfo(name = "doctor_name") val doctorName: String?,
     @ColumnInfo(name = "cost_amount") val costAmount: String?,
 )
+data class IntakeHubView(
+    @Embedded val intake: IntakeEventEntity,
+    @ColumnInfo(name = "substance_name") val substanceName: String,
+)
 
 @Dao
 interface SostanzeDao {
@@ -129,6 +133,15 @@ interface SostanzeDao {
 
     @Query("SELECT * FROM intake_events WHERE id IN (:ids)")
     suspend fun intakesByIds(ids: List<Long>): List<IntakeEventEntity>
+
+    @Query("SELECT i.*,s.name AS substance_name FROM intake_events i JOIN substances s ON s.id=i.substance_id WHERE i.id IN (:ids) ORDER BY i.timestamp_ms DESC,i.id DESC")
+    suspend fun intakeHubViews(ids: List<Long>): List<IntakeHubView>
+
+    @Query("SELECT i.*,s.name AS substance_name FROM intake_events i JOIN substances s ON s.id=i.substance_id WHERE s.name LIKE '%' || :query || '%' ORDER BY i.timestamp_ms DESC,i.id DESC LIMIT :limit")
+    suspend fun searchIntakeHubViews(query: String, limit: Int): List<IntakeHubView>
+
+    @Query("SELECT i.*,s.name AS substance_name FROM intake_events i JOIN substances s ON s.id=i.substance_id WHERE i.timestamp_ms >= :fromMs AND i.timestamp_ms < :toMs ORDER BY i.timestamp_ms DESC,i.id DESC LIMIT :limit OFFSET :offset")
+    suspend fun temporalIntakeHubViews(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<IntakeHubView>
 
     @Query("SELECT * FROM intake_events WHERE timestamp_ms BETWEEN :startMs AND :endMs ORDER BY timestamp_ms DESC")
     suspend fun intakesBetween(startMs: Long, endMs: Long): List<IntakeEventEntity>

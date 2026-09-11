@@ -20,10 +20,10 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
 
-internal data class ComposerMember(val summary: HubEntitySummary, val role: String = "")
+internal data class ComposerMember(val summary: HubEntitySummary, val role: String = "", val automatic: Boolean = false)
 
 internal class HubComposerState(
-    val anchor: HubEntityRef,
+    val anchor: HubEntityRef?,
     val editingContextId: String?,
     restoredMembers: List<ComposerMember> = emptyList(),
     restoredTypeId: String? = null,
@@ -34,7 +34,7 @@ internal class HubComposerState(
     restoredResourceValue: String = "",
     restoredResourcePermission: Boolean = false,
     private var initialized: Boolean = false,
-    private val initialScope: List<HubEntityRef> = listOf(anchor),
+    private val initialScope: List<HubEntityRef> = listOfNotNull(anchor),
 ) {
     var members by mutableStateOf(restoredMembers)
     var typeId by mutableStateOf(restoredTypeId)
@@ -78,7 +78,12 @@ internal class HubComposerState(
 
     suspend fun refresh() {
         val adapter = selectedAdapter() ?: run { results = emptyList(); return }
-        results = adapter.search(query, 20)
+        val candidates = adapter.search(query, 50)
+        val counts = if (members.isEmpty()) emptyMap() else runCatching {
+            HubContextRuntime.explore(members.map { it.summary.ref }, 200).facets.flatMap { facet -> facet.candidates }.associate { it.summary.ref to it.compatibleContextCount }
+        }.getOrDefault(emptyMap())
+        val placeId = members.firstOrNull { it.summary.ref.moduleId == "places" && it.summary.ref.entityKind == "place" }?.summary?.ref?.canonicalId
+        results = rankComposerCandidates(candidates, counts, placeId).take(5)
     }
 
     fun chooseKind(adapter: HubEntityAdapter) {
@@ -88,14 +93,25 @@ internal class HubComposerState(
         error = null
     }
 
-    fun add(summary: HubEntitySummary) {
+    fun add(summary: HubEntitySummary, automatic: Boolean = false) {
         val role = roleFor(summary.ref)
-        if (members.none { it.summary.ref == summary.ref && it.role == role }) members = members + ComposerMember(summary, role)
+        if (members.none { it.summary.ref == summary.ref && it.role == role }) members = members + ComposerMember(summary, role, automatic)
         error = null
     }
 
     fun remove(member: ComposerMember) {
         if (member.summary.ref != anchor) members = members - member
+    }
+
+    suspend fun detect(fromMs: Long, toMs: Long) {
+        members = members.filterNot { it.automatic }
+        val records = HubContextRuntime.temporal(HubTemporalQuery(fromMs, toMs, 20))
+        records.forEach { record ->
+            val ref = record.entityRef ?: HubEntityRef(record.moduleId, record.source, record.stableId)
+            val adapter = HubContextRuntime.adapters().firstOrNull { it.moduleId == ref.moduleId && it.entityKind == ref.entityKind } ?: return@forEach
+            adapter.summaries(setOf(ref.canonicalId))[ref.canonicalId]?.let { add(it, automatic = true) }
+        }
+        refresh()
     }
 
     suspend fun createCanonical() {
@@ -151,8 +167,8 @@ internal class HubComposerState(
         val Saver = Saver<HubComposerState, List<Any?>>(
             save = { state ->
                 listOf(
-                    encodeRef(state.anchor), state.editingContextId,
-                    state.members.map { encodeRef(it.summary.ref) + listOf(it.summary.label, it.summary.description, it.summary.lifecycle, it.role) },
+                    state.anchor?.let(::encodeRef), state.editingContextId,
+                    state.members.map { encodeRef(it.summary.ref) + listOf(it.summary.label, it.summary.description, it.summary.lifecycle, it.role, it.automatic.toString()) },
                     state.typeId, state.query, state.createDraft, state.selectedKind,
                     state.resourceKind, state.resourceValue, state.resourcePermission,
                 )
@@ -160,15 +176,85 @@ internal class HubComposerState(
             restore = { saved ->
                 @Suppress("UNCHECKED_CAST")
                 HubComposerState(
-                    decodeRef(saved[0] as List<String>), saved[1] as String?,
+                    (saved[0] as List<String>?)?.let(::decodeRef), saved[1] as String?,
                     (saved[2] as List<List<String?>>).map { row ->
-                        ComposerMember(HubEntitySummary(HubEntityRef(row[0]!!, row[1]!!, row[2]!!), row[3]!!, row[4], row[5]!!), row[6]!!)
+                        ComposerMember(HubEntitySummary(HubEntityRef(row[0]!!, row[1]!!, row[2]!!), row[3]!!, row[4], row[5]!!), row[6]!!, row.getOrNull(7)?.toBoolean() == true)
                     },
                     saved[3] as String?, saved[4] as String, saved[5] as String, saved[6] as String?,
                     saved[7] as String, saved[8] as String, saved[9] as Boolean, initialized = true,
                 )
             },
         )
+    }
+}
+
+internal fun rankComposerCandidates(
+    candidates: List<HubEntitySummary>,
+    cooccurrence: Map<HubEntityRef, Int>,
+    selectedPlaceId: String?,
+): List<HubEntitySummary> = candidates.sortedWith(
+    compareByDescending<HubEntitySummary> { cooccurrence[it.ref] ?: 0 }
+        .thenByDescending { if (selectedPlaceId != null && it.attributes["place_id"] == selectedPlaceId) 1 else 0 }
+        .thenByDescending { it.attributes["time_ms"]?.toLongOrNull() ?: it.attributes["start_ms"]?.toLongOrNull() ?: Long.MIN_VALUE }
+        .thenBy { it.label.lowercase() }
+        .thenBy { "${it.ref.moduleId}/${it.ref.entityKind}/${it.ref.canonicalId}" },
+)
+
+@Composable
+fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
+    val androidContext = LocalContext.current
+    val state = rememberSaveable(saver = HubComposerState.Saver) { HubComposerState(null, null) }
+    val scope = rememberCoroutineScope()
+    var fromText by rememberSaveable { mutableStateOf((System.currentTimeMillis() - 60 * 60 * 1000L).toString()) }
+    var toText by rememberSaveable { mutableStateOf((System.currentTimeMillis() + 1).toString()) }
+    LaunchedEffect(state) { runCatching { state.initialize(); state.detect(fromText.toLong(), toText.toLong()) }.onFailure { state.error = it.message } }
+    LaunchedEffect(Unit) {
+        val granted = androidContext.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val location = if (granted) (androidContext.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager)
+            .getProviders(true).mapNotNull { provider -> runCatching { androidContext.getSystemService(android.location.LocationManager::class.java).getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull { it.time } else null
+        HubContextRuntime.adapters().filterIsInstance<HubPlaceSuggestionProvider>().firstOrNull()?.suggestPlaces(location?.latitude, location?.longitude)?.let { suggestions ->
+            suggestions.preselect?.let { state.add(it, automatic = true) }
+            if (state.selectedKind == null && suggestions.candidates.isNotEmpty()) {
+                HubContextRuntime.adapters().firstOrNull { it.moduleId == "places" && it.entityKind == "place" }?.let(state::chooseKind)
+                state.results = suggestions.candidates
+            }
+        }
+    }
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onBack) { Text(stringResource(R.string.hub_cancel)) }
+            Text(stringResource(R.string.hub_composer_title_new), style = MaterialTheme.typography.titleLarge)
+            Button(onClick = { scope.launch { runCatching { state.save() }.onSuccess { onSaved() }.onFailure { state.error = it.message } } }, modifier = Modifier.testTag("hub-composer-save"), enabled = state.members.size >= 2) { Text(stringResource(R.string.hub_save)) }
+        }
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                Text(stringResource(R.string.hub_time_anchor), style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(fromText, { fromText = it.filter(Char::isDigit) }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_from)) })
+                    OutlinedTextField(toText, { toText = it.filter(Char::isDigit) }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_to)) })
+                }
+                TextButton(onClick = { scope.launch { runCatching { state.detect(fromText.toLong(), toText.toLong()) }.onFailure { state.error = it.message } } }) { Text(stringResource(R.string.hub_detect)) }
+            }
+            item {
+                Text(stringResource(R.string.hub_composer_members), style = MaterialTheme.typography.labelLarge)
+                state.members.forEach { member -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text((if (member.automatic) "• " else "") + member.summary.label, Modifier.weight(1f))
+                    TextButton(onClick = { state.remove(member) }) { Text(stringResource(R.string.hub_remove)) }
+                } }
+            }
+            item {
+                Text(stringResource(R.string.hub_composer_add_kind), style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { HubContextRuntime.adapters().forEach { adapter ->
+                    FilterChip(state.selectedKind == key(adapter.moduleId, adapter.entityKind), { state.chooseKind(adapter); scope.launch { state.refresh() } }, label = { Text(adapter.entityKind.replace('_', ' ').replaceFirstChar(Char::uppercase)) })
+                } }
+            }
+            if (state.selectedKind != null) item {
+                OutlinedTextField(state.query, { state.query = it; scope.launch { state.refresh() } }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.hub_search)) })
+                state.results.filter { result -> state.members.none { it.summary.ref == result.ref } }.forEach { result -> TextButton({ state.add(result) }, Modifier.fillMaxWidth()) { Text(result.label) } }
+            }
+            state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
+        }
     }
 }
 

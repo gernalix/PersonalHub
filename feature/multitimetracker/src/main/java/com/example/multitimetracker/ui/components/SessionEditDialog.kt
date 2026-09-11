@@ -126,9 +126,6 @@ fun SessionEditDialog(
     var isSavingTimes by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     val saveScope = rememberCoroutineScope()
-    val contextEditor = rememberSessionContextEditorState(session.id)
-
-
     var name by remember { mutableStateOf(session.title) }
 
     // Tag selection: same closure/exclusions model as tasks
@@ -235,28 +232,10 @@ fun SessionEditDialog(
                             dismissKeyboard()
                             saveScope.launch {
                                 if (isNewSession) {
-                                    onCreateNewSession(name, session.startMs, selectedEffective) { createdSession ->
-                                        saveScope.launch {
-                                            runCatching {
-                                                saveContextForCreatedTimerSession(createdSession, contextEditor::save)
-                                            }.onSuccess {
-                                                onDismiss()
-                                            }.onFailure {
-                                                isSavingMeta = false
-                                                Toast.makeText(context, it.message ?: context.getString(R.string.hub_context_save_failed), Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }
+                                    onCreateNewSession(name, session.startMs, selectedEffective) { onDismiss() }
                                 } else {
-                                    runCatching { contextEditor.save(session.id) }
-                                        .onSuccess {
-                                            onSaveMeta(session.id, name, selectedEffective)
-                                            onDismiss()
-                                        }
-                                        .onFailure {
-                                            isSavingMeta = false
-                                            Toast.makeText(context, it.message ?: context.getString(R.string.hub_context_save_failed), Toast.LENGTH_SHORT).show()
-                                        }
+                                    saveSessionMetadataOnly(session.id, name, selectedEffective, onSaveMeta)
+                                    onDismiss()
                                 }
                             }
                         },
@@ -325,8 +304,7 @@ fun SessionEditDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    SessionContextEditor(contextEditor, readOnly)
-                    HubContextLinks(HubEntityRef("timer", "session", session.id.toString()))
+                    if (!isNewSession) HubContextLinks(HubEntityRef("timer", "session", session.id.toString()))
 
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -589,6 +567,13 @@ fun SessionEditDialog(
         )
     }
 }
+
+internal fun saveSessionMetadataOnly(
+    sessionId: Long,
+    title: String,
+    tagIds: Set<Long>,
+    onSaveMeta: (Long, String, Set<Long>) -> Unit,
+) = onSaveMeta(sessionId, title, tagIds)
 
 @Composable
 private fun SessionTagPickerDialog(

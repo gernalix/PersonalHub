@@ -157,6 +157,27 @@ internal class SessionRepository(private val context: Context) {
         }
     }
 
+    fun readTemporalSessions(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<SessionUi> {
+        require(fromMs < toMs && limit in 1..200 && offset >= 0)
+        SnapshotSqlite.ensureSessionTables(context)
+        val db = SnapshotSqlite.openReadableDb(context)
+        try {
+            val sql = """
+                SELECT id,title,start_ms,end_ms,expected_end_ms,deleted_at_ms
+                FROM ${SnapshotSqlite.SESSIONS_TABLE}
+                WHERE deleted_at_ms IS NULL AND start_ms < ? AND (end_ms IS NULL OR end_ms > ?)
+                ORDER BY start_ms DESC,id DESC LIMIT ? OFFSET ?
+            """.trimIndent()
+            return db.rawQuery(sql, arrayOf(toMs.toString(), fromMs.toString(), limit.toString(), offset.toString())).use { c ->
+                buildList {
+                    while (c.moveToNext()) add(SessionAccumulator(c.getLong(0), c.getString(1), c.getLong(2), if (c.isNull(3)) null else c.getLong(3), if (c.isNull(4)) null else c.getLong(4), if (c.isNull(5)) null else c.getLong(5)).toUi())
+                }
+            }
+        } finally {
+            db.close()
+        }
+    }
+
     /** Returns sessions where end_ms IS NULL (running sessions). */
     fun readRunningSessions(): List<SessionUi> {
         SnapshotSqlite.ensureSessionTables(context)
