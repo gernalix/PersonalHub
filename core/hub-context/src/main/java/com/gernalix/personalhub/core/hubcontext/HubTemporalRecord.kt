@@ -1,6 +1,10 @@
 package com.gernalix.personalhub.core.hubcontext
 
 import com.gernalix.personalhub.contracts.database.HubEntityRef
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 enum class HubTemporalKind { POINT, INTERVAL }
 
@@ -57,3 +61,11 @@ fun mergeTemporalSlices(
         )
         .toList()
 }
+
+private val hubDateTimeFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+
+fun formatHubDateTime(epochMs: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
+    Instant.ofEpochMilli(epochMs).atZone(zoneId).format(hubDateTimeFormatter)
+
+fun parseHubDateTime(value: String, zoneId: ZoneId = ZoneId.systemDefault()): Long =
+    LocalDateTime.parse(value.trim(), hubDateTimeFormatter).atZone(zoneId).toInstant().toEpochMilli()

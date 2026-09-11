@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.ZoneId
 
 class HubTemporalRecordTest {
     @Test
@@ -56,6 +57,13 @@ class HubTemporalRecordTest {
     @Test(expected = IllegalArgumentException::class)
     fun rejectsEmptyWindow() {
         point("x", 1).overlaps(10, 10)
+    }
+
+    @Test fun readableLocalTimestampRoundTripsWithoutExposingEpoch() {
+        val zone = ZoneId.of("Europe/Copenhagen")
+        val text = formatHubDateTime(1_789_167_600_000L, zone)
+        assertFalse(text.all(Char::isDigit))
+        assertEquals(1_789_167_600_000L, parseHubDateTime(text, zone))
     }
 
     private fun point(

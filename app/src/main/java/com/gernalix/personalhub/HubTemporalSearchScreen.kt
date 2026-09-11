@@ -12,22 +12,21 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.hubcontext.*
 import kotlinx.coroutines.launch
-import java.time.Instant
 
 @Composable
 fun HubTemporalSearchScreen(onBack: () -> Unit) {
     val providers = remember { HubContextRuntime.temporalProviders() }
     var selected by rememberSaveable { mutableStateOf(providers.map { it.moduleId }.toSet()) }
-    var fromText by rememberSaveable { mutableStateOf((System.currentTimeMillis() - 24 * 60 * 60 * 1000L).toString()) }
-    var toText by rememberSaveable { mutableStateOf((System.currentTimeMillis() + 1).toString()) }
+    var fromText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)) }
+    var toText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() + 60_000L)) }
     var records by remember { mutableStateOf<List<HubTemporalRecord>>(emptyList()) }
     var cursors by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     suspend fun search(append: Boolean) {
-        val from = fromText.toLong()
-        val to = toText.toLong()
+        val from = parseHubDateTime(fromText)
+        val to = parseHubDateTime(toText)
         val pages = providers.filter { it.moduleId in selected }.map { provider ->
             provider.moduleId to provider.queryTemporal(HubTemporalQuery(from, to, 50, if (append) cursors[provider.moduleId] else null))
         }
@@ -43,10 +42,9 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
             Spacer(Modifier.width(64.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(fromText, { fromText = it.filter(Char::isDigit) }, Modifier.weight(1f).testTag("temporal-from"), label = { Text(stringResource(R.string.temporal_from)) })
-            OutlinedTextField(toText, { toText = it.filter(Char::isDigit) }, Modifier.weight(1f).testTag("temporal-to"), label = { Text(stringResource(R.string.temporal_to)) })
+            OutlinedTextField(fromText, { fromText = it }, Modifier.weight(1f).testTag("temporal-from"), label = { Text(stringResource(R.string.temporal_from)) })
+            OutlinedTextField(toText, { toText = it }, Modifier.weight(1f).testTag("temporal-to"), label = { Text(stringResource(R.string.temporal_to)) })
         }
-        runCatching { Text("${Instant.ofEpochMilli(fromText.toLong())} — ${Instant.ofEpochMilli(toText.toLong())}", style = MaterialTheme.typography.bodySmall) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { providers.distinctBy { it.moduleId }.forEach { provider ->
             FilterChip(provider.moduleId in selected, { selected = if (provider.moduleId in selected) selected - provider.moduleId else selected + provider.moduleId }, label = { Text(provider.moduleId.replaceFirstChar { it.uppercase() }) })
         } }
@@ -56,7 +54,7 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
             items(records, key = { "${it.moduleId}/${it.source}/${it.stableId}" }) { record ->
                 Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
                     Text(record.title, style = MaterialTheme.typography.titleMedium)
-                    Text("${record.moduleId} · ${Instant.ofEpochMilli(record.startMs)}", style = MaterialTheme.typography.bodySmall)
+                    Text("${record.moduleId} · ${formatHubDateTime(record.startMs)}", style = MaterialTheme.typography.bodySmall)
                     record.subtitle?.let { Text(it) }
                 } }
             }

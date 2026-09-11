@@ -205,9 +205,9 @@ fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
     val androidContext = LocalContext.current
     val state = rememberSaveable(saver = HubComposerState.Saver) { HubComposerState(null, null) }
     val scope = rememberCoroutineScope()
-    var fromText by rememberSaveable { mutableStateOf((System.currentTimeMillis() - 60 * 60 * 1000L).toString()) }
-    var toText by rememberSaveable { mutableStateOf((System.currentTimeMillis() + 1).toString()) }
-    LaunchedEffect(state) { runCatching { state.initialize(); state.detect(fromText.toLong(), toText.toLong()) }.onFailure { state.error = it.message } }
+    var fromText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() - 60 * 60 * 1000L)) }
+    var toText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() + 60_000L)) }
+    LaunchedEffect(state) { runCatching { state.initialize(); state.detect(parseHubDateTime(fromText), parseHubDateTime(toText)) }.onFailure { state.error = it.message } }
     LaunchedEffect(Unit) {
         val granted = androidContext.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
         val location = if (granted) (androidContext.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager)
@@ -231,10 +231,10 @@ fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
             item {
                 Text(stringResource(R.string.hub_time_anchor), style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(fromText, { fromText = it.filter(Char::isDigit) }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_from)) })
-                    OutlinedTextField(toText, { toText = it.filter(Char::isDigit) }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_to)) })
+                    OutlinedTextField(fromText, { fromText = it }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_from)) })
+                    OutlinedTextField(toText, { toText = it }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_to)) })
                 }
-                TextButton(onClick = { scope.launch { runCatching { state.detect(fromText.toLong(), toText.toLong()) }.onFailure { state.error = it.message } } }) { Text(stringResource(R.string.hub_detect)) }
+                TextButton(onClick = { scope.launch { runCatching { state.detect(parseHubDateTime(fromText), parseHubDateTime(toText)) }.onFailure { state.error = it.message } } }) { Text(stringResource(R.string.hub_detect)) }
             }
             item {
                 Text(stringResource(R.string.hub_composer_members), style = MaterialTheme.typography.labelLarge)
