@@ -23,18 +23,37 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal class CallOverlayRequestGate {
+    private var generation = 0L
+
+    @Synchronized
+    fun begin(): Long = ++generation
+
+    @Synchronized
+    fun invalidate() {
+        generation += 1
+    }
+
+    @Synchronized
+    fun isCurrent(token: Long): Boolean = token == generation
+}
+
 object CallSystemOverlayController {
     private const val TAG = "SC_CallOverlay"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val requestGate = CallOverlayRequestGate()
     private var overlayView: View? = null
     private var windowManager: WindowManager? = null
 
     fun show(context: Context, phoneNumber: String?) {
         val appContext = context.applicationContext
+        val requestToken = requestGate.begin()
         scope.launch {
             if (!CallOverlayPermission.canDrawOverlays(appContext)) {
-                Log.w(TAG, "Cannot show system call overlay: SYSTEM_ALERT_WINDOW is not allowed")
-                requestOverlayPermission(appContext)
+                if (requestGate.isCurrent(requestToken)) {
+                    Log.w(TAG, "Cannot show system call overlay: SYSTEM_ALERT_WINDOW is not allowed")
+                    requestOverlayPermission(appContext)
+                }
                 return@launch
             }
             val match: CallOverlayContactMatch? = withContext(Dispatchers.IO) {
@@ -42,20 +61,15 @@ object CallSystemOverlayController {
                     ?.takeIf { it.isNotBlank() }
                     ?.let { AppContainer.contactsRepository(appContext).findContactForCallOverlay(it) }
             }
+            if (!requestGate.isCurrent(requestToken)) return@launch
             showResolved(appContext, phoneNumber, match)
         }
     }
 
     fun dismiss() {
+        requestGate.invalidate()
         scope.launch {
-            val view = overlayView ?: return@launch
-            runCatching {
-                windowManager?.removeView(view)
-            }.onFailure { error ->
-                Log.w(TAG, "Failed to remove system call overlay", error)
-            }
-            overlayView = null
-            windowManager = null
+            dismissCurrent()
             Log.i(TAG, "System call overlay dismissed")
         }
     }
@@ -85,7 +99,7 @@ object CallSystemOverlayController {
             manager.addView(view, params)
             windowManager = manager
             overlayView = view
-            Log.i(TAG, "System call overlay shown number=${phoneNumber.orEmpty()} matched=${match != null}")
+            Log.i(TAG, "System call overlay shown matched=${match != null}")
         }.onFailure { error ->
             Log.e(TAG, "Failed to show system call overlay", error)
             requestOverlayPermission(context)
@@ -96,6 +110,8 @@ object CallSystemOverlayController {
         val current = overlayView ?: return
         runCatching {
             windowManager?.removeView(current)
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to remove system call overlay", error)
         }
         overlayView = null
         windowManager = null
@@ -176,7 +192,9 @@ object CallSystemOverlayController {
 
     private fun openContact(context: Context, publicId: String) {
         val uri = Uri.parse(ContactDeepLink.create(publicId))
-        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = uri
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         context.startActivity(intent)
