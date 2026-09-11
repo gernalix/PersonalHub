@@ -20,6 +20,7 @@ object HubActivityCapture {
         val labelOld: String = labelNew.replace("NEW.", "OLD."),
         val insertAction: String = "created",
         val updateActionSql: String = "'updated'",
+        val updateWhenSql: String? = null,
         val deleteAction: String = "deleted",
         val origin: String = "user",
         val system: Boolean = false,
@@ -31,10 +32,9 @@ object HubActivityCapture {
     )
 
     /*
-     * Keep this list intentionally sparse. In particular Timer, People and Places-history changes
-     * are sourced from their semantic audit streams below, not from every underlying table write.
-     * Auxiliary finance dictionaries are also excluded so one transaction does not explode into
-     * several implementation-detail activities.
+     * Keep this list intentionally sparse. Timer, People and Places-history changes are sourced
+     * from their semantic audit streams below. Derived changes (for example a substance stock
+     * recalculation after an intake) are filtered so one user action does not produce duplicates.
      */
     private val rowSpecs = listOf(
         RowSpec(
@@ -45,6 +45,7 @@ object HubActivityCapture {
             labelNew = "NULLIF(NEW.`nickname`, '')",
             insertAction = "place_created",
             updateActionSql = "CASE WHEN OLD.`archived`=0 AND NEW.`archived`=1 THEN 'place_archived' WHEN OLD.`archived`=1 AND NEW.`archived`=0 THEN 'place_restored' ELSE 'place_updated' END",
+            updateWhenSql = "OLD.`nickname` IS NOT NEW.`nickname` OR OLD.`address` IS NOT NEW.`address` OR OLD.`lat` IS NOT NEW.`lat` OR OLD.`lon` IS NOT NEW.`lon` OR OLD.`radius_m` IS NOT NEW.`radius_m` OR OLD.`notes` IS NOT NEW.`notes` OR OLD.`source_app` IS NOT NEW.`source_app` OR OLD.`archived` IS NOT NEW.`archived`",
             deleteAction = "place_deleted",
             reversibleInsert = true,
             reversibleUpdate = true,
@@ -79,6 +80,7 @@ object HubActivityCapture {
             labelNew = "NULLIF(NEW.`name`, '')",
             insertAction = "substance_created",
             updateActionSql = "CASE WHEN OLD.`archived`=0 AND NEW.`archived`=1 THEN 'substance_archived' WHEN OLD.`archived`=1 AND NEW.`archived`=0 THEN 'substance_restored' ELSE 'substance_updated' END",
+            updateWhenSql = "OLD.`name` IS NOT NEW.`name` OR OLD.`canonical_name` IS NOT NEW.`canonical_name` OR OLD.`type` IS NOT NEW.`type` OR OLD.`stock_unit` IS NOT NEW.`stock_unit` OR OLD.`dose_per_intake` IS NOT NEW.`dose_per_intake` OR OLD.`dose_unit` IS NOT NEW.`dose_unit` OR OLD.`daily_frequency` IS NOT NEW.`daily_frequency` OR OLD.`start_epoch_day` IS NOT NEW.`start_epoch_day` OR OLD.`end_epoch_day` IS NOT NEW.`end_epoch_day` OR OLD.`forever` IS NOT NEW.`forever` OR OLD.`archived` IS NOT NEW.`archived` OR OLD.`prn` IS NOT NEW.`prn` OR OLD.`dose_times_csv` IS NOT NEW.`dose_times_csv` OR OLD.`days_mask` IS NOT NEW.`days_mask`",
             deleteAction = "substance_deleted",
         ),
         RowSpec(
@@ -140,6 +142,7 @@ object HubActivityCapture {
             labelNew = "'Typing session'",
             insertAction = "typing_session_started",
             updateActionSql = "CASE WHEN OLD.`ended_at_utc_ms` IS NULL AND NEW.`ended_at_utc_ms` IS NOT NULL THEN 'typing_session_completed' ELSE 'typing_session_updated' END",
+            updateWhenSql = "OLD.`ended_at_utc_ms` IS NOT NEW.`ended_at_utc_ms`",
             deleteAction = "typing_session_deleted",
             origin = "system",
             system = true,
@@ -152,6 +155,7 @@ object HubActivityCapture {
             labelNew = "NULLIF(NEW.`title`, '')",
             insertAction = "episode_created",
             updateActionSql = "'episode_updated'",
+            updateWhenSql = "OLD.`context_type_id` IS NOT NEW.`context_type_id` OR OLD.`title` IS NOT NEW.`title`",
             deleteAction = "episode_deleted",
         ),
         RowSpec(
@@ -222,6 +226,7 @@ object HubActivityCapture {
         db.execSQL(
             """
             CREATE TRIGGER `${base}_UPDATE` AFTER UPDATE ON `${spec.table}`
+            ${spec.updateWhenSql?.let { "WHEN $it" }.orEmpty()}
             BEGIN
                 ${insertSql(
                     appVersion = appVersion,
@@ -276,11 +281,35 @@ object HubActivityCapture {
     }
 
     private fun installPeopleBridge(db: SupportSQLiteDatabase, appVersion: Long) {
+        val initialField = "lower(NEW.entity_type)='field' AND lower(NEW.action_type)='added' AND EXISTS (SELECT 1 FROM contact_events seed WHERE seed.contact_id=NEW.contact_id AND lower(seed.entity_type)='contact' AND lower(seed.action_type)='created' AND seed.occurred_at=NEW.occurred_at)"
         val nameSql = "(SELECT NULLIF(value,'') FROM contact_fields WHERE contact_id=NEW.contact_id AND field_type='name' ORDER BY position LIMIT 1)"
         db.execSQL("DROP TRIGGER IF EXISTS `hub_activity_bridge_people`")
+        db.execSQL("DROP TRIGGER IF EXISTS `hub_activity_people_creation_label`")
+        db.execSQL(
+            """
+            CREATE TRIGGER `hub_activity_people_creation_label` AFTER INSERT ON `contact_events`
+            WHEN $initialField AND lower(COALESCE(NEW.field_type,''))='name'
+            BEGIN
+                UPDATE hub_activity_log
+                SET entity_label=NULLIF(NEW.new_value,'')
+                WHERE module_id='people'
+                  AND source_table='contact_events'
+                  AND source_row_key=CAST((
+                      SELECT seed.id FROM contact_events seed
+                      WHERE seed.contact_id=NEW.contact_id
+                        AND lower(seed.entity_type)='contact'
+                        AND lower(seed.action_type)='created'
+                        AND seed.occurred_at=NEW.occurred_at
+                      ORDER BY seed.id DESC LIMIT 1
+                  ) AS TEXT)
+                  AND entity_label IS NULL;
+            END
+            """.trimIndent(),
+        )
         db.execSQL(
             """
             CREATE TRIGGER `hub_activity_bridge_people` AFTER INSERT ON `contact_events`
+            WHEN NOT ($initialField)
             BEGIN
                 ${insertSql(
                     appVersion,
