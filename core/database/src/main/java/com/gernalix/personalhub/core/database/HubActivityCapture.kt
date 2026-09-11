@@ -4,8 +4,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Builds the global activity register from authoritative semantic audit streams where they already
- * exist (People, Timer, Places), and from selected user-facing canonical tables elsewhere.
- * Operational/bookkeeping tables are intentionally not captured.
+ * exist (People, Timer, Places), and from a deliberately small set of user-facing canonical tables
+ * where no equivalent semantic audit exists. Operational/bookkeeping tables are never captured.
  */
 object HubActivityCapture {
     const val UNDO_CONTEXT_TABLE = "hub_activity_undo_context"
@@ -29,6 +29,12 @@ object HubActivityCapture {
         val captureDelete: Boolean = true,
     )
 
+    /*
+     * Keep this list intentionally sparse. In particular Timer, People and Places-history changes
+     * are sourced from their semantic audit streams below, not from every underlying table write.
+     * Auxiliary finance dictionaries are also excluded so one transaction does not explode into
+     * several implementation-detail activities.
+     */
     private val rowSpecs = listOf(
         RowSpec(
             table = "places",
@@ -42,45 +48,121 @@ object HubActivityCapture {
             reversibleInsert = true,
             reversibleUpdate = true,
         ),
-        RowSpec("finance_accounts", "soldi", "account", "NEW.`id`", labelNew = "NULLIF(NEW.`name`, '')", insertAction = "account_created", updateActionSql = "'account_updated'", deleteAction = "account_deleted", reversibleInsert = true, reversibleUpdate = true),
-        RowSpec("finance_transactions", "soldi", "transaction", "NEW.`uuid`", labelNew = "NEW.`amount` || ' ' || NEW.`currency`", insertAction = "transaction_created", updateActionSql = "'transaction_updated'", deleteAction = "transaction_deleted"),
-        RowSpec("finance_products", "soldi", "product", "NEW.`uuid`", labelNew = "NULLIF(NEW.`name`, '')", insertAction = "product_created", updateActionSql = "'product_updated'", deleteAction = "product_deleted"),
-        RowSpec("finance_titles", "soldi", "title", "CAST(NEW.`id` AS TEXT)", labelNew = "NULLIF(NEW.`name`, '')", insertAction = "title_created", updateActionSql = "'title_updated'", deleteAction = "title_deleted"),
-        RowSpec("finance_chains", "soldi", "chain", "CAST(NEW.`id` AS TEXT)", labelNew = "NULLIF(NEW.`name`, '')", insertAction = "chain_created", updateActionSql = "'chain_updated'", deleteAction = "chain_deleted"),
-        RowSpec("finance_tags", "soldi", "tag", "CAST(NEW.`id` AS TEXT)", labelNew = "NULLIF(NEW.`name`, '')", insertAction = "tag_created", updateActionSql = "'tag_updated'", deleteAction = "tag_deleted"),
         RowSpec(
-            "substances",
-            "substances",
-            "substance",
-            "CAST(NEW.`id` AS TEXT)",
+            table = "finance_accounts",
+            moduleId = "soldi",
+            entityKind = "account",
+            entityIdNew = "NEW.`id`",
+            labelNew = "NULLIF(NEW.`name`, '')",
+            insertAction = "account_created",
+            updateActionSql = "'account_updated'",
+            deleteAction = "account_deleted",
+            reversibleInsert = true,
+            reversibleUpdate = true,
+        ),
+        RowSpec(
+            table = "finance_transactions",
+            moduleId = "soldi",
+            entityKind = "transaction",
+            entityIdNew = "NEW.`uuid`",
+            labelNew = "NEW.`amount` || ' ' || NEW.`currency`",
+            insertAction = "transaction_created",
+            updateActionSql = "'transaction_updated'",
+            deleteAction = "transaction_deleted",
+        ),
+        RowSpec(
+            table = "substances",
+            moduleId = "substances",
+            entityKind = "substance",
+            entityIdNew = "CAST(NEW.`id` AS TEXT)",
             labelNew = "NULLIF(NEW.`name`, '')",
             insertAction = "substance_created",
             updateActionSql = "CASE WHEN OLD.`archived`=0 AND NEW.`archived`=1 THEN 'substance_archived' WHEN OLD.`archived`=1 AND NEW.`archived`=0 THEN 'substance_restored' ELSE 'substance_updated' END",
             deleteAction = "substance_deleted",
         ),
-        RowSpec("intake_events", "substances", "intake", "CAST(NEW.`id` AS TEXT)", labelNew = "(SELECT NULLIF(name,'') FROM substances WHERE id=NEW.`substance_id`)", insertAction = "intake_recorded", updateActionSql = "'intake_updated'", deleteAction = "intake_deleted"),
-        RowSpec("stock_adjustments", "substances", "stock_adjustment", "CAST(NEW.`id` AS TEXT)", labelNew = "(SELECT NULLIF(name,'') FROM substances WHERE id=NEW.`substance_id`)", insertAction = "stock_adjusted", updateActionSql = "'stock_adjustment_updated'", deleteAction = "stock_adjustment_deleted"),
-        RowSpec("prescriptions", "substances", "prescription", "CAST(NEW.`id` AS TEXT)", labelNew = "(SELECT NULLIF(name,'') FROM substances WHERE id=NEW.`substance_id`)", insertAction = "prescription_created", updateActionSql = "'prescription_updated'", deleteAction = "prescription_deleted"),
-        RowSpec("macros", "substances", "macro", "CAST(NEW.`id` AS TEXT)", labelNew = "NULLIF(NEW.`name`, '')", insertAction = "macro_created", updateActionSql = "'macro_updated'", deleteAction = "macro_deleted"),
-        RowSpec("settings", "substances", "setting", "NEW.`key`", labelNew = "NEW.`key`", insertAction = "setting_changed", updateActionSql = "'setting_changed'", deleteAction = "setting_removed"),
         RowSpec(
-            "sessions",
-            "timer",
-            "session",
-            "CAST(NEW.`id` AS TEXT)",
-            labelNew = "NULLIF(NEW.`title`, '')",
-            insertAction = "session_started",
-            updateActionSql = "CASE WHEN OLD.`end_ms` IS NULL AND NEW.`end_ms` IS NOT NULL THEN 'session_stopped' WHEN OLD.`end_ms` IS NOT NULL AND NEW.`end_ms` IS NULL THEN 'session_reopened' ELSE 'session_updated' END",
-            deleteAction = "session_deleted",
-            system = false,
+            table = "intake_events",
+            moduleId = "substances",
+            entityKind = "intake",
+            entityIdNew = "CAST(NEW.`id` AS TEXT)",
+            labelNew = "(SELECT NULLIF(name,'') FROM substances WHERE id=NEW.`substance_id`)",
+            insertAction = "intake_recorded",
+            updateActionSql = "'intake_updated'",
+            deleteAction = "intake_deleted",
         ),
-        RowSpec("quick_event_entries", "timer", "quick_event", "CAST(NEW.`id` AS TEXT)", labelNew = "NULLIF(NEW.`title`, '')", insertAction = "quick_event_recorded", updateActionSql = "'quick_event_updated'", deleteAction = "quick_event_deleted"),
-        RowSpec("quick_event_templates", "timer", "quick_event_template", "CAST(NEW.`id` AS TEXT)", labelNew = "NULLIF(NEW.`title`, '')", insertAction = "quick_event_template_created", updateActionSql = "'quick_event_template_updated'", deleteAction = "quick_event_template_deleted"),
-        RowSpec("quick_event_macros", "timer", "quick_event_macro", "CAST(NEW.`id` AS TEXT)", labelNew = "NULLIF(NEW.`title`, '')", insertAction = "quick_event_macro_created", updateActionSql = "'quick_event_macro_updated'", deleteAction = "quick_event_macro_deleted"),
-        RowSpec("wordpulse_sessions", "wordpulse", "session", "NEW.`id`", labelNew = "'Typing session'", insertAction = "typing_session_started", updateActionSql = "CASE WHEN OLD.`ended_at_utc_ms` IS NULL AND NEW.`ended_at_utc_ms` IS NOT NULL THEN 'typing_session_completed' ELSE 'typing_session_updated' END", deleteAction = "typing_session_deleted", origin = "system", system = true),
-        RowSpec("hub_contexts", "hub", "episode", "NEW.`id`", labelNew = "NULLIF(NEW.`title`, '')", insertAction = "episode_created", updateActionSql = "'episode_updated'", deleteAction = "episode_deleted"),
-        RowSpec("hub_context_types", "hub", "context_type", "NEW.`id`", labelNew = "NULLIF(NEW.`name`, '')", insertAction = "context_type_created", updateActionSql = "'context_type_updated'", deleteAction = "context_type_deleted"),
-        RowSpec("hub_preferences", "settings", "setting", "NEW.`namespace`", labelNew = "NEW.`namespace`", insertAction = "setting_changed", updateActionSql = "'setting_changed'", deleteAction = "setting_removed", captureDelete = false),
+        RowSpec(
+            table = "stock_adjustments",
+            moduleId = "substances",
+            entityKind = "stock_adjustment",
+            entityIdNew = "CAST(NEW.`id` AS TEXT)",
+            labelNew = "(SELECT NULLIF(name,'') FROM substances WHERE id=NEW.`substance_id`)",
+            insertAction = "stock_adjusted",
+            updateActionSql = "'stock_adjustment_updated'",
+            deleteAction = "stock_adjustment_deleted",
+        ),
+        RowSpec(
+            table = "prescriptions",
+            moduleId = "substances",
+            entityKind = "prescription",
+            entityIdNew = "CAST(NEW.`id` AS TEXT)",
+            labelNew = "(SELECT NULLIF(name,'') FROM substances WHERE id=NEW.`substance_id`)",
+            insertAction = "prescription_created",
+            updateActionSql = "'prescription_updated'",
+            deleteAction = "prescription_deleted",
+        ),
+        RowSpec(
+            table = "macros",
+            moduleId = "substances",
+            entityKind = "macro",
+            entityIdNew = "CAST(NEW.`id` AS TEXT)",
+            labelNew = "NULLIF(NEW.`name`, '')",
+            insertAction = "macro_created",
+            updateActionSql = "'macro_updated'",
+            deleteAction = "macro_deleted",
+        ),
+        RowSpec(
+            table = "settings",
+            moduleId = "substances",
+            entityKind = "setting",
+            entityIdNew = "NEW.`key`",
+            labelNew = "NEW.`key`",
+            insertAction = "setting_changed",
+            updateActionSql = "'setting_changed'",
+            deleteAction = "setting_removed",
+        ),
+        RowSpec(
+            table = "wordpulse_sessions",
+            moduleId = "wordpulse",
+            entityKind = "session",
+            entityIdNew = "NEW.`id`",
+            labelNew = "'Typing session'",
+            insertAction = "typing_session_started",
+            updateActionSql = "CASE WHEN OLD.`ended_at_utc_ms` IS NULL AND NEW.`ended_at_utc_ms` IS NOT NULL THEN 'typing_session_completed' ELSE 'typing_session_updated' END",
+            deleteAction = "typing_session_deleted",
+            origin = "system",
+            system = true,
+        ),
+        RowSpec(
+            table = "hub_contexts",
+            moduleId = "hub",
+            entityKind = "episode",
+            entityIdNew = "NEW.`id`",
+            labelNew = "NULLIF(NEW.`title`, '')",
+            insertAction = "episode_created",
+            updateActionSql = "'episode_updated'",
+            deleteAction = "episode_deleted",
+        ),
+        RowSpec(
+            table = "hub_preferences",
+            moduleId = "settings",
+            entityKind = "setting",
+            entityIdNew = "NEW.`namespace`",
+            labelNew = "NEW.`namespace`",
+            insertAction = "setting_changed",
+            updateActionSql = "'setting_changed'",
+            deleteAction = "setting_removed",
+            captureDelete = false,
+        ),
     )
 
     fun createInternalTables(db: SupportSQLiteDatabase) {
@@ -212,7 +294,7 @@ object HubActivityCapture {
                     null,
                     "NEW.old_value",
                     "NEW.new_value",
-                    "CASE WHEN lower(NEW.action_type) IN ('created','deleted') AND lower(NEW.entity_type)='contact' THEN 1 WHEN lower(NEW.action_type)='updated' AND NEW.field_type IS NOT NULL THEN 1 ELSE 0 END",
+                    "CASE WHEN lower(NEW.action_type) IN ('created','deleted') AND lower(NEW.entity_type)='contact' THEN 1 ELSE 0 END",
                 )}
             END
             """.trimIndent(),
