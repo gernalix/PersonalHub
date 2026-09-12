@@ -179,9 +179,6 @@ private fun ContextDeepLink(contextId: String, onBack: () -> Unit) {
                 )
             }) { Text(stringResource(R.string.deep_link_copy)) }
         }
-        resolved.context.contextTypeId?.let {
-            Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(resolved.members, key = { "${it.ref.moduleId}/${it.ref.entityKind}/${it.ref.canonicalId}" }) { summary ->
                 Card(
@@ -198,11 +195,6 @@ private fun ContextDeepLink(contextId: String, onBack: () -> Unit) {
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(summary.label, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "${summary.ref.moduleId} · ${summary.ref.entityKind}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                         summary.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                     }
                 }
