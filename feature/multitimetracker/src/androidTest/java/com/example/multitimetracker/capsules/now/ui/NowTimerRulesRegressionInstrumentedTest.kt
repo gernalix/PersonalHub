@@ -18,6 +18,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.multitimetracker.R
@@ -108,9 +110,60 @@ class NowTimerRulesRegressionInstrumentedTest {
     }
 
     @Test
-    fun savingExistingSessionFromNormalEditorUpdatesMetadataOnly() {
+    fun swipeRightOpensNormalEditorWithoutStoppingOrDeletingSession() {
         val running = runningSession(
             id = 103L,
+            title = "Swipe edit regression",
+            startMs = 840_000L,
+            tagIds = setOf(alpha.id),
+        )
+        val timeUpdates = mutableListOf<Triple<Long, Long, Long?>>()
+        val deleted = mutableListOf<Long>()
+        val capsule = capsuleFor(
+            state = nowState(nowMs = 1_000_000L, runningSessions = listOf(running)),
+            onUpdateTimes = { id, startMs, endMs -> timeUpdates += Triple(id, startMs, endMs) },
+            onDelete = { deleted += it },
+        )
+        setNowScreen(capsule)
+
+        composeRule.onNodeWithText(running.title).performTouchInput { swipeRight() }
+
+        composeRule.onNodeWithText(targetString(R.string.modifica_sessione)).assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertTrue(timeUpdates.isEmpty())
+            assertTrue(deleted.isEmpty())
+        }
+    }
+
+    @Test
+    fun swipeLeftDeletesExactRunningSessionWithoutStoppingAnotherPath() {
+        val running = runningSession(
+            id = 104L,
+            title = "Swipe delete regression",
+            startMs = 830_000L,
+            tagIds = setOf(alpha.id),
+        )
+        val timeUpdates = mutableListOf<Triple<Long, Long, Long?>>()
+        val deleted = mutableListOf<Long>()
+        val capsule = capsuleFor(
+            state = nowState(nowMs = 1_000_000L, runningSessions = listOf(running)),
+            onUpdateTimes = { id, startMs, endMs -> timeUpdates += Triple(id, startMs, endMs) },
+            onDelete = { deleted += it },
+        )
+        setNowScreen(capsule)
+
+        composeRule.onNodeWithText(running.title).performTouchInput { swipeLeft() }
+
+        composeRule.runOnIdle {
+            assertEquals(listOf(running.id), deleted)
+            assertTrue(timeUpdates.isEmpty())
+        }
+    }
+
+    @Test
+    fun savingExistingSessionFromNormalEditorUpdatesMetadataOnly() {
+        val running = runningSession(
+            id = 105L,
             title = "Original editor title",
             startMs = 800_000L,
             tagIds = setOf(alpha.id),
@@ -143,7 +196,7 @@ class NowTimerRulesRegressionInstrumentedTest {
     @Test
     fun deletingExistingSessionThroughNowEditorTargetsExactSessionAfterConfirmation() {
         val running = runningSession(
-            id = 104L,
+            id = 106L,
             title = "Delete editor regression",
             startMs = 810_000L,
             tagIds = setOf(alpha.id),
@@ -172,7 +225,7 @@ class NowTimerRulesRegressionInstrumentedTest {
     @Test
     fun readOnlyNowBlocksStopAndDoesNotOpenNormalEditor() {
         val running = runningSession(
-            id = 105L,
+            id = 107L,
             title = "Read only regression",
             startMs = 820_000L,
             tagIds = setOf(alpha.id),
@@ -207,7 +260,7 @@ class NowTimerRulesRegressionInstrumentedTest {
     fun timedDurationTapTogglesRemainingToElapsedWithoutStoppingSession() {
         val nowMs = 1_000_000L
         val timed = runningSession(
-            id = 106L,
+            id = 108L,
             title = "Timed display regression",
             startMs = 820_000L,
             expectedEndMs = 1_060_000L,
@@ -231,20 +284,20 @@ class NowTimerRulesRegressionInstrumentedTest {
     @Test
     fun endedAndDeletedRowsAreNeverExposedAsRunningSessions() {
         val valid = runningSession(
-            id = 107L,
+            id = 109L,
             title = "Valid running row",
             startMs = 900_000L,
             tagIds = setOf(alpha.id),
         )
         val ended = runningSession(
-            id = 108L,
+            id = 110L,
             title = "Ended row must stay hidden",
             startMs = 800_000L,
             endMs = 850_000L,
             tagIds = setOf(alpha.id),
         )
         val deleted = runningSession(
-            id = 109L,
+            id = 111L,
             title = "Deleted row must stay hidden",
             startMs = 700_000L,
             deletedAtMs = 950_000L,
