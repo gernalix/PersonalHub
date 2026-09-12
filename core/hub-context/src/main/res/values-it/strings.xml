@@ -49,4 +49,13 @@
     <string name="hub_resource_pick_document">Scegli documento/immagine</string>
     <string name="hub_resource_title_optional">Titolo facoltativo</string>
     <string name="hub_resource_value">URL, URI o testo</string>
+    <string name="hub_copy_personalhub_link">Copia link PersonalHub</string>
+    <string name="hub_copy_context_link">Copia link</string>
+    <string name="hub_permalink_copied">Link PersonalHub copiato.</string>
+    <string name="hub_attach_workflowy">+ Link Workflowy</string>
+    <string name="hub_workflowy_title">Workflowy</string>
+    <string name="hub_workflowy_url">URL Workflowy</string>
+    <string name="hub_workflowy_invalid">Inserisci un URL workflowy.com valido.</string>
+    <string name="hub_workflowy_exists">Questo URL Workflowy è già collegato qui.</string>
+    <string name="hub_workflowy_save">Collega</string>
 </resources>
