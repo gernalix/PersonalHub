@@ -3,13 +3,14 @@
 `Pixel_8a` is the canonical PersonalHub AVD on this Fedora host. Discover its
 runtime serial every time; never store or assume an `emulator-*` value.
 
-Use the existing helper from the PersonalHub repository:
+Use the canonical control facade from the PersonalHub repository:
 
 ```bash
-python3 tools/android_target_preflight.py status
-python3 tools/android_target_preflight.py start
-python3 tools/android_target_preflight.py wait
-python3 tools/android_target_preflight.py stop
+python3 tools/android_emulator_control.py status
+python3 tools/android_emulator_control.py start
+python3 tools/android_emulator_control.py wait
+python3 tools/android_emulator_control.py stop
+python3 tools/android_emulator_control.py smoke --timeout 90
 ```
 
 `start` is idempotent: it reuses a healthy `Pixel_8a`, waits on an existing
@@ -17,13 +18,21 @@ booting/offline `Pixel_8a` instead of launching a second one, otherwise starts i
 from the CLI with a hidden Qt window, no boot animation, and no snapshot
 load/save. Readiness means the discovered target is in ADB state `device` and
 `sys.boot_completed=1`. The returned JSON contains the live serial to pass to
-every later `adb -s <serial> ...` command. The older `--target emulator`
-invocation remains supported.
+every later `adb -s <serial> ...` command.
 
-`--timeout` is an end-to-end operation budget: subprocess calls, ADB recovery,
-readiness polling and cleanup must all stay inside it. A single helper operation
+The facade delegates low-level ADB/AVD work to `android_target_preflight.py` but
+adds two safety guarantees for future automation: a failed `start` cleans only
+Pixel_8a processes created by that invocation, never a pre-existing emulator;
+and an offline ADB row is not presented as the canonical target unless identity
+is actually known. The older preflight CLI remains available for compatibility,
+but new Codex workflows should use the facade above.
+
+`--timeout` bounds each requested operation. A single low-level helper operation
 attempts each ADB recovery class at most once, so a persistently `offline`
 device cannot trigger repeated `adb reconnect offline` calls during polling.
+`smoke` is the canonical infrastructure validation: it performs one clean
+stop/start/ADB/readiness/process-count/stop cycle and returns one structured JSON
+result, so future Codex sessions do not need to rebuild that shell sequence.
 
 The canonical cold boot deliberately does not depend on Quick Boot. On this
 host the emulator reports that file-backed Quick Boot is unavailable on the
@@ -35,8 +44,9 @@ If startup is blocked, inspect `/tmp/personalhub-pixel_8a-emulator.log`. The
 helper identifies the canonical AVD from its actual `Pixel_8a` host process;
 an unrelated offline AVD does not block a Pixel_8a launch. `stop` can terminate
 the canonical AVD through the emulator process when ADB cannot address it as a
-normal `device`. For a boot timeout, run `stop`, inspect the log, then `start`.
-Do not wipe or recreate the AVD merely to recover a snapshot: snapshots are not
-used by this procedure. A renderer fallback is attempted once only when the
-failed launch log contains concrete GPU/renderer error evidence, and only after
-the first process and any residual Pixel_8a PID have been terminated.
+normal `device`. For a boot timeout, inspect the returned JSON and emulator log;
+do not immediately repeat an identical start without new evidence. Do not wipe
+or recreate the AVD merely to recover a snapshot: snapshots are not used by
+this procedure. A renderer fallback is attempted once only when the failed
+launch log contains concrete GPU/renderer error evidence, and only after the
+first process and any residual Pixel_8a PID have been terminated.
