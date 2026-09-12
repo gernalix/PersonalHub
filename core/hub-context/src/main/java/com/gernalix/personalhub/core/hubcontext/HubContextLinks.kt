@@ -40,7 +40,10 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
     var workflowyUrl by rememberSaveable(anchor) { mutableStateOf("") }
     var workflowyError by rememberSaveable(anchor) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    suspend fun refresh() { contexts = HubContextRuntime.contexts(anchor); linked = contexts.flatMap { it.members }.filter { it.ref != anchor }.distinctBy { it.ref } }
+    suspend fun refresh() {
+        contexts = HubContextRuntime.contexts(anchor)
+        linked = contexts.flatMap { it.members }.filter { it.ref != anchor }.distinctBy { it.ref }
+    }
     LaunchedEffect(anchor) { refresh() }
     if (composerOpen) HubContextComposerDialog(anchor, composerContextId, { composerOpen = false }, { composerOpen = false; scope.launch { refresh() } })
     if (explorerOpen) HubContextExplorerDialog(anchor) { explorerOpen = false }
@@ -85,11 +88,14 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                                 workflowyError = context.getString(R.string.hub_workflowy_invalid)
                                 return@launch
                             }
-                            runCatching {
-                                HubContextRuntime.createContext(listOf(anchor to "", created.ref to ""), title = context.getString(R.string.hub_workflowy_title))
-                            }.onFailure {
+                            try {
+                                HubContextRuntime.createContext(
+                                    listOf(anchor to "", created.ref to ""),
+                                    title = context.getString(R.string.hub_workflowy_title),
+                                )
+                            } catch (error: Throwable) {
                                 (adapter as? ResourceHubAdapter)?.delete(created.ref.canonicalId)
-                                workflowyError = it.message ?: context.getString(R.string.hub_workflowy_invalid)
+                                workflowyError = error.message ?: context.getString(R.string.hub_workflowy_invalid)
                                 return@launch
                             }
                             workflowyOpen = false
