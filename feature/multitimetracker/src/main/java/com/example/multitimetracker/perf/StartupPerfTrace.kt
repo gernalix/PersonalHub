@@ -5,7 +5,7 @@ import android.util.Log
 import com.example.multitimetracker.BuildConfig
 import java.util.Locale
 
-object StartupPerfTrace {
+internal object StartupPerfTrace {
     private const val LOG_TAG = "MTT_STARTUP"
     private val enabled: Boolean
         get() = BuildConfig.DEBUG || BuildConfig.APPLICATION_ID.endsWith(".devicetest")
