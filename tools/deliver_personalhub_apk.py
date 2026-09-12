@@ -13,6 +13,7 @@ from pathlib import Path
 TELEGRAM_LIMIT_BYTES = 50 * 1024 * 1024
 DEV_RELEASE_TAG = "personalhub-dev-apk"
 REPO = "gernalix/PersonalHub"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -26,7 +27,7 @@ def _repo_visibility() -> tuple[bool, str]:
 
 
 def _short_head() -> str:
-    return _run(["git", "rev-parse", "--short=12", "HEAD"]).stdout.strip()
+    return _run(["git", "-C", str(REPO_ROOT), "rev-parse", "--short=12", "HEAD"]).stdout.strip()
 
 
 def _release_url() -> str:
@@ -40,16 +41,21 @@ def _existing_assets() -> list[str]:
     return [asset["name"] for asset in payload.get("assets", []) if asset.get("name", "").endswith(".apk")]
 
 
-def _ensure_release(version: str, commit: str) -> None:
-    title = "PersonalHub development APK"
-    notes = f"Current PersonalHub debug APK: version={version}, commit={commit}."
-    view = subprocess.run(
+def _release_exists() -> bool:
+    result = subprocess.run(
         ["gh", "release", "view", DEV_RELEASE_TAG, "--repo", REPO],
         text=True,
         capture_output=True,
     )
-    if view.returncode == 0:
-        _run(["gh", "release", "edit", DEV_RELEASE_TAG, "--repo", REPO, "--title", title, "--notes", notes, "--prerelease"])
+    return result.returncode == 0
+
+
+def _release_notes(version: str, commit: str) -> str:
+    return f"Current PersonalHub debug APK: version={version}, commit={commit}."
+
+
+def _ensure_release(version: str, commit: str) -> None:
+    if _release_exists():
         return
     _run([
         "gh",
@@ -59,12 +65,28 @@ def _ensure_release(version: str, commit: str) -> None:
         "--repo",
         REPO,
         "--title",
-        title,
+        "PersonalHub development APK",
         "--notes",
-        notes,
+        _release_notes(version, commit),
         "--prerelease",
         "--target",
         "HEAD",
+    ])
+
+
+def _update_release_metadata(version: str, commit: str) -> None:
+    _run([
+        "gh",
+        "release",
+        "edit",
+        DEV_RELEASE_TAG,
+        "--repo",
+        REPO,
+        "--title",
+        "PersonalHub development APK",
+        "--notes",
+        _release_notes(version, commit),
+        "--prerelease",
     ])
 
 
@@ -72,10 +94,39 @@ def publish_release_asset(apk_path: Path, version: str) -> tuple[str, bool, str]
     is_private, visibility = _repo_visibility()
     commit = _short_head()
     _ensure_release(version, commit)
-    for asset_name in _existing_assets():
-        _run(["gh", "release", "delete-asset", DEV_RELEASE_TAG, asset_name, "--repo", REPO, "-y"])
+
+    # Keep the last known-good APK until the replacement upload succeeds. This
+    # makes retries safe and avoids leaving the stable prerelease without an APK.
+    previous_assets = _existing_assets()
     asset_name = f"PersonalHub-{version}-{commit}.apk"
-    _run(["gh", "release", "upload", DEV_RELEASE_TAG, str(apk_path) + f"#{asset_name}", "--repo", REPO, "--clobber"])
+    _run([
+        "gh",
+        "release",
+        "upload",
+        DEV_RELEASE_TAG,
+        str(apk_path) + f"#{asset_name}",
+        "--repo",
+        REPO,
+        "--clobber",
+    ])
+
+    for previous_asset in previous_assets:
+        if previous_asset == asset_name:
+            continue
+        _run([
+            "gh",
+            "release",
+            "delete-asset",
+            DEV_RELEASE_TAG,
+            previous_asset,
+            "--repo",
+            REPO,
+            "-y",
+        ])
+
+    # Only advertise the new version/commit after the new asset is known to be
+    # present. If upload failed, the old asset and its metadata remain usable.
+    _update_release_metadata(version, commit)
     return _release_url(), is_private, visibility
 
 
