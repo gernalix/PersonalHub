@@ -14,6 +14,7 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
@@ -70,7 +71,7 @@ class NowTimerRulesRegressionInstrumentedTest {
         )
         setNowScreen(capsule)
 
-        composeRule.onNodeWithText(running.title).performTouchInput { click() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { click() }
 
         composeRule.runOnIdle {
             assertEquals(listOf(Triple(running.id, running.startMs, nowMs)), timeUpdates)
@@ -94,7 +95,7 @@ class NowTimerRulesRegressionInstrumentedTest {
         )
         setNowScreen(capsule)
 
-        composeRule.onNodeWithText(running.title).performTouchInput { longClick() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { longClick() }
 
         composeRule.onNodeWithText(targetString(R.string.modifica_sessione)).assertIsDisplayed()
         composeRule.runOnIdle {
@@ -126,7 +127,7 @@ class NowTimerRulesRegressionInstrumentedTest {
         )
         setNowScreen(capsule)
 
-        composeRule.onNodeWithText(running.title).performTouchInput { swipeRight() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { swipeRight() }
 
         composeRule.onNodeWithText(targetString(R.string.modifica_sessione)).assertIsDisplayed()
         composeRule.runOnIdle {
@@ -152,7 +153,7 @@ class NowTimerRulesRegressionInstrumentedTest {
         )
         setNowScreen(capsule)
 
-        composeRule.onNodeWithText(running.title).performTouchInput { swipeLeft() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { swipeLeft() }
 
         composeRule.runOnIdle {
             assertEquals(listOf(running.id), deleted)
@@ -179,7 +180,7 @@ class NowTimerRulesRegressionInstrumentedTest {
         )
         setNowScreen(capsule)
 
-        composeRule.onNodeWithText(running.title).performTouchInput { longClick() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { longClick() }
         composeRule.onAllNodes(hasSetTextAction())[0].performTextReplacement("Updated editor title")
         composeRule.onNodeWithContentDescription(targetString(R.string.salva)).performClick()
 
@@ -208,7 +209,7 @@ class NowTimerRulesRegressionInstrumentedTest {
         )
         setNowScreen(capsule)
 
-        composeRule.onNodeWithText(running.title).performTouchInput { longClick() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { longClick() }
         val deleteLabel = targetString(R.string.elimina)
         composeRule.onNodeWithText(deleteLabel).performClick()
         composeRule.runOnIdle { assertTrue(deleted.isEmpty()) }
@@ -245,8 +246,8 @@ class NowTimerRulesRegressionInstrumentedTest {
         )
         setNowScreen(capsule)
 
-        composeRule.onNodeWithText(running.title).performTouchInput { click() }
-        composeRule.onNodeWithText(running.title).performTouchInput { longClick() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { click() }
+        composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { longClick() }
 
         composeRule.onNodeWithText(targetString(R.string.modifica_sessione)).assertDoesNotExist()
         composeRule.runOnIdle {
@@ -406,6 +407,8 @@ class NowTimerRulesRegressionInstrumentedTest {
             totalMs = 0L,
             lastStartedAtMs = null,
         )
+
+    private fun sessionTag(id: Long): String = "running_session_$id"
 
     private fun targetString(resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
