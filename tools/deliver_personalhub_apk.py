@@ -70,7 +70,7 @@ def _ensure_release(version: str, commit: str) -> None:
         _release_notes(version, commit),
         "--prerelease",
         "--target",
-        "HEAD",
+        commit,
     ])
 
 

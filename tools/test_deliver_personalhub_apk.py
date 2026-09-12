@@ -43,6 +43,21 @@ class DeliverPersonalHubApkTest(unittest.TestCase):
             telegram_notify.send_message.assert_called_once()
             self.assertIn("autenticazione GitHub", telegram_notify.send_message.call_args.args[1])
 
+    def test_new_release_targets_exact_commit(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str]) -> mock.Mock:
+            calls.append(args)
+            return mock.Mock(stdout="")
+
+        with mock.patch.object(delivery, "_release_exists", return_value=False):
+            with mock.patch.object(delivery, "_run", side_effect=fake_run):
+                delivery._ensure_release("42", "abc123def456")
+
+        create = next(call for call in calls if call[:3] == ["gh", "release", "create"])
+        target_index = create.index("--target")
+        self.assertEqual("abc123def456", create[target_index + 1])
+
     def test_release_upload_precedes_old_asset_deletion_and_metadata_update(self) -> None:
         with tempfile.NamedTemporaryFile(suffix=".apk") as handle:
             calls: list[list[str]] = []
