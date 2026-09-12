@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -28,7 +29,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -91,7 +95,10 @@ internal fun QuickStartTagLauncher(
                 modifier = Modifier.weight(1f),
             )
             if (multiSelectMode) {
-                IconButton(onClick = { clearMultiSelect() }) {
+                IconButton(
+                    onClick = { clearMultiSelect() },
+                    modifier = Modifier.testTag("quick_start_cancel"),
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.quick_start_cancel_cd),
@@ -107,6 +114,7 @@ internal fun QuickStartTagLauncher(
                         }
                     },
                     enabled = enabled && selectedTagIds.isNotEmpty(),
+                    modifier = Modifier.testTag("quick_start_confirm"),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Check,
@@ -119,13 +127,18 @@ internal fun QuickStartTagLauncher(
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("quick_start_search"),
             singleLine = true,
             label = { Text(stringResource(R.string.cerca_tag)) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = if (query.isNotBlank()) {
                 {
-                    IconButton(onClick = { query = "" }) {
+                    IconButton(
+                        onClick = { query = "" },
+                        modifier = Modifier.testTag("quick_start_search_clear"),
+                    ) {
                         Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.annulla))
                     }
                 }
@@ -217,11 +230,14 @@ private fun QuickStartTagChip(
     onLongClick: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier.combinedClickable(
-            enabled = enabled,
-            onClick = onClick,
-            onLongClick = onLongClick,
-        ),
+        modifier = Modifier
+            .testTag("quick_start_tag_${tag.id}")
+            .semantics { this.selected = selected }
+            .combinedClickable(
+                enabled = enabled,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
