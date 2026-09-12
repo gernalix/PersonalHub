@@ -1,6 +1,8 @@
 package com.example.multitimetracker.ui.components
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodes
@@ -11,15 +13,16 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.click
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.multitimetracker.R
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
 import com.example.multitimetracker.model.TimedTagNotificationType
+import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +46,14 @@ class SessionEditDialogRegressionInstrumentedTest {
         timedDurationMinutes = 15,
         notificationType = TimedTagNotificationType.NORMAL,
     )
+
+    @Before
+    fun initializeHubContextRuntime() {
+        HubContextRuntime.initialize(
+            InstrumentationRegistry.getInstrumentation().targetContext,
+            emptyList(),
+        )
+    }
 
     @Test
     fun normalEditorCreatesDraftExactlyOnceWithEditedTitleAndExistingTag() {
@@ -179,7 +190,7 @@ class SessionEditDialogRegressionInstrumentedTest {
         val deleteLabel = targetString(R.string.elimina)
         composeRule.onNodeWithText(deleteLabel).performClick()
         composeRule.runOnIdle { assertTrue(deleted.isEmpty()) }
-        composeRule.onNodeWithText(targetString(R.string.elimina_sessione)).performClick()
+        composeRule.onNodeWithText(targetString(R.string.elimina_sessione)).assertIsDisplayed()
 
         val deleteNodes = composeRule.onAllNodesWithText(deleteLabel)
         val lastDeleteIndex = deleteNodes.fetchSemanticsNodes().lastIndex
