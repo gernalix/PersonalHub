@@ -24,11 +24,10 @@ object AutoConsistencyCore {
     )
 
     fun runIfNeeded(context: Context, nowMs: Long, currentPatch: Long): Result {
-        // Old session-only bootstraps could copy closed sessions without their
-        // historical tag edges. Repair those edges first, even if the regular
-        // auto-consistency patch already ran: the repair is additive and
-        // idempotent, and prevents a later snapshot save from looking like
-        // destructive `tagSessions: N -> 0` data loss.
+        // Old session-only bootstraps could omit historical tag edges or, on
+        // partially migrated devices, the closed session row itself. Repair
+        // additively before regular auto-consistency; CriticalDataGuard remains
+        // authoritative for anything the repair cannot map safely.
         val repair = LegacyTagSessionRepair.repairIfNeeded(context)
 
         val r = AutoConsistencyEngine.runIfNeeded(
@@ -39,8 +38,9 @@ object AutoConsistencyCore {
 
         val repairReason = when {
             repair.error != null -> "legacy tag-session repair error=${repair.error}"
-            repair.inserted > 0 ->
-                "legacy tag-session repair inserted=${repair.inserted}/${repair.examined}"
+            repair.createdSessions > 0 || repair.inserted > 0 ->
+                "legacy tag-session repair createdSessions=${repair.createdSessions} " +
+                    "insertedEdges=${repair.inserted}/${repair.examined}"
             repair.ambiguousOrMissingSession > 0 || repair.missingTag > 0 ->
                 "legacy tag-session repair unresolved=${repair.ambiguousOrMissingSession} missingTag=${repair.missingTag}"
             repair.examined > 0 -> "legacy tag-session repair already consistent"
