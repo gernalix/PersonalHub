@@ -102,4 +102,17 @@
     <string name="activity_undo_stale">The data changed later, so this action was not undone.</string>
     <string name="activity_undo_referenced">Other data depends on this item, so it was not removed.</string>
     <string name="activity_undo_invalid">The stored undo data is incomplete. Nothing was changed.</string>
+
+    <string name="deep_link_back">Back</string>
+    <string name="deep_link_copy">Copy link</string>
+    <string name="deep_link_copied">PersonalHub link copied.</string>
+    <string name="deep_link_invalid">This PersonalHub link is invalid.</string>
+    <string name="deep_link_unsupported_version">This PersonalHub link uses an unsupported contract version.</string>
+    <string name="deep_link_unsupported_action">This PersonalHub link requests an unsupported action.</string>
+    <string name="deep_link_entity_unavailable">This PersonalHub item no longer exists or cannot be opened.</string>
+    <string name="deep_link_context_unavailable">This PersonalHub context no longer exists.</string>
+    <string name="deep_link_cannot_open">No available screen can open this item.</string>
+    <string name="deep_link_invalid_time_range">The time range in this PersonalHub link is invalid.</string>
+    <string name="deep_link_context_title">Context</string>
+    <string name="activity_event_not_found">This activity entry no longer exists.</string>
 </resources>

@@ -102,4 +102,17 @@
     <string name="activity_undo_stale">I dati sono stati modificati successivamente, quindi l’azione non è stata annullata.</string>
     <string name="activity_undo_referenced">Altri dati dipendono da questo elemento, quindi non è stato rimosso.</string>
     <string name="activity_undo_invalid">I dati salvati per l’annullamento sono incompleti. Nessuna modifica è stata eseguita.</string>
+
+    <string name="deep_link_back">Indietro</string>
+    <string name="deep_link_copy">Copia link</string>
+    <string name="deep_link_copied">Link PersonalHub copiato.</string>
+    <string name="deep_link_invalid">Questo link PersonalHub non è valido.</string>
+    <string name="deep_link_unsupported_version">Questo link PersonalHub usa una versione del contratto non supportata.</string>
+    <string name="deep_link_unsupported_action">Questo link PersonalHub richiede un’azione non supportata.</string>
+    <string name="deep_link_entity_unavailable">Questo elemento PersonalHub non esiste più o non può essere aperto.</string>
+    <string name="deep_link_context_unavailable">Questo contesto PersonalHub non esiste più.</string>
+    <string name="deep_link_cannot_open">Nessuna schermata disponibile può aprire questo elemento.</string>
+    <string name="deep_link_invalid_time_range">L’intervallo temporale di questo link PersonalHub non è valido.</string>
+    <string name="deep_link_context_title">Contesto</string>
+    <string name="activity_event_not_found">Questa voce del Registro non esiste più.</string>
 </resources>
