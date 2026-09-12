@@ -30,23 +30,21 @@ internal fun rankQuickStartTags(
             }
         }
 
-    val tagsWithRecency = visibleTags
-        .filter { (tagLastUsedMsByTagId[it.id] ?: 0L) > 0L }
-        .sortedWith(
-            compareByDescending<Tag> { tagLastUsedMsByTagId[it.id] ?: 0L }
-                .thenBy { it.name.lowercase() }
-        )
-
-    val recencyScoreByTagId = HashMap<Long, Double>(tagsWithRecency.size)
-    val denominator = tagsWithRecency.size.coerceAtLeast(1).toDouble()
-    tagsWithRecency.forEachIndexed { index, tag ->
-        recencyScoreByTagId[tag.id] = (tagsWithRecency.size - index).toDouble() / denominator
+    val recencyValues = visibleTags
+        .mapNotNull { tag -> (tagLastUsedMsByTagId[tag.id] ?: 0L).takeIf { it > 0L } }
+        .distinct()
+        .sortedDescending()
+    val recencyScoreByTimestamp = HashMap<Long, Double>(recencyValues.size)
+    val recencyDenominator = recencyValues.size.coerceAtLeast(1).toDouble()
+    recencyValues.forEachIndexed { index, timestamp ->
+        recencyScoreByTimestamp[timestamp] = (recencyValues.size - index).toDouble() / recencyDenominator
     }
 
     val maxFrequency = frequencyByTagId.values.maxOrNull()?.coerceAtLeast(1) ?: 1
 
     fun score(tag: Tag): Double {
-        val recency = recencyScoreByTagId[tag.id] ?: 0.0
+        val lastUsedMs = tagLastUsedMsByTagId[tag.id] ?: 0L
+        val recency = recencyScoreByTimestamp[lastUsedMs] ?: 0.0
         val frequency = (frequencyByTagId[tag.id] ?: 0).toDouble() / maxFrequency.toDouble()
         return (recency * RECENCY_WEIGHT) + (frequency * FREQUENCY_WEIGHT)
     }
