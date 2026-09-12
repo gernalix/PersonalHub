@@ -148,7 +148,7 @@ class HubContextRepositoryTest {
 
     @Test fun multipleContextViewsResolveBindingsInOneBatch() = runBlocking {
         val batches = mutableListOf<Int>()
-        val graph = HubContextRepository(database, HubAdapterRegistry(listOf(adapter))) { batches += it }
+        val graph = HubContextRepository(database, HubAdapterRegistry(listOf(adapter)), onBindingBatch = { batches += it })
         val anchor = graph.bind(ref("anchor"))
         val b = graph.bind(ref("b"))
         val c = graph.bind(ref("c"))
