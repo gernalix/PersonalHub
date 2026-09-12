@@ -77,9 +77,9 @@ object HubDeepLinkContract {
         .authority(SEARCH)
         .appendPath(VERSION)
         .apply {
-            fromIso?.trim()?.takeIf(String::isNotEmpty)?.let { appendQueryParameter(PARAM_FROM, it) }
-            toIso?.trim()?.takeIf(String::isNotEmpty)?.let { appendQueryParameter(PARAM_TO, it) }
-            modules.map(String::trim).filter(String::isNotEmpty).distinct().sorted()
+            fromIso?.trim()?.takeIf { it.isNotEmpty() }?.let { appendQueryParameter(PARAM_FROM, it) }
+            toIso?.trim()?.takeIf { it.isNotEmpty() }?.let { appendQueryParameter(PARAM_TO, it) }
+            modules.map { it.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
                 .forEach { appendQueryParameter(PARAM_MODULE, it) }
         }
         .build()
@@ -101,7 +101,7 @@ object HubDeepLinkContract {
     }
 
     private fun parseEntity(uri: Uri, segments: List<String>): ParseResult {
-        if (segments.size != 4 || segments.drop(1).any(String::isBlank)) return ParseResult(error = ParseError.MALFORMED)
+        if (segments.size != 4 || segments.drop(1).any { it.isBlank() }) return ParseResult(error = ParseError.MALFORMED)
         val actions = uri.getQueryParameters(PARAM_ACTION)
         if (actions.size > 1) return ParseResult(error = ParseError.MALFORMED)
         val action = actions.singleOrNull()?.ifBlank { ACTION_VIEW } ?: ACTION_VIEW
@@ -116,14 +116,17 @@ object HubDeepLinkContract {
 
     private fun parseSearch(uri: Uri, segments: List<String>): ParseResult {
         if (segments.size != 1) return ParseResult(error = ParseError.MALFORMED)
-        val from = singleQueryValue(uri, PARAM_FROM) ?: if (uri.getQueryParameters(PARAM_FROM).size > 1) return ParseResult(error = ParseError.MALFORMED) else null
-        val to = singleQueryValue(uri, PARAM_TO) ?: if (uri.getQueryParameters(PARAM_TO).size > 1) return ParseResult(error = ParseError.MALFORMED) else null
-        val modules = uri.getQueryParameters(PARAM_MODULE).map(String::trim).filter(String::isNotEmpty).distinct()
+        val fromValues = uri.getQueryParameters(PARAM_FROM)
+        val toValues = uri.getQueryParameters(PARAM_TO)
+        if (fromValues.size > 1 || toValues.size > 1) return ParseResult(error = ParseError.MALFORMED)
+        val from = fromValues.singleOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+        val to = toValues.singleOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+        val modules = uri.getQueryParameters(PARAM_MODULE)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
         return ParseResult(target = SearchTarget(from, to, modules))
     }
-
-    private fun singleQueryValue(uri: Uri, key: String): String? =
-        uri.getQueryParameters(key).singleOrNull()?.trim()?.takeIf(String::isNotEmpty)
 
     private inline fun <T : Target> parseSimple(
         segments: List<String>,
