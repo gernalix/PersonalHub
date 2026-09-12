@@ -21,18 +21,42 @@ load/save. Readiness means the discovered target is in ADB state `device` and
 every later `adb -s <serial> ...` command.
 
 The facade delegates low-level ADB/AVD work to `android_target_preflight.py` but
-adds two safety guarantees for future automation: a failed `start` cleans only
+adds safety guarantees for future automation: a failed `start` cleans only
 Pixel_8a processes created by that invocation, never a pre-existing emulator;
-and an offline ADB row is not presented as the canonical target unless identity
-is actually known. The older preflight CLI remains available for compatibility,
-but new Codex workflows should use the facade above.
+an offline ADB row is not presented as the canonical target unless identity is
+actually known; imports suppress Python bytecode writes so ordinary validation
+cannot dirty the repository with `__pycache__`; and `smoke` reserves time for a
+final stop instead of allowing startup to consume the cleanup budget. The older
+preflight CLI remains available for compatibility, but new Codex workflows
+should use the facade above.
 
-`--timeout` bounds each requested operation. A single low-level helper operation
-attempts each ADB recovery class at most once, so a persistently `offline`
-device cannot trigger repeated `adb reconnect offline` calls during polling.
-`smoke` is the canonical infrastructure validation: it performs one clean
-stop/start/ADB/readiness/process-count/stop cycle and returns one structured JSON
-result, so future Codex sessions do not need to rebuild that shell sequence.
+## Canonical verification
+
+Run the complete emulator infrastructure unit gate exactly once:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_emulator_stack.py
+```
+
+That runner loads the historical preflight suite, the regression suite and the
+facade suite, and also rejects tracked `.pyc`, `.pyo` or `__pycache__` artifacts.
+If it passes, do **not** rerun its component suites separately. For a task that
+actually requires host/runtime verification, follow it with at most one:
+
+```bash
+python3 tools/android_emulator_control.py smoke --timeout 90
+```
+
+The smoke JSON already certifies boot completion, the live target, exactly one
+canonical Pixel_8a process and a clean final stop. Do not repeat manual ADB/AVD
+process discovery or a second stop/start sequence after a PASS. This two-command
+flow is the complete emulator-infrastructure verification contract.
+
+`--timeout` bounds each requested operation. `smoke` rejects unrealistically
+small budgets before touching the emulator and reserves a cleanup window for the
+final stop. A single low-level helper operation attempts each ADB recovery class
+at most once, so a persistently `offline` device cannot trigger repeated
+`adb reconnect offline` calls during polling.
 
 The canonical cold boot deliberately does not depend on Quick Boot. On this
 host the emulator reports that file-backed Quick Boot is unavailable on the
