@@ -56,6 +56,55 @@ class HubActivityRegisterTest {
     }
 
     @Test
+    fun missingCanonicalRowMarksOriginalUndoAsConflict() = runBlocking {
+        withDatabase { database ->
+            val db = database.openHelper.writableDatabase
+            val placeId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            db.execSQL(
+                """
+                INSERT INTO places(uuid,nickname,address,lat,lon,radius_m,notes,source_app,created_at,updated_at,archived,first_check_in_at_place)
+                VALUES(?, 'Home', NULL, NULL, NULL, NULL, NULL, 'test', ?, ?, 0, NULL)
+                """.trimIndent(),
+                arrayOf(placeId, now, now),
+            )
+            db.execSQL("UPDATE places SET nickname='Casa', updated_at=? WHERE uuid=?", arrayOf(now + 1, placeId))
+            val update = database.activityDao().page("places", 1, null, null, 20)
+                .first { it.action == "place_updated" && it.entityId == placeId }
+
+            db.execSQL("DELETE FROM places WHERE uuid=?", arrayOf(placeId))
+            val result = HubActivityUndoEngine.undo(database, update.id)
+
+            assertEquals(
+                HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE),
+                result,
+            )
+            assertEquals(HubActivityStatus.CONFLICT, database.activityDao().byId(update.id)!!.status)
+        }
+    }
+
+    @Test
+    fun nonReversibleCanonicalActivityDoesNotRetainRowSnapshots() = runBlocking {
+        withDatabase { database ->
+            val db = database.openHelper.writableDatabase
+            val episodeId = UUID.randomUUID().toString()
+            val now = "2026-09-12T00:00:00Z"
+            db.execSQL(
+                "INSERT INTO hub_contexts(id,context_type_id,title,created_at,updated_at) VALUES(?,NULL,'Test episode',?,?)",
+                arrayOf(episodeId, now, now),
+            )
+
+            val created = database.activityDao().page("hub", 1, null, null, 20)
+                .first { it.action == "episode_created" && it.entityId == episodeId }
+            assertFalse(created.reversible)
+            assertNull(created.payloadKind)
+            assertNull(created.payloadColumns)
+            assertNull(created.beforePayload)
+            assertNull(created.afterPayload)
+        }
+    }
+
+    @Test
     fun peopleAuditBecomesReadableActivityAndCreateUndoSoftDeletesContact() = runBlocking {
         withDatabase { database ->
             val db = database.openHelper.writableDatabase
