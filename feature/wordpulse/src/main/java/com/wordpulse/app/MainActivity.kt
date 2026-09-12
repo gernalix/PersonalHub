@@ -18,9 +18,8 @@ import com.wordpulse.app.ui.WordPulseViewModelFactory
 class MainActivity : ComponentActivity() {
     private var hubSessionId by mutableStateOf<String?>(null)
     private val viewModel: WordPulseViewModel by viewModels {
-        val app = application as WordPulseApplication
         WordPulseViewModelFactory(
-            repository = app.repository,
+            repository = WordPulseRuntime.repository(applicationContext),
             timeProvider = SystemTimeProvider,
         )
     }

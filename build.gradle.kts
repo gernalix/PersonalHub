@@ -9,7 +9,7 @@ plugins {
 
 val checkArchitectureBoundaries = tasks.register<Exec>("checkArchitectureBoundaries") {
     group = "verification"
-    description = "Checks module dependency and database ownership boundaries."
+    description = "Checks capsule public surfaces, module dependency direction, and persistence ownership boundaries."
     commandLine("python3", "tools/check_architecture_boundaries.py")
 }
 
