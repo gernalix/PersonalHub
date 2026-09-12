@@ -26,7 +26,10 @@ import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
 import com.gernalix.personalhub.contracts.database.HubResourceKinds
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
@@ -93,8 +96,13 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                                     listOf(anchor to "", created.ref to ""),
                                     title = context.getString(R.string.hub_workflowy_title),
                                 )
-                            } catch (error: Throwable) {
-                                (adapter as? ResourceHubAdapter)?.delete(created.ref.canonicalId)
+                            } catch (error: CancellationException) {
+                                withContext(NonCancellable) {
+                                    (adapter as? ResourceHubAdapter)?.delete(created.ref.canonicalId)
+                                }
+                                throw error
+                            } catch (error: Exception) {
+                                runCatching { (adapter as? ResourceHubAdapter)?.delete(created.ref.canonicalId) }
                                 workflowyError = error.message ?: context.getString(R.string.hub_workflowy_invalid)
                                 return@launch
                             }
