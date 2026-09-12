@@ -20,6 +20,11 @@ load/save. Readiness means the discovered target is in ADB state `device` and
 every later `adb -s <serial> ...` command. The older `--target emulator`
 invocation remains supported.
 
+`--timeout` is an end-to-end operation budget: subprocess calls, ADB recovery,
+readiness polling and cleanup must all stay inside it. A single helper operation
+attempts each ADB recovery class at most once, so a persistently `offline`
+device cannot trigger repeated `adb reconnect offline` calls during polling.
+
 The canonical cold boot deliberately does not depend on Quick Boot. On this
 host the emulator reports that file-backed Quick Boot is unavailable on the
 current filesystem; the verified cold boot is fast enough and avoids stale or
@@ -27,11 +32,11 @@ corrupt snapshot recovery. Android Studio and manual GUI interaction are not
 required.
 
 If startup is blocked, inspect `/tmp/personalhub-pixel_8a-emulator.log`. The
-helper performs one controlled ADB recovery for failed device listings or
-`offline` devices, and `stop` can terminate the canonical AVD through the
-emulator process when ADB cannot address it as a normal `device`. For a boot
-timeout, run `stop`, inspect the log, then `start`. Do not wipe or recreate the
-AVD merely to recover a snapshot: snapshots are not used by this procedure. A
-renderer fallback is attempted once only when the failed launch log contains
-concrete GPU/renderer error evidence, and only after the first process has
-terminated.
+helper identifies the canonical AVD from its actual `Pixel_8a` host process;
+an unrelated offline AVD does not block a Pixel_8a launch. `stop` can terminate
+the canonical AVD through the emulator process when ADB cannot address it as a
+normal `device`. For a boot timeout, run `stop`, inspect the log, then `start`.
+Do not wipe or recreate the AVD merely to recover a snapshot: snapshots are not
+used by this procedure. A renderer fallback is attempted once only when the
+failed launch log contains concrete GPU/renderer error evidence, and only after
+the first process and any residual Pixel_8a PID have been terminated.
