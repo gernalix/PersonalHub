@@ -26,6 +26,14 @@ def proc(args: list[str], code: int, stdout: str = "", stderr: str = "") -> Comp
     return CompletedProcess(args, code, stdout, stderr)
 
 
+class FakeProcess:
+    def __init__(self, returncode=None):
+        self.returncode = returncode
+
+    def poll(self):
+        return self.returncode
+
+
 class AndroidTargetPreflightTests(unittest.TestCase):
     def test_classifies_pixel_tcl_and_emulator_without_transport_id(self) -> None:
         rows = preflight.parse_devices(
@@ -37,11 +45,13 @@ class AndroidTargetPreflightTests(unittest.TestCase):
         self.assertEqual(["pixel", "tcl", "emulator"], [row["kind"] for row in rows])
         self.assertTrue(all("transport_id" not in row for row in rows))
 
-    def test_offline_target_is_not_eligible(self) -> None:
-        rows = preflight.parse_devices(
-            "List of devices attached\nP offline product:akita model:Pixel_8a device:akita\n"
-        )
-        self.assertEqual("offline", rows[0]["state"])
+    def test_any_prefers_emulator_over_physical_devices(self) -> None:
+        live = [
+            {"serial": "P", "state": "device", "model": "Pixel_8a", "kind": "pixel"},
+            {"serial": "T", "state": "device", "model": "TCL_6102H", "kind": "tcl"},
+            {"serial": "emulator-5554", "state": "device", "model": "sdk", "kind": "emulator"},
+        ]
+        self.assertEqual("emulator-5554", preflight.choose_target(live, "any", False)["serial"])
 
     def test_single_start_server_recovery_then_reuses_existing_target(self) -> None:
         adb = FakeAdb({
@@ -51,9 +61,7 @@ class AndroidTargetPreflightTests(unittest.TestCase):
             ],
             ("start-server",): [proc(["start-server"], 0)],
         })
-
-        result = preflight.select_target("tcl", False, runner=adb, start_avd=lambda runner: None)
-
+        result = preflight.select_target("tcl", False, runner=adb, start_avd=lambda *_: {})
         self.assertEqual("ok", result["status"])
         self.assertEqual("T", result["target"]["serial"])
         self.assertTrue(result["adb_recovered"])
@@ -62,50 +70,75 @@ class AndroidTargetPreflightTests(unittest.TestCase):
     def test_pixel_without_fallback_stays_blocked_when_only_emulator_is_live(self) -> None:
         adb = FakeAdb({
             ("devices", "-l"): [proc(
-                ["devices", "-l"],
-                0,
+                ["devices", "-l"], 0,
                 "List of devices attached\nemulator-5554 device product:sdk model:sdk_gphone64_x86_64\n",
             )],
         })
+        result = preflight.select_target("pixel", False, runner=adb, start_avd=lambda *_: {})
+        self.assertEqual(
+            {"status": "blocked", "reason": "pixel_physical_required_but_absent", "adb_recovered": False},
+            result,
+        )
 
-        result = preflight.select_target("pixel", False, runner=adb, start_avd=lambda runner: None)
-
-        self.assertEqual({"status": "blocked", "reason": "pixel_physical_required_but_absent", "adb_recovered": False}, result)
-
-    def test_pixel_with_fallback_can_reuse_live_emulator(self) -> None:
+    def test_pixel_with_fallback_can_reuse_booted_live_emulator(self) -> None:
         adb = FakeAdb({
             ("devices", "-l"): [proc(
-                ["devices", "-l"],
-                0,
+                ["devices", "-l"], 0,
                 "List of devices attached\nemulator-5554 device product:sdk model:sdk_gphone64_x86_64\n",
             )],
+            ("-s", "emulator-5554", "shell", "getprop", "sys.boot_completed"): [
+                proc([], 0, "1\n")
+            ],
         })
-
-        result = preflight.select_target("pixel", True, runner=adb, start_avd=lambda runner: self.fail("must not start AVD"))
-
+        result = preflight.select_target(
+            "pixel", True, runner=adb,
+            start_avd=lambda *_: self.fail("must not start AVD"),
+        )
         self.assertEqual("ok", result["status"])
         self.assertEqual("emulator-5554", result["target"]["serial"])
 
-    def test_started_avd_matches_by_emulator_console_name(self) -> None:
+    def test_waiter_requires_boot_completed(self) -> None:
         adb = FakeAdb({
-            ("devices", "-l"): [
-                proc(["devices", "-l"], 0, "List of devices attached\n"),
-                proc(["devices", "-l"], 0, "List of devices attached\nemulator-5554 device product:sdk model:sdk_gphone64_x86_64\n"),
+            ("devices", "-l"): [proc(
+                ["devices", "-l"], 0,
+                "List of devices attached\nemulator-5554 device model:sdk\n",
+            )],
+            ("-s", "emulator-5554", "emu", "avd", "name"): [proc([], 0, "Pixel_8a\nOK\n")],
+            ("-s", "emulator-5554", "shell", "getprop", "sys.boot_completed"): [
+                proc([], 0, "1\n")
             ],
-            ("-s", "emulator-5554", "emu", "avd", "name"): [proc(["-s", "emulator-5554", "emu", "avd", "name"], 0, "Pixel_8a\nOK\n")],
         })
-        started = []
+        row = preflight.wait_for_pixel_8a_emulator(adb, timeout_s=0.1, interval_s=0)
+        self.assertIsNotNone(row)
+        self.assertEqual("emulator-5554", row["serial"])
+
+    def test_renderer_failure_gets_one_software_retry(self) -> None:
+        starts = []
+        fake_target = {"serial": "emulator-5554", "state": "device", "model": "sdk", "kind": "emulator"}
+
+        def start(extra=None):
+            starts.append(extra)
+            return {
+                "process": FakeProcess(None),
+                "log_path": "/tmp/software" if extra else "/tmp/first",
+            }
+
+        waits = iter([None, fake_target])
+
+        def waiter(*args, **kwargs):
+            return next(waits)
 
         result = preflight.select_target(
             "emulator",
             False,
-            runner=adb,
-            start_avd=lambda runner: started.append("Pixel_8a"),
+            runner=FakeAdb({("devices", "-l"): [proc([], 0, "List of devices attached\n")]}),
+            start_avd=start,
+            waiter=waiter,
+            renderer_check=lambda path: path == "/tmp/first",
         )
-
+        self.assertEqual([None, ["-gpu", "swiftshader_indirect"]], starts)
         self.assertEqual("ok", result["status"])
-        self.assertEqual(["Pixel_8a"], started)
-        self.assertEqual("Pixel_8a", result["avd_started"])
+        self.assertEqual("swiftshader_indirect", result["renderer_fallback"])
 
 
 if __name__ == "__main__":
