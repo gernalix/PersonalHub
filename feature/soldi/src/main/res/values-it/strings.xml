@@ -14,6 +14,7 @@
     <string name="purchase">Usa in transazione</string>
     <string name="delete_confirm">Eliminare questo dato? I prodotti collegati sono protetti.</string>
     <string name="cancel">Annulla</string>
+    <string name="close">Chiudi</string>
     <string name="product_name">Nome prodotto</string>
     <string name="title">Titolo</string>
     <string name="is_product">Acquisto prodotto</string>
@@ -53,4 +54,29 @@
     <string name="git_error">Interscambio interrotto. Controlla URL, rete e accesso al server. Se il remoto è cambiato serve Pull; conflitti locali o dati non validi richiedono una verifica. Nessuna credenziale è accettata.</string>
     <string name="git_configured">Configurazione salvata</string>
     <string name="transaction_actions">Azioni transazione</string>
+    <string name="receipt_import">Importa scontrino</string>
+    <string name="receipt_review_help">PersonalHub ha letto questo scontrino sul dispositivo. Controlla gli acquisti rilevati prima di salvarli.</string>
+    <string name="receipt_merchant">Negozio</string>
+    <string name="receipt_date">Data e ora dello scontrino</string>
+    <string name="receipt_total">Totale scontrino</string>
+    <string name="receipt_products">Acquisti rilevati</string>
+    <string name="receipt_review_line">Controlla questa riga</string>
+    <string name="receipt_include_line">Includi questo acquisto</string>
+    <string name="receipt_matched_product">Associato a: %1$s</string>
+    <string name="receipt_new_product">Nuovo prodotto nel catalogo</string>
+    <string name="receipt_choose_product">Scegli prodotto esistente</string>
+    <string name="receipt_add_line">Aggiungi acquisto</string>
+    <string name="receipt_import_save">Importa acquisti</string>
+    <string name="receipt_chatgpt_setting">Migliora gli scontrini con ChatGPT</string>
+    <string name="receipt_chatgpt_setting_summary">Facoltativo. L&apos;importazione locale resta disponibile quando questa opzione è disattivata.</string>
+    <string name="receipt_chatgpt_info_action">Informazioni sull&apos;arricchimento con ChatGPT</string>
+    <string name="receipt_chatgpt_info_title">Importazione scontrini e ChatGPT</string>
+    <string name="receipt_chatgpt_info_body">SENZA CHATGPT\nPersonalHub legge lo scontrino direttamente su questo dispositivo, prova a riconoscere negozio, data, totale e prodotti e riutilizza i prodotti che conosce già. Puoi controllare e correggere tutto prima di salvare. Funziona senza account ChatGPT, piano a pagamento o connessione Internet.\n\nCON CHATGPT\nSe attivi questa opzione, nella schermata dello scontrino compare l&apos;azione facoltativa Migliora con ChatGPT. Non viene inviato nulla automaticamente. Quando la scegli, PersonalHub condivide il testo letto dallo scontrino, i nomi dei prodotti già salvati nel catalogo e il piccolo numero che PersonalHub usa per distinguere ciascun prodotto già presente. Non condivide l&apos;immagine dello scontrino. ChatGPT può suggerire nomi più chiari e riconoscere quando descrizioni diverse indicano lo stesso prodotto. Incolli poi la sua risposta in PersonalHub e controlli il risultato prima di salvare.\n\nPRIVACY E ACCESSO\nLasciando questa opzione disattivata, l&apos;elaborazione dello scontrino resta sul dispositivo. Attivandola, PersonalHub non memorizza la password di ChatGPT e non contatta ChatGPT da solo. Disponibilità e limiti di ChatGPT dipendono dall&apos;account che scegli di usare. Puoi cambiare questa scelta in qualsiasi momento.</string>
+    <string name="receipt_chatgpt_improve">Migliora con ChatGPT</string>
+    <string name="receipt_chatgpt_share_title">Invia a ChatGPT</string>
+    <string name="receipt_chatgpt_share_help">PersonalHub non invia nulla automaticamente. Scegli ChatGPT nel pannello di condivisione, invia il testo preparato e poi incolla qui la risposta.</string>
+    <string name="receipt_chatgpt_paste_title">Incolla la risposta di ChatGPT</string>
+    <string name="receipt_chatgpt_paste_help">Incolla la risposta ottenuta dal testo preparato dello scontrino. Prima di applicarla, PersonalHub controlla che ogni prodotto già esistente suggerito sia davvero presente nel catalogo.</string>
+    <string name="receipt_chatgpt_invalid">Questa risposta non può essere applicata. Chiedi a ChatGPT di restituire il formato richiesto senza testo aggiuntivo.</string>
+    <string name="receipt_chatgpt_apply">Applica risposta</string>
 </resources>

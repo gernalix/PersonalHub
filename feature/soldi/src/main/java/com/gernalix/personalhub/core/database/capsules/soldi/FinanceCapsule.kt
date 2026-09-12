@@ -73,6 +73,34 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
         }
         id
     }
+
+    /** Import all accepted receipt lines as one atomic finance operation. */
+    suspend fun importReceipt(value: FinanceReceiptImport): List<FinanceReceiptImportResult> = db.withTransaction {
+        require(value.items.isNotEmpty())
+        val occurredAt = utc(value.occurredAt)
+        val receiptCurrency = currency(value.currency)
+        value.items.map { item ->
+            val selected = item.productId?.let { requireNotNull(dao.product(it)) }
+            val productId = selected?.id ?: product(item.productName)
+            val canonicalProduct = requireNotNull(dao.product(productId))
+            val amount = BigDecimal(decimal(item.totalPrice)).negate().stripTrailingZeros().toPlainString()
+            val transactionId = saveTransaction(
+                TransactionDraft(
+                    title = canonicalProduct.name,
+                    isProduct = true,
+                    amount = amount,
+                    currency = receiptCurrency,
+                    chain = value.merchant,
+                    fromReceipt = true,
+                    occurredAt = occurredAt,
+                    accountId = value.accountId,
+                    productId = canonicalProduct.id,
+                )
+            )
+            FinanceReceiptImportResult(item.rawDescription, canonicalProduct, transactionId)
+        }
+    }
+
     suspend fun deleteTransaction(id: Long) {
         val uuid = db.withTransaction { dao.transaction(id)?.uuid.also { dao.deleteTransaction(id) } }
         uuid?.let {
@@ -137,3 +165,24 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 data class TransactionDraft(val id: Long? = null, val title: String = "", val isProduct: Boolean = false,
     val amount: String = "", val currency: String = "DKK", val chain: String = "", val placeId: String? = null,
     val notes: String = "", val tags: String = "", val fromReceipt: Boolean = false, val occurredAt: String = Instant.now().toString(), val accountId: String? = null, val productId: Long? = null)
+
+data class FinanceReceiptImport(
+    val merchant: String,
+    val occurredAt: String,
+    val currency: String,
+    val accountId: String?,
+    val items: List<FinanceReceiptImportItem>,
+)
+
+data class FinanceReceiptImportItem(
+    val rawDescription: String,
+    val productName: String,
+    val productId: Long?,
+    val totalPrice: String,
+)
+
+data class FinanceReceiptImportResult(
+    val rawDescription: String,
+    val product: FinanceProduct,
+    val transactionId: Long,
+)

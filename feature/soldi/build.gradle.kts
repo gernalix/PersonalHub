@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:hub-context"))
     implementation("org.eclipse.jgit:org.eclipse.jgit:6.10.1.202505221210-r")
+    implementation(libs.mlkit.text.recognition)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)

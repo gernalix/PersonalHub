@@ -3,9 +3,11 @@ package com.gernalix.personalhub.soldi
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.compose.BackHandler
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,14 +18,16 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.capsules.soldi.*
-import kotlinx.coroutines.launch
+import com.gernalix.personalhub.soldi.receipt.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.time.Instant
@@ -59,6 +63,11 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
     val products by capsule.products.collectAsState(emptyList())
     val places by capsule.places.collectAsState(emptyList())
     val tags by capsule.tagNames.collectAsState(emptyList())
+    val context = LocalContext.current
+    val receiptOcr = remember { ReceiptOcrProcessor() }
+    val receiptParser = remember { ReceiptParser() }
+    val receiptAliases = remember { ReceiptProductAliasStore(context.applicationContext) }
+    val receiptPreferences = remember { ReceiptEnrichmentPreferences(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var search by rememberSaveable { mutableStateOf("") }
@@ -68,10 +77,12 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
     var settings by rememberSaveable { mutableStateOf(false) }
     var month by rememberSaveable(stateSaver = YearMonthSaver) { mutableStateOf(java.time.YearMonth.now()) }
     var product by rememberSaveable(stateSaver = NullableFinanceProductSaver) { mutableStateOf<FinanceProduct?>(null) }
+    var receiptImport by remember { mutableStateOf<ReceiptImportDraft?>(null) }
     var error by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var deletion by remember { mutableStateOf<Pair<Int, Long>?>(null) }
     var handledHubTransactionUuid by rememberSaveable { mutableStateOf<String?>(null) }
+
     LaunchedEffect(hubTransactionUuid, transactions) {
         val uuid = hubTransactionUuid ?: return@LaunchedEffect
         if (handledHubTransactionUuid == uuid) return@LaunchedEffect
@@ -83,16 +94,39 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
         )
         handledHubTransactionUuid = uuid
     }
+
     fun action(block: suspend () -> Unit) {
         if (busy) return
-        busy = true; error = false
+        busy = true
+        error = false
         scope.launch {
-            try { block() } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (_: Exception) { error = true } finally { busy = false }
+            try { block() }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { error = true }
+            finally { busy = false }
         }
     }
-    fun back() { transaction = null; product = null; account = null; reconcile = null; settings = false; error = false }
-    val editing = transaction != null || product != null || account != null || reconcile != null || settings
+
+    val receiptLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            action {
+                val rawText = receiptOcr.recognize(context, uri)
+                receiptImport = receiptParser.parse(rawText).toImportDraft(products, receiptAliases)
+            }
+        }
+    }
+
+    fun back() {
+        transaction = null
+        product = null
+        account = null
+        reconcile = null
+        receiptImport = null
+        settings = false
+        error = false
+    }
+
+    val editing = transaction != null || product != null || account != null || reconcile != null || receiptImport != null || settings
     BackHandler(editing && !busy) { back() }
     Column(
         Modifier.fillMaxSize()
@@ -105,6 +139,7 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
                 transaction != null -> R.string.transaction
                 account != null -> R.string.account
                 reconcile != null -> R.string.reconcile
+                receiptImport != null -> R.string.receipt_import
                 product != null -> R.string.product_name
                 settings -> R.string.settings
                 tab == 1 -> R.string.products
@@ -122,25 +157,74 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
                 action { capsule.saveTransaction(draft); back() }
             }
             account != null -> AccountEditor(account!!, { account = it }, busy) {
-                val draft = account!!; action { capsule.saveAccount(draft); back() }
+                val draft = account!!
+                action { capsule.saveAccount(draft); back() }
             }
             reconcile != null -> ReconcileEditor(reconcile!!, transactions.map { it.value }, busy) { at, desired, title, notes ->
-                val id = reconcile!!.id; action { capsule.reconcile(id,at,desired,title,notes); back(); tab = 0 }
+                val id = reconcile!!.id
+                action { capsule.reconcile(id, at, desired, title, notes); back(); tab = 0 }
             }
-            settings -> GitSettings()
+            receiptImport != null -> ReceiptImportScreen(
+                draft = receiptImport!!,
+                products = products,
+                accounts = accounts,
+                chatGptEnabled = receiptPreferences.chatGptEnabled(),
+                busy = busy,
+                onChange = { receiptImport = it },
+                onSave = {
+                    val draft = receiptImport!!
+                    action {
+                        val imported = capsule.importReceipt(
+                            FinanceReceiptImport(
+                                merchant = draft.merchant,
+                                occurredAt = receiptOccurredAt(draft.dateTime),
+                                currency = draft.currency,
+                                accountId = draft.accountId,
+                                items = draft.lines.filter { it.include }.map { line ->
+                                    FinanceReceiptImportItem(
+                                        rawDescription = line.rawDescription.ifBlank { line.description },
+                                        productName = line.description,
+                                        productId = line.productId,
+                                        totalPrice = line.totalPrice,
+                                    )
+                                },
+                            )
+                        )
+                        imported.forEach { receiptAliases.remember(it.rawDescription, it.product) }
+                        back()
+                    }
+                },
+            )
+            settings -> SoldiSettings()
             product != null -> {
                 Field(R.string.product_name, product!!.name) { product = product!!.copy(name = it) }
-                Button(enabled = !busy, onClick = { val p = product!!; action { capsule.saveProduct(p.id.takeIf { it != 0L }, p.name); back() } }) { Text(stringResource(R.string.save)) }
+                Button(enabled = !busy, onClick = {
+                    val p = product!!
+                    action { capsule.saveProduct(p.id.takeIf { it != 0L }, p.name); back() }
+                }) { Text(stringResource(R.string.save)) }
             }
             else -> {
                 Row {
                     listOf(R.string.transactions, R.string.products, R.string.accounts).forEachIndexed { index, label ->
-                        TextButton(onClick = { tab = index }) { Text(stringResource(label), style = if (tab == index) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall) }
+                        TextButton(onClick = { tab = index }) {
+                            Text(stringResource(label), style = if (tab == index) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
                 Field(R.string.search, search) { search = it }
-                Row {
-                    Button(onClick = { when (tab) { 0 -> transaction = TransactionDraft(accountId = accounts.firstOrNull()?.id, currency = accounts.firstOrNull()?.currency ?: "DKK"); 1 -> product = FinanceProduct(name = ""); else -> account = FinanceAccount(name = "", currency = "DKK") } }) { Text(stringResource(R.string.add)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        when (tab) {
+                            0 -> transaction = TransactionDraft(accountId = accounts.firstOrNull()?.id, currency = accounts.firstOrNull()?.currency ?: "DKK")
+                            1 -> product = FinanceProduct(name = "")
+                            else -> account = FinanceAccount(name = "", currency = "DKK")
+                        }
+                    }) { Text(stringResource(R.string.add)) }
+                    if (tab == 0) {
+                        TextButton(enabled = !busy, onClick = { receiptLauncher.launch("image/*") }) {
+                            Text(stringResource(R.string.receipt_import))
+                        }
+                    }
                 }
                 if (tab == 0) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = { month = month.minusMonths(1) }) { Text("‹") }
@@ -151,12 +235,21 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
                     when (tab) {
                         0 -> {
                             if (transactions.isEmpty()) item { Text(stringResource(R.string.empty)) }
-                            items(transactions.filter { row -> accounts.any { it.id == row.value.accountId && it.included } && java.time.YearMonth.from(Instant.parse(row.value.occurredAt).atZone(ZoneId.systemDefault())) == month && listOf(row.title,row.chain,row.place,row.value.notes).any { it?.contains(search,true) == true } }, key = { it.value.id }) { row ->
+                            items(transactions.filter { row ->
+                                accounts.any { it.id == row.value.accountId && it.included } &&
+                                    java.time.YearMonth.from(Instant.parse(row.value.occurredAt).atZone(ZoneId.systemDefault())) == month &&
+                                    listOf(row.title, row.chain, row.place, row.value.notes).any { it?.contains(search, true) == true }
+                            }, key = { it.value.id }) { row ->
                                 var menuOpen by remember { mutableStateOf(false) }
-                                val edit = { action {
-                                    transaction = TransactionDraft(row.value.id, row.title, row.value.productId != null, row.value.amount, row.value.currency,
-                                        row.chain.orEmpty(), row.value.placeId, row.value.notes, capsule.tags(row.value.id).joinToString(", "), row.value.fromReceipt, row.value.occurredAt, row.value.accountId, row.value.productId)
-                                } }
+                                val edit = {
+                                    action {
+                                        transaction = TransactionDraft(
+                                            row.value.id, row.title, row.value.productId != null, row.value.amount, row.value.currency,
+                                            row.chain.orEmpty(), row.value.placeId, row.value.notes, capsule.tags(row.value.id).joinToString(", "),
+                                            row.value.fromReceipt, row.value.occurredAt, row.value.accountId, row.value.productId,
+                                        )
+                                    }
+                                }
                                 Card(onClick = edit, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                                     Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -164,17 +257,35 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
                                                 Text(row.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                                 Text("${row.value.amount} ${row.value.currency}", style = MaterialTheme.typography.titleSmall)
                                             }
-                                            Text(listOfNotNull(accounts.find { it.id == row.value.accountId }?.name, localDate(row.value.occurredAt)).joinToString(" · "),
-                                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                            val details = listOfNotNull(row.chain, row.place, row.value.notes,
-                                                if (row.value.fromReceipt) stringResource(R.string.from_receipt) else null).filter { it.isNotBlank() }
-                                            if (details.isNotEmpty()) Text(details.joinToString(" · "), style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                            Text(
+                                                listOfNotNull(accounts.find { it.id == row.value.accountId }?.name, localDate(row.value.occurredAt)).joinToString(" · "),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                            )
+                                            val details = listOfNotNull(
+                                                row.chain,
+                                                row.place,
+                                                row.value.notes,
+                                                if (row.value.fromReceipt) stringResource(R.string.from_receipt) else null,
+                                            ).filter { it.isNotBlank() }
+                                            if (details.isNotEmpty()) Text(
+                                                details.joinToString(" · "),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                            )
                                         }
                                         Box {
                                             val actions = stringResource(R.string.transaction_actions)
-                                            TextButton(onClick = { menuOpen = true }, enabled = !busy, modifier = Modifier.size(48.dp).semantics { contentDescription = actions }, contentPadding = PaddingValues(0.dp)) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                                            TextButton(
+                                                onClick = { menuOpen = true },
+                                                enabled = !busy,
+                                                modifier = Modifier.size(48.dp).semantics { contentDescription = actions },
+                                                contentPadding = PaddingValues(0.dp),
+                                            ) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                                 DropdownMenuItem(text = { Text(stringResource(R.string.edit)) }, onClick = { menuOpen = false; edit() })
                                                 DropdownMenuItem(text = { Text(stringResource(R.string.delete)) }, onClick = { menuOpen = false; deletion = 0 to row.value.id })
@@ -187,36 +298,51 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
                         1 -> {
                             if (products.isEmpty()) item { Text(stringResource(R.string.empty)) }
                             items(products.filter { it.name.contains(search, true) }, key = { it.id }) { row ->
-                                Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
-                                    Text(row.name)
-                                    Row {
-                                        TextButton(onClick = { product = row }) { Text(stringResource(R.string.edit)) }
-                                        TextButton(onClick = { transaction = TransactionDraft(title = row.name, isProduct = true, productId = row.id, accountId = accounts.firstOrNull()?.id, currency = accounts.firstOrNull()?.currency ?: "DKK") }) { Text(stringResource(R.string.purchase)) }
-                                        TextButton(onClick = { deletion = 1 to row.id }) { Text(stringResource(R.string.delete)) }
+                                Card(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        Text(row.name)
+                                        Row {
+                                            TextButton(onClick = { product = row }) { Text(stringResource(R.string.edit)) }
+                                            TextButton(onClick = {
+                                                transaction = TransactionDraft(
+                                                    title = row.name,
+                                                    isProduct = true,
+                                                    productId = row.id,
+                                                    accountId = accounts.firstOrNull()?.id,
+                                                    currency = accounts.firstOrNull()?.currency ?: "DKK",
+                                                )
+                                            }) { Text(stringResource(R.string.purchase)) }
+                                            TextButton(onClick = { deletion = 1 to row.id }) { Text(stringResource(R.string.delete)) }
+                                        }
                                     }
-                                } }
+                                }
                             }
                         }
                         else -> {
                             accounts.groupBy { it.currency }.toSortedMap().forEach { (currency, currencyAccounts) ->
-                            item(key = "currency-$currency") { Text(currency, style = MaterialTheme.typography.titleLarge) }
-                            items(currencyAccounts, key = { it.id }) { row ->
-                                Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
-                                    Row { Checkbox(row.included, { value -> action { capsule.setIncluded(row.id,value) } }); Text(row.name,style = MaterialTheme.typography.titleMedium) }
-                                    Text(stringResource(R.string.opening_balance) + ": ${row.openingBalance} ${row.currency}")
-                                    Text(stringResource(R.string.current_balance) + ": ${FinanceCapsule.balance(row,transactions.map { it.value }).toPlainString()} ${row.currency}")
-                                    Row {
-                                        TextButton(onClick = { account = row }) { Text(stringResource(R.string.edit)) }
-                                        TextButton(onClick = { reconcile = row }) { Text(stringResource(R.string.reconcile)) }
+                                item(key = "currency-$currency") { Text(currency, style = MaterialTheme.typography.titleLarge) }
+                                items(currencyAccounts, key = { it.id }) { row ->
+                                    Card(Modifier.fillMaxWidth()) {
+                                        Column(Modifier.padding(12.dp)) {
+                                            Row {
+                                                Checkbox(row.included, { value -> action { capsule.setIncluded(row.id, value) } })
+                                                Text(row.name, style = MaterialTheme.typography.titleMedium)
+                                            }
+                                            Text(stringResource(R.string.opening_balance) + ": ${row.openingBalance} ${row.currency}")
+                                            Text(stringResource(R.string.current_balance) + ": ${FinanceCapsule.balance(row, transactions.map { it.value }).toPlainString()} ${row.currency}")
+                                            Row {
+                                                TextButton(onClick = { account = row }) { Text(stringResource(R.string.edit)) }
+                                                TextButton(onClick = { reconcile = row }) { Text(stringResource(R.string.reconcile)) }
+                                            }
+                                        }
                                     }
-                                } }
-                            }
+                                }
                             }
                         }
                     }
                 }
                 HorizontalDivider()
-                val totals = FinanceCapsule.totals(accounts,transactions.map { it.value })
+                val totals = FinanceCapsule.totals(accounts, transactions.map { it.value })
                 if (totals.isEmpty()) Text(stringResource(R.string.empty))
                 totals.toSortedMap().forEach { (currency, total) ->
                     Text(stringResource(R.string.total_owned) + ": ${total.toPlainString()} $currency", style = MaterialTheme.typography.titleLarge)
@@ -226,13 +352,20 @@ private fun SoldiScreen(capsule: FinanceCapsule, finish: () -> Unit, hubTransact
         }
     }
     deletion?.let { (kind, id) ->
-        AlertDialog(onDismissRequest = { if (!busy) deletion = null }, title = { Text(stringResource(R.string.delete)) },
+        AlertDialog(
+            onDismissRequest = { if (!busy) deletion = null },
+            title = { Text(stringResource(R.string.delete)) },
             text = { Text(stringResource(R.string.delete_confirm)) },
-            confirmButton = { TextButton(enabled = !busy, onClick = { action {
-                when (kind) { 0 -> capsule.deleteTransaction(id); else -> capsule.deleteProduct(id) }
-                deletion = null
-            } }) { Text(stringResource(R.string.delete)) } },
-            dismissButton = { TextButton(enabled = !busy, onClick = { deletion = null }) { Text(stringResource(R.string.cancel)) } })
+            confirmButton = {
+                TextButton(enabled = !busy, onClick = {
+                    action {
+                        when (kind) { 0 -> capsule.deleteTransaction(id); else -> capsule.deleteProduct(id) }
+                        deletion = null
+                    }
+                }) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = { TextButton(enabled = !busy, onClick = { deletion = null }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 }
 
@@ -244,10 +377,10 @@ private fun TransactionEditor(d: TransactionDraft, products: List<FinanceProduct
                 com.gernalix.personalhub.contracts.database.HubEntityRef("soldi", "transaction", stored.value.uuid),
             )
         } }
-        item { AccountPicker(accounts,d.accountId) { change(d.copy(accountId = it.id,currency = it.currency)) } }
+        item { AccountPicker(accounts, d.accountId) { change(d.copy(accountId = it.id, currency = it.currency)) } }
         item { Field(R.string.title, d.title, readOnly = d.productId != null, suggestions = transactions.filter { it.value.productId == null }.map { it.title }, selectSuggestion = selectTitle) { change(d.copy(title = it)) } }
-        item { Row { Checkbox(d.isProduct, { change(d.copy(isProduct = it,productId = if(it) d.productId else null)) }); Text(stringResource(R.string.is_product)) } }
-        if (d.isProduct) item { ProductPicker(products) { change(d.copy(title = it.name,productId = it.id)) } }
+        item { Row { Checkbox(d.isProduct, { change(d.copy(isProduct = it, productId = if (it) d.productId else null)) }); Text(stringResource(R.string.is_product)) } }
+        if (d.isProduct) item { ProductPicker(products) { change(d.copy(title = it.name, productId = it.id)) } }
         item { Field(R.string.amount, d.amount) { change(d.copy(amount = it)) } }
         item { Text(stringResource(R.string.amount_help)) }
         item { Row { Checkbox(d.fromReceipt, { change(d.copy(fromReceipt = it)) }); Text(stringResource(R.string.from_receipt)) } }
@@ -270,10 +403,16 @@ private fun Field(label: Int, value: String, readOnly: Boolean = false, suggesti
             (!commaSeparated || value.split(',').none { selected -> selected.trim().equals(it, true) })
     }.take(4)
     Column {
-        OutlinedTextField(value = value, onValueChange = change, readOnly = readOnly,
+        OutlinedTextField(
+            value = value,
+            onValueChange = change,
+            readOnly = readOnly,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                keyboardType = if (label in listOf(R.string.amount, R.string.opening_balance, R.string.desired_balance)) androidx.compose.ui.text.input.KeyboardType.Decimal else androidx.compose.ui.text.input.KeyboardType.Text),
-            label = { Text(stringResource(label)) }, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused })
+                keyboardType = if (label in listOf(R.string.amount, R.string.opening_balance, R.string.desired_balance)) androidx.compose.ui.text.input.KeyboardType.Decimal else androidx.compose.ui.text.input.KeyboardType.Text,
+            ),
+            label = { Text(stringResource(label)) },
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+        )
         if (focused && !readOnly && query.isNotEmpty()) options.forEach { suggestion ->
             TextButton(onClick = {
                 (selectSuggestion ?: change)(if (commaSeparated && value.contains(',')) value.substringBeforeLast(',') + ", " + suggestion else suggestion)
@@ -286,19 +425,29 @@ private fun Field(label: Int, value: String, readOnly: Boolean = false, suggesti
 private fun PlacePicker(places: List<PlaceChoice>, selected: String?, change: (String?) -> Unit) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) { Text(stringResource(R.string.place) + ": " + (places.find { it.id == selected }?.name ?: stringResource(R.string.none))) }
-    if (open) AlertDialog(onDismissRequest = { open = false }, title = { Text(stringResource(R.string.place)) },
-        text = { LazyColumn { item { Text(stringResource(R.string.none), Modifier.fillMaxWidth().clickable { change(null); open = false }.padding(12.dp)) }
-            items(places, key = { it.id }) { p -> Text(p.name, Modifier.fillMaxWidth().clickable { change(p.id); open = false }.padding(12.dp)) } } },
-        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } })
+    if (open) AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(stringResource(R.string.place)) },
+        text = {
+            LazyColumn {
+                item { Text(stringResource(R.string.none), Modifier.fillMaxWidth().clickable { change(null); open = false }.padding(12.dp)) }
+                items(places, key = { it.id }) { p -> Text(p.name, Modifier.fillMaxWidth().clickable { change(p.id); open = false }.padding(12.dp)) }
+            }
+        },
+        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 @Composable
 private fun ProductPicker(products: List<FinanceProduct>, change: (FinanceProduct) -> Unit) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) { Text(stringResource(R.string.select_product)) }
-    if (open) AlertDialog(onDismissRequest = { open = false }, title = { Text(stringResource(R.string.products)) },
+    if (open) AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(stringResource(R.string.products)) },
         text = { LazyColumn { items(products, key = { it.id }) { p -> Text(p.name, Modifier.fillMaxWidth().clickable { change(p); open = false }.padding(12.dp)) } } },
-        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } })
+        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 private fun localDate(value: String): String = DateTimeFormatter
@@ -307,7 +456,7 @@ private fun localDate(value: String): String = DateTimeFormatter
 
 @Composable
 private fun DateField(value: String, change: (String) -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val current = Instant.parse(value).atZone(ZoneId.systemDefault())
     OutlinedButton(onClick = {
         android.app.DatePickerDialog(context, { _, year, month, day ->
@@ -325,42 +474,45 @@ private fun DateField(value: String, change: (String) -> Unit) {
 private fun AccountPicker(accounts: List<FinanceAccount>, selected: String?, change: (FinanceAccount) -> Unit) {
     var open by remember { mutableStateOf(false) }
     TextButton(onClick = { open = true }) { Text(stringResource(R.string.account) + ": " + (accounts.find { it.id == selected }?.name ?: stringResource(R.string.default_account))) }
-    if (open) AlertDialog(onDismissRequest = { open = false },title = { Text(stringResource(R.string.accounts)) },
-        text = { LazyColumn { items(accounts,key = { it.id }) { a -> Text("${a.name} (${a.currency})",Modifier.fillMaxWidth().clickable { change(a); open = false }.padding(12.dp)) } } },
-        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.back)) } })
+    if (open) AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(stringResource(R.string.accounts)) },
+        text = { LazyColumn { items(accounts, key = { it.id }) { a -> Text("${a.name} (${a.currency})", Modifier.fillMaxWidth().clickable { change(a); open = false }.padding(12.dp)) } } },
+        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.back)) } },
+    )
 }
 
 @Composable
 private fun AccountEditor(value: FinanceAccount, change: (FinanceAccount) -> Unit, busy: Boolean, save: () -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Field(R.string.account_name,value.name) { change(value.copy(name = it)) } }
-        item { Field(R.string.currency,value.currency, suggestions = java.util.Currency.getAvailableCurrencies().map { it.currencyCode }.sorted()) { change(value.copy(currency = it)) } }
-        item { Field(R.string.opening_balance,value.openingBalance) { change(value.copy(openingBalance = it)) } }
+        item { Field(R.string.account_name, value.name) { change(value.copy(name = it)) } }
+        item { Field(R.string.currency, value.currency, suggestions = java.util.Currency.getAvailableCurrencies().map { it.currencyCode }.sorted()) { change(value.copy(currency = it)) } }
+        item { Field(R.string.opening_balance, value.openingBalance) { change(value.copy(openingBalance = it)) } }
         item { DateField(value.openedAt) { change(value.copy(openedAt = it)) } }
-        item { Row { Checkbox(value.included,{ change(value.copy(included = it)) }); Text(stringResource(R.string.include_total)) } }
-        item { Button(onClick = save,enabled = !busy) { Text(stringResource(R.string.save)) } }
+        item { Row { Checkbox(value.included, { change(value.copy(included = it)) }); Text(stringResource(R.string.include_total)) } }
+        item { Button(onClick = save, enabled = !busy) { Text(stringResource(R.string.save)) } }
     }
 }
 
 @Composable
-private fun ReconcileEditor(account: FinanceAccount, rows: List<FinanceTransaction>, busy: Boolean, save: (String,String,String,String) -> Unit) {
+private fun ReconcileEditor(account: FinanceAccount, rows: List<FinanceTransaction>, busy: Boolean, save: (String, String, String, String) -> Unit) {
     var at by rememberSaveable(account.id) { mutableStateOf(Instant.now().toString()) }
     var desired by rememberSaveable(account.id) { mutableStateOf("") }
     val defaultTitle = stringResource(R.string.compensation)
     var title by rememberSaveable(account.id) { mutableStateOf(defaultTitle) }
     var notes by rememberSaveable(account.id) { mutableStateOf("") }
-    val balance = runCatching { FinanceCapsule.balance(account,rows,Instant.parse(at)) }.getOrNull()
+    val balance = runCatching { FinanceCapsule.balance(account, rows, Instant.parse(at)) }.getOrNull()
     val difference = runCatching { BigDecimal(FinanceCapsule.decimal(desired)) - requireNotNull(balance) }.getOrNull()
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text(account.name,style = MaterialTheme.typography.titleLarge) }
+        item { Text(account.name, style = MaterialTheme.typography.titleLarge) }
         item { DateField(at) { at = it } }
         item { Text(stringResource(R.string.current_balance) + ": ${balance?.toPlainString().orEmpty()} ${account.currency}") }
-        item { Field(R.string.desired_balance,desired) { desired = it } }
+        item { Field(R.string.desired_balance, desired) { desired = it } }
         item { Text(stringResource(R.string.difference) + ": ${difference?.toPlainString().orEmpty()} ${account.currency}") }
-        item { Field(R.string.title,title) { title = it } }
-        item { Field(R.string.notes,notes) { notes = it } }
+        item { Field(R.string.title, title) { title = it } }
+        item { Field(R.string.notes, notes) { notes = it } }
         item { Text(stringResource(R.string.reconcile_help)) }
-        item { Button(enabled = !busy && difference != null,onClick = { save(at,desired,title,notes) }) { Text(stringResource(R.string.save)) } }
+        item { Button(enabled = !busy && difference != null, onClick = { save(at, desired, title, notes) }) { Text(stringResource(R.string.save)) } }
     }
 }
 
@@ -443,37 +595,92 @@ private val NullableTransactionDraftSaver = listSaver<TransactionDraft?, Any?>(
 )
 
 @Composable
-private fun GitSettings() {
-    val context = androidx.compose.ui.platform.LocalContext.current
+private fun SoldiSettings() {
+    val context = LocalContext.current
     val git = remember { FinanceGit(context.applicationContext) }
+    val receiptPreferences = remember { ReceiptEnrichmentPreferences(context.applicationContext) }
     var url by remember { mutableStateOf(git.url()) }
     var status by remember { mutableIntStateOf(0) }
     var running by remember { mutableStateOf(false) }
+    var chatGptEnabled by remember { mutableStateOf(receiptPreferences.chatGptEnabled()) }
+    var showInfo by remember { mutableStateOf(false) }
+    val infoDescription = stringResource(R.string.receipt_chatgpt_info_action)
     val scope = rememberCoroutineScope()
-    fun run(push: Boolean) {
-        if(running) return
-        running = true; status = R.string.git_running
-        scope.launch { try {
-            withContext(Dispatchers.IO) { git.configure(url) }
-            if(push) git.push() else git.pull()
-            status = R.string.git_success
-        } catch(e: kotlinx.coroutines.CancellationException) { throw e }
-        catch(_: Exception) { status = R.string.git_error }
-        finally { running = false } }
-    }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text(stringResource(R.string.git_help)) }
-        item { Field(R.string.git_url,url) { url = it } }
-        item { TextButton(enabled = !running,onClick = {
-            scope.launch { try { withContext(Dispatchers.IO) { git.configure(url) }; status = R.string.git_configured }
-                catch(_: Exception) { status = R.string.git_error } }
-        }) { Text(stringResource(R.string.save)) } }
 
-        item { Row {
-            Button(enabled = !running,onClick = { run(false) }) { Text(stringResource(R.string.git_pull)) }
-            TextButton(enabled = !running,onClick = { run(true) }) { Text(stringResource(R.string.git_push)) }
-        } }
-        item { TextButton(enabled = !running,onClick = { git.configure(""); url = ""; status = 0 }) { Text(stringResource(R.string.git_disconnect)) } }
-        if(status != 0) item { Text(stringResource(status)) }
+    fun run(push: Boolean) {
+        if (running) return
+        running = true
+        status = R.string.git_running
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { git.configure(url) }
+                if (push) git.push() else git.pull()
+                status = R.string.git_success
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                status = R.string.git_error
+            } finally {
+                running = false
+            }
+        }
+    }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = chatGptEnabled,
+                    onCheckedChange = { value ->
+                        chatGptEnabled = value
+                        receiptPreferences.setChatGptEnabled(value)
+                    },
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.receipt_chatgpt_setting), style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.receipt_chatgpt_setting_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(
+                    onClick = { showInfo = true },
+                    modifier = Modifier.semantics { contentDescription = infoDescription },
+                ) { Text("ℹ️") }
+            }
+        }
+        item { HorizontalDivider() }
+        item { Text(stringResource(R.string.git_help)) }
+        item { Field(R.string.git_url, url) { url = it } }
+        item {
+            TextButton(enabled = !running, onClick = {
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) { git.configure(url) }
+                        status = R.string.git_configured
+                    } catch (_: Exception) {
+                        status = R.string.git_error
+                    }
+                }
+            }) { Text(stringResource(R.string.save)) }
+        }
+        item {
+            Row {
+                Button(enabled = !running, onClick = { run(false) }) { Text(stringResource(R.string.git_pull)) }
+                TextButton(enabled = !running, onClick = { run(true) }) { Text(stringResource(R.string.git_push)) }
+            }
+        }
+        item { TextButton(enabled = !running, onClick = { git.configure(""); url = ""; status = 0 }) { Text(stringResource(R.string.git_disconnect)) } }
+        if (status != 0) item { Text(stringResource(status)) }
+    }
+
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            title = { Text(stringResource(R.string.receipt_chatgpt_info_title)) },
+            text = { Text(stringResource(R.string.receipt_chatgpt_info_body)) },
+            confirmButton = { TextButton(onClick = { showInfo = false }) { Text(stringResource(R.string.close)) } },
+        )
     }
 }

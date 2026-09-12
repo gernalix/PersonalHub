@@ -14,6 +14,7 @@
     <string name="purchase">Use in transaction</string>
     <string name="delete_confirm">Delete this record? Referenced products are protected.</string>
     <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
     <string name="product_name">Product name</string>
     <string name="title">Title</string>
     <string name="is_product">Product purchase</string>
@@ -53,4 +54,29 @@
     <string name="git_error">Exchange stopped. Check the URL, network and server access. A changed remote requires Pull; conflicting local edits or invalid records require review. No credentials are accepted.</string>
     <string name="git_configured">Configuration saved</string>
     <string name="transaction_actions">Transaction actions</string>
+    <string name="receipt_import">Import receipt</string>
+    <string name="receipt_review_help">PersonalHub read this receipt on your device. Review the detected purchases before saving.</string>
+    <string name="receipt_merchant">Shop</string>
+    <string name="receipt_date">Receipt date and time</string>
+    <string name="receipt_total">Receipt total</string>
+    <string name="receipt_products">Detected purchases</string>
+    <string name="receipt_review_line">Check this line</string>
+    <string name="receipt_include_line">Include this purchase</string>
+    <string name="receipt_matched_product">Matched to: %1$s</string>
+    <string name="receipt_new_product">New catalog product</string>
+    <string name="receipt_choose_product">Choose existing product</string>
+    <string name="receipt_add_line">Add purchase</string>
+    <string name="receipt_import_save">Import purchases</string>
+    <string name="receipt_chatgpt_setting">Improve receipts with ChatGPT</string>
+    <string name="receipt_chatgpt_setting_summary">Optional. Local receipt import stays available when this is off.</string>
+    <string name="receipt_chatgpt_info_action">About ChatGPT receipt enrichment</string>
+    <string name="receipt_chatgpt_info_title">Receipt import and ChatGPT</string>
+    <string name="receipt_chatgpt_info_body">WITHOUT CHATGPT\nPersonalHub reads the receipt on this device, tries to find the shop, date, total and products, and reuses products it already knows. You can review and correct everything before saving. This works without a ChatGPT account, paid plan or internet connection.\n\nWITH CHATGPT\nIf you turn this on, the receipt screen adds an optional Improve with ChatGPT action. Nothing is sent automatically. When you choose it, PersonalHub shares the text read from the receipt, the names of products already saved in your catalog and the small number PersonalHub uses to tell each saved product apart. It does not share the receipt image. ChatGPT can suggest clearer product names and recognize when differently written lines are the same product. You paste its reply back into PersonalHub and review the result before saving.\n\nPRIVACY AND ACCESS\nLeaving this off keeps receipt processing on the device. Turning it on does not make PersonalHub store your ChatGPT password or contact ChatGPT on its own. ChatGPT availability and limits depend on the account you choose to use. You can change this choice at any time.</string>
+    <string name="receipt_chatgpt_improve">Improve with ChatGPT</string>
+    <string name="receipt_chatgpt_share_title">Send to ChatGPT</string>
+    <string name="receipt_chatgpt_share_help">PersonalHub sends nothing automatically. Choose ChatGPT in the share panel, send the prepared text, then paste its reply here.</string>
+    <string name="receipt_chatgpt_paste_title">Paste ChatGPT reply</string>
+    <string name="receipt_chatgpt_paste_help">Paste the reply produced from the prepared receipt text. PersonalHub checks that every suggested saved product really exists in your catalog before applying it.</string>
+    <string name="receipt_chatgpt_invalid">This reply cannot be applied. Ask ChatGPT to return the requested format without extra text.</string>
+    <string name="receipt_chatgpt_apply">Apply reply</string>
 </resources>
