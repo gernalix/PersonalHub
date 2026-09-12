@@ -217,7 +217,11 @@ private fun ActivityCard(
 ) {
     val activity = item.activity
     val moduleName = moduleLabel(activity.moduleId)
-    val subject = item.label?.takeIf(String::isNotBlank) ?: moduleName
+    val subject = when {
+        activity.entityKind == "setting" -> moduleName
+        activity.moduleId == "wordpulse" && activity.entityKind == "session" -> moduleName
+        else -> item.label?.takeIf(String::isNotBlank) ?: moduleName
+    }
     val title = humanActivityTitle(activity.action, subject)
     val canOpen = item.navigationRef != null || moduleFor(activity.moduleId) != null
     Card(
@@ -299,7 +303,11 @@ private fun humanActivityTitle(action: String, subject: String): String {
 
 private suspend fun resolveActivityItems(rows: List<HubActivityEntity>): List<ActivityUiItem> {
     val refs = rows.mapNotNull(::navigationRef).distinct()
-    val summaries = runCatching { HubContextRuntime.summaries(refs) }.getOrDefault(emptyMap())
+    val adapters = runCatching { HubContextRuntime.adapters() }.getOrDefault(emptyList())
+    val supportedRefs = refs.filter { ref ->
+        adapters.any { adapter -> adapter.moduleId == ref.moduleId && adapter.entityKind == ref.entityKind }
+    }
+    val summaries = runCatching { HubContextRuntime.summaries(supportedRefs) }.getOrDefault(emptyMap())
     return rows.map { activity ->
         val ref = navigationRef(activity)
         ActivityUiItem(
