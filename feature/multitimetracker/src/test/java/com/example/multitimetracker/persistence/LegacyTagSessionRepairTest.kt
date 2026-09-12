@@ -2,7 +2,9 @@ package com.example.multitimetracker.persistence
 
 import com.example.multitimetracker.core.contracts.TaggedSessionRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LegacyTagSessionRepairTest {
@@ -65,5 +67,45 @@ class LegacyTagSessionRepairTest {
         )
 
         assertNull(LegacyTagSessionRepair.resolveModernSessionId(record(), rows))
+    }
+
+    @Test
+    fun missingModernIntervalCanBeRecreatedForOneLegacySession() {
+        val resolution = LegacyTagSessionRepair.resolveRepairTarget(
+            record = record(),
+            candidates = emptyList(),
+            distinctLegacySessionsForInterval = 1,
+        )
+
+        assertNull(resolution.existingSessionId)
+        assertTrue(resolution.createFromLegacy)
+    }
+
+    @Test
+    fun missingModernIntervalIsNotRecreatedWhenLegacyIntervalIsAmbiguous() {
+        val resolution = LegacyTagSessionRepair.resolveRepairTarget(
+            record = record(),
+            candidates = emptyList(),
+            distinctLegacySessionsForInterval = 2,
+        )
+
+        assertNull(resolution.existingSessionId)
+        assertFalse(resolution.createFromLegacy)
+    }
+
+    @Test
+    fun ambiguousModernIntervalIsNeverRecreated() {
+        val rows = listOf(
+            LegacyTagSessionRepair.ClosedSessionRow(900L, "Same", 100L, 200L),
+            LegacyTagSessionRepair.ClosedSessionRow(901L, "Same", 100L, 200L),
+        )
+        val resolution = LegacyTagSessionRepair.resolveRepairTarget(
+            record = record(sessionTitle = "Same"),
+            candidates = rows,
+            distinctLegacySessionsForInterval = 1,
+        )
+
+        assertNull(resolution.existingSessionId)
+        assertFalse(resolution.createFromLegacy)
     }
 }
