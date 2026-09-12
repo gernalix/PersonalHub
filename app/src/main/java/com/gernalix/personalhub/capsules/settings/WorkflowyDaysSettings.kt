@@ -38,13 +38,14 @@ import kotlinx.coroutines.withContext
 private const val PREFS = "workflowy_days_sync"
 private const val KEY_URL = "feed_url"
 private const val KEY_ENABLED = "enabled"
+private const val DEFAULT_FEED_URL = "https://mtt-sync.danielegalati.com/workflowy-days.json"
 
 @Composable
 internal fun WorkflowyDaysSettings(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
-    var url by remember { mutableStateOf(prefs.getString(KEY_URL, "").orEmpty()) }
+    var url by remember { mutableStateOf(prefs.getString(KEY_URL, DEFAULT_FEED_URL).orEmpty()) }
     var enabled by remember { mutableStateOf(prefs.getBoolean(KEY_ENABLED, false)) }
     var status by remember { mutableStateOf(WorkflowyDaysSync.status(context)) }
     var busy by remember { mutableStateOf(false) }
@@ -87,7 +88,7 @@ internal fun WorkflowyDaysSettings(onBack: () -> Unit) {
                         runCatching { WorkflowyDaysSync.configure(context, url.trim(), enabled) }.isFailure
                     }
                     busy = false
-                    if (!failed) url = prefs.getString(KEY_URL, "").orEmpty()
+                    if (!failed) url = prefs.getString(KEY_URL, DEFAULT_FEED_URL).orEmpty()
                 }
             },
         ) { Text(stringResource(R.string.workflowy_days_save)) }
