@@ -31,12 +31,14 @@ fun HubSettings(onBack: () -> Unit) {
     when (page) {
         "shortcuts" -> HomeShortcutsSettings { page = "root" }
         "sync" -> SyncSettings { page = "root" }
+        "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
         else -> {
             val context = LocalContext.current
             SettingsPage(R.string.settings_title, ::back) {
                 OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
                 OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) { Text(stringResource(R.string.database_title)) }
                 OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
+                OutlinedButton(onClick = { page = "workflowy-days" }) { Text(stringResource(R.string.workflowy_days_title)) }
             }
         }
     }
