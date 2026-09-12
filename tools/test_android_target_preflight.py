@@ -89,6 +89,9 @@ class AndroidTargetPreflightTests(unittest.TestCase):
             ("-s", "emulator-5554", "shell", "getprop", "sys.boot_completed"): [
                 proc([], 0, "1\n")
             ],
+            ("-s", "emulator-5554", "emu", "avd", "name"): [
+                proc([], 0, "Pixel_8a\nOK\n")
+            ],
         })
         result = preflight.select_target(
             "pixel", True, runner=adb,
@@ -139,6 +142,59 @@ class AndroidTargetPreflightTests(unittest.TestCase):
         self.assertEqual([None, ["-gpu", "swiftshader_indirect"]], starts)
         self.assertEqual("ok", result["status"])
         self.assertEqual("swiftshader_indirect", result["renderer_fallback"])
+
+    def test_noncanonical_live_emulator_is_not_reused(self) -> None:
+        adb = FakeAdb({
+            ("devices", "-l"): [proc(
+                ["devices", "-l"], 0,
+                "List of devices attached\nemulator-5554 device model:sdk\n",
+            )],
+            ("-s", "emulator-5554", "emu", "avd", "name"): [proc([], 0, "Other_AVD\nOK\n")],
+        })
+        starts = []
+        expected = {"serial": "emulator-5556", "state": "device", "model": "sdk", "kind": "emulator"}
+        result = preflight.select_target(
+            "emulator", False, runner=adb,
+            start_avd=lambda *_: starts.append(True) or {"process": FakeProcess(None), "log_path": "/tmp/log"},
+            waiter=lambda *_args, **_kwargs: expected,
+        )
+        self.assertEqual([True], starts)
+        self.assertEqual("emulator-5556", result["target"]["serial"])
+
+    def test_status_reports_ready_only_for_booted_pixel_8a(self) -> None:
+        adb = FakeAdb({
+            ("devices", "-l"): [proc([], 0, "List of devices attached\nemulator-5554 device model:sdk\n")],
+            ("-s", "emulator-5554", "emu", "avd", "name"): [proc([], 0, "Pixel_8a\nOK\n")],
+            ("-s", "emulator-5554", "shell", "getprop", "sys.boot_completed"): [proc([], 0, "1\n")],
+        })
+        original_list_avds = preflight.list_avds
+        original_resolve_tool = preflight.resolve_tool
+        try:
+            preflight.list_avds = lambda: ("/sdk/emulator", ["Pixel_8a"])
+            preflight.resolve_tool = lambda name: f"/sdk/{name}"
+            result = preflight.emulator_status(adb)
+        finally:
+            preflight.list_avds = original_list_avds
+            preflight.resolve_tool = original_resolve_tool
+        self.assertEqual("ready", result["status"])
+        self.assertEqual({"adb_state": "device", "sys.boot_completed": "1"}, result["readiness"])
+
+    def test_stop_is_idempotent_when_pixel_8a_is_absent(self) -> None:
+        adb = FakeAdb({("devices", "-l"): [proc([], 0, "List of devices attached\n")]})
+        self.assertEqual({"status": "stopped", "adb_recovered": False}, preflight.stop_pixel_8a(adb))
+
+    def test_stop_kills_pixel_8a_and_waits_until_absent(self) -> None:
+        adb = FakeAdb({
+            ("devices", "-l"): [
+                proc([], 0, "List of devices attached\nemulator-5554 device model:sdk\n"),
+                proc([], 0, "List of devices attached\n"),
+            ],
+            ("-s", "emulator-5554", "emu", "avd", "name"): [proc([], 0, "Pixel_8a\nOK\n")],
+            ("-s", "emulator-5554", "emu", "kill"): [proc([], 0, "OK\n")],
+        })
+        result = preflight.stop_pixel_8a(adb, timeout_s=0.1, interval_s=0)
+        self.assertEqual("stopped", result["status"])
+        self.assertIn(("-s", "emulator-5554", "emu", "kill"), adb.calls)
 
 
 if __name__ == "__main__":

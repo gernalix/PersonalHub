@@ -120,6 +120,8 @@ def start_pixel_8a_avd(extra_args: list[str] | None = None) -> dict[str, object]
         [
             emulator,
             "-avd", "Pixel_8a",
+            "-qt-hide-window",
+            "-no-boot-anim",
             "-no-snapshot-load",
             "-no-snapshot-save",
             *(extra_args or []),
@@ -175,6 +177,8 @@ def select_target(
 ) -> dict[str, object]:
     live, recovered = live_devices(runner)
     chosen = choose_target(live, target, allow_emulator_fallback)
+    if chosen and chosen["kind"] == "emulator" and resolve_avd_name(chosen["serial"], runner) != "Pixel_8a":
+        chosen = None
     if chosen:
         if chosen["kind"] != "emulator" or boot_completed(chosen["serial"], runner):
             return {"status": "ok", "target": chosen, "adb_recovered": recovered}
@@ -214,14 +218,91 @@ def select_target(
     return {"status": "blocked", "reason": reason, "adb_recovered": recovered}
 
 
+def emulator_status(runner=run_adb) -> dict[str, object]:
+    try:
+        emulator, avds = list_avds()
+        adb = resolve_tool("adb")
+    except FileNotFoundError as exc:
+        return {"status": "blocked", "reason": str(exc)}
+    devices, recovered = list_devices(runner)
+    emulator_rows = [row for row in devices if row["kind"] == "emulator"]
+    for row in emulator_rows:
+        if row["state"] != "device":
+            continue
+        if resolve_avd_name(row["serial"], runner) != "Pixel_8a":
+            continue
+        ready = boot_completed(row["serial"], runner)
+        return {
+            "status": "ready" if ready else "booting",
+            "target": row,
+            "readiness": {"adb_state": row["state"], "sys.boot_completed": "1" if ready else "0"},
+            "adb": adb,
+            "emulator": emulator,
+            "adb_recovered": recovered,
+        }
+    return {
+        "status": "stopped" if "Pixel_8a" in avds else "blocked",
+        "reason": None if "Pixel_8a" in avds else "Pixel_8a_avd_not_found",
+        "adb": adb,
+        "emulator": emulator,
+        "emulators": emulator_rows,
+        "adb_recovered": recovered,
+    }
+
+
+def wait_command(runner=run_adb, *, timeout_s: float = 180.0) -> dict[str, object]:
+    ready = wait_for_pixel_8a_emulator(runner, timeout_s=timeout_s)
+    if ready:
+        return {
+            "status": "ready",
+            "target": ready,
+            "readiness": {"adb_state": "device", "sys.boot_completed": "1"},
+        }
+    return {"status": "blocked", "reason": "Pixel_8a_readiness_timeout"}
+
+
+def stop_pixel_8a(runner=run_adb, *, timeout_s: float = 30.0, interval_s: float = 1.0) -> dict[str, object]:
+    devices, recovered = list_devices(runner)
+    targets = [
+        row for row in devices
+        if row["kind"] == "emulator"
+        and row["state"] == "device"
+        and resolve_avd_name(row["serial"], runner) == "Pixel_8a"
+    ]
+    if not targets:
+        return {"status": "stopped", "adb_recovered": recovered}
+    serial = targets[0]["serial"]
+    result = runner(["-s", serial, "emu", "kill"])
+    if result.returncode != 0:
+        return {"status": "blocked", "reason": "emulator_shutdown_failed", "serial": serial}
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        devices, _ = list_devices(runner, allow_recovery=False)
+        if not any(row["serial"] == serial and row["state"] == "device" for row in devices):
+            return {"status": "stopped", "serial": serial}
+        time.sleep(interval_s)
+    return {"status": "blocked", "reason": "emulator_shutdown_timeout", "serial": serial}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("command", nargs="?", choices=("status", "start", "wait", "stop"))
     parser.add_argument("--target", choices=("pixel", "tcl", "emulator", "any"), default="any")
     parser.add_argument("--allow-emulator-fallback", action="store_true")
+    parser.add_argument("--timeout", type=float, default=180.0)
     args = parser.parse_args()
-    result = select_target(args.target, args.allow_emulator_fallback)
+    if args.command == "status":
+        result = emulator_status()
+    elif args.command == "start":
+        result = select_target("emulator", False)
+    elif args.command == "wait":
+        result = wait_command(timeout_s=args.timeout)
+    elif args.command == "stop":
+        result = stop_pixel_8a(timeout_s=min(args.timeout, 30.0))
+    else:
+        result = select_target(args.target, args.allow_emulator_fallback)
     print(json.dumps(result, sort_keys=True))
-    return 0 if result["status"] == "ok" else 2
+    return 0 if result["status"] in ("ok", "ready", "stopped") else 2
 
 
 if __name__ == "__main__":
