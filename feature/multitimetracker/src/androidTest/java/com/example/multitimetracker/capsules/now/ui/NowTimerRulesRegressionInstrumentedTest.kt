@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -140,9 +141,38 @@ class NowTimerRulesRegressionInstrumentedTest {
     }
 
     @Test
-    fun readOnlyNowBlocksStopAndDoesNotOpenNormalEditor() {
+    fun deletingExistingSessionThroughNowEditorTargetsExactSessionAfterConfirmation() {
         val running = runningSession(
             id = 104L,
+            title = "Delete editor regression",
+            startMs = 810_000L,
+            tagIds = setOf(alpha.id),
+        )
+        val deleted = mutableListOf<Long>()
+        val capsule = capsuleFor(
+            state = nowState(nowMs = 1_000_000L, runningSessions = listOf(running)),
+            onDelete = { deleted += it },
+        )
+        setNowScreen(capsule)
+
+        composeRule.onNodeWithText(running.title).performTouchInput { longClick() }
+        val deleteLabel = targetString(R.string.elimina)
+        composeRule.onNodeWithText(deleteLabel).performClick()
+        composeRule.runOnIdle { assertTrue(deleted.isEmpty()) }
+        composeRule.onNodeWithText(targetString(R.string.elimina_sessione)).assertIsDisplayed()
+
+        val deleteNodes = composeRule.onAllNodesWithText(deleteLabel)
+        deleteNodes[deleteNodes.fetchSemanticsNodes().lastIndex].performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(listOf(running.id), deleted)
+        }
+    }
+
+    @Test
+    fun readOnlyNowBlocksStopAndDoesNotOpenNormalEditor() {
+        val running = runningSession(
+            id = 105L,
             title = "Read only regression",
             startMs = 820_000L,
             tagIds = setOf(alpha.id),
@@ -177,7 +207,7 @@ class NowTimerRulesRegressionInstrumentedTest {
     fun timedDurationTapTogglesRemainingToElapsedWithoutStoppingSession() {
         val nowMs = 1_000_000L
         val timed = runningSession(
-            id = 105L,
+            id = 106L,
             title = "Timed display regression",
             startMs = 820_000L,
             expectedEndMs = 1_060_000L,
@@ -201,20 +231,20 @@ class NowTimerRulesRegressionInstrumentedTest {
     @Test
     fun endedAndDeletedRowsAreNeverExposedAsRunningSessions() {
         val valid = runningSession(
-            id = 106L,
+            id = 107L,
             title = "Valid running row",
             startMs = 900_000L,
             tagIds = setOf(alpha.id),
         )
         val ended = runningSession(
-            id = 107L,
+            id = 108L,
             title = "Ended row must stay hidden",
             startMs = 800_000L,
             endMs = 850_000L,
             tagIds = setOf(alpha.id),
         )
         val deleted = runningSession(
-            id = 108L,
+            id = 109L,
             title = "Deleted row must stay hidden",
             startMs = 700_000L,
             deletedAtMs = 950_000L,
