@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quick_start_header">Start by tag</string>
+    <string name="quick_start_hint">Tap: start · Long press: select multiple</string>
+    <string name="quick_start_select_tags">Select tags</string>
+    <string name="quick_start_no_results">No matching tags</string>
+    <string name="quick_start_session_started">Started: %1$s</string>
+    <string name="quick_start_cancel_cd">Cancel multi-select</string>
+    <string name="quick_start_confirm_cd">Start with selected tags</string>
+</resources>
