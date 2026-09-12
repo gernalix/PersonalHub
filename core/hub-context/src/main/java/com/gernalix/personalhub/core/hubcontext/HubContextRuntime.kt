@@ -25,9 +25,17 @@ object HubContextRuntime {
     @Volatile private var repository: HubContextRepository? = null
 
     fun initialize(context: Context, adapters: Collection<HubEntityAdapter>) {
+        val appContext = context.applicationContext
         val resolvedRegistry = HubAdapterRegistry(adapters)
+        val appVersion = runCatching {
+            appContext.packageManager.getPackageInfo(appContext.packageName, 0).longVersionCode
+        }.getOrDefault(0L)
         registry = resolvedRegistry
-        repository = HubContextRepository(PersonalHubDatabase.get(context.applicationContext), resolvedRegistry)
+        repository = HubContextRepository(
+            PersonalHubDatabase.get(appContext),
+            resolvedRegistry,
+            appVersion = appVersion,
+        )
     }
 
     fun adapter(moduleId: String, entityKind: String): HubEntityAdapter =
