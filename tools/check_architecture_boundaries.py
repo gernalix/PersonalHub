@@ -14,6 +14,11 @@ errors: list[str] = []
 PROJECT_DEPENDENCY = re.compile(r'project\("(:[^"]+)"\)')
 PACKAGE_LINE = re.compile(r"^\s*package\s+([A-Za-z0-9_.]+)\s*$", re.MULTILINE)
 IMPORT_LINE = re.compile(r"^\s*import\s+([^\s]+)(?:\s+as\s+\w+)?\s*$", re.MULTILINE)
+TOP_LEVEL_DECLARATION = re.compile(
+    r"^(?:(?:public|internal|private|protected|data|sealed|open|abstract|enum|annotation|value|expect|actual|inline|tailrec|operator|infix|suspend|const|lateinit)\s+)*"
+    r"(?:class|interface|object|typealias|fun|val|var)\s+([A-Za-z_][A-Za-z0-9_]*)",
+    re.MULTILINE,
+)
 
 
 def project_dependencies(build_file: Path) -> set[str]:
@@ -27,6 +32,10 @@ def kotlin_package(path: Path) -> str | None:
 
 def kotlin_imports(path: Path) -> list[str]:
     return IMPORT_LINE.findall(path.read_text())
+
+
+def kotlin_top_level_declarations(path: Path) -> set[str]:
+    return set(TOP_LEVEL_DECLARATION.findall(path.read_text()))
 
 
 # Gradle dependency direction: contracts -> nothing implementation-specific;
@@ -68,8 +77,10 @@ for forbidden_file in ("TimerEntities.kt", "PeoplePhoto.kt"):
         errors.append(f"feature database contract returned to generic core: {forbidden_file}")
 
 
-# Build a package-to-module ownership index from actual Kotlin sources. This avoids
-# hard-coding old package names while still detecting direct source imports that bypass Gradle intent.
+# Build package and symbol ownership indices from actual Kotlin sources. Contract-owned
+# Room entities intentionally retain some legacy package names for compatibility, so a
+# package can span contracts + implementation. Exact imported symbols must therefore win
+# over package fallback or the gate reports false contract->implementation crossings.
 source_roots: dict[str, Path] = {
     "app": ROOT / "app/src/main",
     "contracts:database": ROOT / "contracts/database/src/main",
@@ -81,6 +92,7 @@ for feature_dir in sorted((ROOT / "feature").glob("*")):
         source_roots[f"feature:{feature_dir.name}"] = feature_dir / "src/main"
 
 package_owners: dict[str, set[str]] = defaultdict(set)
+symbol_owners: dict[str, set[str]] = defaultdict(set)
 source_files: dict[str, list[Path]] = defaultdict(list)
 for owner, source_root in source_roots.items():
     if not source_root.exists():
@@ -90,12 +102,23 @@ for owner, source_root in source_roots.items():
         package = kotlin_package(kotlin)
         if package:
             package_owners[package].add(owner)
+            for declaration in kotlin_top_level_declarations(kotlin):
+                symbol_owners[f"{package}.{declaration}"].add(owner)
 
 
 def resolve_import_owner(import_name: str) -> str | None:
     target = import_name.removesuffix(".*")
+
+    # Prefer exact symbol ownership. This is essential for split legacy packages where
+    # stable entity/DAO contracts live in :contracts:database while runtime helpers remain
+    # in a feature module under the same Kotlin package.
+    owners = symbol_owners.get(target)
+    if owners and len(owners) == 1:
+        return next(iter(owners))
+
     parts = target.split(".")
-    # Imports normally end in a type/function; walk upward until an owned package is found.
+    # Imports may target members or symbols we do not parse; walk upward to a uniquely
+    # owned package as a conservative fallback.
     for size in range(len(parts), 0, -1):
         package = ".".join(parts[:size])
         owners = package_owners.get(package)
