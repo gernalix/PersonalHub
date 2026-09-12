@@ -1,7 +1,11 @@
 package com.gernalix.personalhub
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.database.HubActivityEntity
 import com.gernalix.personalhub.core.database.HubActivityPayloadKind
@@ -68,7 +73,7 @@ private data class ActivityUiItem(
 private data class ActivityFilter(val id: String, val labelRes: Int)
 
 @Composable
-fun HubActivityRegisterScreen(onBack: () -> Unit) {
+fun HubActivityRegisterScreen(onBack: () -> Unit, initialEventId: String? = null) {
     val context = LocalContext.current
     val database = remember(context) { PersonalHubDatabase.get(context) }
     val scope = rememberCoroutineScope()
@@ -78,6 +83,7 @@ fun HubActivityRegisterScreen(onBack: () -> Unit) {
     var entries by remember { mutableStateOf<List<ActivityUiItem>>(emptyList()) }
     var hasMore by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
+    var eventMissing by remember(initialEventId) { mutableStateOf(false) }
 
     val filters = listOf(
         ActivityFilter(ALL_ACTIVITY_MODULES, R.string.activity_filter_all),
@@ -95,6 +101,13 @@ fun HubActivityRegisterScreen(onBack: () -> Unit) {
         if (loading) return
         loading = true
         try {
+            if (initialEventId != null) {
+                val row = database.activityDao().byId(initialEventId)
+                eventMissing = row == null
+                entries = row?.let { resolveActivityItems(listOf(it)) }.orEmpty()
+                hasMore = false
+                return
+            }
             val cursor = if (reset) null else entries.lastOrNull()?.activity
             val rows = database.activityDao().page(
                 moduleId = selectedModule.takeUnless { it == ALL_ACTIVITY_MODULES },
@@ -106,12 +119,13 @@ fun HubActivityRegisterScreen(onBack: () -> Unit) {
             hasMore = rows.size > ACTIVITY_PAGE_SIZE
             val page = resolveActivityItems(rows.take(ACTIVITY_PAGE_SIZE))
             entries = if (reset) page else (entries + page).distinctBy { it.activity.id }
+            eventMissing = false
         } finally {
             loading = false
         }
     }
 
-    LaunchedEffect(selectedModule, includeSystem) { load(reset = true) }
+    LaunchedEffect(selectedModule, includeSystem, initialEventId) { load(reset = true) }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { contentPadding ->
         Column(
@@ -135,26 +149,28 @@ fun HubActivityRegisterScreen(onBack: () -> Unit) {
                 )
             }
 
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filters, key = { it.id }) { filter ->
-                    FilterChip(
-                        selected = selectedModule == filter.id,
-                        onClick = { selectedModule = filter.id },
-                        label = { Text(stringResource(filter.labelRes)) },
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = includeSystem,
-                        onClick = { includeSystem = !includeSystem },
-                        label = { Text(stringResource(R.string.activity_filter_system)) },
-                    )
+            if (initialEventId == null) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(filters, key = { it.id }) { filter ->
+                        FilterChip(
+                            selected = selectedModule == filter.id,
+                            onClick = { selectedModule = filter.id },
+                            label = { Text(stringResource(filter.labelRes)) },
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = includeSystem,
+                            onClick = { includeSystem = !includeSystem },
+                            label = { Text(stringResource(R.string.activity_filter_system)) },
+                        )
+                    }
                 }
             }
 
             if (entries.isEmpty() && !loading) {
                 Text(
-                    text = stringResource(R.string.activity_empty),
+                    text = stringResource(if (eventMissing) R.string.activity_event_not_found else R.string.activity_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -191,6 +207,7 @@ fun HubActivityRegisterScreen(onBack: () -> Unit) {
                                     }
                                 }
                             },
+                            onCopyLink = { copyActivityLink(context, item.activity.id) },
                         )
                     }
                     if (hasMore) {
@@ -214,6 +231,7 @@ private fun ActivityCard(
     item: ActivityUiItem,
     onOpen: () -> Unit,
     onUndo: () -> Unit,
+    onCopyLink: () -> Unit,
 ) {
     val activity = item.activity
     val moduleName = moduleLabel(activity.moduleId)
@@ -267,6 +285,7 @@ private fun ActivityCard(
                     OutlinedButton(onClick = onUndo) { Text(stringResource(R.string.activity_undo)) }
                 }
             }
+            OutlinedButton(onClick = onCopyLink) { Text(stringResource(R.string.deep_link_copy)) }
         }
     }
 }
@@ -365,4 +384,10 @@ private fun HubActivityUndoConflict.messageRes(): Int = when (this) {
     HubActivityUndoConflict.STALE -> R.string.activity_undo_stale
     HubActivityUndoConflict.REFERENCED -> R.string.activity_undo_referenced
     HubActivityUndoConflict.INVALID_PAYLOAD -> R.string.activity_undo_invalid
+}
+
+private fun copyActivityLink(context: Context, eventId: String) {
+    context.getSystemService(ClipboardManager::class.java)
+        ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.activity_title), HubDeepLinkContract.eventUri(eventId).toString()))
+    Toast.makeText(context, R.string.deep_link_copied, Toast.LENGTH_SHORT).show()
 }

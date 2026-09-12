@@ -1,5 +1,9 @@
 package com.gernalix.personalhub
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,22 +11,40 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.core.hubcontext.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 
 @Composable
-fun HubTemporalSearchScreen(onBack: () -> Unit) {
+fun HubTemporalSearchScreen(
+    onBack: () -> Unit,
+    initialFromMs: Long? = null,
+    initialToMs: Long? = null,
+    initialModules: Set<String> = emptySet(),
+    autoSearch: Boolean = false,
+) {
+    val context = LocalContext.current
     val providers = remember { HubContextRuntime.temporalProviders() }
-    var selected by rememberSaveable { mutableStateOf(providers.map { it.moduleId }.toSet()) }
-    var fromText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() - 24 * 60 * 60 * 1000L)) }
-    var toText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() + 60_000L)) }
+    val allModules = remember(providers) { providers.map { it.moduleId }.toSet() }
+    var selected by rememberSaveable(initialModules) {
+        mutableStateOf(if (initialModules.isEmpty()) allModules else allModules.intersect(initialModules))
+    }
+    var fromText by rememberSaveable(initialFromMs) {
+        mutableStateOf(formatHubDateTime(initialFromMs ?: (System.currentTimeMillis() - 24 * 60 * 60 * 1000L)))
+    }
+    var toText by rememberSaveable(initialToMs) {
+        mutableStateOf(formatHubDateTime(initialToMs ?: (System.currentTimeMillis() + 60_000L)))
+    }
     var records by remember { mutableStateOf<List<HubTemporalRecord>>(emptyList()) }
     var cursors by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -31,6 +53,7 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
     suspend fun search(append: Boolean) {
         val from = parseHubDateTime(fromText)
         val to = parseHubDateTime(toText)
+        require(from <= to)
         val requestedProviders = providers.filter { provider ->
             provider.moduleId in selected && (!append || cursors[provider.moduleId] != null)
         }
@@ -60,6 +83,11 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
             mergeTemporalSlices(listOf(records, incoming), from, to, selected)
                 .distinctBy { Triple(it.moduleId, it.source, it.stableId) }
         } else incoming
+        error = null
+    }
+
+    LaunchedEffect(initialFromMs, initialToMs, initialModules, autoSearch) {
+        if (autoSearch) runCatching { search(false) }.onFailure { error = it.message }
     }
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -75,7 +103,23 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { providers.distinctBy { it.moduleId }.forEach { provider ->
             FilterChip(provider.moduleId in selected, { selected = if (provider.moduleId in selected) selected - provider.moduleId else selected + provider.moduleId }, label = { Text(provider.moduleId.replaceFirstChar { it.uppercase() }) })
         } }
-        Button(onClick = { scope.launch { runCatching { search(false) }.onFailure { error = it.message } } }, modifier = Modifier.testTag("temporal-search")) { Text(stringResource(R.string.temporal_search)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { scope.launch { runCatching { search(false) }.onFailure { error = it.message } } }, modifier = Modifier.testTag("temporal-search")) { Text(stringResource(R.string.temporal_search)) }
+            OutlinedButton(onClick = {
+                runCatching {
+                    val from = parseHubDateTime(fromText)
+                    val to = parseHubDateTime(toText)
+                    require(from <= to)
+                    val zone = ZoneId.systemDefault()
+                    val uri = HubDeepLinkContract.searchUri(
+                        fromIso = Instant.ofEpochMilli(from).atZone(zone).toOffsetDateTime().toString(),
+                        toIso = Instant.ofEpochMilli(to).atZone(zone).toOffsetDateTime().toString(),
+                        modules = selected,
+                    )
+                    copyTemporalLink(context, uri.toString())
+                }.onFailure { error = it.message }
+            }) { Text(stringResource(R.string.deep_link_copy)) }
+        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(records, key = { "${it.moduleId}/${it.source}/${it.stableId}" }) { record ->
@@ -90,4 +134,10 @@ fun HubTemporalSearchScreen(onBack: () -> Unit) {
             }
         }
     }
+}
+
+private fun copyTemporalLink(context: Context, value: String) {
+    context.getSystemService(ClipboardManager::class.java)
+        ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.temporal_title), value))
+    Toast.makeText(context, R.string.deep_link_copied, Toast.LENGTH_SHORT).show()
 }
