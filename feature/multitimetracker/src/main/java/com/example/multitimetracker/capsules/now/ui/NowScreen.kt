@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -224,7 +223,37 @@ fun NowScreen(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
             ) {
-                if (runningRowCount > 0) {
+                if (state.homeLoadState == HomeLoadState.Loading || state.homeLoadState == HomeLoadState.Error) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 24.dp, bottom = 112.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        NowCapsuleUi.run {
+                            render(
+                                nowMs = effectiveTime.nowMs,
+                                regularRows = regularRows,
+                                timedRows = timedRows,
+                                tagNameById = tagNameById,
+                                activeTags = activeTags,
+                                activeTagTotalsMsByTagId = state.activeTagTotalsMsByTagId,
+                                runningMinStartByTagId = state.runningMinStartByTagId,
+                                homeLoadState = state.homeLoadState,
+                                showSeconds = showSeconds,
+                                hideHoursIfZero = hideHoursIfZero,
+                                showOnboardingIntro = false,
+                                onOpenTag = onOpenTag,
+                                onCreateSession = { openNewSessionDraft() },
+                                onEditSession = {},
+                                onStopSession = {},
+                                onDeleteSession = {},
+                                elapsedModeSessionIds = elapsedModeSessionIds,
+                                onToggleTimedDisplayMode = {},
+                            )
+                        }
+                    }
+                } else if (runningRowCount > 0) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
