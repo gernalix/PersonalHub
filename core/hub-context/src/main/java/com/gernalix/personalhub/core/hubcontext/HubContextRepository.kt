@@ -2,6 +2,7 @@ package com.gernalix.personalhub.core.hubcontext
 
 import androidx.room.withTransaction
 import com.gernalix.personalhub.contracts.database.*
+import com.gernalix.personalhub.core.database.HubActivityEntity
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import java.time.Instant
 import java.util.UUID
@@ -55,11 +56,18 @@ class HubContextRepository(
         typeId: String? = null,
         title: String? = null,
     ) = database.withTransaction {
-        requireNotNull(dao.context(contextId)) { "Context not found" }
+        val existing = requireNotNull(dao.context(contextId)) { "Context not found" }
+        val normalizedTitle = title?.trim()?.takeIf(String::isNotEmpty)
         validateMembers(members, typeId)
         dao.deleteMembers(contextId)
         dao.insertMembers(members.mapIndexed { index, member -> HubContextMember(contextId, member.bindingId, member.role.trim(), index) })
-        require(dao.updateContext(contextId, typeId, title?.trim()?.takeIf(String::isNotEmpty), now()) == 1)
+        require(dao.updateContext(contextId, typeId, normalizedTitle, now()) == 1)
+        // HubActivityCapture already records title/type changes through hub_contexts. When only the
+        // member set changes that trigger intentionally stays quiet, so record the semantic episode
+        // edit here rather than exposing one technical row per hub_context_member mutation.
+        if (existing.contextTypeId == typeId && existing.title == normalizedTitle) {
+            recordMemberOnlyContextUpdate(contextId, normalizedTitle)
+        }
     }
 
     suspend fun context(contextId: String): HubContextView? {
@@ -68,8 +76,10 @@ class HubContextRepository(
     }
 
     suspend fun removeMember(contextId: String, member: HubContextMemberDraft) = database.withTransaction {
+        val context = requireNotNull(dao.context(contextId)) { "Context not found" }
         require(dao.memberCount(contextId) > 2) { "Removing this member would invalidate the Context" }
         require(dao.removeMember(contextId, member.bindingId, member.role.trim()) == 1) { "Context member not found" }
+        recordMemberOnlyContextUpdate(contextId, context.title)
     }
 
     suspend fun deleteContext(contextId: String) = database.withTransaction {
@@ -244,6 +254,26 @@ class HubContextRepository(
             HubContextView(context, resolved.map { it.summary }, resolved)
         }
     }
+
+    private suspend fun recordMemberOnlyContextUpdate(contextId: String, title: String?) {
+        database.activityDao().insert(
+            HubActivityEntity(
+                id = UUID.randomUUID().toString(),
+                occurredAt = System.currentTimeMillis(),
+                moduleId = "hub",
+                action = "episode_updated",
+                entityKind = "episode",
+                entityId = contextId,
+                entityLabel = title,
+                origin = "user",
+                sourceTable = "hub_contexts",
+                sourceRowKey = contextId,
+                appVersion = 0,
+                reversible = false,
+            ),
+        )
+    }
+
     private suspend fun summaries(bindings: List<HubEntityBinding>): List<HubEntitySummary> =
         bindings.groupBy { it.moduleId to it.entityKind }.flatMap { (_, group) ->
             val first = group.first()
