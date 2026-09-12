@@ -1,19 +1,25 @@
 package com.wordpulse.app
 
-import android.app.Application
+import android.content.Context
 import com.wordpulse.app.data.SystemTimeProvider
 import com.wordpulse.app.data.WordPulseDatabase
 import com.wordpulse.app.data.WordRepository
 
-open class WordPulseApplication : Application() {
-    val database: WordPulseDatabase by lazy {
-        WordPulseDatabase.create(applicationContext)
-    }
+/**
+ * Feature-local runtime holder. The host application does not inherit from or expose
+ * WordPulse implementation types; the WordPulse Activity resolves its own repository lazily.
+ */
+internal object WordPulseRuntime {
+    @Volatile
+    private var repositoryInstance: WordRepository? = null
 
-    val repository: WordRepository by lazy {
-        WordRepository(
-            database = database,
-            timeProvider = SystemTimeProvider,
-        )
+    fun repository(context: Context): WordRepository {
+        repositoryInstance?.let { return it }
+        return synchronized(this) {
+            repositoryInstance ?: WordRepository(
+                database = WordPulseDatabase.create(context.applicationContext),
+                timeProvider = SystemTimeProvider,
+            ).also { repositoryInstance = it }
+        }
     }
 }
