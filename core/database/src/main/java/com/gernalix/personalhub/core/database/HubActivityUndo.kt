@@ -90,10 +90,9 @@ object HubActivityUndoEngine {
         }
         val primaryKeyValue = afterValues[primaryKeyIndex]
         val currentPayload = currentPayload(db, activity.sourceTable, columns, primaryKey, primaryKeyValue)
-            ?: return HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE)
+            ?: return markStale(database, activity)
         if (currentPayload != afterPayload) {
-            database.activityDao().updateStatus(activity.id, HubActivityStatus.CONFLICT, null)
-            return HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE)
+            return markStale(database, activity)
         }
 
         setUndoContext(db, activity.id)
@@ -155,7 +154,7 @@ object HubActivityUndoEngine {
                 actionType = cursor.getString(2),
                 occurredAt = cursor.getLong(3),
             )
-        } ?: return HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE)
+        } ?: return markStale(database, activity)
 
         if (event.entityType != "contact" || event.actionType !in setOf("created", "deleted")) {
             return HubActivityUndoResult.Conflict(HubActivityUndoConflict.UNSUPPORTED)
@@ -169,21 +168,26 @@ object HubActivityUndoEngine {
             arrayOf(event.contactId, event.occurredAt),
         ).use { it.moveToFirst() }
         if (hasLaterSemanticChange) {
-            database.activityDao().updateStatus(activity.id, HubActivityStatus.CONFLICT, null)
-            return HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE)
+            return markStale(database, activity)
         }
 
-        val currentDeletedAt = db.query(
+        val contactState = db.query(
             "SELECT deleted_at FROM contacts WHERE id=? LIMIT 1",
             arrayOf(event.contactId),
         ).use { cursor ->
-            if (!cursor.moveToFirst()) return HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE)
-            if (cursor.isNull(0)) null else cursor.getLong(0)
+            if (!cursor.moveToFirst()) {
+                false to null
+            } else {
+                true to if (cursor.isNull(0)) null else cursor.getLong(0)
+            }
         }
+        if (!contactState.first) {
+            return markStale(database, activity)
+        }
+        val currentDeletedAt = contactState.second
         val undoingCreate = event.actionType == "created"
         if ((undoingCreate && currentDeletedAt != null) || (!undoingCreate && currentDeletedAt == null)) {
-            database.activityDao().updateStatus(activity.id, HubActivityStatus.CONFLICT, null)
-            return HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE)
+            return markStale(database, activity)
         }
 
         val now = System.currentTimeMillis()
@@ -204,6 +208,14 @@ object HubActivityUndoEngine {
             activity.toEntityRef(),
             if (undoingCreate) HubActivityUndoEffect.DELETED else HubActivityUndoEffect.LIFECYCLE_CHANGED,
         )
+    }
+
+    private suspend fun markStale(
+        database: PersonalHubDatabase,
+        activity: HubActivityEntity,
+    ): HubActivityUndoResult.Conflict {
+        database.activityDao().updateStatus(activity.id, HubActivityStatus.CONFLICT, null)
+        return HubActivityUndoResult.Conflict(HubActivityUndoConflict.STALE)
     }
 
     private fun insertPeopleCompensation(
