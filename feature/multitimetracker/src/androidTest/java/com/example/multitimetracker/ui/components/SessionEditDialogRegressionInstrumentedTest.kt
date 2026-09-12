@@ -2,6 +2,7 @@ package com.example.multitimetracker.ui.components
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.multitimetracker.R
+import com.example.multitimetracker.hub.TimerSessionHubAdapter
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
 import com.example.multitimetracker.model.TimedTagNotificationType
@@ -49,10 +51,8 @@ class SessionEditDialogRegressionInstrumentedTest {
 
     @Before
     fun initializeHubContextRuntime() {
-        HubContextRuntime.initialize(
-            InstrumentationRegistry.getInstrumentation().targetContext,
-            emptyList(),
-        )
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        HubContextRuntime.initialize(context, listOf(TimerSessionHubAdapter(context)))
     }
 
     @Test
@@ -201,6 +201,67 @@ class SessionEditDialogRegressionInstrumentedTest {
         }
     }
 
+    @Test
+    fun runningSessionWithFutureStartCannotBeSavedByTimeEditor() {
+        val timeUpdates = mutableListOf<Triple<Long, Long, Long?>>()
+        val invalidDraft = session(id = -1L, startMs = 20_000_000L)
+
+        setEditor(
+            session = invalidDraft,
+            isNewSession = true,
+            tags = listOf(normal),
+            referenceNowMs = 10_000_000L,
+            onSaveTimes = { id, startMs, endMs -> timeUpdates += Triple(id, startMs, endMs) },
+        )
+
+        composeRule.onNodeWithText(targetString(R.string.edit_times)).performClick()
+        composeRule.onNodeWithText(targetString(R.string.salva)).performClick()
+
+        composeRule.runOnIdle {
+            assertTrue(timeUpdates.isEmpty())
+        }
+    }
+
+    @Test
+    fun closedSessionWithEndBeforeStartShowsErrorAndDoesNotSaveTimes() {
+        val timeUpdates = mutableListOf<Triple<Long, Long, Long?>>()
+        val invalidDraft = session(
+            id = -1L,
+            startMs = 9_000_000L,
+            endMs = 8_000_000L,
+        )
+
+        setEditor(
+            session = invalidDraft,
+            isNewSession = true,
+            tags = listOf(normal),
+            onSaveTimes = { id, startMs, endMs -> timeUpdates += Triple(id, startMs, endMs) },
+        )
+
+        composeRule.onNodeWithText(targetString(R.string.edit_times)).performClick()
+        composeRule.onNodeWithText(targetString(R.string.la_fine_deve_essere_dopo_l_inizio)).assertIsDisplayed()
+        composeRule.onNodeWithText(targetString(R.string.salva)).performClick()
+
+        composeRule.runOnIdle {
+            assertTrue(timeUpdates.isEmpty())
+        }
+    }
+
+    @Test
+    fun readOnlyEditorDisablesSaveAndTimeEditing() {
+        val draft = session(id = -1L, startMs = 6_000_000L)
+
+        setEditor(
+            session = draft,
+            isNewSession = true,
+            tags = listOf(normal),
+            readOnly = true,
+        )
+
+        composeRule.onNodeWithContentDescription(targetString(R.string.salva)).assertIsNotEnabled()
+        composeRule.onNodeWithText(targetString(R.string.edit_times)).assertIsNotEnabled()
+    }
+
     private fun openTagPicker() {
         composeRule.onNodeWithText(targetString(R.string.cerca_tag))
             .performTouchInput { click() }
@@ -217,6 +278,7 @@ class SessionEditDialogRegressionInstrumentedTest {
         isNewSession: Boolean,
         tags: List<Tag>,
         tagParentsByChild: Map<Long, Set<Long>> = emptyMap(),
+        referenceNowMs: Long = 10_000_000L,
         readOnly: Boolean = false,
         onSaveMeta: (Long, String, Set<Long>) -> Unit = { _, _, _ -> },
         onCreate: (String, Long, Set<Long>, (SessionUi) -> Unit) -> Unit = { _, _, _, _ -> },
@@ -233,7 +295,7 @@ class SessionEditDialogRegressionInstrumentedTest {
                     tagLastUsedMsByTagId = emptyMap(),
                     tagParentsByChild = tagParentsByChild,
                     showSeconds = false,
-                    referenceNowMs = 10_000_000L,
+                    referenceNowMs = referenceNowMs,
                     readOnly = readOnly,
                     onAddTag = {},
                     onSaveMeta = onSaveMeta,
