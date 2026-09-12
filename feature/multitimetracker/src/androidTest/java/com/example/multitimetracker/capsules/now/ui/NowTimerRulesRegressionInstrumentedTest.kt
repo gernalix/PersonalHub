@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -16,20 +17,22 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.click
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.multitimetracker.R
 import com.example.multitimetracker.capsules.now.controller.NowCapsuleViewModel
 import com.example.multitimetracker.capsules.now.state.NowUiState
 import com.example.multitimetracker.capsules.system.NowCapsuleAccess
+import com.example.multitimetracker.hub.TimerSessionHubAdapter
 import com.example.multitimetracker.model.HomeLoadState
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
+import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +44,12 @@ class NowTimerRulesRegressionInstrumentedTest {
     val composeRule = createComposeRule()
 
     private val alpha = tag(1L, "Alpha")
+
+    @Before
+    fun initializeHubContextRuntime() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        HubContextRuntime.initialize(context, listOf(TimerSessionHubAdapter(context)))
+    }
 
     @Test
     fun tappingRunningSessionStopsExactSessionAtEffectiveNow() {
