@@ -15,6 +15,7 @@ import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.ResourceHubAdapter
 import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
+import com.gernalix.personalhub.workflowydays.WorkflowyDaysSync
 import com.gernalix.sostanze.hub.SubstanceHubAdapter
 import com.gernalix.sostanze.hub.SubstanceIntakeHubAdapter
 import com.supercontacts.app.hub.PeopleHubAdapter
@@ -55,6 +56,7 @@ private object PostFirstFrameStartup {
                         DatabaseVault.cleanupOrphanedPreImportBackups(app)
                         HubAutoExport.start(app)
                         DatasetteSync.start(app)
+                        WorkflowyDaysSync.ensureScheduled(app)
                     }
                 }
             }
