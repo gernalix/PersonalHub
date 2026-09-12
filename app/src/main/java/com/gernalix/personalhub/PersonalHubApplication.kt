@@ -34,6 +34,7 @@ class PersonalHubApplication : Application(), Configuration.Provider {
         TimerStartupApi.applicationOnCreate()
         DatabaseVault.recoverInterruptedImport(this)
         super.onCreate()
+        TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(this)
         HubContextRuntime.initialize(
             this,
             listOf(
