@@ -28,7 +28,7 @@ object HubActivityCapture {
         val reversibleUpdate: Boolean = false,
         val reversibleDelete: Boolean = false,
         val captureDelete: Boolean = true,
-        val capturePayload: Boolean = true,
+        val capturePayload: Boolean = false,
     )
 
     /*
@@ -190,10 +190,11 @@ object HubActivityCapture {
         val columns = columns(db, spec.table)
         if (columns.isEmpty()) return
         val columnList = columns.joinToString(",")
-        val afterPayload = if (spec.capturePayload) encodedPayload(columns, "NEW") else "NULL"
-        val beforePayload = if (spec.capturePayload) encodedPayload(columns, "OLD") else "NULL"
-        val payloadKind = if (spec.capturePayload) HubActivityPayloadKind.ROW_V1 else null
-        val payloadColumns = if (spec.capturePayload) columnList else null
+        val capturePayload = spec.capturePayload || spec.reversibleInsert || spec.reversibleUpdate || spec.reversibleDelete
+        val afterPayload = if (capturePayload) encodedPayload(columns, "NEW") else "NULL"
+        val beforePayload = if (capturePayload) encodedPayload(columns, "OLD") else "NULL"
+        val payloadKind = if (capturePayload) HubActivityPayloadKind.ROW_V1 else null
+        val payloadColumns = if (capturePayload) columnList else null
         val base = "hub_activity_${spec.table}"
         listOf("INSERT", "UPDATE", "DELETE").forEach { db.execSQL("DROP TRIGGER IF EXISTS `${base}_$it`") }
 
