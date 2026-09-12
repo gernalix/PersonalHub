@@ -22,6 +22,7 @@ class HubContextRepository(
     private val database: PersonalHubDatabase,
     private val adapters: HubAdapterRegistry,
     private val onBindingBatch: ((Int) -> Unit)? = null,
+    private val appVersion: Long = 0,
 ) {
     private val dao = database.hubContextDao()
 
@@ -148,7 +149,8 @@ class HubContextRepository(
 
     suspend fun types(): List<HubContextType> = dao.types()
     suspend fun type(typeId: String): Pair<HubContextType, List<HubContextTypeField>>? =
-        dao.type(typeId)?.let { it to dao.typeFields(typeId) }
+        dao.type(typeId)?.let { it to dao.typeFields(typeId)
+        }
 
     suspend fun saveCombinationAsType(contextId: String, name: String): String {
         require(name.isNotBlank())
@@ -178,7 +180,7 @@ class HubContextRepository(
         return views(dao.contextsForEntity(anchor.id))
     }
 
-    suspend fun viewsByType(typeId: String): List<HubContextView> = views(dao.contextsByType(typeId))
+    suspend fun viewsByType(typeId: String): List<HubContextView> = dao.contextsByType(typeId).let { views(it) }
 
     fun changes() = dao.observeContextIds()
 
@@ -268,7 +270,7 @@ class HubContextRepository(
                 origin = "user",
                 sourceTable = "hub_contexts",
                 sourceRowKey = contextId,
-                appVersion = 0,
+                appVersion = appVersion,
                 reversible = false,
             ),
         )
