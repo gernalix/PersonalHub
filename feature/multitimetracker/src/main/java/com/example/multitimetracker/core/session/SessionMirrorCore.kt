@@ -5,6 +5,7 @@ import android.content.Context
 import com.example.multitimetracker.core.contracts.ClosedSessionRecord
 import com.example.multitimetracker.model.Tag
 import com.example.multitimetracker.model.Task
+import com.example.multitimetracker.persistence.LegacyTagSessionRepair
 import com.example.multitimetracker.persistence.SessionMirrorSqlite
 import com.example.multitimetracker.util.CapsuleWriteApi
 
@@ -76,6 +77,12 @@ object SessionMirrorCore {
             closedSessions = closedSessions,
             nowMs = nowMs
         )
+        // The historical snapshot stores per-interval tag assignments separately
+        // from Task.tagIds. Old mirror code could therefore create the session
+        // row but omit its historical tag edge. Repair immediately after a
+        // bootstrap; the same idempotent repair also runs before auto-consistency
+        // to heal devices that were already bootstrapped by older builds.
+        LegacyTagSessionRepair.repairIfNeeded(context)
     }
 }
 
