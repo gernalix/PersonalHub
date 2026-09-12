@@ -12,6 +12,7 @@ from pathlib import Path
 
 TELEGRAM_LIMIT_BYTES = 50 * 1024 * 1024
 DEV_RELEASE_TAG = "personalhub-dev-apk"
+DEV_RELEASE_TITLE = "PersonalHub development APK"
 REPO = "gernalix/PersonalHub"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,24 +27,24 @@ def _repo_visibility() -> tuple[bool, str]:
     return bool(payload["isPrivate"]), str(payload["visibility"])
 
 
-def _short_head() -> str:
-    return _run(["git", "-C", str(REPO_ROOT), "rev-parse", "--short=12", "HEAD"]).stdout.strip()
+def _head_sha() -> str:
+    return _run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"]).stdout.strip()
 
 
-def _release_url() -> str:
-    result = _run(["gh", "release", "view", DEV_RELEASE_TAG, "--repo", REPO, "--json", "url"])
+def _release_url(release_tag: str = DEV_RELEASE_TAG) -> str:
+    result = _run(["gh", "release", "view", release_tag, "--repo", REPO, "--json", "url"])
     return str(json.loads(result.stdout)["url"])
 
 
-def _existing_assets() -> list[str]:
-    result = _run(["gh", "release", "view", DEV_RELEASE_TAG, "--repo", REPO, "--json", "assets"])
+def _existing_assets(release_tag: str = DEV_RELEASE_TAG) -> list[str]:
+    result = _run(["gh", "release", "view", release_tag, "--repo", REPO, "--json", "assets"])
     payload = json.loads(result.stdout)
     return [asset["name"] for asset in payload.get("assets", []) if asset.get("name", "").endswith(".apk")]
 
 
-def _release_exists() -> bool:
+def _release_exists(release_tag: str = DEV_RELEASE_TAG) -> bool:
     result = subprocess.run(
-        ["gh", "release", "view", DEV_RELEASE_TAG, "--repo", REPO],
+        ["gh", "release", "view", release_tag, "--repo", REPO],
         text=True,
         capture_output=True,
     )
@@ -54,18 +55,24 @@ def _release_notes(version: str, commit: str) -> str:
     return f"Current PersonalHub debug APK: version={version}, commit={commit}."
 
 
-def _ensure_release(version: str, commit: str) -> None:
-    if _release_exists():
+def _ensure_release(
+    version: str,
+    commit: str,
+    *,
+    release_tag: str = DEV_RELEASE_TAG,
+    release_title: str = DEV_RELEASE_TITLE,
+) -> None:
+    if _release_exists(release_tag):
         return
     _run([
         "gh",
         "release",
         "create",
-        DEV_RELEASE_TAG,
+        release_tag,
         "--repo",
         REPO,
         "--title",
-        "PersonalHub development APK",
+        release_title,
         "--notes",
         _release_notes(version, commit),
         "--prerelease",
@@ -74,36 +81,53 @@ def _ensure_release(version: str, commit: str) -> None:
     ])
 
 
-def _update_release_metadata(version: str, commit: str) -> None:
+def _update_release_metadata(
+    version: str,
+    commit: str,
+    *,
+    release_tag: str = DEV_RELEASE_TAG,
+    release_title: str = DEV_RELEASE_TITLE,
+) -> None:
     _run([
         "gh",
         "release",
         "edit",
-        DEV_RELEASE_TAG,
+        release_tag,
         "--repo",
         REPO,
         "--title",
-        "PersonalHub development APK",
+        release_title,
         "--notes",
         _release_notes(version, commit),
         "--prerelease",
     ])
 
 
-def publish_release_asset(apk_path: Path, version: str) -> tuple[str, bool, str]:
+def publish_release_asset(
+    apk_path: Path,
+    version: str,
+    *,
+    release_tag: str = DEV_RELEASE_TAG,
+    release_title: str = DEV_RELEASE_TITLE,
+) -> tuple[str, bool, str]:
     is_private, visibility = _repo_visibility()
-    commit = _short_head()
-    _ensure_release(version, commit)
+    commit = _head_sha()
+    _ensure_release(
+        version,
+        commit,
+        release_tag=release_tag,
+        release_title=release_title,
+    )
 
     # Keep the last known-good APK until the replacement upload succeeds. This
     # makes retries safe and avoids leaving the stable prerelease without an APK.
-    previous_assets = _existing_assets()
-    asset_name = f"PersonalHub-{version}-{commit}.apk"
+    previous_assets = _existing_assets(release_tag)
+    asset_name = f"PersonalHub-{version}-{commit[:12]}.apk"
     _run([
         "gh",
         "release",
         "upload",
-        DEV_RELEASE_TAG,
+        release_tag,
         str(apk_path) + f"#{asset_name}",
         "--repo",
         REPO,
@@ -117,7 +141,7 @@ def publish_release_asset(apk_path: Path, version: str) -> tuple[str, bool, str]
             "gh",
             "release",
             "delete-asset",
-            DEV_RELEASE_TAG,
+            release_tag,
             previous_asset,
             "--repo",
             REPO,
@@ -126,11 +150,23 @@ def publish_release_asset(apk_path: Path, version: str) -> tuple[str, bool, str]
 
     # Only advertise the new version/commit after the new asset is known to be
     # present. If upload failed, the old asset and its metadata remain usable.
-    _update_release_metadata(version, commit)
-    return _release_url(), is_private, visibility
+    _update_release_metadata(
+        version,
+        commit,
+        release_tag=release_tag,
+        release_title=release_title,
+    )
+    return _release_url(release_tag), is_private, visibility
 
 
-def deliver(apk_path: Path, version: str, *, telegram_title: str) -> str:
+def deliver(
+    apk_path: Path,
+    version: str,
+    *,
+    telegram_title: str,
+    release_tag: str = DEV_RELEASE_TAG,
+    release_title: str = DEV_RELEASE_TITLE,
+) -> str:
     if not apk_path.is_file():
         raise FileNotFoundError(str(apk_path))
     size = apk_path.stat().st_size
@@ -140,7 +176,12 @@ def deliver(apk_path: Path, version: str, *, telegram_title: str) -> str:
         send_file(apk_path, telegram_title, f"PersonalHub APK {version}")
         return "telegram_file"
 
-    url, is_private, visibility = publish_release_asset(apk_path, version)
+    url, is_private, visibility = publish_release_asset(
+        apk_path,
+        version,
+        release_tag=release_tag,
+        release_title=release_title,
+    )
     auth_note = " Repository privato: download richiede autenticazione GitHub." if is_private else ""
     send_message(
         telegram_title,

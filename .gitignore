@@ -6,3 +6,5 @@ local.properties
 secrets.properties
 *.iml
 .idea/
+__pycache__/
+*.py[cod]

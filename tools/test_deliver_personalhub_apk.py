@@ -43,7 +43,7 @@ class DeliverPersonalHubApkTest(unittest.TestCase):
             telegram_notify.send_message.assert_called_once()
             self.assertIn("autenticazione GitHub", telegram_notify.send_message.call_args.args[1])
 
-    def test_new_release_targets_exact_commit(self) -> None:
+    def test_new_release_targets_exact_full_commit(self) -> None:
         calls: list[list[str]] = []
 
         def fake_run(args: list[str]) -> mock.Mock:
@@ -52,11 +52,43 @@ class DeliverPersonalHubApkTest(unittest.TestCase):
 
         with mock.patch.object(delivery, "_release_exists", return_value=False):
             with mock.patch.object(delivery, "_run", side_effect=fake_run):
-                delivery._ensure_release("42", "abc123def456")
+                delivery._ensure_release("42", "abc123def4567890")
 
         create = next(call for call in calls if call[:3] == ["gh", "release", "create"])
         target_index = create.index("--target")
-        self.assertEqual("abc123def456", create[target_index + 1])
+        self.assertEqual("abc123def4567890", create[target_index + 1])
+
+    def test_custom_release_tag_is_used_for_smoke_path(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(args: list[str]) -> mock.Mock:
+            calls.append(args)
+            if args[:3] == ["gh", "repo", "view"]:
+                return mock.Mock(stdout='{"isPrivate": true, "visibility": "PRIVATE"}')
+            if args[:4] == ["git", "-C", str(delivery.REPO_ROOT), "rev-parse"]:
+                return mock.Mock(stdout="abc123def4567890\n")
+            if args[-1] == "assets":
+                return mock.Mock(stdout='{"assets":[]}')
+            if args[-1] == "url":
+                return mock.Mock(stdout='{"url":"https://example.test/release"}')
+            return mock.Mock(stdout="")
+
+        with tempfile.NamedTemporaryFile(suffix=".apk") as handle:
+            with mock.patch.object(delivery, "_run", side_effect=fake_run):
+                with mock.patch.object(delivery, "_release_exists", return_value=True):
+                    delivery.publish_release_asset(
+                        Path(handle.name),
+                        "42",
+                        release_tag="personalhub-dev-apk-smoke",
+                        release_title="Smoke",
+                    )
+
+        tagged_calls = [
+            call for call in calls
+            if call[:3] == ["gh", "release", "upload"] or call[:3] == ["gh", "release", "edit"]
+        ]
+        self.assertTrue(tagged_calls)
+        self.assertTrue(all("personalhub-dev-apk-smoke" in call for call in tagged_calls))
 
     def test_release_upload_precedes_old_asset_deletion_and_metadata_update(self) -> None:
         with tempfile.NamedTemporaryFile(suffix=".apk") as handle:
@@ -66,8 +98,8 @@ class DeliverPersonalHubApkTest(unittest.TestCase):
                 calls.append(args)
                 if args[:3] == ["gh", "repo", "view"]:
                     return mock.Mock(stdout='{"isPrivate": true, "visibility": "PRIVATE"}')
-                if args[:3] == ["git", "-C", str(delivery.REPO_ROOT)]:
-                    return mock.Mock(stdout="abc123def456\n")
+                if args[:4] == ["git", "-C", str(delivery.REPO_ROOT), "rev-parse"]:
+                    return mock.Mock(stdout="abc123def4567890\n")
                 if args[-1] == "assets":
                     return mock.Mock(stdout='{"assets":[{"name":"old.apk"}]}')
                 if args[-1] == "url":
@@ -94,8 +126,8 @@ class DeliverPersonalHubApkTest(unittest.TestCase):
                 calls.append(args)
                 if args[:3] == ["gh", "repo", "view"]:
                     return mock.Mock(stdout='{"isPrivate": true, "visibility": "PRIVATE"}')
-                if args[:3] == ["git", "-C", str(delivery.REPO_ROOT)]:
-                    return mock.Mock(stdout="abc123def456\n")
+                if args[:4] == ["git", "-C", str(delivery.REPO_ROOT), "rev-parse"]:
+                    return mock.Mock(stdout="abc123def4567890\n")
                 if args[-1] == "assets":
                     return mock.Mock(stdout='{"assets":[{"name":"old.apk"}]}')
                 if args[:3] == ["gh", "release", "upload"]:
