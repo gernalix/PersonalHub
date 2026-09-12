@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
 import tempfile
@@ -65,7 +66,10 @@ def run_adb(args: list[str]) -> subprocess.CompletedProcess[str]:
         adb = resolve_tool("adb")
     except FileNotFoundError as exc:
         return subprocess.CompletedProcess(args, 127, "", str(exc))
-    return subprocess.run([adb, *args], text=True, capture_output=True, check=False, timeout=30)
+    try:
+        return subprocess.run([adb, *args], text=True, capture_output=True, check=False, timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        return subprocess.CompletedProcess(args, 124, exc.stdout or "", f"adb_timeout: {' '.join(args)}")
 
 
 def list_devices(runner=run_adb, *, allow_recovery: bool = True) -> tuple[list[dict[str, str]], bool]:
@@ -75,7 +79,13 @@ def list_devices(runner=run_adb, *, allow_recovery: bool = True) -> tuple[list[d
         runner(["start-server"])
         result = runner(["devices", "-l"])
         recovered = True
-    return (parse_devices(result.stdout) if result.returncode == 0 else [], recovered)
+    devices = parse_devices(result.stdout) if result.returncode == 0 else []
+    if allow_recovery and any(row["state"] == "offline" for row in devices):
+        runner(["reconnect", "offline"])
+        result = runner(["devices", "-l"])
+        recovered = True
+        devices = parse_devices(result.stdout) if result.returncode == 0 else devices
+    return (devices, recovered)
 
 
 def live_devices(runner=run_adb) -> tuple[list[dict[str, str]], bool]:
@@ -104,9 +114,75 @@ def choose_target(live: list[dict[str, str]], target: str, allow_emulator_fallba
 
 def list_avds() -> tuple[str, list[str]]:
     emulator = resolve_tool("emulator")
-    result = subprocess.run([emulator, "-list-avds"], text=True, capture_output=True, check=False, timeout=30)
+    try:
+        result = subprocess.run([emulator, "-list-avds"], text=True, capture_output=True, check=False, timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("emulator_list_avds_timeout") from exc
     avds = [line.strip() for line in result.stdout.splitlines() if line.strip()] if result.returncode == 0 else []
     return emulator, avds
+
+
+def pixel_8a_pids() -> list[int]:
+    pids = []
+    proc = Path("/proc")
+    for item in proc.iterdir():
+        if not item.name.isdigit():
+            continue
+        try:
+            cmdline = (item / "cmdline").read_bytes()
+        except OSError:
+            continue
+        parts = [part for part in cmdline.split(b"\0") if part]
+        if not parts:
+            continue
+        executable = Path(parts[0].decode("utf-8", errors="ignore")).name
+        if not ("emulator" in executable or executable.startswith("qemu-system")):
+            continue
+        if any(part == b"Pixel_8a" or part == b"@Pixel_8a" for part in parts):
+            pids.append(int(item.name))
+    return pids
+
+
+def terminate_pids(pids: list[int], *, timeout_s: float = 15.0, interval_s: float = 0.2) -> bool:
+    live = sorted(set(pids))
+    for pid in live:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        live = [pid for pid in live if Path(f"/proc/{pid}").exists()]
+        if not live:
+            return True
+        time.sleep(interval_s)
+    for pid in live:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        live = [pid for pid in live if Path(f"/proc/{pid}").exists()]
+        if not live:
+            return True
+        time.sleep(interval_s)
+    return False
+
+
+def terminate_process(process, *, timeout_s: float = 15.0) -> bool:
+    if process is None or process.poll() is not None:
+        return True
+    process.terminate()
+    try:
+        process.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            return False
+    return process.poll() is not None
 
 
 def start_pixel_8a_avd(extra_args: list[str] | None = None) -> dict[str, object]:
@@ -140,7 +216,11 @@ def renderer_failure(log_path: str) -> bool:
         text = Path(log_path).read_text(encoding="utf-8", errors="replace").lower()
     except OSError:
         return False
-    return any(marker in text for marker in ("renderer", "vulkan", "gpu", "opengl", "egl"))
+    failure_patterns = (
+        r"\b(fatal|error|failed|failure|crash|abort|cannot|could not|unable)\b.{0,80}\b(renderer|vulkan|gpu|opengl|egl|gles)\b",
+        r"\b(renderer|vulkan|gpu|opengl|egl|gles)\b.{0,80}\b(fatal|error|failed|failure|crash|abort|cannot|could not|unable)\b",
+    )
+    return any(re.search(pattern, text, re.DOTALL) for pattern in failure_patterns)
 
 
 def wait_for_pixel_8a_emulator(
@@ -174,8 +254,10 @@ def select_target(
     start_avd=start_pixel_8a_avd,
     waiter=wait_for_pixel_8a_emulator,
     renderer_check=renderer_failure,
+    process_finder=pixel_8a_pids,
 ) -> dict[str, object]:
-    live, recovered = live_devices(runner)
+    devices, recovered = list_devices(runner)
+    live = [row for row in devices if row["state"] == "device"]
     chosen = choose_target(live, target, allow_emulator_fallback)
     if chosen and chosen["kind"] == "emulator" and resolve_avd_name(chosen["serial"], runner) != "Pixel_8a":
         chosen = None
@@ -186,9 +268,28 @@ def select_target(
             ready = waiter(runner, timeout_s=60)
             if ready:
                 return {"status": "ok", "target": ready, "adb_recovered": recovered}
+            return {
+                "status": "blocked",
+                "reason": "Pixel_8a_booting_or_offline",
+                "adb_recovered": recovered,
+                "target": chosen,
+            }
 
     may_use_emulator = target in ("any", "emulator") or (target == "pixel" and allow_emulator_fallback)
     if may_use_emulator:
+        existing_pixel_processes = process_finder()
+        offline_emulators = [row for row in devices if row["kind"] == "emulator" and row["state"] == "offline"]
+        if existing_pixel_processes or offline_emulators:
+            ready = waiter(runner, timeout_s=60)
+            if ready:
+                return {"status": "ok", "target": ready, "adb_recovered": recovered}
+            return {
+                "status": "blocked",
+                "reason": "Pixel_8a_booting_or_offline",
+                "adb_recovered": recovered,
+                "emulators": offline_emulators,
+                "pids": existing_pixel_processes,
+            }
         try:
             started = start_avd()
         except (FileNotFoundError, RuntimeError) as exc:
@@ -196,6 +297,13 @@ def select_target(
         chosen = waiter(runner, process=started.get("process"))
         used_renderer_fallback = False
         if not chosen and started.get("log_path") and renderer_check(str(started["log_path"])):
+            if not terminate_process(started.get("process")):
+                return {
+                    "status": "blocked",
+                    "reason": "renderer_retry_previous_process_still_live",
+                    "adb_recovered": recovered,
+                    "emulator_log": started["log_path"],
+                }
             started = start_avd(["-gpu", "swiftshader_indirect"])
             used_renderer_fallback = True
             chosen = waiter(runner, process=started.get("process"))
@@ -222,11 +330,20 @@ def emulator_status(runner=run_adb) -> dict[str, object]:
     try:
         emulator, avds = list_avds()
         adb = resolve_tool("adb")
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, RuntimeError) as exc:
         return {"status": "blocked", "reason": str(exc)}
     devices, recovered = list_devices(runner)
     emulator_rows = [row for row in devices if row["kind"] == "emulator"]
     for row in emulator_rows:
+        if row["state"] == "offline":
+            return {
+                "status": "booting/offline",
+                "target": row,
+                "readiness": {"adb_state": row["state"], "sys.boot_completed": "unknown"},
+                "adb": adb,
+                "emulator": emulator,
+                "adb_recovered": recovered,
+            }
         if row["state"] != "device":
             continue
         if resolve_avd_name(row["serial"], runner) != "Pixel_8a":
@@ -236,6 +353,16 @@ def emulator_status(runner=run_adb) -> dict[str, object]:
             "status": "ready" if ready else "booting",
             "target": row,
             "readiness": {"adb_state": row["state"], "sys.boot_completed": "1" if ready else "0"},
+            "adb": adb,
+            "emulator": emulator,
+            "adb_recovered": recovered,
+        }
+    pids = pixel_8a_pids()
+    if pids:
+        return {
+            "status": "booting/offline",
+            "reason": "Pixel_8a_process_running_without_ready_adb",
+            "pids": pids,
             "adb": adb,
             "emulator": emulator,
             "adb_recovered": recovered,
@@ -269,6 +396,11 @@ def stop_pixel_8a(runner=run_adb, *, timeout_s: float = 30.0, interval_s: float 
         and row["state"] == "device"
         and resolve_avd_name(row["serial"], runner) == "Pixel_8a"
     ]
+    pids = pixel_8a_pids()
+    if not targets and pids:
+        if terminate_pids(pids, timeout_s=timeout_s, interval_s=interval_s):
+            return {"status": "stopped", "pids": pids, "adb_recovered": recovered}
+        return {"status": "blocked", "reason": "emulator_process_shutdown_timeout", "pids": pids}
     if not targets:
         return {"status": "stopped", "adb_recovered": recovered}
     serial = targets[0]["serial"]
@@ -279,6 +411,11 @@ def stop_pixel_8a(runner=run_adb, *, timeout_s: float = 30.0, interval_s: float 
     while time.monotonic() < deadline:
         devices, _ = list_devices(runner, allow_recovery=False)
         if not any(row["serial"] == serial and row["state"] == "device" for row in devices):
+            residual_pids = pixel_8a_pids()
+            if residual_pids:
+                if terminate_pids(residual_pids, timeout_s=timeout_s, interval_s=interval_s):
+                    return {"status": "stopped", "serial": serial, "pids": residual_pids}
+                return {"status": "blocked", "reason": "emulator_process_shutdown_timeout", "pids": residual_pids}
             return {"status": "stopped", "serial": serial}
         time.sleep(interval_s)
     return {"status": "blocked", "reason": "emulator_shutdown_timeout", "serial": serial}
