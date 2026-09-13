@@ -187,7 +187,8 @@ object TimeFenceTimerScheduler {
             Log.w("MTT_TIMER", "Exact alarm denied; falling back to setWindow fireAtMs=$fireAtMs", se)
             val windowMs = 30_000L
             am.setWindow(AlarmManager.RTC_WAKEUP, fireAtMs, windowMs, pi)
-        } catch (_: Throwable) {
+        } catch (error: RuntimeException) {
+            Log.e("MTT_TIMER", "Unable to schedule timed session fireAtMs=$fireAtMs", error)
         }
     }
 
