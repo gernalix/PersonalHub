@@ -118,6 +118,7 @@ fun NowScreen(
     var editingSessionIsNew by remember { mutableStateOf(false) }
     var elapsedModeSessionIds by remember { mutableStateOf(setOf<Long>()) }
     var randomMaxMinutes by rememberSaveable { mutableStateOf("60") }
+    var randomResultRevision by rememberSaveable { mutableStateOf(0) }
 
     fun openNewSessionDraft() {
         editingSession = newSessionDraft(effectiveTime.nowMs)
@@ -145,9 +146,10 @@ fun NowScreen(
     val timedRows = remember(runningRows, randomRunningSessionIds) {
         runningRows.filter { it.expectedEndMs != null && it.id !in randomRunningSessionIds }
     }
-    val randomCompletedSession = remember(context, state.chronologySessions) {
+    val randomCompletedSession = remember(context, state.chronologySessions, randomResultRevision) {
         RandomTimerStore.unansweredCompletedSession(context, state.chronologySessions)
     }
+    val randomTimerStartEnabled = !state.isReadOnly && randomRunningSessionIds.isEmpty()
     val runningRowCount = regularRows.size + timedRows.size
     val activeTags = remember(visibleTags, state.runningMinStartByTagId, state.tagLastUsedMsByTagId) {
         NowCapsuleViewModel.computeActiveTags(
@@ -166,6 +168,11 @@ fun NowScreen(
             chronologySessions = state.chronologySessions,
             tagLastUsedMsByTagId = state.tagLastUsedMsByTagId,
         )
+    }
+
+    fun markRandomResultHandled(sessionId: Long) {
+        RandomTimerStore.markAnswered(context, sessionId)
+        randomResultRevision += 1
     }
 
     fun startQuickSession(tags: List<Tag>) {
@@ -278,7 +285,7 @@ fun NowScreen(
                             RandomTimerCard(
                                 maxMinutes = randomMaxMinutes,
                                 onMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
-                                enabled = !state.isReadOnly,
+                                enabled = randomTimerStartEnabled,
                                 onStart = {
                                     capsule.createRandomTimer(
                                         maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
@@ -345,7 +352,7 @@ fun NowScreen(
                             RandomTimerCard(
                                 maxMinutes = randomMaxMinutes,
                                 onMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
-                                enabled = !state.isReadOnly,
+                                enabled = randomTimerStartEnabled,
                                 onStart = {
                                     capsule.createRandomTimer(
                                         maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
@@ -375,7 +382,7 @@ fun NowScreen(
                             RandomTimerCard(
                                 maxMinutes = randomMaxMinutes,
                                 onMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
-                                enabled = !state.isReadOnly,
+                                enabled = randomTimerStartEnabled,
                                 onStart = {
                                     capsule.createRandomTimer(
                                         maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
@@ -399,8 +406,8 @@ fun NowScreen(
             randomCompletedSession?.let { session ->
                 RandomTimerResultDialog(
                     session = session,
-                    onDismiss = { RandomTimerStore.markAnswered(context, session.id) },
-                    onSubmit = { RandomTimerStore.markAnswered(context, session.id) },
+                    onDismiss = { markRandomResultHandled(session.id) },
+                    onSubmit = { markRandomResultHandled(session.id) },
                 )
             }
 
