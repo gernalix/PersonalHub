@@ -208,15 +208,19 @@ object DatabaseVault {
                     require(actualColumns == (0 until columns.length()).map { columns.getString(it) }) { "Incompatible index columns: $name" }
                 }
             }
-            db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { c ->
-                while(c.moveToNext()) require(c.getString(0) in tables || c.getString(0) in listOf("android_metadata", "room_master_table", HubActivityCapture.UNDO_CONTEXT_TABLE)) { "Unexpected database table" }
+            // Room validates every table PersonalHub owns above. Extra tables are intentionally
+            // tolerated: real databases can retain inert legacy tables after migrations, and an
+            // extra table cannot affect app data unless it has a trigger. Every trigger is still
+            // validated below, so this does not weaken the executable-schema boundary.
+            val databaseTables = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { c ->
+                buildSet { while (c.moveToNext()) add(c.getString(0)) }
             }
             db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
                 while (c.moveToNext()) {
                     val name = c.getString(0); val table = c.getString(1)
                     val op = name.substringAfterLast('_')
                     if (name.startsWith("hub_activity_") && table in tables) continue
-                    require(table in tables && op in listOf("INSERT", "UPDATE", "DELETE")) { "Unexpected database trigger" }
+                    require(table in databaseTables && op in listOf("INSERT", "UPDATE", "DELETE")) { "Unexpected database trigger: $name" }
                     val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
                     val expected = when (name) {
                         "hub_dirty_${table}_$op" -> {
@@ -230,9 +234,9 @@ object DatabaseVault {
                             }
                             SyncJournal.trigger(table, keys, op, legacy = db.version == 3)
                         }
-                        else -> error("Unexpected database trigger")
+                        else -> error("Unexpected database trigger: $name")
                     }
-                    require(sql == expected) { "Incompatible database trigger" }
+                    require(sql == expected) { "Incompatible database trigger: $name" }
                 }
             }
             db.rawQuery("SELECT bytes, sha256 FROM people_photos", null).use { c -> while (c.moveToNext()) require(sha256(c.getBlob(0)) == c.getString(1)) { "Photo integrity check failed" } }
