@@ -24,6 +24,9 @@ interface WordPulseDao {
     @Insert
     suspend fun insertCorrectionEvent(event: CorrectionEvent): Long
 
+    @Insert
+    suspend fun insertPvtResult(result: PvtResultEntity): Long
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAppState(state: AppStateEntity)
 
@@ -70,6 +73,7 @@ interface WordPulseDao {
     @Query(
         """
         SELECT id,
+               original_word,
                typing_started_at_utc_ms,
                submitted_at_utc_ms,
                typing_duration_ms,
@@ -81,7 +85,12 @@ interface WordPulseDao {
                longest_inter_key_pause_ms,
                mean_inter_key_interval_ms,
                inter_key_interval_variability_ms,
-               invalid_input_attempt_count
+               invalid_input_attempt_count,
+               median_inter_key_interval_ms,
+               p95_inter_key_interval_ms,
+               inter_key_interval_cv,
+               micro_pause_count,
+               last_edit_to_submit_ms
         FROM word_entries
         WHERE id != :excludedEntryId
           AND session_id != :excludedSessionId
@@ -103,6 +112,39 @@ interface WordPulseDao {
         maximumLength: Int,
         limit: Int,
     ): List<TypingPerformanceRow>
+
+    @Query(
+        """
+        SELECT id, original_word, typing_started_at_utc_ms, submitted_at_utc_ms,
+               typing_duration_ms, final_character_count, inserted_character_count,
+               deleted_character_count, replacement_count, correction_action_count,
+               longest_inter_key_pause_ms, mean_inter_key_interval_ms,
+               inter_key_interval_variability_ms, invalid_input_attempt_count,
+               median_inter_key_interval_ms, p95_inter_key_interval_ms,
+               inter_key_interval_cv, micro_pause_count, last_edit_to_submit_ms
+        FROM word_entries
+        WHERE session_id = :sessionId AND id != :excludedEntryId
+          AND typing_duration_ms IS NOT NULL AND typing_duration_ms > 0
+          AND final_character_count IS NOT NULL AND inserted_character_count IS NOT NULL
+          AND deleted_character_count IS NOT NULL AND correction_action_count IS NOT NULL
+          AND invalid_input_attempt_count IS NOT NULL
+        ORDER BY COALESCE(submitted_at_utc_ms, created_at_utc_ms) ASC, id ASC
+        LIMIT :limit
+        """,
+    )
+    suspend fun getSessionTypingPerformanceRows(sessionId: String, excludedEntryId: Long, limit: Int): List<TypingPerformanceRow>
+
+    @Query("UPDATE word_entries SET fatigue_score = :score WHERE id = :entryId")
+    suspend fun updateFatigueScore(entryId: Long, score: Int?): Int
+
+    @Query("SELECT * FROM pvt_results ORDER BY completed_at_utc_ms DESC, id DESC LIMIT :limit")
+    suspend fun getRecentPvtResults(limit: Int): List<PvtResultEntity>
+
+    @Query("SELECT * FROM pvt_results ORDER BY completed_at_utc_ms DESC, id DESC LIMIT 1")
+    fun observeLatestPvtResult(): Flow<PvtResultEntity?>
+
+    @Query("SELECT * FROM pvt_results ORDER BY completed_at_utc_ms ASC, id ASC")
+    suspend fun getPvtResults(): List<PvtResultEntity>
 
     @Query("SELECT COUNT(*) FROM word_entries")
     fun observeTotalWordCount(): Flow<Int>
@@ -326,6 +368,9 @@ interface WordPulseDao {
 
     @Query("DELETE FROM correction_events")
     suspend fun deleteCorrectionEvents()
+
+    @Query("DELETE FROM pvt_results")
+    suspend fun deletePvtResults()
 
     @Query("DELETE FROM word_entries WHERE id = :id")
     suspend fun deleteWordById(id: Long): Int

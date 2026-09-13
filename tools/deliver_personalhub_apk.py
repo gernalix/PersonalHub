@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -123,16 +125,19 @@ def publish_release_asset(
     # makes retries safe and avoids leaving the stable prerelease without an APK.
     previous_assets = _existing_assets(release_tag)
     asset_name = f"PersonalHub-{version}-{commit[:12]}.apk"
-    _run([
-        "gh",
-        "release",
-        "upload",
-        release_tag,
-        str(apk_path) + f"#{asset_name}",
-        "--repo",
-        REPO,
-        "--clobber",
-    ])
+    with tempfile.TemporaryDirectory(prefix="personalhub-apk-") as temp_dir:
+        staged_apk = Path(temp_dir) / asset_name
+        shutil.copyfile(apk_path, staged_apk)
+        _run([
+            "gh",
+            "release",
+            "upload",
+            release_tag,
+            str(staged_apk),
+            "--repo",
+            REPO,
+            "--clobber",
+        ])
 
     for previous_asset in previous_assets:
         if previous_asset == asset_name:

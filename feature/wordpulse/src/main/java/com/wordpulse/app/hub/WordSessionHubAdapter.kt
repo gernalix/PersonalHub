@@ -31,15 +31,20 @@ class WordSessionHubAdapter(private val context: Context) : HubEntityAdapter, Hu
             args += cursor.sortMs
             args += cursor.sortMs
             args += cursor.stableId
-            "AND (started_at_utc_ms < ? OR (started_at_utc_ms = ? AND id < ?))"
+            "AND (s.started_at_utc_ms < ? OR (s.started_at_utc_ms = ? AND s.id < ?))"
         } else ""
         args += query.limit + 1
         val sql = """
-            SELECT id, started_at_utc_ms, ended_at_utc_ms
-            FROM wordpulse_sessions
-            WHERE started_at_utc_ms < ? AND (ended_at_utc_ms IS NULL OR ended_at_utc_ms > ?)
+            SELECT s.id, s.started_at_utc_ms, s.ended_at_utc_ms,
+                   (SELECT e.fatigue_score
+                    FROM word_entries e
+                    WHERE e.session_id = s.id AND e.fatigue_score BETWEEN 0 AND 100
+                    ORDER BY COALESCE(e.submitted_at_utc_ms, e.created_at_utc_ms) DESC, e.id DESC
+                    LIMIT 1) AS fatigue_score
+            FROM wordpulse_sessions s
+            WHERE s.started_at_utc_ms < ? AND (s.ended_at_utc_ms IS NULL OR s.ended_at_utc_ms > ?)
               $cursorClause
-            ORDER BY started_at_utc_ms DESC, id DESC
+            ORDER BY s.started_at_utc_ms DESC, s.id DESC
             LIMIT ?
         """.trimIndent()
         val rows = database.openHelper.readableDatabase.query(SimpleSQLiteQuery(sql, args.toTypedArray())).use { c ->
@@ -48,6 +53,7 @@ class WordSessionHubAdapter(private val context: Context) : HubEntityAdapter, Hu
                     val id = c.getString(0)
                     val startMs = c.getLong(1)
                     val endMs = if (c.isNull(2)) null else c.getLong(2)
+                    val fatigueScore = if (c.isNull(3)) null else c.getInt(3)
                     add(
                         HubTemporalRecord(
                             moduleId,
@@ -61,6 +67,7 @@ class WordSessionHubAdapter(private val context: Context) : HubEntityAdapter, Hu
                             attributes = buildMap {
                                 put("start_ms", startMs.toString())
                                 endMs?.let { put("end_ms", it.toString()) }
+                                fatigueScore?.let { put("fatigueScore", it.toString()) }
                             },
                         ),
                     )

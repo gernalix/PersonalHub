@@ -116,7 +116,8 @@ class DeliverPersonalHubApkTest(unittest.TestCase):
         self.assertLess(upload_index, delete_index)
         self.assertLess(delete_index, edit_index)
         upload = calls[upload_index]
-        self.assertIn("#PersonalHub-42-abc123def456.apk", upload[4])
+        self.assertEqual(Path(upload[4]).name, "PersonalHub-42-abc123def456.apk")
+        self.assertNotIn("#", upload[4])
 
     def test_failed_upload_keeps_previous_asset_and_does_not_update_metadata(self) -> None:
         with tempfile.NamedTemporaryFile(suffix=".apk") as handle:

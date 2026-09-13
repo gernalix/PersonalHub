@@ -5,12 +5,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.Instant
 import java.time.ZoneId
@@ -22,13 +21,16 @@ fun WordPulseRoute(viewModel: WordPulseViewModel, initialSessionId: String? = nu
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val captureFieldValue by viewModel.captureFieldState.collectAsStateWithLifecycle()
     val typingAlert by viewModel.typingAlertState.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        viewModel.ensureStartupSession()
-    }
+    val latestPerformance by viewModel.latestPerformanceState.collectAsStateWithLifecycle()
+    val sleepIntegration by viewModel.sleepIntegrationState.collectAsStateWithLifecycle()
+    val pvtTest by viewModel.pvtTestState.collectAsStateWithLifecycle()
+    val latestPvtSummary by viewModel.latestPvtSummary.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val healthPermissionLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract(),
+    ) { grantedPermissions -> viewModel.onHealthConnectPermissionsResult(grantedPermissions) }
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv"),
     ) { uri: Uri? ->
@@ -60,6 +62,21 @@ fun WordPulseRoute(viewModel: WordPulseViewModel, initialSessionId: String? = nu
         }
     }
 
+    AlertnessOverlayHost(
+        latestPerformance = latestPerformance,
+        sleepIntegration = sleepIntegration,
+        pvtTest = pvtTest,
+        latestPvtSummary = latestPvtSummary,
+        onRequestSleepPermission = {
+            if (viewModel.healthConnectPermissions.isNotEmpty()) {
+                healthPermissionLauncher.launch(viewModel.healthConnectPermissions)
+            }
+        },
+        onRefreshSleep = viewModel::refreshSleepContext,
+        onStartPvt = viewModel::startPvtTest,
+        onPvtTap = viewModel::onPvtTap,
+        onCancelPvt = viewModel::cancelPvtTest,
+    ) {
     WordPulseScreen(
         uiState = uiState,
         captureFieldValue = captureFieldValue,
@@ -87,4 +104,5 @@ fun WordPulseRoute(viewModel: WordPulseViewModel, initialSessionId: String? = nu
         },
         initialSessionId = initialSessionId,
     )
+    }
 }

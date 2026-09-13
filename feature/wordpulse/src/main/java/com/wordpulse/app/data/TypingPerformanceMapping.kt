@@ -19,6 +19,15 @@ fun TypingPerformanceRow.toPerformanceSample(): TypingPerformanceSample? {
             meanInterKeyIntervalMs = meanInterKeyIntervalMs,
             interKeyIntervalVariabilityMs = interKeyIntervalVariabilityMs,
             invalidInputAttemptCount = invalidInputAttemptCount ?: return null,
+            medianInterKeyIntervalMs = medianInterKeyIntervalMs,
+            p95InterKeyIntervalMs = p95InterKeyIntervalMs,
+            interKeyIntervalCoefficientOfVariation = interKeyIntervalCoefficientOfVariation,
+            microPauseCount = microPauseCount ?: 0,
+            lastEditToSubmitMs = lastEditToSubmitMs,
         )
-        return TypingPerformanceSample.fromMetrics(id, metrics)
+        val sample = TypingPerformanceSample.fromMetrics(id, metrics, originalWord)
+        return sample.copy(
+            activeDurationPerCharacterMs = sample.activeDurationPerCharacterMs.takeIf { lastEditToSubmitMs != null },
+            microPausesPerCharacter = sample.microPausesPerCharacter.takeIf { microPauseCount != null } ?: Double.NaN,
+        )
     }

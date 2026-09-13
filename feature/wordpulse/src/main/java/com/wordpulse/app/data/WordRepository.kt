@@ -4,14 +4,16 @@ import androidx.room.withTransaction
 import com.wordpulse.app.domain.CaptureWordPolicy
 import com.wordpulse.app.domain.CorrectionMetrics
 import com.wordpulse.app.domain.Levenshtein
+import com.wordpulse.app.domain.PvtCalibrationSample
+import com.wordpulse.app.domain.PvtSummary
 import com.wordpulse.app.domain.SearchMode
 import com.wordpulse.app.domain.SearchSort
-import com.wordpulse.app.domain.TimelineEntry
 import com.wordpulse.app.domain.TextNormalizer
+import com.wordpulse.app.domain.TimelineEntry
 import com.wordpulse.app.domain.TypingMetrics
 import com.wordpulse.app.domain.TypingPerformanceSample
-import com.wordpulse.app.domain.WordLengthBand
 import com.wordpulse.app.domain.WordExplorer
+import com.wordpulse.app.domain.WordLengthBand
 import com.wordpulse.app.domain.WordSearchResult
 import java.time.Instant
 import java.time.ZoneId
@@ -35,6 +37,9 @@ class WordRepository(
     fun observeCurrentSessionId(): Flow<String?> = dao.observeCurrentSessionId()
 
     fun observeSessionSummaries(): Flow<List<SessionSummaryRow>> = dao.observeSessionSummaries()
+
+    fun observeLatestPvtSummary(): Flow<PvtSummary?> =
+        dao.observeLatestPvtResult().map { it?.toSummary() }
 
     fun observeSearchResults(
         query: String,
@@ -199,6 +204,11 @@ class WordRepository(
                 meanInterKeyIntervalMs = typingMetrics?.meanInterKeyIntervalMs,
                 interKeyIntervalVariabilityMs = typingMetrics?.interKeyIntervalVariabilityMs,
                 invalidInputAttemptCount = typingMetrics?.invalidInputAttemptCount,
+                medianInterKeyIntervalMs = typingMetrics?.medianInterKeyIntervalMs,
+                p95InterKeyIntervalMs = typingMetrics?.p95InterKeyIntervalMs,
+                interKeyIntervalCoefficientOfVariation = typingMetrics?.interKeyIntervalCoefficientOfVariation,
+                microPauseCount = typingMetrics?.microPauseCount,
+                lastEditToSubmitMs = typingMetrics?.lastEditToSubmitMs,
             )
             val insertedId = dao.insertWord(entry)
             SubmissionResult(
@@ -235,10 +245,32 @@ class WordRepository(
         ).mapNotNull(TypingPerformanceRow::toPerformanceSample)
     }
 
+    suspend fun getSessionTypingSamples(
+        sessionId: String,
+        excludedEntryId: Long,
+        limit: Int = MAX_SESSION_TYPING_SAMPLES,
+    ): List<TypingPerformanceSample> =
+        dao.getSessionTypingPerformanceRows(
+            sessionId = sessionId,
+            excludedEntryId = excludedEntryId,
+            limit = limit,
+        ).mapNotNull(TypingPerformanceRow::toPerformanceSample)
+
+    suspend fun getPvtCalibrationSamples(limit: Int = MAX_PVT_CALIBRATION_SAMPLES): List<PvtCalibrationSample> =
+        dao.getRecentPvtResults(limit).mapNotNull(PvtResultEntity::toCalibrationSample)
+
+    suspend fun savePvtResult(result: PvtResultEntity): Long = dao.insertPvtResult(result)
+
+    suspend fun saveFatigueScore(entryId: Long, score: Int?) {
+        require(score == null || score in 0..100)
+        check(dao.updateFatigueScore(entryId, score) == 1) { "Fatigue target disappeared" }
+    }
+
     suspend fun deleteAllData(): WordSession {
         val formerSessionIds = dao.getSessions().map { it.id }
         val created = database.withTransaction {
             dao.deleteCorrectionEvents()
+            dao.deletePvtResults()
             dao.deleteWords()
             dao.deleteSessions()
             dao.deleteAppState()
@@ -313,6 +345,12 @@ class WordRepository(
                     entry.meanInterKeyIntervalMs,
                     entry.interKeyIntervalVariabilityMs,
                     entry.invalidInputAttemptCount,
+                    entry.medianInterKeyIntervalMs,
+                    entry.p95InterKeyIntervalMs,
+                    entry.interKeyIntervalCoefficientOfVariation,
+                    entry.microPauseCount,
+                    entry.lastEditToSubmitMs,
+                    entry.fatigueScore,
                 )
             },
         )
@@ -322,6 +360,7 @@ class WordRepository(
         val sessions = dao.getSessions()
         val entries = dao.getEntries()
         val corrections = dao.getCorrectionEvents()
+        val pvtResults = dao.getPvtResults()
         val rows = buildList {
             sessions.forEach { session ->
                 add(
@@ -355,6 +394,12 @@ class WordRepository(
                         "mean_inter_key_interval_ms" to entry.meanInterKeyIntervalMs,
                         "inter_key_interval_variability_ms" to entry.interKeyIntervalVariabilityMs,
                         "invalid_input_attempt_count" to entry.invalidInputAttemptCount,
+                        "median_inter_key_interval_ms" to entry.medianInterKeyIntervalMs,
+                        "p95_inter_key_interval_ms" to entry.p95InterKeyIntervalMs,
+                        "inter_key_interval_cv" to entry.interKeyIntervalCoefficientOfVariation,
+                        "micro_pause_count" to entry.microPauseCount,
+                        "last_edit_to_submit_ms" to entry.lastEditToSubmitMs,
+                        "fatigue_score" to entry.fatigueScore,
                     ),
                 )
             }
@@ -371,6 +416,29 @@ class WordRepository(
                         "corrected_at_utc_ms" to correction.correctedAtUtcMs,
                         "correction_latency_ms" to correction.correctionLatencyMs,
                         "correction_action_type" to correction.actionType,
+                    ),
+                )
+            }
+            pvtResults.forEach { result ->
+                add(
+                    backupRow(
+                        "record_type" to "pvt",
+                        "pvt_id" to result.id,
+                        "pvt_started_at_utc_ms" to result.startedAtUtcMs,
+                        "pvt_completed_at_utc_ms" to result.completedAtUtcMs,
+                        "pvt_duration_ms" to result.durationMs,
+                        "pvt_trial_count" to result.trialCount,
+                        "pvt_median_reaction_time_ms" to result.medianReactionTimeMs,
+                        "pvt_p90_reaction_time_ms" to result.p90ReactionTimeMs,
+                        "pvt_lapse_count" to result.lapseCount,
+                        "pvt_false_start_count" to result.falseStartCount,
+                        "pvt_paired_fatigue_score" to result.pairedFatigueScore,
+                        "pvt_speed_domain_score" to result.speedDomainScore,
+                        "pvt_rhythm_domain_score" to result.rhythmDomainScore,
+                        "pvt_control_domain_score" to result.controlDomainScore,
+                        "pvt_session_drift_domain_score" to result.sessionDriftDomainScore,
+                        "pvt_sleep_context_domain_score" to result.sleepContextDomainScore,
+                        "pvt_hours_awake" to result.hoursAwake,
                     ),
                 )
             }
@@ -424,6 +492,7 @@ class WordRepository(
         val columns = header.withIndex().associate { it.value to it.index }
         var sessionsImported = 0
         var correctionsImported = 0
+        var pvtResultsImported = 0
         val words = mutableListOf<WordEntry>()
         rows.forEach { row ->
             when (row.cell(columns, "record_type")) {
@@ -437,7 +506,12 @@ class WordRepository(
                 }
                 "word" -> {
                     val sessionId = row.cell(columns, "session_id").ifBlank { ensureCurrentSessionInsideTransaction().id }
-                    dao.insertSessionIfAbsent(WordSession(sessionId, row.cell(columns, "created_at_utc_ms").toLongOrNull() ?: timeProvider.nowUtcMs()))
+                    dao.insertSessionIfAbsent(
+                        WordSession(
+                            sessionId,
+                            row.cell(columns, "created_at_utc_ms").toLongOrNull() ?: timeProvider.nowUtcMs(),
+                        ),
+                    )
                     row.toImportedWord(columns, sessionId)?.let(words::add)
                 }
                 "correction" -> {
@@ -475,11 +549,20 @@ class WordRepository(
                         correctionsImported += 1
                     }
                 }
+                "pvt" -> row.toImportedPvt(columns)?.let { pvt ->
+                    dao.insertPvtResult(pvt)
+                    pvtResultsImported += 1
+                }
             }
         }
         if (words.isNotEmpty()) dao.insertWords(words)
         ensureCurrentSessionInsideTransaction()
-        return BackupImportResult(sessionsImported, words.size, correctionsImported)
+        return BackupImportResult(
+            sessionsImported = sessionsImported,
+            wordsImported = words.size,
+            correctionsImported = correctionsImported,
+            pvtResultsImported = pvtResultsImported,
+        )
     }
 
     private suspend fun importWordRows(header: List<String>, rows: List<List<String>>): BackupImportResult {
@@ -546,6 +629,39 @@ class WordRepository(
                 "inter_key_interval_variability_ms",
             ).toNullableDouble(),
             invalidInputAttemptCount = cell(columns, "invalid_input_attempt_count").toNullableInt(),
+            medianInterKeyIntervalMs = cell(columns, "median_inter_key_interval_ms").toNullableDouble(),
+            p95InterKeyIntervalMs = cell(columns, "p95_inter_key_interval_ms").toNullableDouble(),
+            interKeyIntervalCoefficientOfVariation = cell(columns, "inter_key_interval_cv").toNullableDouble(),
+            microPauseCount = cell(columns, "micro_pause_count").toNullableInt(),
+            lastEditToSubmitMs = cell(columns, "last_edit_to_submit_ms").toNullableLong(),
+            fatigueScore = cell(columns, "fatigue_score").toNullableInt()?.takeIf { it in 0..100 },
+        )
+    }
+
+    private fun List<String>.toImportedPvt(columns: Map<String, Int>): PvtResultEntity? {
+        val startedAt = cell(columns, "pvt_started_at_utc_ms").toLongOrNull() ?: return null
+        val completedAt = cell(columns, "pvt_completed_at_utc_ms").toLongOrNull() ?: return null
+        val duration = cell(columns, "pvt_duration_ms").toLongOrNull() ?: return null
+        val trials = cell(columns, "pvt_trial_count").toIntOrNull() ?: return null
+        val lapses = cell(columns, "pvt_lapse_count").toIntOrNull() ?: return null
+        val falseStarts = cell(columns, "pvt_false_start_count").toIntOrNull() ?: return null
+        if (completedAt < startedAt || duration < 0L || trials < 0 || lapses < 0 || falseStarts < 0) return null
+        return PvtResultEntity(
+            startedAtUtcMs = startedAt,
+            completedAtUtcMs = completedAt,
+            durationMs = duration,
+            trialCount = trials,
+            medianReactionTimeMs = cell(columns, "pvt_median_reaction_time_ms").toNullableDouble(),
+            p90ReactionTimeMs = cell(columns, "pvt_p90_reaction_time_ms").toNullableDouble(),
+            lapseCount = lapses,
+            falseStartCount = falseStarts,
+            pairedFatigueScore = cell(columns, "pvt_paired_fatigue_score").toNullableInt(),
+            speedDomainScore = cell(columns, "pvt_speed_domain_score").toNullableInt(),
+            rhythmDomainScore = cell(columns, "pvt_rhythm_domain_score").toNullableInt(),
+            controlDomainScore = cell(columns, "pvt_control_domain_score").toNullableInt(),
+            sessionDriftDomainScore = cell(columns, "pvt_session_drift_domain_score").toNullableInt(),
+            sleepContextDomainScore = cell(columns, "pvt_sleep_context_domain_score").toNullableInt(),
+            hoursAwake = cell(columns, "pvt_hours_awake").toNullableDouble(),
         )
     }
 
@@ -659,6 +775,8 @@ class WordRepository(
         const val MAX_TIMELINE_ROWS = 500
         const val MAX_SEARCH_RESULTS = 100
         const val MAX_TYPING_BASELINE_SAMPLES = 300
+        const val MAX_SESSION_TYPING_SAMPLES = 60
+        const val MAX_PVT_CALIBRATION_SAMPLES = 50
         val WORD_EXPORT_COLUMNS = listOf(
             "id",
             "original_word",
@@ -678,6 +796,12 @@ class WordRepository(
             "mean_inter_key_interval_ms",
             "inter_key_interval_variability_ms",
             "invalid_input_attempt_count",
+            "median_inter_key_interval_ms",
+            "p95_inter_key_interval_ms",
+            "inter_key_interval_cv",
+            "micro_pause_count",
+            "last_edit_to_submit_ms",
+            "fatigue_score",
         )
         val BACKUP_EXPORT_COLUMNS = listOf(
             "record_type",
@@ -701,6 +825,12 @@ class WordRepository(
             "mean_inter_key_interval_ms",
             "inter_key_interval_variability_ms",
             "invalid_input_attempt_count",
+            "median_inter_key_interval_ms",
+            "p95_inter_key_interval_ms",
+            "inter_key_interval_cv",
+            "micro_pause_count",
+            "last_edit_to_submit_ms",
+            "fatigue_score",
             "correction_id",
             "original_word_entry_id",
             "correction_original_word",
@@ -709,6 +839,22 @@ class WordRepository(
             "corrected_at_utc_ms",
             "correction_latency_ms",
             "correction_action_type",
+            "pvt_id",
+            "pvt_started_at_utc_ms",
+            "pvt_completed_at_utc_ms",
+            "pvt_duration_ms",
+            "pvt_trial_count",
+            "pvt_median_reaction_time_ms",
+            "pvt_p90_reaction_time_ms",
+            "pvt_lapse_count",
+            "pvt_false_start_count",
+            "pvt_paired_fatigue_score",
+            "pvt_speed_domain_score",
+            "pvt_rhythm_domain_score",
+            "pvt_control_domain_score",
+            "pvt_session_drift_domain_score",
+            "pvt_sleep_context_domain_score",
+            "pvt_hours_awake",
         )
         val QUERY_BACKED_SEARCH_MODES = setOf(
             SearchMode.Substring,

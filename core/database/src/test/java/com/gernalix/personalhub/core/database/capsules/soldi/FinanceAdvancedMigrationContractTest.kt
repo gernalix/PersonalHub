@@ -23,7 +23,7 @@ class FinanceAdvancedMigrationContractTest {
         val migration = FinanceAdvancedMigration()
         assertEquals(11, migration.startVersion)
         assertEquals(12, migration.endVersion)
-        assertEquals(12, PersonalHubDatabase.SCHEMA_VERSION)
+        assertTrue(PersonalHubDatabase.canMigrateFrom(migration.startVersion))
     }
 
     @Test
@@ -55,7 +55,7 @@ class FinanceAdvancedMigrationContractTest {
             assertEquals("", scalarText(sqlite, "SELECT category FROM finance_transactions WHERE id=1"))
             assertFalse(columnNullable(sqlite, "finance_transactions", "category"))
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='finance_transfers'"))
-            assertEquals(101L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(102L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
         } finally {
             database.close()
             context.deleteDatabase(name)

@@ -61,4 +61,16 @@ data class WordEntry(
     val interKeyIntervalVariabilityMs: Double? = null,
     @ColumnInfo(name = "invalid_input_attempt_count")
     val invalidInputAttemptCount: Int? = null,
+    @ColumnInfo(name = "median_inter_key_interval_ms")
+    val medianInterKeyIntervalMs: Double? = null,
+    @ColumnInfo(name = "p95_inter_key_interval_ms")
+    val p95InterKeyIntervalMs: Double? = null,
+    @ColumnInfo(name = "inter_key_interval_cv")
+    val interKeyIntervalCoefficientOfVariation: Double? = null,
+    @ColumnInfo(name = "micro_pause_count")
+    val microPauseCount: Int? = null,
+    @ColumnInfo(name = "last_edit_to_submit_ms")
+    val lastEditToSubmitMs: Long? = null,
+    @ColumnInfo(name = "fatigue_score")
+    val fatigueScore: Int? = null,
 )

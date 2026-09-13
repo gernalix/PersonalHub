@@ -30,8 +30,9 @@ class PersonalHubApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         if (Application.getProcessName() != packageName) return
-        TimerStartupApi.applicationOnCreate()
         DatabaseVault.recoverInterruptedImport(this)
+        if (!DatabaseVault.ensureStartupReady(this)) return
+        TimerStartupApi.applicationOnCreate()
         TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(this)
         HubContextRuntime.initialize(
             this,

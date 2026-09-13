@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.wordpulse.app.data.SystemTimeProvider
+import com.wordpulse.app.data.HealthConnectSleepSource
 import com.wordpulse.app.ui.WordPulseRoute
 import com.wordpulse.app.ui.WordPulseTheme
 import com.wordpulse.app.ui.WordPulseViewModel
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
         WordPulseViewModelFactory(
             repository = WordPulseRuntime.repository(applicationContext),
             timeProvider = SystemTimeProvider,
+            sleepContextSource = HealthConnectSleepSource(applicationContext),
         )
     }
 

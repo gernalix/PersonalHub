@@ -164,11 +164,78 @@ object DatabaseVault {
         cleanupOrphanedPreImportBackups(context)
     }
 
+    /** Validates or safely upgrades the canonical database before feature code can write to it. */
+    fun ensureStartupReady(context: Context): Boolean = operations.withLock {
+        val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
+        val prefs = preferences(context)
+        val appVersion = runCatching {
+            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                context.packageManager.getPackageInfo(context.packageName, 0),
+            )
+        }.getOrDefault(0L)
+        if (
+            prefs.getInt("startup_gate_schema", -1) == PersonalHubDatabase.SCHEMA_VERSION &&
+            prefs.getLong("startup_gate_app_version", -1L) == appVersion && target.isFile
+        ) return@withLock true
+
+        fun pass() = prefs.edit()
+            .putInt("startup_gate_schema", PersonalHubDatabase.SCHEMA_VERSION)
+            .putLong("startup_gate_app_version", appVersion)
+            .remove("error")
+            .commit()
+        fun fail(message: String): Boolean {
+            prefs.edit().remove("startup_gate_schema").remove("startup_gate_app_version")
+                .putString("error", message).commit()
+            return false
+        }
+
+        if (!target.exists()) {
+            return@withLock runCatching {
+                PersonalHubDatabase.get(context).openHelper.writableDatabase
+                validate(context, target)
+                pass()
+            }.getOrElse { fail("Database startup check failed; existing data was preserved") }
+        }
+
+        val sourceVersion = runCatching {
+            SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
+        }.getOrElse { return@withLock fail("Database is unreadable; existing data was preserved") }
+        if (!PersonalHubDatabase.canMigrateFrom(sourceVersion)) {
+            return@withLock fail("Database version is unsupported; existing data was preserved")
+        }
+        if (sourceVersion == PersonalHubDatabase.SCHEMA_VERSION) {
+            return@withLock runCatching { validate(context, target); pass() }
+                .getOrElse { fail("Database validation failed; existing data was preserved") }
+        }
+
+        val snapshot = File(target.parentFile, "personalhub-startup-v$sourceVersion.db")
+        return@withLock runCatching {
+            SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { c ->
+                    require(c.moveToFirst() && c.getInt(0) == 0) { "Database is busy" }
+                }
+            }
+            syncCopy(target, snapshot)
+            PersonalHubDatabase.closeInstance()
+            val temporary = PersonalHubDatabase.openTemporary(context, target.absolutePath)
+            try { temporary.openHelper.writableDatabase } finally { temporary.close() }
+            validate(context, target)
+            pass()
+        }.getOrElse {
+            PersonalHubDatabase.closeInstance()
+            if (snapshot.isFile) {
+                sidecars(target)
+                syncCopy(snapshot, target)
+            }
+            fail("Database upgrade failed and was rolled back; no writes were allowed")
+        }
+    }
+
     fun validate(context: Context, file: File): Long {
         require(file.isFile && file.length() >= 100) { "Invalid SQLite file" }
         file.inputStream().use { input -> val header = ByteArray(16); java.io.DataInputStream(input).readFully(header); require(header.contentEquals("SQLite format 3\u0000".toByteArray())) { "Invalid SQLite header" } }
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-            require(db.version in 2..PersonalHubDatabase.SCHEMA_VERSION) { "Incompatible database version" }
+            require(PersonalHubDatabase.canMigrateFrom(db.version)) { "Incompatible database version" }
             val asset = "com.gernalix.personalhub.core.database.PersonalHubDatabase/${db.version}.json"
             val schema = JSONObject(context.assets.open(asset).bufferedReader().use { it.readText() }).getJSONObject("database")
             db.rawQuery("PRAGMA quick_check", null).use { c -> require(c.moveToFirst() && c.getString(0) == "ok" && !c.moveToNext()) { "SQLite integrity check failed" } }
