@@ -3,6 +3,7 @@ package com.gernalix.personalhub
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
 fun PersonalHubApp() {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var topDestination by rememberSaveable { mutableStateOf<String?>(null) }
+    BackHandler(enabled = topDestination != null) { topDestination = null }
     if (topDestination == "composer") {
         HubContextComposerScreen(onBack = { topDestination = null })
         return
