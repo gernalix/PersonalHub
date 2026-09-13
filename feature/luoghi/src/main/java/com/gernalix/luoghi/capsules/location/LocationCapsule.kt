@@ -78,7 +78,7 @@ class FusedLocationCapsule(
     companion object {
         private const val LOCATION_TIMEOUT_MS = 6_000L
         private const val MAX_LOCATION_AGE_MS = 2 * 60_000L
-        private const val MAX_LOCATION_ACCURACY_M = 100.0
+        private const val MAX_LOCATION_ACCURACY_M = 50.0
 
         fun hasLocationPermission(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
