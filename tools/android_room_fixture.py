@@ -98,6 +98,20 @@ def blocked(reason: str, **extra: object) -> int:
     return 2
 
 
+def migration_health(
+    serial: str,
+    package: str,
+    db_path: str,
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+    result = sqlite(
+        serial,
+        package,
+        db_path,
+        "PRAGMA user_version; PRAGMA integrity_check; PRAGMA foreign_key_check;",
+    )
+    return result, output_lines(result)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial", required=True)
@@ -110,7 +124,12 @@ def main() -> int:
     parser.add_argument("--expect-table", action="append", default=[])
     parser.add_argument("--verify-sql", type=Path)
     parser.add_argument("--expect-line", action="append", default=[])
-    parser.add_argument("--launch-wait", type=float, default=3.0)
+    parser.add_argument(
+        "--launch-wait",
+        type=float,
+        default=3.0,
+        help="maximum seconds to wait for Room to reach the target schema; 0 performs one check",
+    )
     args = parser.parse_args()
 
     if args.launch_and_verify and args.target_version is None:
@@ -182,19 +201,36 @@ def main() -> int:
         launched = adb(args.serial, "shell", "monkey", "-p", args.package, "1", check=False)
         if launched.returncode != 0:
             return blocked("package_launch_failed", detail=launched.stderr.strip() or launched.stdout.strip())
-        if args.launch_wait:
-            time.sleep(args.launch_wait)
 
-        migrated_version_result = sqlite(args.serial, args.package, db_path, "PRAGMA user_version;")
-        migrated_version_lines = output_lines(migrated_version_result)
-        migrated_version = migrated_version_lines[0] if migrated_version_lines else None
-        if migrated_version_result.returncode != 0 or migrated_version != str(args.target_version):
-            return blocked(
-                "target_version_not_reached",
-                expected_version=args.target_version,
-                actual_version=migrated_version,
-                detail=migrated_version_result.stderr.strip(),
-            )
+        deadline = time.monotonic() + args.launch_wait
+        migrated_version: str | None = None
+        health_lines: list[str] = []
+        health_detail = ""
+        while True:
+            health_result, health_lines = migration_health(args.serial, args.package, db_path)
+            migrated_version = health_lines[0] if health_lines else None
+            health_detail = health_result.stderr.strip()
+            target_reached = migrated_version == str(args.target_version)
+            healthy = health_result.returncode == 0 and health_lines == [str(args.target_version), "ok"]
+            if target_reached and healthy:
+                break
+            if target_reached:
+                return blocked(
+                    "post_migration_integrity_failed",
+                    expected_version=args.target_version,
+                    verification=health_lines,
+                    detail=health_detail,
+                )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return blocked(
+                    "target_version_not_reached",
+                    expected_version=args.target_version,
+                    actual_version=migrated_version,
+                    verification=health_lines,
+                    detail=health_detail,
+                )
+            time.sleep(min(0.25, remaining))
 
         table_results: dict[str, bool] = {}
         for table in args.expect_table:
@@ -235,6 +271,8 @@ def main() -> int:
 
         payload["migration"] = {
             "target_version": args.target_version,
+            "integrity": "ok",
+            "foreign_keys": "ok",
             "tables": table_results,
             "verification": custom_lines,
         }
