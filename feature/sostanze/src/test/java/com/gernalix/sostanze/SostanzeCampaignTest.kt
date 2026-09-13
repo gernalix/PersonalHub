@@ -32,17 +32,18 @@ class SostanzeCampaignTest {
         assertEquals("Coffee added", successRecordedMessage("%1\$s added", "Coffee"))
     }
 
-    @Test fun zeroStockStillRecordsIntakeWithoutMakingStockNegative() = database { db, repository ->
-        val id = (repository.saveSubstance(substance("Pregabalin", stock = 0.0)) as SubstanceSaveOutcome.Saved).id
+    @Test fun insufficientStockRejectsIntakeWithoutMutatingHistoryOrStock() = database { db, repository ->
+        val emptyId = (repository.saveSubstance(substance("Pregabalin", stock = 0.0)) as SubstanceSaveOutcome.Saved).id
+        val lowId = (repository.saveSubstance(substance("Low stock", stock = 1.0)) as SubstanceSaveOutcome.Saved).id
 
-        val outcome = repository.recordIntake(id, idempotencyKey = "zero-stock")
+        assertEquals(IntakeOutcome.InsufficientStock, repository.recordIntake(emptyId, idempotencyKey = "zero-stock"))
+        assertEquals(IntakeOutcome.InsufficientStock, repository.recordIntake(lowId, idempotencyKey = "low-stock"))
+        assertEquals(IntakeOutcome.InvalidQuantity, repository.recordIntake(lowId, idempotencyKey = "nan-quantity", quantity = Double.NaN))
 
-        assertTrue(outcome is IntakeOutcome.Recorded)
-        assertEquals(0.0, db.dao().substanceById(id)!!.stockCurrent, 0.0)
-        val intake = db.dao().intakeById((outcome as IntakeOutcome.Recorded).id)!!
-        assertEquals(0.0, intake.appliedStockDelta, 0.0)
-        assertTrue(repository.undoLastIntake(id))
-        assertEquals(0.0, db.dao().substanceById(id)!!.stockCurrent, 0.0)
+        assertEquals(0.0, db.dao().substanceById(emptyId)!!.stockCurrent, 0.0)
+        assertEquals(1.0, db.dao().substanceById(lowId)!!.stockCurrent, 0.0)
+        assertTrue(repository.historyPage(10).isEmpty())
+        assertFalse(repository.undoLastIntake(emptyId))
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
