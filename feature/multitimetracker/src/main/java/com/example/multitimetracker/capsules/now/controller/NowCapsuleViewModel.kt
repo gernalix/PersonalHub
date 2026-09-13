@@ -3,6 +3,7 @@ package com.example.multitimetracker.capsules.now.controller
 
 import android.content.Context
 import android.net.Uri
+import com.example.multitimetracker.SingleSubmitGuard
 import com.example.multitimetracker.capsules.sessions.public.SessionOwnerPublicApi
 import com.example.multitimetracker.capsules.now.state.NowUiState
 import com.example.multitimetracker.capsules.system.CapsuleRuntimeChange
@@ -33,6 +34,7 @@ class NowCapsuleViewModel(
 ) : CapsuleRuntimeParticipant {
     override val capsuleId: String = "now"
     val uiState: StateFlow<NowUiState> = access.uiStateFlow()
+    private val randomTimerSubmitGuard = SingleSubmitGuard()
 
     override fun onCapsuleRuntimeChanged(context: Context?, change: CapsuleRuntimeChange) = Unit
 
@@ -61,6 +63,7 @@ class NowCapsuleViewModel(
     }
 
     fun createRandomTimer(maxMinutes: Int, startMs: Long, onCreated: (SessionUi) -> Unit = {}) {
+        if (!randomTimerSubmitGuard.tryAccept("random-timer")) return
         val cleanMax = maxMinutes.coerceAtLeast(1)
         val targetMinutes = randomTargetMinute(cleanMax).coerceIn(1, cleanMax)
         sessionOwner?.createRandomTimerSession(startMs, targetMinutes, onCreated)
