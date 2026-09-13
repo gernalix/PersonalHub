@@ -53,6 +53,7 @@ class HubTemporalSearchScreenTest {
 
         assertEquals("Average fatigue: 60/100", wordPulse.title)
         assertEquals(listOf("w1", "w2", "w3", "w4"), wordPulse.refs.map { it.canonicalId })
+        assertTrue(wordPulse.selectable)
     }
 
     @Test
@@ -68,6 +69,27 @@ class HubTemporalSearchScreenTest {
 
         assertEquals(listOf(HubEntityRef("soldi", "transaction", "tx1")), entries.single().refs)
         assertTrue(entries.single().selectable)
+    }
+
+    @Test
+    fun recordWithoutCanonicalRefRemainsVisibleButCannotBeSaved() {
+        val entry = buildTemporalEntries(
+            listOf(
+                HubTemporalRecord(
+                    moduleId = "timer",
+                    source = "derived_summary",
+                    stableId = "synthetic",
+                    kind = HubTemporalKind.POINT,
+                    startMs = 20,
+                    title = "Derived",
+                    entityRef = null,
+                ),
+            ),
+        ).single()
+
+        assertEquals("Derived", entry.title)
+        assertTrue(entry.refs.isEmpty())
+        assertFalse(entry.selectable)
     }
 
     private fun record(moduleId: String, source: String, id: String, startMs: Long, title: String) = HubTemporalRecord(
