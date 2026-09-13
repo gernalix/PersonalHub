@@ -53,7 +53,6 @@ import com.gernalix.luoghi.ui.places.PlaceListItem
 @Composable
 fun HomeScreen(
     state: HomeUiState,
-    appVersion: String,
     onCheckAction: () -> Unit,
     onAmbiguousCheckIn: (String) -> Unit,
     onOpenPlace: (PlaceListUiModel) -> Unit,
@@ -178,18 +177,6 @@ fun HomeScreen(
                 TextButton(onClick = { onOpenHistory(null) }, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.view_all_history))
                 }
-            }
-            item(key = "footer") {
-                Text(
-                    text = stringResource(
-                        R.string.home_footer_format,
-                        appVersion,
-                        state.safGate.folderLabel ?: stringResource(R.string.saf_folder_unknown),
-                    ),
-                    modifier = Modifier.padding(top = 8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }

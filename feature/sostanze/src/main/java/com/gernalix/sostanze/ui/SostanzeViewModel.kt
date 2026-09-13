@@ -32,6 +32,7 @@ import com.gernalix.sostanze.domain.NotificationPlan
 import com.gernalix.sostanze.domain.SostanzeEngine
 import com.gernalix.sostanze.domain.StockCoverage
 import com.gernalix.sostanze.notifications.SostanzeNotificationScheduler
+import com.gernalix.sostanze.notifications.SostanzeRandomAlertWindow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -322,6 +323,17 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             if (result is SubstanceSaveOutcome.Saved) refreshExport()
             onResult(result)
         }
+    }
+
+    fun saveRandomAlerts(substance: SubstanceEntity, enabled: Boolean, count: Int, window: SostanzeRandomAlertWindow) {
+        SostanzeNotificationScheduler.saveRandomAlertConfig(
+            context = getApplication(),
+            substanceId = substance.id,
+            label = substance.name,
+            enabled = enabled,
+            count = count,
+            window = window,
+        )
     }
 
     fun archiveSubstance(id: Long) {

@@ -25,7 +25,7 @@ interface SessionCore {
 
     // --- Writes ---
     /** Inserts a new session row and returns the new session id. */
-    fun insertSession(title: String, startMs: Long, endMs: Long?, tagIds: Set<Long>): Long
+    fun insertSession(title: String, startMs: Long, endMs: Long?, tagIds: Set<Long>, expectedEndMsOverride: Long? = null): Long
     fun updateSessionMeta(sessionId: Long, title: String, tagIds: Set<Long>)
     fun updateSessionTimes(sessionId: Long, startMs: Long, endMs: Long?)
     fun softDeleteSession(sessionId: Long)

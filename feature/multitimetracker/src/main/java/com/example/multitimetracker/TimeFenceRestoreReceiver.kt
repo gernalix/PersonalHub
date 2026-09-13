@@ -35,5 +35,21 @@ class TimeFenceRestoreReceiver : BroadcastReceiver() {
             tags = snapshot.tags,
             nowMs = System.currentTimeMillis(),
         )
+        snapshot.timeFenceRules
+            .filter { it.isEnabled && !it.isDeleted && it.randomAlertsEnabled }
+            .forEach { rule ->
+                val identity = rule.randomAlertIdentity.ifBlank { "timer-alert-${rule.id}" }
+                rule.randomAlertScheduledAtMs
+                    .filter { it > System.currentTimeMillis() }
+                    .forEach { fireAtMs ->
+                        TimeFenceTimerScheduler.scheduleRandomAlert(
+                            context = appContext,
+                            identity = identity,
+                            fireAtMs = fireAtMs,
+                            title = appContext.getString(R.string.random_alert_timer_title),
+                            message = rule.message,
+                        )
+                    }
+            }
     }
 }

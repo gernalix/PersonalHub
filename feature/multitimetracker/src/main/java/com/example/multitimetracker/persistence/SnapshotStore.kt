@@ -284,6 +284,11 @@ object SnapshotStore {
                         .put("deletedAtMs", r.deletedAtMs ?: JSONObject.NULL)
                         .put("timerMinutes", r.timerMinutes)
                         .put("cooldownMs", r.cooldownMs)
+                        .put("randomAlertsEnabled", r.randomAlertsEnabled)
+                        .put("randomAlertsCount", r.randomAlertsCount)
+                        .put("randomAlertsWindow", r.randomAlertsWindow)
+                        .put("randomAlertIdentity", r.randomAlertIdentity)
+                        .put("randomAlertScheduledAtMs", JSONArray().apply { r.randomAlertScheduledAtMs.forEach { put(it) } })
                         .put("lastFiredAtMs", r.lastFiredAtMs ?: JSONObject.NULL)
                         .put("tagIds", JSONArray().apply { r.tagIds.forEach { put(it) } })
                 )
@@ -531,6 +536,18 @@ object SnapshotStore {
                         timerMinutes = timerMinutes,
                         isEnabled = o.optBoolean("isEnabled", true),
                         cooldownMs = o.optLong("cooldownMs", 0L),
+                        randomAlertsEnabled = o.optBoolean("randomAlertsEnabled", false),
+                        randomAlertsCount = o.optInt("randomAlertsCount", 0).coerceAtLeast(0),
+                        randomAlertsWindow = o.optString("randomAlertsWindow", "DAY"),
+                        randomAlertIdentity = o.optString("randomAlertIdentity", ""),
+                        randomAlertScheduledAtMs = buildList {
+                            o.optJSONArray("randomAlertScheduledAtMs")?.let { scheduled ->
+                                for (j in 0 until scheduled.length()) {
+                                    val at = scheduled.optLong(j, -1L)
+                                    if (at > 0L) add(at)
+                                }
+                            }
+                        },
                         lastFiredAtMs = o.optLong("lastFiredAtMs", -1L).takeIf { it > 0L }
                     ,
                         isDeleted = o.optBoolean("isDeleted", false),

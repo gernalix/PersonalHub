@@ -103,4 +103,9 @@
     <string name="notification_refill_text">Richiedere nuova prescrizione per %1$s</string>
     <string name="notification_missed_text">Controllare dose prevista per %1$s</string>
     <string name="version_label">v%1$s</string>
+    <string name="random_alert_sostanze_title">Alert casuale Sostanze</string>
+    <string name="random_alerts_enabled">Alert casuali</string>
+    <string name="random_alerts_count">Quanti</string>
+    <string name="random_alerts_per_hour">per ora</string>
+    <string name="random_alerts_per_day">al giorno</string>
 </resources>

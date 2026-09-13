@@ -1,3 +1,5 @@
+@file:android.annotation.SuppressLint("MissingPermission")
+
 package com.example.multitimetracker
 
 import android.app.PendingIntent

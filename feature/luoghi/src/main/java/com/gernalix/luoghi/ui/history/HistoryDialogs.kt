@@ -308,7 +308,7 @@ private fun anomalyList(anomalies: Set<VisitAnomaly>): String {
             }
         )
     }
-    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
+    val locale = LocalConfiguration.current.locales[0]
     return remember(labels, locale) { ListFormatter.getInstance(locale).format(labels) }
 }
 

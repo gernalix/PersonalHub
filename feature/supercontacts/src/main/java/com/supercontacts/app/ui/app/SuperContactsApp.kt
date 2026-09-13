@@ -1,3 +1,5 @@
+@file:android.annotation.SuppressLint("LocalContextGetResourceValueCall", "MissingPermission", "NonObservableLocale")
+
 package com.supercontacts.app.ui.app
 
 import android.Manifest
@@ -222,9 +224,6 @@ fun SuperContactsApp(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val appScope = rememberCoroutineScope()
-    val patchVersion by produceState(initialValue = "", context) {
-        value = loadPatchVersion(context)
-    }
     var activeCallOverlay by remember { mutableStateOf<CallOverlaySignal?>(null) }
     var activeCallContactId by remember { mutableStateOf<Long?>(null) }
     var showOverlayPermissionRequest by rememberSaveable { mutableStateOf(false) }
@@ -705,7 +704,6 @@ fun SuperContactsApp(
         else -> ContactListScreen(
             snackbarHostState = snackbarHostState,
             uiState = uiState,
-            patchVersion = patchVersion,
             onQueryChange = viewModel::setSearchQuery,
             onHomeSortCriterionChange = viewModel::setHomeSortCriterion,
             onHomeSortDirectionToggle = viewModel::toggleHomeSortDirection,
@@ -826,7 +824,6 @@ fun SuperContactsApp(
 private fun ContactListScreen(
     snackbarHostState: SnackbarHostState,
     uiState: ContactsUiState,
-    patchVersion: String,
     onQueryChange: (String) -> Unit,
     onHomeSortCriterionChange: (ContactHomeSort) -> Unit,
     onHomeSortDirectionToggle: () -> Unit,
@@ -997,13 +994,6 @@ private fun ContactListScreen(
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (patchVersion.isNotBlank()) {
-                Text(
-                    text = "v$patchVersion",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             ErrorMessage(uiState.errorMessage, onErrorDismiss)
             if (uiState.activeTagFilters.isNotEmpty()) {
                 ActiveTagFilter(tags = uiState.activeTagFilters, onClear = onClearTagFilter)
@@ -1242,15 +1232,6 @@ private fun ContactListScreen(
         )
     }
 }
-
-private suspend fun loadPatchVersion(context: Context): String =
-    withContext(Dispatchers.IO) {
-        runCatching {
-            context.assets.open("patch-version.txt").bufferedReader().use { reader ->
-                reader.readText().trim()
-            }
-        }.getOrDefault("")
-    }
 
 @Composable
 private fun EmojiToolbarButton(

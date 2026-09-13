@@ -255,7 +255,6 @@ private fun LuoghiNavigation(
     when (destination) {
         AppDestination.HOME -> HomeScreen(
             state = state,
-            appVersion = AppPatchVersion.current(context),
             onCheckAction = onCheckAction,
             onAmbiguousCheckIn = vm::selectAmbiguousCheckIn,
             onOpenPlace = ::openDetail,

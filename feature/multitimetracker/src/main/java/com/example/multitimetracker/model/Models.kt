@@ -32,6 +32,11 @@ data class TimeFenceRule(
     val isEnabled: Boolean = true,
     /** Cooldown anti-spam (ms). */
     val cooldownMs: Long = 0L,
+    val randomAlertsEnabled: Boolean = false,
+    val randomAlertsCount: Int = 0,
+    val randomAlertsWindow: String = "DAY",
+    val randomAlertIdentity: String = "",
+    val randomAlertScheduledAtMs: List<Long> = emptyList(),
     /** Ultima volta che ha sparato (ms). */
     val lastFiredAtMs: Long? = null,
     val isDeleted: Boolean = false,

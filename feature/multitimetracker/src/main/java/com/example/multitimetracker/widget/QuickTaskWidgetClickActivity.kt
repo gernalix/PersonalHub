@@ -1,5 +1,7 @@
 // v471
 // v349
+@file:android.annotation.SuppressLint("MissingPermission")
+
 package com.example.multitimetracker.widget
 
 import android.app.Activity
@@ -76,4 +78,3 @@ class QuickSessionWidgetClickActivity : Activity() {
         }
     }
 }
-

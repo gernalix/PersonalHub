@@ -1,5 +1,7 @@
 // v471
 // v461
+@file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
+
 package com.example.multitimetracker.ui
 import android.os.Trace
 import android.widget.Toast
@@ -65,7 +67,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.DisposableEffect
-import com.example.multitimetracker.AppPatchVersion
 import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.MainViewModel
 import com.example.multitimetracker.core.session.DefaultSessionCore
@@ -309,7 +310,6 @@ private fun VarTabScaffold(
             effectiveNowMs = effectiveTime.nowMs,
         )
     }
-    val patchVersion = remember(context) { AppPatchVersion.current(context) }
     val diagnosticsLoading = stringResource(R.string.diagnostics_loading)
     val timeMachineFormatter = remember { DateTimeFormatter.ofPattern("dd-MM-yy HH:mm", Locale.getDefault()) }
     var pendingAfterFolderPick by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -601,7 +601,6 @@ if (developerSurfaceEnabled && showDevReport) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.info_app_name))
-                    Text(stringResource(R.string.versione_patch_v, patchVersion))
                 }
             },
             confirmButton = {
@@ -840,11 +839,6 @@ if (developerSurfaceEnabled && showDevReport) {
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.End
                         ) {
-                            Text(
-                                text = stringResource(R.string.app_version_footer, patchVersion),
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.alpha(0.7f)
-                            )
                         }
                         NavigationBar(
                             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -963,14 +957,15 @@ if (developerSurfaceEnabled && showDevReport) {
                             state = sinceWhenState,
                             onAddPeriod = vm.sinceWhenCapsule::addLifePeriod,
                             onUpdatePeriod = vm.sinceWhenCapsule::updateLifePeriod,
-                            onDeletePeriod = vm.sinceWhenCapsule::deleteLifePeriod
+                            onDeletePeriod = vm.sinceWhenCapsule::deleteLifePeriod,
+                            onEndSelectedNow = vm.sinceWhenCapsule::endSelectedNow,
                         )
                     }
                     Tab.ALERT -> stateHolder.SaveableStateProvider("alert") {
                         AlertsScreen(
                             modifier = Modifier.padding(inner),
                             state = alertsState,
-                            onAddTimeFenceRule = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
+                            onAddTimeFenceRule = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow ->
                                 vm.alertsCapsule.addTimeFenceRule(
                                     message = msg,
                                     trigger = trigger,
@@ -978,10 +973,13 @@ if (developerSurfaceEnabled && showDevReport) {
                                     scope = scope,
                                     matchMode = matchMode,
                                     tagIds = tagIds,
-                                    cooldownMs = cooldownMs
+                                    cooldownMs = cooldownMs,
+                                    randomAlertsEnabled = randomEnabled,
+                                    randomAlertsCount = randomCount,
+                                    randomAlertsWindow = randomWindow,
                                 )
                             },
-                            onUpdateTimeFenceRule = { id, msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
+                            onUpdateTimeFenceRule = { id, msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow ->
                                 vm.alertsCapsule.updateTimeFenceRule(
                                     ruleId = id,
                                     message = msg,
@@ -990,7 +988,10 @@ if (developerSurfaceEnabled && showDevReport) {
                                     scope = scope,
                                     matchMode = matchMode,
                                     tagIds = tagIds,
-                                    cooldownMs = cooldownMs
+                                    cooldownMs = cooldownMs,
+                                    randomAlertsEnabled = randomEnabled,
+                                    randomAlertsCount = randomCount,
+                                    randomAlertsWindow = randomWindow,
                                 )
                             },
                             onDeleteTimeFenceRule = vm.alertsCapsule::deleteTimeFenceRule,

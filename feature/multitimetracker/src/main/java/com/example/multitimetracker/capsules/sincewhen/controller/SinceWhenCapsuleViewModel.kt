@@ -145,6 +145,28 @@ class SinceWhenCapsuleViewModel(
         access.scheduleAutoBackup()
     }
 
+    fun endSelectedNow(periodIds: Set<Long>, endMs: Long): Boolean {
+        if (access.blockWriteIfNeeded()) return false
+        if (periodIds.isEmpty()) return false
+        var changed = false
+        liveLifePeriods.update { currentPeriods ->
+            currentPeriods.map { period ->
+                if (period.id in periodIds && period.endMs == null && endMs > period.startMs) {
+                    changed = true
+                    period.copy(endMs = endMs)
+                } else {
+                    period
+                }
+            }
+        }
+        if (!changed) return false
+        access.touchNow()
+        refreshUiState()
+        access.persist()
+        access.scheduleAutoBackup()
+        return true
+    }
+
     private fun buildUiState(): SinceWhenUiState {
         return SinceWhenUiState(
             tags = hostState.tags,

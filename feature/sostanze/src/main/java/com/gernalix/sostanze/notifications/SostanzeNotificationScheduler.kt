@@ -1,5 +1,6 @@
 package com.gernalix.sostanze.notifications
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationChannel
@@ -19,7 +20,9 @@ import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
+@SuppressLint("MissingPermission")
 class SostanzeNotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         SostanzeNotificationScheduler.ensureChannel(context)
@@ -72,6 +75,7 @@ class SostanzeNotificationRestoreReceiver : BroadcastReceiver() {
                         state.entityId.toString(),
                     )
                 }
+                SostanzeNotificationScheduler.restoreRandomAlerts(context)
             } finally { pending.finish() }
         }
     }
@@ -120,5 +124,82 @@ object SostanzeNotificationScheduler {
         )
         val alarm = context.getSystemService(AlarmManager::class.java)
         alarm.set(AlarmManager.RTC_WAKEUP, plan.scheduledForMs, pendingIntent)
+    }
+
+    fun saveRandomAlertConfig(
+        context: Context,
+        substanceId: Long,
+        label: String,
+        enabled: Boolean,
+        count: Int,
+        window: SostanzeRandomAlertWindow,
+        nowMs: Long = System.currentTimeMillis(),
+        nextOffsetMs: (Long) -> Long = { maxMs -> Random.nextLong(1L, maxMs + 1L) },
+    ) {
+        val old = SostanzeRandomAlertStore.read(context, substanceId, label)
+        old.scheduledAtMs.filter { it > nowMs }.forEach { cancelRandomAlert(context, old.identity, it) }
+        val scheduled = if (enabled && count > 0) {
+            planSostanzeRandomAlertInstants(nowMs, count, window, nextOffsetMs)
+        } else {
+            emptyList()
+        }
+        val config = SostanzeRandomAlertConfig(
+            substanceId = substanceId,
+            label = label,
+            enabled = enabled,
+            count = count.coerceAtLeast(0),
+            window = window,
+            scheduledAtMs = scheduled,
+        )
+        SostanzeRandomAlertStore.write(context, config)
+        scheduled.forEach { scheduleRandomAlert(context, config.identity, it, label) }
+    }
+
+    fun restoreRandomAlerts(context: Context, nowMs: Long = System.currentTimeMillis()) {
+        SostanzeRandomAlertStore.all(context)
+            .filter { it.enabled && it.count > 0 }
+            .forEach { config ->
+                val future = config.scheduledAtMs.filter { it > nowMs }
+                val scheduled = future.ifEmpty {
+                    planSostanzeRandomAlertInstants(nowMs, config.count, config.window) { maxMs ->
+                        Random.nextLong(1L, maxMs + 1L)
+                    }
+                }
+                if (scheduled != config.scheduledAtMs) SostanzeRandomAlertStore.write(context, config.copy(scheduledAtMs = scheduled))
+                scheduled.filter { it > nowMs }.forEach { scheduleRandomAlert(context, config.identity, it, config.label) }
+            }
+    }
+
+    private fun scheduleRandomAlert(context: Context, identity: String, fireAtMs: Long, label: String) {
+        if (fireAtMs <= System.currentTimeMillis()) return
+        val intent = Intent(context, SostanzeNotificationReceiver::class.java)
+            .setAction("com.gernalix.sostanze.RANDOM_ALERT.$identity.$fireAtMs")
+            .setData(android.net.Uri.parse("personalhub://sostanze/random-alert/$identity/$fireAtMs"))
+            .putExtra(SostanzeNotificationReceiver.EXTRA_TITLE, context.getString(R.string.random_alert_sostanze_title))
+            .putExtra(SostanzeNotificationReceiver.EXTRA_TEXT, label)
+            .putExtra(SostanzeNotificationReceiver.EXTRA_NOTIFICATION_ID, identity.hashCode() xor fireAtMs.hashCode())
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            identity.hashCode() xor fireAtMs.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        context.getSystemService(AlarmManager::class.java)
+            .set(AlarmManager.RTC_WAKEUP, fireAtMs, pendingIntent)
+    }
+
+    private fun cancelRandomAlert(context: Context, identity: String, fireAtMs: Long) {
+        val intent = Intent(context, SostanzeNotificationReceiver::class.java)
+            .setAction("com.gernalix.sostanze.RANDOM_ALERT.$identity.$fireAtMs")
+            .setData(android.net.Uri.parse("personalhub://sostanze/random-alert/$identity/$fireAtMs"))
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            identity.hashCode() xor fireAtMs.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarm = context.getSystemService(AlarmManager::class.java)
+        alarm.cancel(pendingIntent)
+        pendingIntent.cancel()
     }
 }

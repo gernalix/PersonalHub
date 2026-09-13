@@ -64,6 +64,29 @@ object TimeFenceTimerScheduler {
         cancelPendingIntent(am, timedSessionPendingIntent(context, sessionId, legacyIdentity = true))
     }
 
+    fun scheduleRandomAlert(
+        context: Context,
+        identity: String,
+        fireAtMs: Long,
+        title: String,
+        message: String,
+    ) {
+        if (fireAtMs <= System.currentTimeMillis()) return
+        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val pi = randomAlertPendingIntent(context, identity, fireAtMs, title, message)
+        val showPi = alarmClockShowIntent(
+            context = context,
+            requestCode = (identity.hashCode() xor fireAtMs.hashCode()),
+            data = Uri.parse("mtt://random-alert/$identity/$fireAtMs/show"),
+        )
+        setExact(am, fireAtMs, pi, showPi, alarmStyle = false)
+    }
+
+    fun cancelRandomAlert(context: Context, identity: String, fireAtMs: Long) {
+        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        cancelPendingIntent(am, randomAlertPendingIntent(context, identity, fireAtMs, "", ""))
+    }
+
     fun cancelLegacyTimerAlert(
         context: Context,
         ruleId: Long,
@@ -158,6 +181,28 @@ object TimeFenceTimerScheduler {
         return PendingIntent.getBroadcast(
             context,
             requestCode,
+            intent,
+            immutableFlags(PendingIntent.FLAG_UPDATE_CURRENT)
+        )
+    }
+
+    private fun randomAlertPendingIntent(
+        context: Context,
+        identity: String,
+        fireAtMs: Long,
+        title: String,
+        message: String,
+    ): PendingIntent {
+        val intent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
+            action = TimeFenceTimerReceiver.ACTION_RANDOM_ALERT
+            data = Uri.parse("mtt://random-alert/$identity/$fireAtMs")
+            putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TITLE, title)
+            putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TEXT, message)
+            putExtra(TimeFenceTimerReceiver.EXTRA_NOTIFICATION_ID, (identity.hashCode() xor fireAtMs.hashCode()))
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            identity.hashCode() xor fireAtMs.hashCode(),
             intent,
             immutableFlags(PendingIntent.FLAG_UPDATE_CURRENT)
         )

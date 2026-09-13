@@ -12,4 +12,9 @@ interface SessionOwnerPublicApi {
         tagIds: Set<Long>,
         onCreated: (SessionUi) -> Unit = {},
     )
+    fun createRandomTimerSession(
+        startMs: Long,
+        targetMinutes: Int,
+        onCreated: (SessionUi) -> Unit = {},
+    )
 }

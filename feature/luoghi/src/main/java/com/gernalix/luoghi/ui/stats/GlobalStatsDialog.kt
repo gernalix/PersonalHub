@@ -88,7 +88,7 @@ private fun RouteDistancePeriodRow(
 
 @Composable
 private fun localizedDistance(distanceMeters: Long): String {
-    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
+    val locale = LocalConfiguration.current.locales[0]
     val formatter = remember(locale) { NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 1 } }
     return if (distanceMeters >= 1_000L) {
         stringResource(R.string.distance_kilometers_format, formatter.format(distanceMeters / 1_000.0))

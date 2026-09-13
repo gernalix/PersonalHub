@@ -412,12 +412,6 @@ private fun Header(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "v${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("app-version"),
-                )
-                Text(
                     text = currentSessionId?.shortSessionLabel() ?: "Session starting",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

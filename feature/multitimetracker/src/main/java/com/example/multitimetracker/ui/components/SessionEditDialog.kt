@@ -2,6 +2,7 @@
 @file:OptIn(
     androidx.compose.material3.ExperimentalMaterial3Api::class
 )
+@file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
 
 package com.example.multitimetracker.ui.components
 

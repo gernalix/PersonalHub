@@ -114,23 +114,26 @@ internal fun HubContextExplorerDialog(anchor: HubEntityRef, onDismiss: () -> Uni
             sections.filter { it.visible }.forEach { section -> facets[section.key]?.let { facet ->
                 item { Text(facet.entityKind, style = MaterialTheme.typography.titleSmall) }
                 items(facet.candidates, key = { it.summary.ref.toString() }) { candidate ->
+                    val cannotOpen = stringResource(R.string.hub_resource_cannot_open)
+                    val noHandler = stringResource(R.string.hub_resource_no_handler)
+                    val openNamed = stringResource(R.string.hub_open_named, candidate.summary.label)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${candidate.summary.label} — ${candidate.compatibleContextCount}", Modifier.weight(1f).clickable { scope.launch { state.select(candidate.summary) } })
                         TextButton(onClick = {
                             scope.launch {
                                 runCatching {
                                     val target = HubContextRuntime.adapter(candidate.summary.ref.moduleId, candidate.summary.ref.entityKind).openTarget(candidate.summary.ref.canonicalId)
-                                        ?: error(context.getString(R.string.hub_resource_cannot_open))
+                                        ?: error(cannotOpen)
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     target.activityClassName?.let { intent.setClassName(context.packageName, it) }
                                     context.startActivity(intent)
                                 }.onFailure {
                                     state.error = if (it is android.content.ActivityNotFoundException) {
-                                        context.getString(R.string.hub_resource_no_handler)
-                                    } else it.message ?: context.getString(R.string.hub_resource_cannot_open)
+                                        noHandler
+                                    } else it.message ?: cannotOpen
                                 }
                             }
-                        }, modifier = Modifier.semantics { contentDescription = context.getString(R.string.hub_open_named, candidate.summary.label) }) { Text(stringResource(R.string.hub_open_detail)) }
+                        }, modifier = Modifier.semantics { contentDescription = openNamed }) { Text(stringResource(R.string.hub_open_detail)) }
                     }
                 }
             } }

@@ -1,3 +1,5 @@
+@file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
+
 package com.gernalix.personalhub
 
 import android.content.ClipData

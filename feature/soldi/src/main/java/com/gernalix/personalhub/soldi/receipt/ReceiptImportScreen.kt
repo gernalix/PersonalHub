@@ -162,13 +162,14 @@ fun ReceiptImportScreen(
         if (chatGptEnabled) {
             item { HorizontalDivider() }
             item {
+                val chooserTitle = stringResource(R.string.receipt_chatgpt_share_title)
                 Button(enabled = !busy && included.isNotEmpty(), onClick = {
                     val prompt = ReceiptChatGptBridge.buildPrompt(draft, products)
                     val share = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
                         putExtra(Intent.EXTRA_TEXT, prompt)
                     }
-                    context.startActivity(Intent.createChooser(share, context.getString(R.string.receipt_chatgpt_share_title)))
+                    context.startActivity(Intent.createChooser(share, chooserTitle))
                     pasteDialog = true
                 }) { Text(stringResource(R.string.receipt_chatgpt_improve)) }
             }

@@ -134,6 +134,16 @@ object TimedSessionSupport {
     }
 
     fun showCompletionNotificationIfNeeded(context: Context, session: SessionUi, tags: List<Tag>) {
+        if (RandomTimerStore.isRandomSession(context, session.id)) {
+            TimeFenceNotifier.notifyTimedSession(
+                context = context,
+                notificationId = session.id.toInt(),
+                title = context.getString(R.string.random_timer_notification_title),
+                message = context.getString(R.string.random_timer_prompt_title),
+                notificationType = TimedTagNotificationType.NORMAL,
+            )
+            return
+        }
         val timedMatch = findTimedTagMatchForSession(session, tags) ?: return
         if (timedMatch.notificationType == TimedTagNotificationType.NONE) return
 

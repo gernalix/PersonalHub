@@ -1,5 +1,6 @@
 package com.gernalix.luoghi.capsules.geofence
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,15 +10,18 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.gernalix.luoghi.MainActivity
 import com.gernalix.luoghi.R
 import com.gernalix.luoghi.data.PlaceEntity
 import kotlin.math.absoluteValue
 
+@SuppressLint("MissingPermission")
 object PlaceGeofenceNotifier {
     const val CHANNEL_ID = "places_geofence"
 
     fun notifyTransition(context: Context, place: PlaceEntity, transition: PlaceGeofenceTransition, recordedVisit: Boolean) {
+        if (!canNotify(context)) return
         ensureChannel(context)
         val title = place.nickname.ifBlank { context.safeString(R.string.unnamed_place, "Place") }
         val text = when {
@@ -49,6 +53,7 @@ object PlaceGeofenceNotifier {
     }
 
     fun notifyAmbiguous(context: Context, placeCount: Int) {
+        if (!canNotify(context)) return
         ensureChannel(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher)
@@ -75,6 +80,10 @@ object PlaceGeofenceNotifier {
             }
         )
     }
+
+    private fun canNotify(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
     private fun notificationId(uuid: String, transition: PlaceGeofenceTransition): Int =
         (uuid.hashCode() xor transition.storageName.hashCode()).absoluteValue

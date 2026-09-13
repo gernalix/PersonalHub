@@ -1,5 +1,7 @@
 // v471
 // v458
+@file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
+
 package com.example.multitimetracker
 
 import com.example.multitimetracker.util.CapsuleWriteApi

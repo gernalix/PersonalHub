@@ -3,6 +3,7 @@ package com.example.multitimetracker.capsules.sessions.controller
 import android.content.Context
 import android.util.Log
 import com.example.multitimetracker.R
+import com.example.multitimetracker.RandomTimerStore
 import com.example.multitimetracker.SingleSubmitGuard
 import com.example.multitimetracker.canonicalizeTaggedSessionRecords
 import com.example.multitimetracker.capsules.alerts.public.TimeFenceEvent
@@ -409,6 +410,56 @@ class SessionOwnerCapsuleViewModel(
                 access.scheduleSessionsRefresh(ctx, now)
             }.onFailure { err ->
                 Log.e("SessionOwnerCapsule", "createRunningSession failed", err)
+                withContext(Dispatchers.Main) {
+                    access.showSessionWriteFailed(ctx)
+                }
+            }
+        }
+    }
+
+    override fun createRandomTimerSession(
+        startMs: Long,
+        targetMinutes: Int,
+        onCreated: (SessionUi) -> Unit,
+    ) {
+        if (access.blockWriteIfNeeded()) return
+        val ctx = access.appContextOrNull() ?: return
+        val cleanTarget = targetMinutes.coerceAtLeast(1)
+        val expectedEndMs = startMs + cleanTarget.toLong() * 60_000L
+        access.launchIo("create random timer") {
+            runCatching {
+                val repo = access.sessionCore(ctx)
+                val newId = repo.insertSession(
+                    title = "",
+                    startMs = startMs,
+                    endMs = null,
+                    tagIds = emptySet(),
+                    expectedEndMsOverride = expectedEndMs,
+                )
+                RandomTimerStore.saveRun(ctx, newId, cleanTarget)
+                val created = repo.readSessionById(newId)
+                    ?: SessionUi(
+                        id = newId,
+                        title = "",
+                        startMs = startMs,
+                        endMs = null,
+                        expectedEndMs = expectedEndMs,
+                        tagIds = emptySet(),
+                        deletedAtMs = null,
+                    )
+                updateRuntimeState { cur ->
+                    cur.copy(
+                        runningSessions = (listOf(created) + cur.runningSessions).distinctBy { it.id },
+                        chronologySessions = (listOf(created) + cur.chronologySessions).distinctBy { it.id },
+                    )
+                }
+                withContext(Dispatchers.Main.immediate) {
+                    access.onCreatedOnMain(created, onCreated)
+                }
+                access.persist()
+                access.scheduleSessionsRefresh(ctx, startMs)
+            }.onFailure { err ->
+                Log.e("SessionOwnerCapsule", "createRandomTimerSession failed", err)
                 withContext(Dispatchers.Main) {
                     access.showSessionWriteFailed(ctx)
                 }

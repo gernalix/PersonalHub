@@ -194,7 +194,7 @@ class SostanzeCampaignTest {
     @Test fun scheduleInteractionAndDepletionBoundariesAreDeterministic() {
         val zone = ZoneId.of("Europe/Copenhagen")
         val date = LocalDate.of(2026, 9, 7) // Monday
-        val plan = substance().copy(id = 1, doseTimesCsv = "08:00,20:00", daysMask = 1).toPlan()
+        val plan = substance().copy(id = 1, startEpochDay = date.toEpochDay(), doseTimesCsv = "08:00,20:00", daysMask = 1).toPlan()
         assertTrue(SostanzeEngine.isRegimenActive(plan, date))
         assertFalse(SostanzeEngine.isRegimenActive(plan, date.plusDays(1)))
         assertEquals(2, SostanzeEngine.scheduledTimesMs(plan, date, zone).size)

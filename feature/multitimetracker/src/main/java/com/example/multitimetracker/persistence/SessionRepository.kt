@@ -336,13 +336,19 @@ fun computeUnionTotalsClosedForTagIds(tagIds: Set<Long>): Map<Long, Long> {
 
     /** Inserts a new session row and optional tag links. Returns the new session id. */
     @CapsuleWriteApi
-    fun insertSession(title: String, startMs: Long, endMs: Long?, tagIds: Set<Long>): Long {
+    fun insertSession(
+        title: String,
+        startMs: Long,
+        endMs: Long?,
+        tagIds: Set<Long>,
+        expectedEndMsOverride: Long? = null,
+    ): Long {
         // v249: expand capsule boundary self-check coverage for session-only write paths.
         CapsuleAudit.auditPersistenceWrite("SessionRepository.insertSession")
         SnapshotSqlite.ensureSessionTables(context)
         val db = SnapshotSqlite.openWritableDb(context)
         val now = System.currentTimeMillis()
-        val expectedEndMs = computeExpectedEndMs(tagIds = tagIds, startMs = startMs)
+        val expectedEndMs = expectedEndMsOverride ?: computeExpectedEndMs(tagIds = tagIds, startMs = startMs)
         var insertedSessionId = -1L
         db.beginTransaction()
         try {

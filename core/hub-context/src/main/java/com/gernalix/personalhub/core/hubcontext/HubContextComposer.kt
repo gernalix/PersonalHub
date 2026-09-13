@@ -1,6 +1,11 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -23,6 +28,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.UUID
+
+private fun Context.hasLocationPermission(): Boolean =
+    checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+@SuppressLint("MissingPermission")
+private fun Context.latestKnownLocation(): Location? =
+    (getSystemService(Context.LOCATION_SERVICE) as LocationManager)
+        .getProviders(true)
+        .mapNotNull { provider -> runCatching { getSystemService(LocationManager::class.java).getLastKnownLocation(provider) }.getOrNull() }
+        .maxByOrNull { it.time }
 
 internal data class ComposerMember(val summary: HubEntitySummary, val role: String = "", val automatic: Boolean = false)
 
@@ -227,10 +243,7 @@ fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
     var toText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() + 60_000L)) }
     LaunchedEffect(state) { runCatching { state.initialize(); state.detect(parseHubDateTime(fromText), parseHubDateTime(toText)) }.onFailure { state.error = it.message } }
     LaunchedEffect(Unit) {
-        val granted = androidContext.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        val location = if (granted) (androidContext.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager)
-            .getProviders(true).mapNotNull { provider -> runCatching { androidContext.getSystemService(android.location.LocationManager::class.java).getLastKnownLocation(provider) }.getOrNull() }
-            .maxByOrNull { it.time } else null
+        val location = if (androidContext.hasLocationPermission()) androidContext.latestKnownLocation() else null
         HubContextRuntime.adapters().filterIsInstance<HubPlaceSuggestionProvider>().firstOrNull()?.suggestPlaces(location?.latitude, location?.longitude)?.let { suggestions ->
             suggestions.preselect?.let { state.add(it, automatic = true) }
             if (state.selectedKind == null && suggestions.candidates.isNotEmpty()) {

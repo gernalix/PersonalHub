@@ -75,7 +75,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.gernalix.sostanze.BuildConfig
 import com.gernalix.sostanze.R
 import com.gernalix.sostanze.data.SubstanceEntity
 import com.gernalix.sostanze.data.SubstanceTypes
@@ -90,6 +89,8 @@ import com.gernalix.sostanze.domain.DoseButtonState
 import com.gernalix.sostanze.domain.DoseSection
 import com.gernalix.sostanze.domain.SostanzeEngine
 import com.gernalix.sostanze.domain.SubstancePlan
+import com.gernalix.sostanze.notifications.SostanzeRandomAlertStore
+import com.gernalix.sostanze.notifications.SostanzeRandomAlertWindow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -135,6 +136,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     var deletingHistory by remember { mutableStateOf<HistoryUi?>(null) }
     var interactionDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
     var interactionRuleDraft by remember { mutableStateOf<InteractionRuleEntity?>(null) }
+    var randomAlertDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
     var pendingImport by remember { mutableStateOf<android.net.Uri?>(null) }
     var handledInitialSubstanceId by rememberSaveable { mutableStateOf<Long?>(null) }
     LaunchedEffect(initialSubstanceId, state.substances) {
@@ -250,6 +252,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                     onRestore = viewModel::restoreSubstance,
                     onStock = { stockDialog = it },
                     onHistory = { historySubstanceId = it.id },
+                    onRandomAlerts = { randomAlertDialog = it },
                 )
                 AppTab.History -> HistoryScreen(
                     rows = state.history.filter { it.substanceName.contains(historyQuery, true) },
@@ -357,6 +360,16 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
             }
         )
     }
+    randomAlertDialog?.let { substance ->
+        SubstanceRandomAlertDialog(
+            substance = substance,
+            onDismiss = { randomAlertDialog = null },
+            onSave = { enabled, count, window ->
+                viewModel.saveRandomAlerts(substance, enabled, count, window)
+                randomAlertDialog = null
+            },
+        )
+    }
     historySubstanceId?.let { id ->
         SubstanceHistoryDialog(
             title = state.substances.firstOrNull { it.id == id }?.name.orEmpty(),
@@ -437,6 +450,7 @@ private fun HomeScreen(
     onRestore: (Long) -> Unit,
     onStock: (SubstanceEntity) -> Unit,
     onHistory: (SubstanceEntity) -> Unit,
+    onRandomAlerts: (SubstanceEntity) -> Unit,
 ) {
     val sections = listOf(
         DoseSection.DUE_TODAY to stringResource(R.string.section_due_today),
@@ -463,14 +477,6 @@ private fun HomeScreen(
                 MacroButton(macro = macro, onClick = { onMacro(macro) })
             }
         }
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Text(
-                stringResource(R.string.version_label, BuildConfig.VERSION_NAME),
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
         sections.forEach { (section, title) ->
             val sectionItems = states.filter { it.section == section }
             if (sectionItems.isNotEmpty()) {
@@ -487,6 +493,7 @@ private fun HomeScreen(
                         onRestore = { onRestore(state.substance.id) },
                         onStock = { onStock(entity) },
                         onHistory = { onHistory(entity) },
+                        onRandomAlerts = { onRandomAlerts(entity) },
                     )
                 }
             }
@@ -524,6 +531,7 @@ private fun DoseActionButton(
     onRestore: () -> Unit,
     onStock: () -> Unit,
     onHistory: () -> Unit,
+    onRandomAlerts: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var pulse by remember { mutableStateOf(false) }
@@ -582,6 +590,7 @@ private fun DoseActionButton(
                         }
                         DropdownMenuItem(text = { Text(stringResource(R.string.stock)) }, onClick = { menuOpen = false; onStock() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.history)) }, onClick = { menuOpen = false; onHistory() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.random_alerts_enabled)) }, onClick = { menuOpen = false; onRandomAlerts() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.undo_last_tap)) }, onClick = { menuOpen = false; onUndo() })
                     }
                 }
@@ -611,6 +620,58 @@ private fun DoseActionButton(
             }
         }
     }
+}
+
+@Composable
+private fun SubstanceRandomAlertDialog(
+    substance: SubstanceEntity,
+    onDismiss: () -> Unit,
+    onSave: (Boolean, Int, SostanzeRandomAlertWindow) -> Unit,
+) {
+    val context = LocalContext.current
+    val initial = remember(substance.id) { SostanzeRandomAlertStore.read(context, substance.id, substance.name) }
+    var enabled by rememberSaveable(substance.id) { mutableStateOf(initial.enabled) }
+    var count by rememberSaveable(substance.id) { mutableStateOf(initial.count.coerceAtLeast(1).toString()) }
+    var window by rememberSaveable(substance.id) { mutableStateOf(initial.window) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.random_alerts_enabled)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(substance.name)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.random_alerts_enabled))
+                    Switch(enabled, { enabled = it })
+                }
+                if (enabled) {
+                    OutlinedTextField(
+                        value = count,
+                        onValueChange = { count = it.filter(Char::isDigit).take(2) },
+                        label = { Text(stringResource(R.string.random_alerts_count)) },
+                        singleLine = true,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        FilterChip(
+                            selected = window == SostanzeRandomAlertWindow.HOUR,
+                            onClick = { window = SostanzeRandomAlertWindow.HOUR },
+                            label = { Text(stringResource(R.string.random_alerts_per_hour)) },
+                        )
+                        FilterChip(
+                            selected = window == SostanzeRandomAlertWindow.DAY,
+                            onClick = { window = SostanzeRandomAlertWindow.DAY },
+                            label = { Text(stringResource(R.string.random_alerts_per_day)) },
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(enabled, count.toIntOrNull()?.coerceAtLeast(0) ?: 0, window) }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 @Composable
@@ -948,6 +1009,8 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
     var costId by remember { mutableStateOf<Long?>(null) }
     var costChoices by remember { mutableStateOf<List<CostChoice>>(emptyList()) }
     val today = LocalDate.now().toEpochDay()
+    var orderEpochDay by rememberSaveable { mutableStateOf(today) }
+    var prescriptionEpochDay by rememberSaveable { mutableStateOf(today) }
     LaunchedEffect(doctorQuery) {
         if (doctorQuery.length >= 2) viewModel.doctorChoices(doctorQuery) { doctorChoices = it }
         else doctorChoices = emptyList()
@@ -980,8 +1043,16 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
                 OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) })
                 OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") })
                 Row(verticalAlignment = Alignment.CenterVertically) { Text(if (weekly) "X per week" else "X per day"); Switch(weekly, { weekly = it }) }
-                Text("Order date: ${formatDateOnly(LocalDate.ofEpochDay(today))}")
-                Text("Prescription date: ${formatDateOnly(LocalDate.ofEpochDay(today))}")
+                EpochDayPickerField(
+                    label = stringResource(R.string.order_date),
+                    epochDay = orderEpochDay,
+                    onEpochDayChange = { orderEpochDay = it },
+                )
+                EpochDayPickerField(
+                    label = stringResource(R.string.prescription_date),
+                    epochDay = prescriptionEpochDay,
+                    onEpochDayChange = { prescriptionEpochDay = it },
+                )
                 val projected = SostanzeEngine.depletionDate(packages.toIntOrNull() ?: -1, frequency.toIntOrNull() ?: 0, if (weekly) "WEEK" else "DAY", LocalDate.now())
                 Text("Estimated depletion: ${projected?.let(::formatDateOnly) ?: "-"}")
                 OutlinedTextField(doctorQuery, { doctorQuery = it; doctorId = null }, label = { Text("Doctor") })
@@ -1003,7 +1074,7 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
             val mg = dose.toDoubleOrNull()
             val count = frequency.toIntOrNull()
             Button(enabled = name.isNotBlank() && packageCount != null && packageCount > 0 && mg != null && mg > 0 && count != null && count > 0, onClick = {
-                onSave(PrescriptionDraft(name.trim(), packageCount!!, packageCount, mg!!, if (weekly) "WEEK" else "DAY", count!!, today, today, doctorId, costId))
+                onSave(PrescriptionDraft(name.trim(), packageCount!!, packageCount, mg!!, if (weekly) "WEEK" else "DAY", count!!, orderEpochDay, prescriptionEpochDay, doctorId, costId))
             }) {
                 Text(stringResource(R.string.save))
             }
@@ -1020,8 +1091,8 @@ private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, o
     var dose by remember(initial.id) { mutableStateOf(initial.doseMg.clean()) }
     var frequency by remember(initial.id) { mutableStateOf(initial.frequencyCount.toString()) }
     var weekly by remember(initial.id) { mutableStateOf(initial.frequencyPeriod == "WEEK") }
-    var orderDate by remember(initial.id) { mutableStateOf(initial.orderEpochDay.toString()) }
-    var prescriptionDate by remember(initial.id) { mutableStateOf(initial.prescriptionEpochDay.toString()) }
+    var orderEpochDay by rememberSaveable(initial.id) { mutableStateOf(initial.orderEpochDay) }
+    var prescriptionEpochDay by rememberSaveable(initial.id) { mutableStateOf(initial.prescriptionEpochDay) }
     var doctorId by remember(initial.id) { mutableStateOf(initial.doctorContactId?.toString().orEmpty()) }
     var costId by remember(initial.id) { mutableStateOf(initial.financeTransactionId?.toString().orEmpty()) }
     val depletion = SostanzeEngine.depletionDate(
@@ -1040,8 +1111,16 @@ private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, o
                 OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) })
                 OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") })
                 Row(verticalAlignment = Alignment.CenterVertically) { Text("Weekly"); Switch(weekly, { weekly = it }) }
-                OutlinedTextField(orderDate, { orderDate = it.filter { c -> c.isDigit() || c == '-' } }, label = { Text("Order epoch day") })
-                OutlinedTextField(prescriptionDate, { prescriptionDate = it.filter { c -> c.isDigit() || c == '-' } }, label = { Text("Prescription epoch day") })
+                EpochDayPickerField(
+                    label = stringResource(R.string.order_date),
+                    epochDay = orderEpochDay,
+                    onEpochDayChange = { orderEpochDay = it },
+                )
+                EpochDayPickerField(
+                    label = stringResource(R.string.prescription_date),
+                    epochDay = prescriptionEpochDay,
+                    onEpochDayChange = { prescriptionEpochDay = it },
+                )
                 Text("Estimated depletion: ${depletion?.let(::formatDateOnly) ?: "-"}")
                 OutlinedTextField(doctorId, { doctorId = it.filter(Char::isDigit) }, label = { Text("People contact ID") })
                 OutlinedTextField(costId, { costId = it.filter(Char::isDigit) }, label = { Text("Soldi transaction ID") })
@@ -1057,8 +1136,8 @@ private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, o
                     onSave(initial.copy(
                         packageDoseCount = packageCount!!, remainingDoses = left!!, doseMg = mg!!,
                         frequencyCount = count!!, frequencyPeriod = if (weekly) "WEEK" else "DAY",
-                        orderEpochDay = orderDate.toLongOrNull() ?: initial.orderEpochDay,
-                        prescriptionEpochDay = prescriptionDate.toLongOrNull() ?: initial.prescriptionEpochDay,
+                        orderEpochDay = orderEpochDay,
+                        prescriptionEpochDay = prescriptionEpochDay,
                         doctorContactId = doctorId.toLongOrNull(), financeTransactionId = costId.toLongOrNull(),
                     ))
                 }) { Text(stringResource(R.string.save)) }

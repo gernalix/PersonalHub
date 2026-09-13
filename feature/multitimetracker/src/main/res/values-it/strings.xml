@@ -183,6 +183,18 @@
     <string name="modifica_catena">Modifica catena</string>
     <string name="modifica_sessione">Modifica sessione</string>
     <string name="new_session">Nuova sessione</string>
+    <string name="random_timer_start">Timer casuale</string>
+    <string name="random_timer_max_minutes">Max minuti</string>
+    <string name="random_timer_notification_title">Timer casuale</string>
+    <string name="random_timer_prompt_title">Quanto tempo e passato?</string>
+    <string name="random_timer_guess_minutes">Minuti</string>
+    <string name="random_timer_result">Reale: %1$d min · rapporto %2$s</string>
+    <string name="random_alert_timer_title">Alert casuale Timer</string>
+    <string name="random_alerts_enabled">Alert casuali</string>
+    <string name="random_alerts_count">Quanti</string>
+    <string name="random_alerts_per_hour">per ora</string>
+    <string name="random_alerts_per_day">al giorno</string>
+    <string name="random_alerts_summary">%1$d %2$s</string>
     <string name="modifica_task">Modifica sessione</string>
     <string name="mostra_secondi">Mostra secondi</string>
     <string name="nascondi_ore_se_sono_0">Nascondi ore se sono 0</string>
@@ -641,6 +653,7 @@
     <string name="tab_da_quando">Da Quando</string>
     <string name="life_period_add_title">Aggiungi periodo</string>
     <string name="life_period_edit_title">Modifica periodo</string>
+    <string name="life_period_end_selected_now">Termina selezionati ora</string>
     <string name="life_period_empty_title">Nessun periodo ancora</string>
     <string name="life_period_empty_body">Aggiungi il primo periodo per seguire da quanto e attivo un contesto di vita.</string>
     <string name="life_period_description">Descrizione</string>

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -109,13 +110,15 @@ fun LifePeriodsScreen(
     state: SinceWhenUiState,
     onAddPeriod: (String, String, Long, Long?, Long, Set<Long>, Set<LifePeriodDisplayUnit>) -> Unit,
     onUpdatePeriod: (Long, String, String, Long, Long?, Long, Set<Long>, Set<LifePeriodDisplayUnit>) -> Unit,
-    onDeletePeriod: (Long) -> Unit
+    onDeletePeriod: (Long) -> Unit,
+    onEndSelectedNow: (Set<Long>, Long) -> Boolean,
 ) {
     val context = LocalContext.current
     var editingPeriod by remember { mutableStateOf<LifePeriod?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var durationModeMenuExpanded by remember { mutableStateOf(false) }
     var durationMode by rememberSaveable { mutableStateOf(UiPrefsStore.getLifePeriodDurationMode(context)) }
+    var selectedActiveIds by rememberSaveable { mutableStateOf(emptySet<Long>()) }
     val referenceNowMs = remember(state.nowMs, state.timeMachineTargetMs) {
         state.timeMachineTargetMs ?: state.nowMs
     }
@@ -132,6 +135,9 @@ fun LifePeriodsScreen(
                 .thenByDescending { it.startMs }
                 .thenBy { it.title.lowercase(Locale.getDefault()) }
         )
+    }
+    selectedActiveIds = selectedActiveIds.filterTo(mutableSetOf()) { id ->
+        state.lifePeriods.any { it.id == id && statusForPeriod(it, referenceNowMs) == LifePeriodStatus.ACTIVE }
     }
 
     LifePeriodsScreenScaffold(
@@ -236,12 +242,35 @@ fun LifePeriodsScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    if (selectedActiveIds.isNotEmpty()) {
+                        item {
+                            Button(
+                                onClick = {
+                                    val ended = onEndSelectedNow(selectedActiveIds, referenceNowMs)
+                                    if (ended) selectedActiveIds = emptySet()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(stringResource(R.string.life_period_end_selected_now))
+                            }
+                        }
+                    }
                     items(orderedPeriods, key = { it.id }) { period ->
+                        val active = statusForPeriod(period, referenceNowMs) == LifePeriodStatus.ACTIVE
                         LifePeriodCard(
                             period = period,
                             nowMs = referenceNowMs,
                             durationMode = durationMode,
                             tagsById = visibleTagsById,
+                            selected = period.id in selectedActiveIds,
+                            selectable = active,
+                            onToggleSelected = {
+                                selectedActiveIds = if (period.id in selectedActiveIds) {
+                                    selectedActiveIds - period.id
+                                } else {
+                                    selectedActiveIds + period.id
+                                }
+                            },
                             onEdit = { editingPeriod = period },
                             onDelete = { onDeletePeriod(period.id) }
                         )
@@ -258,6 +287,9 @@ private fun LifePeriodCard(
     nowMs: Long,
     durationMode: LifePeriodDurationMode,
     tagsById: Map<Long, Tag>,
+    selected: Boolean,
+    selectable: Boolean,
+    onToggleSelected: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -340,6 +372,12 @@ private fun LifePeriodCard(
                             verticalAlignment = Alignment.Top,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            if (selectable) {
+                                Checkbox(
+                                    checked = selected,
+                                    onCheckedChange = { onToggleSelected() },
+                                )
+                            }
                             Column(
                                 modifier = Modifier.weight(1f, fill = true),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)

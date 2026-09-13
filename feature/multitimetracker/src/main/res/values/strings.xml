@@ -187,6 +187,18 @@
     <string name="modifica_catena">Modifica catena</string>
     <string name="modifica_sessione">Edit session</string>
     <string name="new_session">New session</string>
+    <string name="random_timer_start">Random timer</string>
+    <string name="random_timer_max_minutes">Max minutes</string>
+    <string name="random_timer_notification_title">Random timer</string>
+    <string name="random_timer_prompt_title">How much time has passed?</string>
+    <string name="random_timer_guess_minutes">Minutes</string>
+    <string name="random_timer_result">Actual: %1$d min · ratio %2$s</string>
+    <string name="random_alert_timer_title">Timer random alert</string>
+    <string name="random_alerts_enabled">Random alerts</string>
+    <string name="random_alerts_count">How many</string>
+    <string name="random_alerts_per_hour">per hour</string>
+    <string name="random_alerts_per_day">per day</string>
+    <string name="random_alerts_summary">%1$d %2$s</string>
     <string name="modifica_task">Edit session</string>
     <string name="mostra_secondi">Mostra secondi</string>
     <string name="nascondi_ore_se_sono_0">Nascondi ore se sono 0</string>
@@ -645,6 +657,7 @@
     <string name="tab_da_quando">Since When</string>
     <string name="life_period_add_title">Add period</string>
     <string name="life_period_edit_title">Edit period</string>
+    <string name="life_period_end_selected_now">End selected now</string>
     <string name="life_period_empty_title">No life periods yet</string>
     <string name="life_period_empty_body">Add your first period to track how long a life context has been active.</string>
     <string name="life_period_description">Description</string>

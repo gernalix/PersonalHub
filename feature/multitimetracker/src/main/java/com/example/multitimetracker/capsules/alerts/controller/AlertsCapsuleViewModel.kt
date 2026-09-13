@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.R
+import com.example.multitimetracker.TimeFenceTimerScheduler
 import com.example.multitimetracker.capsules.alerts.core.*
 import com.example.multitimetracker.capsules.alerts.public.TimeFenceEvent
 import com.example.multitimetracker.capsules.alerts.state.AlertsHostState
@@ -88,6 +89,7 @@ class AlertsCapsuleViewModel(
     private val logSystemEvent: (String, String?, Long?, String, JSONObject?) -> Unit,
     private val elapsedRealtimeMs: () -> Long = { SystemClock.elapsedRealtime() },
     private val logDebug: (String, String) -> Unit = { tag, message -> Log.d(tag, message) },
+    private val randomOffsetMs: (Long) -> Long = { maxExclusive -> Random.nextLong(1L, maxExclusive + 1L) },
     private val showNotificationOverride: ((Long, String, String) -> Boolean)? = null
 ) : CapsuleRuntimeParticipant {
     override val capsuleId: String = "alerts"
@@ -201,6 +203,11 @@ class AlertsCapsuleViewModel(
             .put("matchMode", r.matchMode.name)
             .put("tagIds", JSONArray(r.tagIds.toList().sorted()))
             .put("cooldownMs", r.cooldownMs)
+            .put("randomAlertsEnabled", r.randomAlertsEnabled)
+            .put("randomAlertsCount", r.randomAlertsCount)
+            .put("randomAlertsWindow", r.randomAlertsWindow)
+            .put("randomAlertIdentity", r.randomAlertIdentity)
+            .put("randomAlertScheduledAtMs", JSONArray().apply { r.randomAlertScheduledAtMs.forEach { put(it) } })
             .put("timerMinutes", r.timerMinutes)
             .put("isEnabled", r.isEnabled)
             .put("isDeleted", r.isDeleted)
@@ -216,6 +223,9 @@ class AlertsCapsuleViewModel(
         matchMode: TimeFenceMatchMode = TimeFenceMatchMode.AND,
         tagIds: Set<Long>,
         cooldownMs: Long = 0L,
+        randomAlertsEnabled: Boolean = false,
+        randomAlertsCount: Int = 0,
+        randomAlertsWindow: RandomAlertWindow = RandomAlertWindow.DAY,
     ): Boolean {
         val msg = message.trim()
         if (msg.isBlank()) return false
@@ -227,7 +237,7 @@ class AlertsCapsuleViewModel(
                 return false
             }
             val id = System.currentTimeMillis() + Random.nextInt(0, 9999)
-            val created = TimeFenceRule(
+            val createdBase = TimeFenceRule(
                 id = id,
                 message = msg,
                 trigger = trigger,
@@ -238,6 +248,7 @@ class AlertsCapsuleViewModel(
                 timerMinutes = 0,
                 cooldownMs = max(0L, cooldownMs)
             )
+            val created = withRandomAlertPlan(createdBase, randomAlertsEnabled, randomAlertsCount, randomAlertsWindow)
             replaceRules((currentRules + created).sortedBy { it.id })
             created
         }
@@ -267,6 +278,9 @@ class AlertsCapsuleViewModel(
         matchMode: TimeFenceMatchMode,
         tagIds: Set<Long>,
         cooldownMs: Long,
+        randomAlertsEnabled: Boolean = false,
+        randomAlertsCount: Int = 0,
+        randomAlertsWindow: RandomAlertWindow = RandomAlertWindow.DAY,
     ): Boolean {
         val msg = message.trim()
         if (msg.isBlank()) return false
@@ -281,7 +295,7 @@ class AlertsCapsuleViewModel(
             oldRule = currentRules.firstOrNull { it.id == ruleId }
             currentRules.map { r ->
                 if (r.id != ruleId) r
-                else r.copy(
+                else withRandomAlertPlan(r.copy(
                     message = msg,
                     trigger = trigger,
                     delivery = delivery,
@@ -290,7 +304,7 @@ class AlertsCapsuleViewModel(
                     tagIds = tagIds,
                     timerMinutes = 0,
                     cooldownMs = max(0L, cooldownMs)
-                )
+                ), randomAlertsEnabled, randomAlertsCount, randomAlertsWindow)
             }.also { replaceRules(it) }
         }
 
@@ -319,8 +333,9 @@ class AlertsCapsuleViewModel(
     val now = System.currentTimeMillis()
     val beforeRules = rules()
     val oldRule = beforeRules.firstOrNull { it.id == ruleId }
+    oldRule?.let(::cancelRandomAlerts)
     val newRules = beforeRules.map { r ->
-        if (r.id == ruleId) r.copy(isDeleted = true, deletedAtMs = now) else r
+        if (r.id == ruleId) r.copy(isDeleted = true, deletedAtMs = now, randomAlertScheduledAtMs = emptyList()) else r
     }
     replaceRules(newRules)
 
@@ -371,6 +386,7 @@ fun restoreTimeFenceRule(ruleId: Long) {
 fun purgeTimeFenceRule(ruleId: Long) {
     val beforeRules = rules()
     val oldRule = beforeRules.firstOrNull { it.id == ruleId }
+    oldRule?.let(::cancelRandomAlerts)
     val newRules = beforeRules.filterNot { it.id == ruleId }
     replaceRules(newRules)
 
@@ -393,6 +409,7 @@ fun purgeAllDeletedTimeFenceRules() {
     val beforeRules = rules()
     val trashed = beforeRules.filter { it.isDeleted }
     if (trashed.isEmpty()) return
+    trashed.forEach(::cancelRandomAlerts)
 
     val newRules = beforeRules.filterNot { it.isDeleted }
     replaceRules(newRules)
@@ -413,7 +430,19 @@ fun purgeAllDeletedTimeFenceRules() {
 fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
         val beforeRules = rules()
         val before = beforeRules.firstOrNull { it.id == ruleId }
-        val newRules = beforeRules.map { r -> if (r.id == ruleId) r.copy(isEnabled = enabled) else r }
+        val newRules = beforeRules.map { r ->
+            if (r.id != ruleId) r else if (enabled) {
+                withRandomAlertPlan(
+                    rule = r.copy(isEnabled = true),
+                    enabled = r.randomAlertsEnabled,
+                    count = r.randomAlertsCount,
+                    window = RandomAlertWindow.parse(r.randomAlertsWindow),
+                )
+            } else {
+                cancelRandomAlerts(r)
+                r.copy(isEnabled = false, randomAlertScheduledAtMs = emptyList())
+            }
+        }
         replaceRules(newRules)
 
         getContext()?.let { ctx ->
@@ -441,6 +470,53 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
 
         persistAsync()
         scheduleAutoBackup()
+    }
+
+    private fun withRandomAlertPlan(
+        rule: TimeFenceRule,
+        enabled: Boolean,
+        count: Int,
+        window: RandomAlertWindow,
+    ): TimeFenceRule {
+        cancelRandomAlerts(rule)
+        val cleanCount = count.coerceAtLeast(0)
+        val identity = rule.randomAlertIdentity.ifBlank { "timer-alert-${rule.id}" }
+        if (!enabled || cleanCount == 0 || !rule.isEnabled || rule.isDeleted) {
+            return rule.copy(
+                randomAlertsEnabled = enabled,
+                randomAlertsCount = cleanCount,
+                randomAlertsWindow = window.name,
+                randomAlertIdentity = identity,
+                randomAlertScheduledAtMs = emptyList(),
+            )
+        }
+        val scheduled = planRandomAlertInstants(System.currentTimeMillis(), cleanCount, window, randomOffsetMs)
+        getContext()?.let { ctx ->
+            scheduled.forEach { fireAtMs ->
+                TimeFenceTimerScheduler.scheduleRandomAlert(
+                    context = ctx,
+                    identity = identity,
+                    fireAtMs = fireAtMs,
+                    title = ctx.getString(R.string.random_alert_timer_title),
+                    message = rule.message,
+                )
+            }
+        }
+        return rule.copy(
+            randomAlertsEnabled = true,
+            randomAlertsCount = cleanCount,
+            randomAlertsWindow = window.name,
+            randomAlertIdentity = identity,
+            randomAlertScheduledAtMs = scheduled,
+        )
+    }
+
+    private fun cancelRandomAlerts(rule: TimeFenceRule) {
+        val ctx = getContext() ?: return
+        val identity = rule.randomAlertIdentity.ifBlank { "timer-alert-${rule.id}" }
+        rule.randomAlertScheduledAtMs
+            .filter { it > System.currentTimeMillis() }
+            .forEach { TimeFenceTimerScheduler.cancelRandomAlert(ctx, identity, it) }
     }
 
     /**

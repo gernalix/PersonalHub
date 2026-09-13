@@ -52,6 +52,7 @@ import com.example.multitimetracker.model.TimeFenceMatchMode
 import com.example.multitimetracker.model.TimeFenceRule
 import com.example.multitimetracker.model.TimeFenceScope
 import com.example.multitimetracker.model.TimeFenceTrigger
+import com.example.multitimetracker.capsules.alerts.core.RandomAlertWindow
 import com.example.multitimetracker.capsules.alerts.state.AlertsUiState
 import com.example.multitimetracker.ui.util.formatDuration
 import com.example.multitimetracker.ui.util.TagSelectionOrder
@@ -72,8 +73,8 @@ import com.example.multitimetracker.capsules.system.ui.TrashListDialog
 fun AlertsScreen(
     modifier: Modifier = Modifier,
     state: AlertsUiState,
-    onAddTimeFenceRule: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery) -> Unit,
-    onUpdateTimeFenceRule: (Long, String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery) -> Unit,
+    onAddTimeFenceRule: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery, Boolean, Int, RandomAlertWindow) -> Unit,
+    onUpdateTimeFenceRule: (Long, String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery, Boolean, Int, RandomAlertWindow) -> Unit,
     onDeleteTimeFenceRule: (Long) -> Unit,
     onRestoreTimeFenceRule: (Long) -> Unit,
     onPurgeTimeFenceRule: (Long) -> Unit,
@@ -153,8 +154,8 @@ fun AlertsScreen(
             tagLastUsedMsByTagId = state.tagLastUsedMsByTagId,
             initial = null,
             onDismiss = { showAdd = false },
-            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
-                onAddTimeFenceRule(msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery)
+            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow ->
+                onAddTimeFenceRule(msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow)
                 showAdd = false
             }
         )
@@ -167,9 +168,9 @@ fun AlertsScreen(
             tagLastUsedMsByTagId = state.tagLastUsedMsByTagId,
             initial = editRule,
             onDismiss = { editRule = null },
-            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery ->
+            onConfirm = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow ->
                 val r = editRule ?: return@AlertRuleDialog
-                onUpdateTimeFenceRule(r.id, msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery)
+                onUpdateTimeFenceRule(r.id, msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow)
                 editRule = null
             }
         )
@@ -260,6 +261,10 @@ private fun AlertRuleCard(
                             append(" ")
                             append(formatDuration(rule.cooldownMs))
                         }
+                        if (rule.randomAlertsEnabled && rule.randomAlertsCount > 0) {
+                            append(" · ")
+                            append(stringResource(R.string.random_alerts_summary, rule.randomAlertsCount, randomWindowLabel(rule.randomAlertsWindow)))
+                        }
                     }
                     Text(
                         subtitle,
@@ -307,13 +312,16 @@ private fun AlertRuleDialog(
     tagLastUsedMsByTagId: Map<Long, Long>,
     initial: TimeFenceRule?,
     onDismiss: () -> Unit,
-    onConfirm: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery) -> Unit
+    onConfirm: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery, Boolean, Int, RandomAlertWindow) -> Unit
 ) {
     var message by remember { mutableStateOf(initial?.message ?: "") }
     var trigger by remember { mutableStateOf(initial?.trigger ?: TimeFenceTrigger.ON_START) }
     var scope by remember { mutableStateOf(initial?.scope ?: TimeFenceScope.ALWAYS) }
     var matchMode by remember { mutableStateOf(initial?.matchMode ?: TimeFenceMatchMode.AND) }
     var cooldownMs by remember { mutableStateOf(initial?.cooldownMs ?: 0L) }
+    var randomAlertsEnabled by remember { mutableStateOf(initial?.randomAlertsEnabled ?: false) }
+    var randomAlertsCount by remember { mutableStateOf((initial?.randomAlertsCount ?: 1).coerceAtLeast(1).toString()) }
+    var randomAlertsWindow by remember { mutableStateOf(RandomAlertWindow.parse(initial?.randomAlertsWindow ?: RandomAlertWindow.DAY.name)) }
     var selectedTagIds by remember { mutableStateOf(initial?.tagIds ?: emptySet()) }
     var tagQuery by remember { mutableStateOf("") }
 
@@ -330,7 +338,10 @@ private fun AlertRuleDialog(
                         matchMode,
                         selectedTagIds,
                         cooldownMs,
-                        TimeFenceDelivery.NOTIFICATION
+                        TimeFenceDelivery.NOTIFICATION,
+                        randomAlertsEnabled,
+                        randomAlertsCount.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                        randomAlertsWindow,
                     )
                 }
             ) { Text(stringResource(R.string.salva)) }
@@ -421,10 +432,45 @@ private fun AlertRuleDialog(
                     )
                     Text(stringResource(R.string.cooldown_30s_anti_spam), style = MaterialTheme.typography.bodyMedium)
                 }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Switch(
+                        checked = randomAlertsEnabled,
+                        onCheckedChange = { randomAlertsEnabled = it }
+                    )
+                    Text(stringResource(R.string.random_alerts_enabled), style = MaterialTheme.typography.bodyMedium)
+                }
+                if (randomAlertsEnabled) {
+                    OutlinedTextField(
+                        value = randomAlertsCount,
+                        onValueChange = { randomAlertsCount = it.filter(Char::isDigit).take(2) },
+                        label = { Text(stringResource(R.string.random_alerts_count)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = randomAlertsWindow == RandomAlertWindow.HOUR,
+                            onClick = { randomAlertsWindow = RandomAlertWindow.HOUR },
+                            label = { Text(stringResource(R.string.random_alerts_per_hour)) }
+                        )
+                        FilterChip(
+                            selected = randomAlertsWindow == RandomAlertWindow.DAY,
+                            onClick = { randomAlertsWindow = RandomAlertWindow.DAY },
+                            label = { Text(stringResource(R.string.random_alerts_per_day)) }
+                        )
+                    }
+                }
             }
         }
     )
 }
+
+@Composable
+private fun randomWindowLabel(value: String): String =
+    when (RandomAlertWindow.parse(value)) {
+        RandomAlertWindow.HOUR -> stringResource(R.string.random_alerts_per_hour)
+        RandomAlertWindow.DAY -> stringResource(R.string.random_alerts_per_day)
+    }
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)

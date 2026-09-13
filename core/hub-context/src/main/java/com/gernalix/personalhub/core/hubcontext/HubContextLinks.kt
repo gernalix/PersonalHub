@@ -67,34 +67,37 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                 }
             },
             confirmButton = {
+                val invalidWorkflowy = stringResource(R.string.hub_workflowy_invalid)
+                val workflowyExists = stringResource(R.string.hub_workflowy_exists)
+                val workflowyTitle = stringResource(R.string.hub_workflowy_title)
                 Button(
                     enabled = workflowyUrl.isNotBlank(),
                     onClick = {
                         scope.launch {
                             val normalized = normalizeWorkflowyUrl(workflowyUrl)
                             if (normalized == null) {
-                                workflowyError = context.getString(R.string.hub_workflowy_invalid)
+                                workflowyError = invalidWorkflowy
                                 return@launch
                             }
                             if (linked.any { it.ref.moduleId == "hub" && it.ref.entityKind == "resource" && it.attributes["value"] == normalized }) {
-                                workflowyError = context.getString(R.string.hub_workflowy_exists)
+                                workflowyError = workflowyExists
                                 return@launch
                             }
                             val adapter = HubContextRuntime.adapter("hub", "resource")
                             val created = adapter.create(
                                 HubCreateRequest(
-                                    suggestedLabel = context.getString(R.string.hub_workflowy_title),
+                                    suggestedLabel = workflowyTitle,
                                     extras = mapOf("kind" to HubResourceKinds.WEB_URL, "value" to normalized),
                                 ),
                             )
                             if (created == null) {
-                                workflowyError = context.getString(R.string.hub_workflowy_invalid)
+                                workflowyError = invalidWorkflowy
                                 return@launch
                             }
                             try {
                                 HubContextRuntime.createContext(
                                     listOf(anchor to "", created.ref to ""),
-                                    title = context.getString(R.string.hub_workflowy_title),
+                                    title = workflowyTitle,
                                 )
                             } catch (error: CancellationException) {
                                 withContext(NonCancellable) {
@@ -103,7 +106,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                                 throw error
                             } catch (error: Exception) {
                                 runCatching { (adapter as? ResourceHubAdapter)?.delete(created.ref.canonicalId) }
-                                workflowyError = error.message ?: context.getString(R.string.hub_workflowy_invalid)
+                                workflowyError = error.message ?: invalidWorkflowy
                                 return@launch
                             }
                             workflowyOpen = false

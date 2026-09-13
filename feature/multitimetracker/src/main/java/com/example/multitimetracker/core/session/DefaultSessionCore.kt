@@ -2,6 +2,7 @@
 package com.example.multitimetracker.core.session
 
 import android.content.Context
+import com.example.multitimetracker.RandomTimerStore
 import com.example.multitimetracker.TimeFenceTimerScheduler
 import com.example.multitimetracker.TimedSessionSupport
 import com.example.multitimetracker.model.SessionUi
@@ -48,8 +49,14 @@ class DefaultSessionCore(private val context: Context) : SessionCore {
     override fun readRunningSessions(): List<SessionUi> =
         repo.readRunningSessions()
 
-    override fun insertSession(title: String, startMs: Long, endMs: Long?, tagIds: Set<Long>): Long {
-        val sessionId = repo.insertSession(title = title, startMs = startMs, endMs = endMs, tagIds = tagIds)
+    override fun insertSession(title: String, startMs: Long, endMs: Long?, tagIds: Set<Long>, expectedEndMsOverride: Long?): Long {
+        val sessionId = repo.insertSession(
+            title = title,
+            startMs = startMs,
+            endMs = endMs,
+            tagIds = tagIds,
+            expectedEndMsOverride = expectedEndMsOverride,
+        )
         syncTimedSessionAlarm(sessionId)
         return sessionId
     }
@@ -89,18 +96,18 @@ class DefaultSessionCore(private val context: Context) : SessionCore {
         val nowMs = System.currentTimeMillis()
         val timedMatch = TimedSessionSupport.findTimedTagMatchForSession(session, tags)
         val expectedEndMs = session.expectedEndMs
+        val isRandomTimer = RandomTimerStore.isRandomSession(context, session.id)
         val shouldSchedule = session.endMs == null &&
             expectedEndMs != null &&
             expectedEndMs > nowMs &&
-            timedMatch != null &&
-            timedMatch.notificationType != TimedTagNotificationType.NONE
+            ((timedMatch != null && timedMatch.notificationType != TimedTagNotificationType.NONE) || isRandomTimer)
 
         if (shouldSchedule) {
             TimeFenceTimerScheduler.scheduleTimedSession(
                 context = context,
                 sessionId = session.id,
                 fireAtMs = expectedEndMs,
-                alarmStyle = timedMatch.notificationType == TimedTagNotificationType.ALARM,
+                alarmStyle = timedMatch?.notificationType == TimedTagNotificationType.ALARM,
             )
         } else {
             TimeFenceTimerScheduler.cancelTimedSession(context, session.id)

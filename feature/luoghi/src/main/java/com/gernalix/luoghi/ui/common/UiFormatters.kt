@@ -39,7 +39,7 @@ fun localizedTime(timestamp: Long): String = localizedDateTime(timestamp, Format
 @Composable
 fun localizedFullDate(timestamp: Long): String {
     val configuration = LocalConfiguration.current
-    val locale = configuration.locales[0] ?: Locale.getDefault()
+    val locale = configuration.locales[0]
     val zone = ZoneId.systemDefault()
     return remember(timestamp, locale, zone) {
         DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
@@ -52,7 +52,7 @@ fun localizedFullDate(timestamp: Long): String {
 @Composable
 fun localizedPercent(value: Double?): String {
     val configuration = LocalConfiguration.current
-    val locale = configuration.locales[0] ?: Locale.getDefault()
+    val locale = configuration.locales[0]
     return remember(value, locale) {
         value?.takeIf { it.isFinite() }?.let {
             NumberFormat.getPercentInstance(locale).apply { maximumFractionDigits = 1 }
@@ -100,7 +100,7 @@ fun localizedDuration(durationMs: Long): String {
 @Composable
 fun localizedDistance(distanceMeters: Long): String {
     val configuration = LocalConfiguration.current
-    val locale = configuration.locales[0] ?: Locale.getDefault()
+    val locale = configuration.locales[0]
     return remember(distanceMeters, locale) {
         val format = NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 1 }
         if (distanceMeters >= 1_000L) {
@@ -133,7 +133,7 @@ fun localizedDateTime(timestamp: Long): String = localizedDateTime(timestamp, Fo
 @Composable
 private fun localizedDateTime(timestamp: Long, style: FormatStyle, dateOnly: Boolean?): String {
     val configuration = LocalConfiguration.current
-    val locale = configuration.locales[0] ?: Locale.getDefault()
+    val locale = configuration.locales[0]
     val zone = ZoneId.systemDefault()
     return remember(timestamp, locale, zone, style, dateOnly) {
         val formatter = when (dateOnly) {

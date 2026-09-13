@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.example.multitimetracker.AppPatchVersion
 import com.example.multitimetracker.R
 import com.example.multitimetracker.core.contracts.ClosedSessionRecord
 import com.example.multitimetracker.core.session.SessionMirrorCore
@@ -79,8 +78,6 @@ fun DevToolsDialog(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val patchVersion = remember(context) { AppPatchVersion.current(context) }
-
     var useSessionsReader by remember { mutableStateOf(UiPrefsStore.getDevChronologyUseSessions(context)) }
 
     AlertDialog(
@@ -91,14 +88,6 @@ fun DevToolsDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = stringResource(R.string.versione_patch_v, patchVersion),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                AppDivider()
-
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,

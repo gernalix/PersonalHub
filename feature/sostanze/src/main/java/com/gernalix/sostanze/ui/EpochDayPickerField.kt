@@ -14,14 +14,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.core.os.ConfigurationCompat
 import com.gernalix.sostanze.R
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.util.Locale
 
 internal fun epochDayToUtcMillis(epochDay: Long): Long =
     LocalDate.ofEpochDay(epochDay).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
@@ -37,8 +38,10 @@ internal fun EpochDayPickerField(
     onEpochDayChange: (Long) -> Unit,
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
-    val formatter = remember(Locale.getDefault()) {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())
+    val configuration = LocalConfiguration.current
+    val locale = ConfigurationCompat.getLocales(configuration).get(0)
+    val formatter = remember(locale) {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
     }
     OutlinedButton(onClick = { open = true }) {
         Column {

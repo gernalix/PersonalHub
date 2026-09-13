@@ -1,4 +1,6 @@
 // v351
+@file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
+
 package com.example.multitimetracker.capsules.auditlog.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 

@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 class TimeFenceTimerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return
-        if (action != ACTION_FIRE_TIMED_SESSION && action != ACTION_ACK_TIMED_SESSION) return
+        if (action != ACTION_FIRE_TIMED_SESSION && action != ACTION_ACK_TIMED_SESSION && action != ACTION_RANDOM_ALERT) return
         val pendingResult = goAsync()
         val appContext = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
@@ -23,6 +23,7 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
                 when (action) {
                     ACTION_FIRE_TIMED_SESSION -> handleTimedSession(appContext, intent)
                     ACTION_ACK_TIMED_SESSION -> handleTimedSessionAcknowledge(appContext, intent)
+                    ACTION_RANDOM_ALERT -> handleRandomAlert(appContext, intent)
                 }
             } finally {
                 pendingResult.finish()
@@ -59,10 +60,26 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
         TimeFenceNotifier.acknowledgeTimedSession(context, notificationId)
     }
 
+    private fun handleRandomAlert(context: Context, intent: Intent) {
+        val title = intent.getStringExtra(EXTRA_RANDOM_ALERT_TITLE) ?: context.getString(R.string.app_name)
+        val text = intent.getStringExtra(EXTRA_RANDOM_ALERT_TEXT) ?: context.getString(R.string.notification_label)
+        val id = intent.getIntExtra(EXTRA_NOTIFICATION_ID, title.hashCode())
+        TimeFenceNotifier.notifyTimedSession(
+            context = context,
+            notificationId = id,
+            title = title,
+            message = text,
+            notificationType = com.example.multitimetracker.model.TimedTagNotificationType.NORMAL,
+        )
+    }
+
     companion object {
         const val ACTION_FIRE_TIMED_SESSION = "com.example.multitimetracker.ACTION_TIMED_SESSION"
         const val ACTION_ACK_TIMED_SESSION = "com.example.multitimetracker.ACTION_ACK_TIMED_SESSION"
+        const val ACTION_RANDOM_ALERT = "com.example.multitimetracker.ACTION_RANDOM_ALERT"
         const val EXTRA_SESSION_ID = "extra_session_id"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
+        const val EXTRA_RANDOM_ALERT_TITLE = "extra_random_alert_title"
+        const val EXTRA_RANDOM_ALERT_TEXT = "extra_random_alert_text"
     }
 }

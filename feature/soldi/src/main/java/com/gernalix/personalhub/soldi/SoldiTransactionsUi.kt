@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -218,6 +219,7 @@ private fun DayGroupCardV2(
     val end = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().minusMillis(1)
     val balances = FinanceCapsule.totals(accountMap.values.toList(), allRows.map { it.value }, end)
 
+    val locale = LocalConfiguration.current.locales[0]
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -227,12 +229,12 @@ private fun DayGroupCardV2(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(date.dayOfMonth.toString(), fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text(date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()), fontSize = 10.sp)
+                        Text(date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale), fontSize = 10.sp)
                     }
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()), fontWeight = FontWeight.SemiBold)
+                    Text(date.dayOfWeek.getDisplayName(TextStyle.FULL, locale), fontWeight = FontWeight.SemiBold)
                     if (showBalance) {
                         Text(
                             balances.entries.joinToString(" · ") { compactMoney(it.value, it.key) },

@@ -11,6 +11,7 @@ import com.example.multitimetracker.capsules.system.NowCapsuleAccess
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.random.Random
 
 /**
  * ===== FEATURE CAPSULE: Now.SessionList (ViewModel) — START =====
@@ -28,6 +29,7 @@ class NowCapsuleViewModel(
     private val updateSessionTimesOverride: ((Long, Long, Long?) -> Unit)? = null,
     private val deleteSessionOverride: ((Long) -> Unit)? = null,
     private val createNewSessionOverride: ((String, Long, Set<Long>, (SessionUi) -> Unit) -> Unit)? = null,
+    private val randomTargetMinute: (Int) -> Int = { maxMinutes -> Random.nextInt(1, maxMinutes + 1) },
 ) : CapsuleRuntimeParticipant {
     override val capsuleId: String = "now"
     val uiState: StateFlow<NowUiState> = access.uiStateFlow()
@@ -55,6 +57,13 @@ class NowCapsuleViewModel(
     fun createNewSession(title: String, startMs: Long, tagIds: Set<Long>, onCreated: (SessionUi) -> Unit = {}) {
         sessionOwner?.createRunningSession(title, startMs, tagIds, onCreated)
             ?: createNewSessionOverride?.invoke(title, startMs, tagIds, onCreated)
+            ?: error("NowCapsuleViewModel requires a session owner boundary")
+    }
+
+    fun createRandomTimer(maxMinutes: Int, startMs: Long, onCreated: (SessionUi) -> Unit = {}) {
+        val cleanMax = maxMinutes.coerceAtLeast(1)
+        val targetMinutes = randomTargetMinute(cleanMax).coerceIn(1, cleanMax)
+        sessionOwner?.createRandomTimerSession(startMs, targetMinutes, onCreated)
             ?: error("NowCapsuleViewModel requires a session owner boundary")
     }
 
