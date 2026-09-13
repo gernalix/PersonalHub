@@ -36,8 +36,9 @@ fun HubTemporalSearchScreen(
     val context = LocalContext.current
     val providers = remember { HubContextRuntime.temporalProviders() }
     val allModules = remember(providers) { providers.map { it.moduleId }.toSet() }
-    var selected by rememberSaveable(initialModules) {
-        mutableStateOf(if (initialModules.isEmpty()) allModules else allModules.intersect(initialModules))
+    var selected by rememberSaveable(initialModules, allModules) {
+        val requested = if (initialModules.isEmpty()) allModules else allModules.intersect(initialModules)
+        mutableStateOf(requested.ifEmpty { allModules })
     }
     var fromText by rememberSaveable(initialFromMs) {
         mutableStateOf(formatHubDateTime(initialFromMs ?: (System.currentTimeMillis() - 24 * 60 * 60 * 1000L)))
@@ -101,7 +102,14 @@ fun HubTemporalSearchScreen(
             OutlinedTextField(toText, { toText = it }, Modifier.weight(1f).testTag("temporal-to"), label = { Text(stringResource(R.string.temporal_to)) })
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { providers.distinctBy { it.moduleId }.forEach { provider ->
-            FilterChip(provider.moduleId in selected, { selected = if (provider.moduleId in selected) selected - provider.moduleId else selected + provider.moduleId }, label = { Text(provider.moduleId.replaceFirstChar { it.uppercase() }) })
+            FilterChip(
+                provider.moduleId in selected,
+                {
+                    val next = if (provider.moduleId in selected) selected - provider.moduleId else selected + provider.moduleId
+                    if (next.isNotEmpty()) selected = next
+                },
+                label = { Text(provider.moduleId.replaceFirstChar { it.uppercase() }) },
+            )
         } }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { scope.launch { runCatching { search(false) }.onFailure { error = it.message } } }, modifier = Modifier.testTag("temporal-search")) { Text(stringResource(R.string.temporal_search)) }
