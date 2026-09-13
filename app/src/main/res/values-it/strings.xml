@@ -9,6 +9,14 @@
     <string name="temporal_to">A (AAAA-MM-GG HH:MM)</string>
     <string name="temporal_search">Cerca</string>
     <string name="temporal_more">Carica altro</string>
+    <string name="temporal_empty">Nessun elemento in questo periodo.</string>
+    <string name="temporal_save_episode">Salva</string>
+    <string name="temporal_cancel_selection">Annulla</string>
+    <string name="temporal_episode_title">Titolo episodio</string>
+    <string name="temporal_save_selection">Salva selezionati</string>
+    <string name="temporal_people">Persone</string>
+    <string name="temporal_wordpulse_fatigue_available">Stanchezza media: %1$d/100</string>
+    <string name="temporal_wordpulse_fatigue_unavailable">Stanchezza media: non disponibile</string>
     <string name="app_name">PersonalHub</string>
     <string name="module_people">Persone</string>
     <string name="module_people_subtitle">Contatti, campi, eventi, tag</string>

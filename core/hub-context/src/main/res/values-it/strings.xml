@@ -5,7 +5,7 @@
     <string name="hub_composer_title_new">Collega entità</string>
     <string name="hub_composer_title_edit">Modifica contesto</string>
     <string name="hub_composer_members">Membri</string>
-    <string name="hub_composer_add_kind">+ Aggiungi</string>
+    <string name="hub_composer_add_kind">Aggiungi altro</string>
     <string name="hub_remove">Rimuovi</string>
     <string name="hub_search">Cerca</string>
     <string name="hub_time_anchor">Riferimento temporale</string>

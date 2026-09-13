@@ -9,6 +9,14 @@
     <string name="temporal_to">To (YYYY-MM-DD HH:MM)</string>
     <string name="temporal_search">Search</string>
     <string name="temporal_more">Load more</string>
+    <string name="temporal_empty">No items in this period.</string>
+    <string name="temporal_save_episode">Save</string>
+    <string name="temporal_cancel_selection">Cancel</string>
+    <string name="temporal_episode_title">Episode title</string>
+    <string name="temporal_save_selection">Save selected</string>
+    <string name="temporal_people">People</string>
+    <string name="temporal_wordpulse_fatigue_available">Average fatigue: %1$d/100</string>
+    <string name="temporal_wordpulse_fatigue_unavailable">Average fatigue: unavailable</string>
     <string name="app_name">PersonalHub</string>
     <string name="module_people">People</string>
     <string name="module_people_subtitle">Contacts, fields, events, tags</string>

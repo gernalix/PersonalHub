@@ -58,6 +58,10 @@ class WordSessionHubAdapter(private val context: Context) : HubEntityAdapter, Hu
                             endMs,
                             "WordPulse · ${Instant.ofEpochMilli(startMs)}",
                             entityRef = HubEntityRef(moduleId, entityKind, id),
+                            attributes = buildMap {
+                                put("start_ms", startMs.toString())
+                                endMs?.let { put("end_ms", it.toString()) }
+                            },
                         ),
                     )
                 }

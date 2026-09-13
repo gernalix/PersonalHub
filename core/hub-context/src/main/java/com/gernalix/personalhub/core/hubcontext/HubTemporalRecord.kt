@@ -18,6 +18,7 @@ data class HubTemporalRecord(
     val title: String,
     val subtitle: String? = null,
     val entityRef: HubEntityRef? = null,
+    val attributes: Map<String, String> = emptyMap(),
 ) {
     init {
         require(moduleId.isNotBlank())
