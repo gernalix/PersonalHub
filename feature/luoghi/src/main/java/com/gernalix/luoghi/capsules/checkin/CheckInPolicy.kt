@@ -7,7 +7,7 @@ import com.gernalix.luoghi.data.PlaceEventEntity
 
 object CheckInPolicy {
     const val DEFAULT_RADIUS_M = 75.0
-    private const val MAX_ACCURACY_ALLOWANCE_M = 100.0
+    private const val MAX_ACCURACY_ALLOWANCE_M = 50.0
     private const val MAX_AMBIGUOUS_CHOICES = 5
 
     fun choosePlace(
