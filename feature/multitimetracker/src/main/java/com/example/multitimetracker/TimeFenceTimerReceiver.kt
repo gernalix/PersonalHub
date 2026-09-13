@@ -7,14 +7,26 @@ import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.util.CapsuleWriteApi
 import com.example.multitimetracker.widget.QuickSessionWidgetProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(CapsuleWriteApi::class)
 class TimeFenceTimerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        when (intent?.action) {
-            ACTION_FIRE_TIMED_SESSION -> handleTimedSession(context, intent)
-            ACTION_ACK_TIMED_SESSION -> handleTimedSessionAcknowledge(context, intent)
-            else -> return
+        val action = intent?.action ?: return
+        if (action != ACTION_FIRE_TIMED_SESSION && action != ACTION_ACK_TIMED_SESSION) return
+        val pendingResult = goAsync()
+        val appContext = context.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                when (action) {
+                    ACTION_FIRE_TIMED_SESSION -> handleTimedSession(appContext, intent)
+                    ACTION_ACK_TIMED_SESSION -> handleTimedSessionAcknowledge(appContext, intent)
+                }
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
