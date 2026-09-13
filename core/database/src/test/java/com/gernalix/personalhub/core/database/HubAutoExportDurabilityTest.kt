@@ -137,7 +137,7 @@ class HubAutoExportDurabilityTest {
         val publisher = RecordingExportPublisher()
         DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
 
-        assertEquals(before + 21, latest)
+        assertEquals(before + 22, latest)
         assertEquals(1, scheduler.activeAutoExports)
         assertEquals(ExistingWorkPolicy.REPLACE, scheduler.lastPolicy)
         assertTrue(HubAutoExport.exportUntilClean(context) { false })

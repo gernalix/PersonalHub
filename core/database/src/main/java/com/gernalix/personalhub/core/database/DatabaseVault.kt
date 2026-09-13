@@ -209,12 +209,13 @@ object DatabaseVault {
                 }
             }
             db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { c ->
-                while(c.moveToNext()) require(c.getString(0) in tables || c.getString(0) in listOf("android_metadata", "room_master_table")) { "Unexpected database table" }
+                while(c.moveToNext()) require(c.getString(0) in tables || c.getString(0) in listOf("android_metadata", "room_master_table", HubActivityCapture.UNDO_CONTEXT_TABLE)) { "Unexpected database table" }
             }
             db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
                 while (c.moveToNext()) {
                     val name = c.getString(0); val table = c.getString(1)
                     val op = name.substringAfterLast('_')
+                    if (name.startsWith("hub_activity_") && table in tables) continue
                     require(table in tables && op in listOf("INSERT", "UPDATE", "DELETE")) { "Unexpected database trigger" }
                     val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
                     val expected = when (name) {
