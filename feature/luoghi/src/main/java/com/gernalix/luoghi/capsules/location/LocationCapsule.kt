@@ -35,7 +35,10 @@ class FusedLocationCapsule(
     override suspend fun currentLocation(): LocationSample? = withContext(Dispatchers.IO) {
         if (!hasLocationPermission(appContext)) return@withContext null
         withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
-            currentFusedLocation() ?: lastKnownLocation()
+            val nowMs = System.currentTimeMillis()
+            currentFusedLocation()
+                ?.takeIf { it.isUsable(nowMs) }
+                ?: lastKnownLocation()?.takeIf { it.isUsable(nowMs) }
         }
     }
 
@@ -43,7 +46,7 @@ class FusedLocationCapsule(
     private suspend fun currentFusedLocation(): LocationSample? = suspendCancellableCoroutine { continuation ->
         val cancellation = CancellationTokenSource()
         continuation.invokeOnCancellation { cancellation.cancel() }
-        client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cancellation.token)
+        client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cancellation.token)
             .addOnSuccessListener { location -> continuation.resume(location?.toSample()) }
             .addOnFailureListener { continuation.resume(null) }
             .addOnCanceledListener { continuation.resume(null) }
@@ -65,8 +68,17 @@ class FusedLocationCapsule(
             capturedAt = time.takeIf { it > 0L } ?: System.currentTimeMillis(),
         )
 
+    private fun LocationSample.isUsable(nowMs: Long): Boolean {
+        val ageMs = (nowMs - capturedAt).coerceAtLeast(0L)
+        val accurateEnough = accuracyM == null ||
+            (accuracyM.isFinite() && accuracyM > 0.0 && accuracyM <= MAX_LOCATION_ACCURACY_M)
+        return ageMs <= MAX_LOCATION_AGE_MS && accurateEnough
+    }
+
     companion object {
-        private const val LOCATION_TIMEOUT_MS = 4_000L
+        private const val LOCATION_TIMEOUT_MS = 6_000L
+        private const val MAX_LOCATION_AGE_MS = 2 * 60_000L
+        private const val MAX_LOCATION_ACCURACY_M = 100.0
 
         fun hasLocationPermission(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
