@@ -14,6 +14,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
@@ -72,6 +74,31 @@ class FinanceAccountsTest {
         assertEquals(draft.occurredAt, db.financeDao().transaction(id)!!.occurredAt)
         assertEquals(b.id, db.financeDao().transaction(id)!!.accountId)
         assertEquals(listOf("food", "weekly"), finance.tags(id))
+    }
+    @Test fun sameDayRecurrenceMaterializesAtAccountOpeningInstant() = db { db, finance ->
+        val date = LocalDate.of(2026, 9, 13)
+        val openedAt = date.atTime(14, 30).atZone(ZoneId.systemDefault()).toInstant().toString()
+        val account = FinanceAccount(name="Same-day EUR", currency="EUR", openedAt=openedAt)
+        finance.saveAccount(account)
+        val recurrenceId = finance.saveRecurrence(
+            RecurrenceDraft(
+                title="Same-day recurring expense",
+                amount="45.67",
+                currency="EUR",
+                accountId=account.id,
+                dayOfMonth=date.dayOfMonth,
+                startDate=date.toString(),
+            ),
+        )
+
+        val ids = finance.materializeDueRecurrences(date)
+
+        assertEquals(1, ids.size)
+        val row = requireNotNull(db.financeDao().transaction(ids.single()))
+        assertEquals(openedAt, row.occurredAt)
+        assertEquals(recurrenceId, row.recurrenceId)
+        assertEquals(date.toString(), row.occurrenceKey)
+        assertTrue(Instant.parse(row.occurredAt) >= Instant.parse(account.openedAt))
     }
     @Test fun deterministicExchangeAtomicConflictsAndCredentialFreeConfiguration() = db { db,finance ->
         val account=FinanceAccount(name="QA",currency="DKK"); finance.saveAccount(account)

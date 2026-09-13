@@ -18,6 +18,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransaction::class,
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceTag::class,
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransactionTag::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransfer::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceMacro::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceRecurrence::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceRecurrenceTag::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceRecurrenceOverride::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceAttachment::class,
     com.supercontacts.app.data.local.BackupMetadataEntity::class,
     com.supercontacts.app.data.local.ContactEntity::class,
     com.supercontacts.app.data.local.ContactFieldEntity::class,
@@ -75,7 +81,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class, HubActivityEntity::class,
-], version = 11, exportSchema = true)
+], version = 12, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -93,7 +99,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 11
+        const val SCHEMA_VERSION = 12
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -214,6 +220,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                         db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                     }
                 })
+                .addMigrations(com.gernalix.personalhub.core.database.capsules.soldi.FinanceAdvancedMigration())
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
