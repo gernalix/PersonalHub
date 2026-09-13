@@ -13,7 +13,13 @@ val checkArchitectureBoundaries = tasks.register<Exec>("checkArchitectureBoundar
     commandLine("python3", "tools/check_architecture_boundaries.py")
 }
 
+val moduleChecks = subprojects.map { project ->
+    project.tasks.matching { task -> task.name == "check" }
+}
+
 tasks.register("check") {
     group = "verification"
+    description = "Runs architecture checks and every module's verification lifecycle."
     dependsOn(checkArchitectureBoundaries)
+    dependsOn(moduleChecks)
 }
