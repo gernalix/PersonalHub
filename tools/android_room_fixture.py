@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 
@@ -37,6 +38,10 @@ def run(cmd: list[str], *, input_text: str | None = None, check: bool = True) ->
 
 def adb(serial: str, *args: str, input_text: str | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
     return run(["adb", "-s", serial, *args], input_text=input_text, check=check)
+
+
+def adb_shell(serial: str, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return adb(serial, "shell", shlex.join(args), check=check)
 
 
 def room_sql(schema_path: Path) -> tuple[int, str]:
@@ -92,26 +97,23 @@ def main() -> int:
     adb(args.serial, "shell", "am", "force-stop", args.package)
     adb(args.serial, "shell", "run-as", args.package, "mkdir", "-p", db_dir)
     # Operates only inside the explicitly supplied debuggable package sandbox.
-    cleanup = f"rm -f {db_path} {db_path}-wal {db_path}-shm"
-    adb(args.serial, "shell", "run-as", args.package, "sh", "-c", cleanup)
+    adb(args.serial, "shell", "run-as", args.package, "rm", "-f", db_path, f"{db_path}-wal", f"{db_path}-shm")
 
-    created = adb(
+    created = adb_shell(
         args.serial,
-        "exec-in",
         "run-as",
         args.package,
         "sqlite3",
         db_path,
-        input_text=sql,
+        sql,
         check=False,
     )
     if created.returncode != 0:
         print(json.dumps({"status": "blocked", "reason": "fixture_create_failed", "detail": created.stderr.strip()}, sort_keys=True))
         return 2
 
-    verify = adb(
+    verify = adb_shell(
         args.serial,
-        "shell",
         "run-as",
         args.package,
         "sqlite3",
