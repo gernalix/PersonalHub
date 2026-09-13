@@ -103,11 +103,13 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             val substance = dao.substanceById(substanceId) ?: return@withTransaction IntakeOutcome.NotFound
             if (substance.archived) return@withTransaction IntakeOutcome.Archived
             if (dao.intakeCountForKey(idempotencyKey) > 0) return@withTransaction IntakeOutcome.Duplicate
-            if (quantity <= 0.0) return@withTransaction IntakeOutcome.InvalidQuantity
+            if (!quantity.isFinite() || quantity <= 0.0) return@withTransaction IntakeOutcome.InvalidQuantity
             val requestedUnit = unit ?: substance.doseUnit
             if (!substance.stockUnit.equals(substance.doseUnit, ignoreCase = true) || !requestedUnit.equals(substance.doseUnit, ignoreCase = true)) return@withTransaction IntakeOutcome.UnsupportedUnits
             val appliedDose = substance.dosePerIntake * quantity
-            if (substance.dosePerIntake <= 0.0) return@withTransaction IntakeOutcome.InvalidQuantity
+            if (substance.dosePerIntake <= 0.0 || !appliedDose.isFinite()) return@withTransaction IntakeOutcome.InvalidQuantity
+            val stockTolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(substance.stockCurrent), kotlin.math.abs(appliedDose))
+            if (appliedDose - substance.stockCurrent > stockTolerance) return@withTransaction IntakeOutcome.InsufficientStock
             val plans = dao.allSubstances().map { it.toPlan() }
             val intakes = dao.recentIntakes().map { it.toRecord() }
             val rules = dao.allInteractionRules().map { it.toPlan(dao.allInteractionTargets()) }
@@ -120,7 +122,8 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             }
             if (state.dosesPlannedToday > 0 && state.dosesDoneToday >= state.dosesPlannedToday) return@withTransaction IntakeOutcome.Duplicate
             val prescription = dao.currentPrescription(substanceId)
-            val appliedStockDelta = -minOf(substance.stockCurrent, appliedDose)
+            val newStock = (substance.stockCurrent - appliedDose).coerceAtLeast(0.0)
+            val appliedStockDelta = newStock - substance.stockCurrent
             val eventId = dao.insertIntake(
                 IntakeEventEntity(
                     substanceId = substanceId,
@@ -134,7 +137,6 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                     prescriptionId = prescription?.id,
                 )
             )
-            val newStock = substance.stockCurrent + appliedStockDelta
             dao.updateStock(substanceId, newStock)
             dao.insertStockAdjustment(
                 StockAdjustmentEntity(
@@ -216,11 +218,12 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
     suspend fun deleteIntake(id: Long): Boolean = undoIntakes(listOf(id))
 
     suspend fun editIntake(id: Long, timestampMs: Long, quantity: Double): IntakeEditOutcome = db.withTransaction {
-        if (quantity <= 0.0) return@withTransaction IntakeEditOutcome.Invalid
+        if (!quantity.isFinite() || quantity <= 0.0) return@withTransaction IntakeEditOutcome.Invalid
         val intake = dao.intakeById(id) ?: return@withTransaction IntakeEditOutcome.NotFound
         val substance = dao.substanceById(intake.substanceId) ?: return@withTransaction IntakeEditOutcome.NotFound
         if (!substance.stockUnit.equals(intake.doseUnit, ignoreCase = true)) return@withTransaction IntakeEditOutcome.UnsupportedUnits
         val newApplied = -(intake.dose * quantity)
+        if (!newApplied.isFinite()) return@withTransaction IntakeEditOutcome.Invalid
         val correctedStock = substance.stockCurrent - intake.appliedStockDelta + newApplied
         if (correctedStock < 0.0) return@withTransaction IntakeEditOutcome.InsufficientStock
         dao.updateIntake(
