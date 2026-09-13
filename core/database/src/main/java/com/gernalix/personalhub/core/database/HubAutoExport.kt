@@ -53,12 +53,12 @@ object HubAutoExport {
 
     @Synchronized fun start(context: Context) {
         if (started) return
-        started = true
         val app = context.applicationContext
         scheduler.cancelLegacyWork(app)
         scheduler.enqueuePeriodicRecovery(app)
         requestIfDirty(app)
         com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync.checkForChanges(app)
+        started = true
     }
     fun dirty(context: Context): Boolean {
         if (DatabaseVault.folder(context) == null) return false
