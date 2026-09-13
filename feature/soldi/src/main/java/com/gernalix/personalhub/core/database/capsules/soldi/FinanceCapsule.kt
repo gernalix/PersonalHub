@@ -415,6 +415,20 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
         }
     }
 
+    private suspend fun materializedOccurrenceInstant(rule: FinanceRecurrence, date: LocalDate): String? {
+        val zone = ZoneId.systemDefault()
+        val accountIds = buildList {
+            add(rule.accountId)
+            if (rule.kind == "TRANSFER") add(requireNotNull(rule.targetAccountId))
+        }
+        val latestOpening = accountIds
+            .map { id -> Instant.parse(requireNotNull(dao.account(id)).openedAt) }
+            .maxOrNull()
+            ?: return null
+        if (latestOpening.atZone(zone).toLocalDate().isAfter(date)) return null
+        return maxOf(date.atStartOfDay(zone).toInstant(), latestOpening).toString()
+    }
+
     /** Materialize occurrences through today. Future occurrences remain projections until due. */
     suspend fun materializeDueRecurrences(today: LocalDate = LocalDate.now()): List<Long> = db.withTransaction {
         val created = mutableListOf<Long>()
@@ -427,6 +441,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                 if (dao.transactionForOccurrence(rule.id, key) != null) continue
                 val override = dao.recurrenceOverride(rule.id, key)
                 if (override?.skipped == true) continue
+                val occurredAt = materializedOccurrenceInstant(rule, date) ?: continue
                 if (rule.kind == "TRANSFER") {
                     val transfer = saveTransfer(
                         TransferDraft(
@@ -442,7 +457,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                             tags = dao.recurrenceTags(rule.id).joinToString(", "),
                             personId = rule.personId,
                             category = rule.category,
-                            occurredAt = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toString(),
+                            occurredAt = occurredAt,
                             recurrenceId = rule.id,
                             occurrenceKey = key,
                         ),
@@ -463,7 +478,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                             category = rule.category,
                             notes = rule.notes,
                             tags = dao.recurrenceTags(rule.id).joinToString(", "),
-                            occurredAt = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toString(),
+                            occurredAt = occurredAt,
                             recurrenceId = rule.id,
                             occurrenceKey = key,
                         ),
