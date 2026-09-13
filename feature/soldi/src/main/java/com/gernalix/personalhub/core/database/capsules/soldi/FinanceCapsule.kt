@@ -4,47 +4,85 @@ import android.content.Context
 import androidx.room.withTransaction
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import java.math.BigDecimal
+import java.math.RoundingMode
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Currency
 
-/** Finance boundary: all writes, dimensions and links commit atomically through PH's writer gate. */
+/** Finance boundary: all Soldi writes commit atomically through the shared PersonalHub database. */
 class FinanceCapsule(private val db: PersonalHubDatabase) {
     constructor(context: Context) : this(PersonalHubDatabase.get(context))
+
     private val dao = db.financeDao()
     val accounts = dao.accounts()
     val transactions = dao.transactions()
     val products = dao.products()
     val places = dao.places()
+    val people = dao.people()
     val tagNames = dao.tagNames()
-    suspend fun tags(id: Long) = dao.tags(id)
+    val categories = dao.categories()
+    val transfers = dao.transfers()
+    val macros = dao.macros()
+    val recurrences = dao.recurrences()
 
-    /** Reuse the most recent occurrence, preserving the draft's identity and selected date. */
+    suspend fun tags(id: Long) = dao.tags(id)
+    suspend fun recurrenceTags(id: String) = dao.recurrenceTags(id)
+    fun attachments(transactionId: Long) = dao.attachments(transactionId)
+
     suspend fun reuseLatestTitle(draft: TransactionDraft, title: String): TransactionDraft = db.withTransaction {
         val previous = dao.transactionsWithTitle(title).maxWithOrNull(
-            compareBy<FinanceTransaction> { Instant.parse(it.occurredAt) }.thenBy { it.id }
+            compareBy<FinanceTransaction> { Instant.parse(it.occurredAt) }.thenBy { it.id },
         ) ?: return@withTransaction draft.copy(title = title)
-        draft.copy(title = title, isProduct = false, productId = null,
-            amount = previous.amount, currency = previous.currency, accountId = previous.accountId,
-            chain = previous.chainId?.let { dao.chainName(it) }.orEmpty(), placeId = previous.placeId,
-            notes = previous.notes, tags = dao.tags(previous.id).joinToString(", "), fromReceipt = previous.fromReceipt)
+        draft.copy(
+            title = title,
+            isProduct = false,
+            productId = null,
+            amount = previous.amount,
+            currency = previous.currency,
+            accountId = previous.accountId,
+            chain = previous.chainId?.let { dao.chainName(it) }.orEmpty(),
+            placeId = previous.placeId,
+            personId = previous.personId,
+            category = previous.category,
+            notes = previous.notes,
+            tags = dao.tags(previous.id).joinToString(", "),
+            fromReceipt = previous.fromReceipt,
+        )
     }
 
     private suspend fun product(name: String): Long {
-        val n = name.trim(); require(n.isNotEmpty())
-        return dao.productId(n) ?: dao.add(FinanceProduct(name = n))
+        val normalized = name.trim()
+        require(normalized.isNotEmpty())
+        return dao.productId(normalized) ?: dao.add(FinanceProduct(name = normalized))
     }
+
     private suspend fun title(name: String): Long {
-        val n = name.trim(); require(n.isNotEmpty())
-        return dao.titleId(n) ?: dao.add(FinanceTitle(name = n))
+        val normalized = name.trim()
+        require(normalized.isNotEmpty())
+        return dao.titleId(normalized) ?: dao.add(FinanceTitle(name = normalized))
     }
-    private suspend fun chain(name: String): Long? = name.trim().takeIf { it.isNotEmpty() }?.let {
+
+    private suspend fun chain(name: String): Long? = name.trim().takeIf(String::isNotEmpty)?.let {
         dao.chainId(it) ?: dao.add(FinanceChain(name = it))
     }
+
     private suspend fun store(placeId: String?, chainId: Long?) {
         if (placeId == null) return
         val existing = dao.store(placeId)
         if (existing == null) dao.add(FinanceStore(placeId, chainId))
         else require(existing.chainId == chainId) { "Store chain differs" }
+    }
+
+    private suspend fun setTransactionTags(id: Long, csv: String) {
+        dao.deleteTags(id)
+        csv.split(',').map(String::trim).filter(String::isNotEmpty).distinctBy { it.lowercase() }.forEach { name ->
+            val tag = dao.tagId(name) ?: dao.add(FinanceTag(name = name))
+            dao.add(FinanceTransactionTag(id, tag))
+        }
     }
 
     suspend fun saveTransaction(draft: TransactionDraft): Long = db.withTransaction {
@@ -58,27 +96,102 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
         val selectedProduct = draft.productId?.let { requireNotNull(dao.product(it)) }
         val value = FinanceTransaction(
             id = old?.id ?: 0,
-            accountId = account.id, uuid = old?.uuid ?: java.util.UUID.randomUUID().toString(),
+            accountId = account.id,
+            uuid = old?.uuid ?: java.util.UUID.randomUUID().toString(),
             titleId = if (draft.isProduct || selectedProduct != null) null else title(draft.title),
             productId = selectedProduct?.id ?: if (draft.isProduct) product(draft.title) else null,
-            amount = decimal(draft.amount), currency = currency(draft.currency),
-            chainId = chainId, placeId = draft.placeId, fromReceipt = draft.fromReceipt, notes = draft.notes,
-            occurredAt = utc(draft.occurredAt), createdAt = old?.createdAt ?: now, updatedAt = now
+            amount = decimal(draft.amount),
+            currency = currency(draft.currency),
+            chainId = chainId,
+            placeId = draft.placeId,
+            fromReceipt = draft.fromReceipt,
+            notes = draft.notes,
+            occurredAt = utc(draft.occurredAt),
+            createdAt = old?.createdAt ?: now,
+            updatedAt = now,
+            personId = draft.personId,
+            macroId = draft.macroId,
+            recurrenceId = draft.recurrenceId,
+            occurrenceKey = draft.occurrenceKey,
+            reminderAt = draft.reminderAt?.takeIf(String::isNotBlank)?.let(::utc),
+            category = draft.category.trim(),
         )
-        val id = if (old == null) dao.add(value) else { dao.update(value); old.id }
-        dao.deleteTags(id)
-        draft.tags.split(',').map(String::trim).filter(String::isNotEmpty).distinct().forEach { name ->
-            val tag = dao.tagId(name) ?: dao.add(FinanceTag(name = name))
-            dao.add(FinanceTransactionTag(id, tag))
+        val id = if (old == null) dao.add(value) else {
+            dao.update(value)
+            old.id
         }
+        setTransactionTags(id, draft.tags)
         id
     }
 
-    /** Import all accepted receipt lines as one atomic finance operation. */
+    /** Two ledger legs plus one transfer record form a single logical transfer. */
+    suspend fun saveTransfer(draft: TransferDraft): FinanceTransfer = db.withTransaction {
+        val source = requireNotNull(dao.account(draft.sourceAccountId))
+        val target = requireNotNull(dao.account(draft.targetAccountId))
+        require(source.id != target.id)
+        val sourceAmount = BigDecimal(decimal(draft.sourceAmount)).abs()
+        val targetAmount = BigDecimal(decimal(draft.targetAmount)).abs()
+        require(sourceAmount.signum() > 0 && targetAmount.signum() > 0)
+        val old = draft.transferId?.let { dao.transfer(it) }
+        val sourceId = saveTransaction(
+            TransactionDraft(
+                id = old?.sourceTransactionId,
+                title = draft.title.ifBlank { "Transfer" },
+                amount = sourceAmount.negate().stripTrailingZeros().toPlainString(),
+                currency = source.currency,
+                accountId = source.id,
+                notes = draft.notes,
+                tags = draft.tags,
+                personId = draft.personId,
+                category = draft.category,
+                occurredAt = draft.occurredAt,
+                reminderAt = draft.reminderAt,
+                recurrenceId = draft.recurrenceId,
+                occurrenceKey = draft.occurrenceKey,
+            ),
+        )
+        val targetId = saveTransaction(
+            TransactionDraft(
+                id = old?.targetTransactionId,
+                title = draft.title.ifBlank { "Transfer" },
+                amount = targetAmount.stripTrailingZeros().toPlainString(),
+                currency = target.currency,
+                accountId = target.id,
+                notes = draft.notes,
+                tags = draft.tags,
+                personId = draft.personId,
+                category = draft.category,
+                occurredAt = draft.occurredAt,
+                recurrenceId = draft.recurrenceId,
+                occurrenceKey = draft.occurrenceKey,
+            ),
+        )
+        val value = FinanceTransfer(
+            id = old?.id ?: draft.transferId ?: java.util.UUID.randomUUID().toString(),
+            sourceTransactionId = sourceId,
+            targetTransactionId = targetId,
+            quotedRate = draft.quotedRate?.takeIf(String::isNotBlank)?.let(::decimal),
+            feeAmount = draft.feeAmount?.takeIf(String::isNotBlank)?.let(::decimal),
+            feeCurrency = draft.feeCurrency?.takeIf(String::isNotBlank)?.let(::currency),
+            createdAt = old?.createdAt ?: Instant.now().toString(),
+        )
+        if (old == null) dao.add(value) else dao.update(value)
+        value
+    }
+
+    /** Receipt import creates one non-posting macro and leaf postings that alone affect balances. */
     suspend fun importReceipt(value: FinanceReceiptImport): List<FinanceReceiptImportResult> = db.withTransaction {
         require(value.items.isNotEmpty())
         val occurredAt = utc(value.occurredAt)
         val receiptCurrency = currency(value.currency)
+        val account = value.accountId?.let { requireNotNull(dao.account(it)) } ?: defaultAccount(receiptCurrency)
+        val macro = FinanceMacro(
+            title = value.merchant.ifBlank { "Receipt" },
+            accountId = account.id,
+            currency = receiptCurrency,
+            occurredAt = occurredAt,
+        )
+        dao.add(macro)
         value.items.map { item ->
             val selected = item.productId?.let { requireNotNull(dao.product(it)) }
             val productId = selected?.id ?: product(item.productName)
@@ -91,54 +204,305 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                     amount = amount,
                     currency = receiptCurrency,
                     chain = value.merchant,
+                    category = value.category,
                     fromReceipt = true,
                     occurredAt = occurredAt,
-                    accountId = value.accountId,
+                    accountId = account.id,
                     productId = canonicalProduct.id,
-                )
+                    macroId = macro.id,
+                ),
             )
             FinanceReceiptImportResult(item.rawDescription, canonicalProduct, transactionId)
         }
     }
 
     suspend fun deleteTransaction(id: Long) {
-        val uuid = db.withTransaction { dao.transaction(id)?.uuid.also { dao.deleteTransaction(id) } }
-        uuid?.let {
+        val deletedUuids = db.withTransaction {
+            val transfer = dao.transferForTransaction(id)
+            val ids = if (transfer == null) listOf(id) else listOf(transfer.sourceTransactionId, transfer.targetTransactionId)
+            val uuids = ids.mapNotNull { dao.transaction(it)?.uuid }
+            transfer?.let { dao.deleteTransfer(it.id) }
+            ids.distinct().forEach { dao.deleteTransaction(it) }
+            uuids
+        }
+        deletedUuids.forEach {
             com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalDeletedIfInitialized(
                 com.gernalix.personalhub.contracts.database.HubEntityRef("soldi", "transaction", it),
             )
         }
     }
+
+    suspend fun deleteMacro(id: String) = db.withTransaction {
+        dao.macroChildren(id).forEach { dao.deleteTransaction(it.id) }
+        dao.deleteMacro(id)
+    }
+
     suspend fun saveProduct(id: Long?, name: String) = db.withTransaction {
         if (id == null) product(name) else {
-            require(name.isNotBlank()); dao.update(requireNotNull(dao.product(id)).copy(name = name.trim())); id
+            require(name.isNotBlank())
+            dao.update(requireNotNull(dao.product(id)).copy(name = name.trim()))
+            id
         }
     }
+
     suspend fun deleteProduct(id: Long) = db.withTransaction { dao.deleteProduct(id) }
 
     private suspend fun defaultAccount(code: String): FinanceAccount {
-        val c = currency(code)
-        val id = java.util.UUID.nameUUIDFromBytes(("finance-default:" + c).toByteArray()).toString()
-        return dao.account(id) ?: FinanceAccount(id = id, name = c, currency = c).also { dao.add(it) }
+        val normalized = currency(code)
+        val id = java.util.UUID.nameUUIDFromBytes(("finance-default:" + normalized).toByteArray()).toString()
+        return dao.account(id) ?: FinanceAccount(id = id, name = normalized, currency = normalized).also { dao.add(it) }
     }
+
     suspend fun saveAccount(value: FinanceAccount): String = db.withTransaction {
         require(value.name.isNotBlank())
-        val account = value.copy(name = value.name.trim(), currency = currency(value.currency), openingBalance = decimal(value.openingBalance), openedAt = utc(value.openedAt))
+        val account = value.copy(
+            name = value.name.trim(),
+            currency = currency(value.currency),
+            openingBalance = decimal(value.openingBalance),
+            openedAt = utc(value.openedAt),
+        )
         val rows = dao.allTransactions().filter { it.accountId == account.id }
         require(rows.all { it.currency == account.currency && Instant.parse(it.occurredAt) >= Instant.parse(account.openedAt) })
         if (dao.account(account.id) == null) dao.add(account) else dao.update(account)
         account.id
     }
+
     suspend fun setIncluded(id: String, included: Boolean) = db.withTransaction {
         dao.update(requireNotNull(dao.account(id)).copy(included = included))
     }
+
     suspend fun reconcile(id: String, at: String, desired: String, title: String, notes: String): Long? = db.withTransaction {
-        val account = requireNotNull(dao.account(id)); val instant = Instant.parse(utc(at))
+        val account = requireNotNull(dao.account(id))
+        val instant = Instant.parse(utc(at))
         require(instant >= Instant.parse(account.openedAt))
         val difference = BigDecimal(decimal(desired)) - balance(account, dao.allTransactions(), instant)
-        if (difference.signum() == 0) null else saveTransaction(TransactionDraft(
-            title = title, amount = difference.toPlainString(), currency = account.currency, notes = notes,
-            tags = "reconciliation", occurredAt = instant.toString(), accountId = id))
+        if (difference.signum() == 0) null else saveTransaction(
+            TransactionDraft(
+                title = title,
+                amount = difference.toPlainString(),
+                currency = account.currency,
+                notes = notes,
+                tags = "reconciliation",
+                occurredAt = instant.toString(),
+                accountId = id,
+            ),
+        )
+    }
+
+    suspend fun addAttachment(transactionId: Long, draft: AttachmentDraft): FinanceAttachment = db.withTransaction {
+        requireNotNull(dao.transaction(transactionId))
+        require(draft.uri.isNotBlank())
+        FinanceAttachment(
+            transactionId = transactionId,
+            kind = draft.kind,
+            uri = draft.uri.trim(),
+            title = draft.title.trim(),
+            mimeType = draft.mimeType,
+        ).also { dao.add(it) }
+    }
+
+    suspend fun deleteAttachment(id: String) = db.withTransaction { dao.deleteAttachment(id) }
+
+    suspend fun saveRecurrence(draft: RecurrenceDraft): String = db.withTransaction {
+        val kind = recurrenceKind(draft.kind)
+        val account = requireNotNull(dao.account(draft.accountId))
+        val sourceAbs = BigDecimal(decimal(draft.amount)).abs()
+        require(sourceAbs.signum() > 0)
+        require(account.currency == currency(draft.currency))
+        require((draft.dayOfMonth != null) xor draft.lastBusinessDay)
+        draft.dayOfMonth?.let { require(it in 1..31) }
+        draft.reminderDaysBefore?.let { require(it >= 0) }
+        val start = LocalDate.parse(draft.startDate)
+        val end = draft.endDate?.takeIf(String::isNotBlank)?.let(LocalDate::parse)
+        require(end == null || !end.isBefore(start))
+
+        val target = if (kind == "TRANSFER") requireNotNull(draft.targetAccountId).let { requireNotNull(dao.account(it)) } else null
+        if (target != null) require(target.id != account.id)
+        val normalizedAmount = when (kind) {
+            "EXPENSE", "TRANSFER" -> sourceAbs.negate().stripTrailingZeros().toPlainString()
+            else -> sourceAbs.stripTrailingZeros().toPlainString()
+        }
+        val normalizedTarget = if (kind == "TRANSFER") {
+            BigDecimal(decimal(requireNotNull(draft.targetAmount))).abs().also { require(it.signum() > 0) }.stripTrailingZeros().toPlainString()
+        } else null
+
+        val now = Instant.now().toString()
+        val old = draft.id?.let { dao.recurrence(it) }
+        val value = FinanceRecurrence(
+            id = old?.id ?: draft.id ?: java.util.UUID.randomUUID().toString(),
+            title = draft.title.trim().also { require(it.isNotBlank()) },
+            amount = normalizedAmount,
+            currency = account.currency,
+            accountId = account.id,
+            personId = draft.personId,
+            chain = draft.chain.trim(),
+            placeId = draft.placeId,
+            notes = draft.notes,
+            dayOfMonth = draft.dayOfMonth,
+            lastBusinessDay = draft.lastBusinessDay,
+            startDate = start.toString(),
+            endDate = end?.toString(),
+            reminderDaysBefore = draft.reminderDaysBefore,
+            enabled = draft.enabled,
+            createdAt = old?.createdAt ?: now,
+            updatedAt = now,
+            kind = kind,
+            targetAccountId = target?.id,
+            targetAmount = normalizedTarget,
+            quotedRate = draft.quotedRate?.takeIf(String::isNotBlank)?.let(::decimal),
+            feeAmount = draft.feeAmount?.takeIf(String::isNotBlank)?.let(::decimal),
+            feeCurrency = draft.feeCurrency?.takeIf(String::isNotBlank)?.let(::currency),
+            category = draft.category.trim(),
+        )
+        if (old == null) dao.add(value) else dao.update(value)
+        dao.deleteRecurrenceTags(value.id)
+        draft.tags.split(',').map(String::trim).filter(String::isNotEmpty).distinctBy { it.lowercase() }.forEach { name ->
+            val tagId = dao.tagId(name) ?: dao.add(FinanceTag(name = name))
+            dao.add(FinanceRecurrenceTag(value.id, tagId))
+        }
+        value.id
+    }
+
+    suspend fun setRecurrenceEnabled(id: String, enabled: Boolean) = db.withTransaction {
+        val row = requireNotNull(dao.recurrence(id))
+        dao.update(row.copy(enabled = enabled, updatedAt = Instant.now().toString()))
+    }
+
+    suspend fun deleteRecurrence(id: String) = db.withTransaction { dao.deleteRecurrence(id) }
+
+    suspend fun editRecurrenceAmount(
+        id: String,
+        occurrenceDate: LocalDate,
+        amount: String,
+        targetAmount: String? = null,
+        scope: RecurrenceEditScope,
+    ): String = db.withTransaction {
+        val row = requireNotNull(dao.recurrence(id))
+        val sourceAbs = BigDecimal(decimal(amount)).abs()
+        val normalized = if (row.kind == "INCOME") sourceAbs.toPlainString() else sourceAbs.negate().toPlainString()
+        val normalizedTarget = if (row.kind == "TRANSFER") {
+            BigDecimal(decimal(targetAmount ?: requireNotNull(row.targetAmount))).abs().stripTrailingZeros().toPlainString()
+        } else null
+        when (scope) {
+            RecurrenceEditScope.ONLY_THIS -> {
+                dao.put(FinanceRecurrenceOverride(id, occurrenceDate.toString(), amount = normalized, targetAmount = normalizedTarget))
+                id
+            }
+            RecurrenceEditScope.THIS_AND_FOLLOWING -> {
+                val start = LocalDate.parse(row.startDate)
+                if (!occurrenceDate.isAfter(start)) {
+                    dao.update(row.copy(amount = normalized, targetAmount = normalizedTarget ?: row.targetAmount, startDate = occurrenceDate.toString(), updatedAt = Instant.now().toString()))
+                    id
+                } else {
+                    val originalEnd = row.endDate
+                    dao.update(row.copy(endDate = occurrenceDate.minusDays(1).toString(), updatedAt = Instant.now().toString()))
+                    val newId = java.util.UUID.randomUUID().toString()
+                    dao.add(
+                        row.copy(
+                            id = newId,
+                            amount = normalized,
+                            targetAmount = normalizedTarget ?: row.targetAmount,
+                            startDate = occurrenceDate.toString(),
+                            endDate = originalEnd,
+                            createdAt = Instant.now().toString(),
+                            updatedAt = Instant.now().toString(),
+                        ),
+                    )
+                    dao.recurrenceTagIds(id).forEach { dao.add(FinanceRecurrenceTag(newId, it)) }
+                    newId
+                }
+            }
+        }
+    }
+
+    /** Materialize occurrences through today. Future occurrences remain projections until due. */
+    suspend fun materializeDueRecurrences(today: LocalDate = LocalDate.now()): List<Long> = db.withTransaction {
+        val created = mutableListOf<Long>()
+        for (rule in dao.enabledRecurrences()) {
+            val start = LocalDate.parse(rule.startDate)
+            val end = rule.endDate?.let(LocalDate::parse)?.let { minOf(it, today) } ?: today
+            if (end.isBefore(start)) continue
+            for (date in occurrenceDates(rule, start, end)) {
+                val key = date.toString()
+                if (dao.transactionForOccurrence(rule.id, key) != null) continue
+                val override = dao.recurrenceOverride(rule.id, key)
+                if (override?.skipped == true) continue
+                if (rule.kind == "TRANSFER") {
+                    val transfer = saveTransfer(
+                        TransferDraft(
+                            title = rule.title,
+                            sourceAccountId = rule.accountId,
+                            targetAccountId = requireNotNull(rule.targetAccountId),
+                            sourceAmount = override?.amount ?: rule.amount,
+                            targetAmount = override?.targetAmount ?: requireNotNull(rule.targetAmount),
+                            quotedRate = rule.quotedRate,
+                            feeAmount = rule.feeAmount,
+                            feeCurrency = rule.feeCurrency,
+                            notes = rule.notes,
+                            tags = dao.recurrenceTags(rule.id).joinToString(", "),
+                            personId = rule.personId,
+                            category = rule.category,
+                            occurredAt = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toString(),
+                            recurrenceId = rule.id,
+                            occurrenceKey = key,
+                        ),
+                    )
+                    dao.put(FinanceRecurrenceOverride(rule.id, key, amount = override?.amount, targetAmount = override?.targetAmount, skipped = false, transactionId = transfer.sourceTransactionId))
+                    created += transfer.sourceTransactionId
+                    created += transfer.targetTransactionId
+                } else {
+                    val id = saveTransaction(
+                        TransactionDraft(
+                            title = rule.title,
+                            amount = override?.amount ?: rule.amount,
+                            currency = rule.currency,
+                            accountId = rule.accountId,
+                            chain = rule.chain,
+                            placeId = rule.placeId,
+                            personId = rule.personId,
+                            category = rule.category,
+                            notes = rule.notes,
+                            tags = dao.recurrenceTags(rule.id).joinToString(", "),
+                            occurredAt = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toString(),
+                            recurrenceId = rule.id,
+                            occurrenceKey = key,
+                        ),
+                    )
+                    dao.put(FinanceRecurrenceOverride(rule.id, key, amount = override?.amount, skipped = false, transactionId = id))
+                    created += id
+                }
+            }
+        }
+        created
+    }
+
+    suspend fun projectedOccurrences(from: LocalDate, to: LocalDate): List<ProjectedOccurrence> = db.withTransaction {
+        require(!to.isBefore(from))
+        dao.enabledRecurrences().flatMap { rule ->
+            occurrenceDates(rule, from, to).flatMap { date ->
+                val override = dao.recurrenceOverride(rule.id, date.toString())
+                if (override?.skipped == true) return@flatMap emptyList()
+                val materializedId = override?.transactionId ?: dao.transactionForOccurrence(rule.id, date.toString())?.id
+                if (rule.kind == "TRANSFER") {
+                    val target = requireNotNull(rule.targetAccountId).let { requireNotNull(dao.account(it)) }
+                    listOf(
+                        ProjectedOccurrence(rule.id, rule.title, override?.amount ?: rule.amount, rule.currency, rule.accountId, date, materializedId, "SOURCE"),
+                        ProjectedOccurrence(rule.id, rule.title, override?.targetAmount ?: requireNotNull(rule.targetAmount), target.currency, target.id, date, materializedId, "TARGET"),
+                    )
+                } else {
+                    listOf(ProjectedOccurrence(rule.id, rule.title, override?.amount ?: rule.amount, rule.currency, rule.accountId, date, materializedId, "SINGLE"))
+                }
+            }
+        }.sortedWith(compareBy<ProjectedOccurrence> { it.date }.thenBy { it.title }.thenBy { it.leg })
+    }
+
+    suspend fun nextOccurrence(rule: FinanceRecurrence, after: LocalDate = LocalDate.now()): LocalDate? {
+        for (date in occurrenceDates(rule, after, after.plusYears(2))) {
+            val override = dao.recurrenceOverride(rule.id, date.toString())
+            if (override?.skipped == true) continue
+            if (dao.transactionForOccurrence(rule.id, date.toString()) == null) return date
+        }
+        return null
     }
 
     companion object {
@@ -147,24 +511,149 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             return rows.filter { it.accountId == account.id && Instant.parse(it.occurredAt) <= at }
                 .fold(BigDecimal(account.openingBalance)) { sum, row -> sum + BigDecimal(row.amount) }
         }
+
         fun totals(accounts: List<FinanceAccount>, rows: List<FinanceTransaction>, at: Instant = Instant.now()): Map<String, BigDecimal> =
             accounts.filter { it.included }.groupBy { it.currency }.toSortedMap().mapValues { (_, group) ->
                 group.fold(BigDecimal.ZERO) { sum, account -> sum + balance(account, rows, at) }
             }
+
+        fun projectedTotals(
+            accounts: List<FinanceAccount>,
+            rows: List<FinanceTransaction>,
+            at: Instant,
+            projected: List<ProjectedOccurrence>,
+        ): Map<String, BigDecimal> {
+            val base = totals(accounts, rows, at).toMutableMap()
+            val includedIds = accounts.filter { it.included }.map { it.id }.toSet()
+            projected.filter { it.accountId in includedIds && it.materializedTransactionId == null }.forEach { occurrence ->
+                base[occurrence.currency] = (base[occurrence.currency] ?: BigDecimal.ZERO) + BigDecimal(occurrence.amount)
+            }
+            return base.toSortedMap()
+        }
+
+        fun effectiveRate(sourceAmount: String, targetAmount: String): BigDecimal {
+            val source = BigDecimal(decimal(sourceAmount)).abs()
+            val target = BigDecimal(decimal(targetAmount)).abs()
+            require(source.signum() != 0)
+            return target.divide(source, 8, RoundingMode.HALF_UP).stripTrailingZeros()
+        }
 
         fun decimal(input: String): String {
             val value = input.trim().replace(',', '.')
             require(value.matches(Regex("[+-]?[0-9]+(\\.[0-9]+)?")))
             return BigDecimal(value).stripTrailingZeros().toPlainString()
         }
+
         fun currency(input: String): String = input.trim().uppercase(java.util.Locale.ROOT).also { Currency.getInstance(it) }
         fun utc(input: String): String = Instant.parse(input.trim()).toString()
+
+        fun occurrenceDate(rule: FinanceRecurrence, month: YearMonth): LocalDate = if (rule.lastBusinessDay) {
+            var date = month.atEndOfMonth()
+            while (date.dayOfWeek == DayOfWeek.SATURDAY || date.dayOfWeek == DayOfWeek.SUNDAY) date = date.minusDays(1)
+            date
+        } else {
+            month.atDay(minOf(requireNotNull(rule.dayOfMonth), month.lengthOfMonth()))
+        }
+
+        fun occurrenceDates(rule: FinanceRecurrence, from: LocalDate, to: LocalDate): List<LocalDate> {
+            if (to.isBefore(from)) return emptyList()
+            val start = maxOf(from, LocalDate.parse(rule.startDate))
+            val boundedTo = rule.endDate?.let(LocalDate::parse)?.let { minOf(to, it) } ?: to
+            if (boundedTo.isBefore(start)) return emptyList()
+            val firstMonth = YearMonth.from(start)
+            val lastMonth = YearMonth.from(boundedTo)
+            val months = ChronoUnit.MONTHS.between(firstMonth, lastMonth).toInt()
+            return (0..months)
+                .map { occurrenceDate(rule, firstMonth.plusMonths(it.toLong())) }
+                .filter { !it.isBefore(start) && !it.isAfter(boundedTo) }
+        }
+
+        fun recurrenceKind(value: String): String = value.trim().uppercase().also { require(it in setOf("EXPENSE", "INCOME", "TRANSFER")) }
     }
 }
 
-data class TransactionDraft(val id: Long? = null, val title: String = "", val isProduct: Boolean = false,
-    val amount: String = "", val currency: String = "DKK", val chain: String = "", val placeId: String? = null,
-    val notes: String = "", val tags: String = "", val fromReceipt: Boolean = false, val occurredAt: String = Instant.now().toString(), val accountId: String? = null, val productId: Long? = null)
+data class TransactionDraft(
+    val id: Long? = null,
+    val title: String = "",
+    val isProduct: Boolean = false,
+    val amount: String = "",
+    val currency: String = "DKK",
+    val chain: String = "",
+    val placeId: String? = null,
+    val notes: String = "",
+    val tags: String = "",
+    val fromReceipt: Boolean = false,
+    val occurredAt: String = Instant.now().toString(),
+    val accountId: String? = null,
+    val productId: Long? = null,
+    val personId: Long? = null,
+    val macroId: String? = null,
+    val recurrenceId: String? = null,
+    val occurrenceKey: String? = null,
+    val reminderAt: String? = null,
+    val category: String = "",
+)
+
+data class TransferDraft(
+    val transferId: String? = null,
+    val title: String = "Transfer",
+    val sourceAccountId: String,
+    val targetAccountId: String,
+    val sourceAmount: String,
+    val targetAmount: String,
+    val quotedRate: String? = null,
+    val feeAmount: String? = null,
+    val feeCurrency: String? = null,
+    val notes: String = "",
+    val tags: String = "",
+    val personId: Long? = null,
+    val category: String = "",
+    val occurredAt: String = Instant.now().toString(),
+    val reminderAt: String? = null,
+    val recurrenceId: String? = null,
+    val occurrenceKey: String? = null,
+)
+
+data class RecurrenceDraft(
+    val id: String? = null,
+    val title: String,
+    val amount: String,
+    val currency: String,
+    val accountId: String,
+    val personId: Long? = null,
+    val chain: String = "",
+    val placeId: String? = null,
+    val notes: String = "",
+    val tags: String = "",
+    val dayOfMonth: Int? = null,
+    val lastBusinessDay: Boolean = false,
+    val startDate: String = LocalDate.now().toString(),
+    val endDate: String? = null,
+    val reminderDaysBefore: Int? = null,
+    val enabled: Boolean = true,
+    val kind: String = "EXPENSE",
+    val targetAccountId: String? = null,
+    val targetAmount: String? = null,
+    val quotedRate: String? = null,
+    val feeAmount: String? = null,
+    val feeCurrency: String? = null,
+    val category: String = "",
+)
+
+enum class RecurrenceEditScope { ONLY_THIS, THIS_AND_FOLLOWING }
+
+data class ProjectedOccurrence(
+    val recurrenceId: String,
+    val title: String,
+    val amount: String,
+    val currency: String,
+    val accountId: String,
+    val date: LocalDate,
+    val materializedTransactionId: Long?,
+    val leg: String,
+)
+
+data class AttachmentDraft(val kind: String, val uri: String, val title: String = "", val mimeType: String? = null)
 
 data class FinanceReceiptImport(
     val merchant: String,
@@ -172,17 +661,9 @@ data class FinanceReceiptImport(
     val currency: String,
     val accountId: String?,
     val items: List<FinanceReceiptImportItem>,
+    val category: String = "",
 )
 
-data class FinanceReceiptImportItem(
-    val rawDescription: String,
-    val productName: String,
-    val productId: Long?,
-    val totalPrice: String,
-)
+data class FinanceReceiptImportItem(val rawDescription: String, val productName: String, val productId: Long?, val totalPrice: String)
 
-data class FinanceReceiptImportResult(
-    val rawDescription: String,
-    val product: FinanceProduct,
-    val transactionId: Long,
-)
+data class FinanceReceiptImportResult(val rawDescription: String, val product: FinanceProduct, val transactionId: Long)
