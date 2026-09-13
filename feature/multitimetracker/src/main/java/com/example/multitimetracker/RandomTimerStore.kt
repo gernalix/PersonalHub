@@ -33,9 +33,13 @@ object RandomTimerStore {
 
     fun unansweredCompletedSession(context: Context, sessions: List<SessionUi>): SessionUi? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        return sessions
-            .filter { it.endMs != null && isRandomSession(context, it.id) }
-            .firstOrNull { !prefs.getBoolean(KEY_ANSWERED_PREFIX + it.id, false) }
+        val randomIds = prefs.getStringSet(KEY_IDS, emptySet()).orEmpty()
+        return sessions.firstOrNull { session ->
+            session.endMs != null &&
+                session.deletedAtMs == null &&
+                session.id.toString() in randomIds &&
+                !prefs.getBoolean(KEY_ANSWERED_PREFIX + session.id, false)
+        }
     }
 
     fun markAnswered(context: Context, sessionId: Long) {
