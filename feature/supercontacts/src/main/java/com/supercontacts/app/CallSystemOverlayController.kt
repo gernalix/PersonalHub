@@ -52,7 +52,6 @@ object CallSystemOverlayController {
             if (!CallOverlayPermission.canDrawOverlays(appContext)) {
                 if (requestGate.isCurrent(requestToken)) {
                     Log.w(TAG, "Cannot show system call overlay: SYSTEM_ALERT_WINDOW is not allowed")
-                    requestOverlayPermission(appContext)
                 }
                 return@launch
             }
@@ -102,7 +101,6 @@ object CallSystemOverlayController {
             Log.i(TAG, "System call overlay shown matched=${match != null}")
         }.onFailure { error ->
             Log.e(TAG, "Failed to show system call overlay", error)
-            requestOverlayPermission(context)
         }
     }
 
@@ -199,13 +197,5 @@ object CallSystemOverlayController {
         }
         context.startActivity(intent)
         Log.i(TAG, "Open contact requested from system call overlay")
-    }
-
-    private fun requestOverlayPermission(context: Context) {
-        runCatching {
-            context.startActivity(CallOverlayPermission.settingsIntent(context))
-        }.onFailure { error ->
-            Log.w(TAG, "Unable to open overlay permission settings", error)
-        }
     }
 }
