@@ -57,6 +57,7 @@ internal fun buildTemporalEntries(
     peopleTitle: String = "People",
 ): List<TemporalEntry> {
     val regular = records.filterNot { it.moduleId == "wordpulse" }.map { record ->
+        val refs = listOfNotNull(record.entityRef)
         TemporalEntry(
             id = "record:${record.moduleId}/${record.source}/${record.stableId}",
             sectionKey = record.moduleId,
@@ -64,7 +65,8 @@ internal fun buildTemporalEntries(
             title = record.title,
             subtitle = listOfNotNull(formatHubDateTime(record.startMs), record.subtitle).joinToString(" · "),
             startMs = record.startMs,
-            refs = listOfNotNull(record.entityRef ?: HubEntityRef(record.moduleId, record.source, record.stableId)),
+            refs = refs,
+            selectable = refs.isNotEmpty(),
         )
     }
     val people = boundedPeople.distinctBy { it.ref }.map { person ->
@@ -81,6 +83,7 @@ internal fun buildTemporalEntries(
     val wordPulse = records.filter { it.moduleId == "wordpulse" }
     val wordPulseEntry = if (wordPulse.isNotEmpty()) {
         val scores = wordPulse.mapNotNull { it.attributes["fatigueScore"]?.toIntOrNull() }.filter { it in 0..100 }
+        val refs = wordPulse.mapNotNull { it.entityRef }.distinct()
         TemporalEntry(
             id = "wordpulse:aggregate",
             sectionKey = "wordpulse",
@@ -88,7 +91,8 @@ internal fun buildTemporalEntries(
             title = scores.takeIf { it.isNotEmpty() }?.let { wordPulseAvailableLabel(it.average().roundToInt()) } ?: wordPulseUnavailableLabel,
             subtitle = null,
             startMs = wordPulse.maxOf { it.startMs },
-            refs = wordPulse.mapNotNull { it.entityRef }.distinct(),
+            refs = refs,
+            selectable = refs.isNotEmpty(),
         )
     } else null
     return (people + regular + listOfNotNull(wordPulseEntry))
@@ -232,19 +236,24 @@ fun HubTemporalSearchScreen(
             pages.associate { (moduleId, page) -> moduleId to page.nextCursor }
         }
         val incoming = mergeTemporalSlices(pages.map { it.second.records }, from, to, selected)
-        records = if (append) {
+        val nextRecords = if (append) {
             mergeTemporalSlices(listOf(records, incoming), from, to, selected)
                 .distinctBy { Triple(it.moduleId, it.source, it.stableId) }
         } else incoming
-        val visibleRecords = records
+        records = nextRecords
+        val recordsNeedingPeopleLookup = if (append) incoming else nextRecords
         val linkedPeople = coroutineScope {
-            visibleRecords.mapNotNull { record -> record.entityRef }.distinct().map { ref ->
+            recordsNeedingPeopleLookup.mapNotNull { record -> record.entityRef }.distinct().map { ref ->
                 async(Dispatchers.IO) {
                     HubContextRuntime.linked(ref).filter { it.ref.moduleId == "people" && it.ref.entityKind == "person" }
                 }
             }.awaitAll().flatten()
         }.distinctBy { it.ref }
-        boundedPeople = linkedPeople
+        boundedPeople = if (append) {
+            (boundedPeople + linkedPeople).distinctBy { it.ref }
+        } else {
+            linkedPeople
+        }
         if (!append) {
             saving = false
             selectedRefs = emptyList()
