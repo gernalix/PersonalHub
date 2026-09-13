@@ -7,19 +7,24 @@ import com.gernalix.luoghi.data.PlaceEventEntity
 
 object CheckInPolicy {
     const val DEFAULT_RADIUS_M = 75.0
+    private const val MAX_ACCURACY_ALLOWANCE_M = 100.0
     private const val MAX_AMBIGUOUS_CHOICES = 5
 
     fun choosePlace(
         places: List<PlaceEntity>,
         location: LocationSample,
     ): CheckInMatchDecision {
+        val accuracyAllowanceM = location.accuracyM
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?.coerceAtMost(MAX_ACCURACY_ALLOWANCE_M)
+            ?: 0.0
         val candidates = places
             .filter { !it.archived }
             .mapNotNull { place ->
                 val lat = place.lat ?: return@mapNotNull null
                 val lon = place.lon ?: return@mapNotNull null
                 val distance = GeoSearch.distanceMeters(location.latitude, location.longitude, lat, lon)
-                if (distance <= effectiveRadiusM(place)) {
+                if (distance <= effectiveRadiusM(place) + accuracyAllowanceM) {
                     CheckInCandidate(place, distance)
                 } else {
                     null
