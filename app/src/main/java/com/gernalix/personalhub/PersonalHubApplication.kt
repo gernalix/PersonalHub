@@ -3,6 +3,7 @@ package com.gernalix.personalhub
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import android.util.Log
 import android.view.Choreographer
 import androidx.work.Configuration
 import com.example.multitimetracker.api.TimerStartupApi
@@ -27,13 +28,10 @@ class PersonalHubApplication : Application(), Configuration.Provider {
         get() = Configuration.Builder().build()
 
     override fun onCreate() {
-        if (Application.getProcessName() != packageName) {
-            super.onCreate()
-            return
-        }
+        super.onCreate()
+        if (Application.getProcessName() != packageName) return
         TimerStartupApi.applicationOnCreate()
         DatabaseVault.recoverInterruptedImport(this)
-        super.onCreate()
         TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(this)
         HubContextRuntime.initialize(
             this,
@@ -53,6 +51,7 @@ class PersonalHubApplication : Application(), Configuration.Provider {
 }
 
 private object PostFirstFrameStartup {
+    private const val TAG = "PersonalHubStartup"
     private val started = AtomicBoolean(false)
     private val executor = Executors.newSingleThreadExecutor {
         Thread(it, "personalhub-post-frame-startup").apply { isDaemon = true }
@@ -66,10 +65,10 @@ private object PostFirstFrameStartup {
                 app.unregisterActivityLifecycleCallbacks(this)
                 Choreographer.getInstance().postFrameCallback {
                     executor.execute {
-                        DatabaseVault.cleanupOrphanedPreImportBackups(app)
-                        HubAutoExport.start(app)
-                        DatasetteSync.start(app)
-                        WorkflowyDaysSync.ensureScheduled(app)
+                        runStep("database backup cleanup") { DatabaseVault.cleanupOrphanedPreImportBackups(app) }
+                        runStep("auto-export") { HubAutoExport.start(app) }
+                        runStep("Datasette sync") { DatasetteSync.start(app) }
+                        runStep("Workflowy days sync") { WorkflowyDaysSync.ensureScheduled(app) }
                     }
                 }
             }
@@ -81,5 +80,11 @@ private object PostFirstFrameStartup {
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
         })
+    }
+
+    private fun runStep(name: String, block: () -> Unit) {
+        runCatching(block).onFailure { error ->
+            Log.e(TAG, "$name failed", error)
+        }
     }
 }
