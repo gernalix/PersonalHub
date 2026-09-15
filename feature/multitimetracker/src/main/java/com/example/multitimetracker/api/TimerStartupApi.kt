@@ -11,9 +11,10 @@ object TimerStartupApi {
     /**
      * Heals tag/session edges omitted by older session-only bootstraps.
      *
-     * The host calls this after interrupted DB-import recovery and before any
-     * Activity can mutate Timer state. The repair is additive/idempotent and
-     * CriticalDataGuard remains authoritative if a legacy row cannot be mapped.
+     * The host runs this off the UI thread after interrupted DB-import recovery.
+     * The repair is additive/idempotent and uses a database transaction, so it
+     * does not need to delay the first Activity/frame. CriticalDataGuard remains
+     * authoritative if a legacy row cannot be mapped.
      */
     fun repairLegacyTagSessionsAfterHostDatabaseRecovery(context: Context) {
         LegacyTagSessionRepair.repairIfNeeded(context.applicationContext)
