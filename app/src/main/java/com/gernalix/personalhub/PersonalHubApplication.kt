@@ -33,7 +33,6 @@ class PersonalHubApplication : Application(), Configuration.Provider {
         DatabaseVault.recoverInterruptedImport(this)
         if (!DatabaseVault.ensureStartupReady(this)) return
         TimerStartupApi.applicationOnCreate()
-        TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(this)
         HubContextRuntime.initialize(
             this,
             listOf(
@@ -64,12 +63,20 @@ private object PostFirstFrameStartup {
             override fun onActivityResumed(activity: Activity) {
                 if (!started.compareAndSet(false, true)) return
                 app.unregisterActivityLifecycleCallbacks(this)
+                // A Choreographer callback runs at the start of a frame. Waiting for a second
+                // callback guarantees that the first resumed Activity has had one frame to draw
+                // before legacy repair, export and sync work can compete for CPU or database I/O.
                 Choreographer.getInstance().postFrameCallback {
-                    executor.execute {
-                        runStep("database backup cleanup") { DatabaseVault.cleanupOrphanedPreImportBackups(app) }
-                        runStep("auto-export") { HubAutoExport.start(app) }
-                        runStep("Datasette sync") { DatasetteSync.start(app) }
-                        runStep("Workflowy days sync") { WorkflowyDaysSync.ensureScheduled(app) }
+                    Choreographer.getInstance().postFrameCallback {
+                        executor.execute {
+                            runStep("legacy Timer tag/session repair") {
+                                TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(app)
+                            }
+                            runStep("database backup cleanup") { DatabaseVault.cleanupOrphanedPreImportBackups(app) }
+                            runStep("auto-export") { HubAutoExport.start(app) }
+                            runStep("Datasette sync") { DatasetteSync.start(app) }
+                            runStep("Workflowy days sync") { WorkflowyDaysSync.ensureScheduled(app) }
+                        }
                     }
                 }
             }
