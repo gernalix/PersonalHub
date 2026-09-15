@@ -4,12 +4,16 @@ on:
   push:
     branches:
       - main
+  issues:
+    types:
+      - opened
 
 permissions:
   contents: write
 
 jobs:
   delete-non-main-branches:
+    if: github.event_name == 'push' || github.event.issue.title == '[internal] PersonalHub branch cleanup trigger'
     runs-on: ubuntu-latest
     steps:
       - name: Delete consolidated branches
