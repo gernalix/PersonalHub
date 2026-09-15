@@ -3,6 +3,8 @@ package com.gernalix.personalhub
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Choreographer
 import androidx.work.Configuration
@@ -52,7 +54,9 @@ class PersonalHubApplication : Application(), Configuration.Provider {
 
 private object PostFirstFrameStartup {
     private const val TAG = "PersonalHubStartup"
+    private const val STARTUP_IDLE_DELAY_MS = 12_000L
     private val started = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor {
         Thread(it, "personalhub-post-frame-startup").apply { isDaemon = true }
     }
@@ -68,15 +72,7 @@ private object PostFirstFrameStartup {
                 // before legacy repair, export and sync work can compete for CPU or database I/O.
                 Choreographer.getInstance().postFrameCallback {
                     Choreographer.getInstance().postFrameCallback {
-                        executor.execute {
-                            runStep("legacy Timer tag/session repair") {
-                                TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(app)
-                            }
-                            runStep("database backup cleanup") { DatabaseVault.cleanupOrphanedPreImportBackups(app) }
-                            runStep("auto-export") { HubAutoExport.start(app) }
-                            runStep("Datasette sync") { DatasetteSync.start(app) }
-                            runStep("Workflowy days sync") { WorkflowyDaysSync.ensureScheduled(app) }
-                        }
+                        mainHandler.postDelayed({ runDeferredStartup(app) }, STARTUP_IDLE_DELAY_MS)
                     }
                 }
             }
@@ -88,6 +84,18 @@ private object PostFirstFrameStartup {
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
         })
+    }
+
+    private fun runDeferredStartup(app: Application) {
+        executor.execute {
+            runStep("legacy Timer tag/session repair") {
+                TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(app)
+            }
+            runStep("database backup cleanup") { DatabaseVault.cleanupOrphanedPreImportBackups(app) }
+            runStep("auto-export") { HubAutoExport.start(app) }
+            runStep("Datasette sync") { DatasetteSync.start(app) }
+            runStep("Workflowy days sync") { WorkflowyDaysSync.ensureScheduled(app) }
+        }
     }
 
     private fun runStep(name: String, block: () -> Unit) {
