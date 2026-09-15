@@ -21,28 +21,30 @@ data class HubTemporalFact(
 
 object HubContextRuntime {
     const val TIMER_ACTIVITY_TYPE = "timer_activity"
+
+    @Volatile private var appContext: Context? = null
     @Volatile private var registry: HubAdapterRegistry? = null
     @Volatile private var repository: HubContextRepository? = null
 
+    /**
+     * Installs the lightweight Hub routing configuration.
+     *
+     * Repository/Room materialization is intentionally deferred until a Hub operation actually
+     * needs persistence. The launcher Home does not need Hub persistence, so opening the shared
+     * database here only adds work to the process-start critical path.
+     */
     fun initialize(context: Context, adapters: Collection<HubEntityAdapter>) {
-        val appContext = context.applicationContext
-        val resolvedRegistry = HubAdapterRegistry(adapters)
-        val appVersion = runCatching {
-            appContext.packageManager.getPackageInfo(appContext.packageName, 0).longVersionCode
-        }.getOrDefault(0L)
-        registry = resolvedRegistry
-        repository = HubContextRepository(
-            PersonalHubDatabase.get(appContext),
-            resolvedRegistry,
-            appVersion = appVersion,
-        )
+        synchronized(this) {
+            appContext = context.applicationContext
+            registry = HubAdapterRegistry(adapters)
+            repository = null
+        }
     }
 
     fun adapter(moduleId: String, entityKind: String): HubEntityAdapter =
-        requireNotNull(registry) { "Hub Context runtime is not initialized" }
-            .adapter(HubEntityRef(moduleId, entityKind, ""))
+        requireRegistry().adapter(HubEntityRef(moduleId, entityKind, ""))
 
-    fun adapters(): List<HubEntityAdapter> = requireNotNull(registry) { "Hub Context runtime is not initialized" }.all().toList()
+    fun adapters(): List<HubEntityAdapter> = requireRegistry().all().toList()
 
     fun temporalProviders(): List<HubTemporalProvider> = adapters().filterIsInstance<HubTemporalProvider>()
 
@@ -70,29 +72,29 @@ object HubContextRuntime {
     }
 
     suspend fun createContext(refs: List<Pair<HubEntityRef, String>>, typeId: String? = null, title: String? = null): String {
-        val repo = requireNotNull(repository)
+        val repo = requireRepository()
         val drafts = refs.distinct().map { (ref, role) -> HubContextMemberDraft(repo.bind(ref).id, role) }
         return repo.createContext(drafts, typeId, title)
     }
 
     suspend fun updateContext(contextId: String, refs: List<Pair<HubEntityRef, String>>, typeId: String? = null, title: String? = null) {
-        val repo = requireNotNull(repository)
+        val repo = requireRepository()
         val drafts = refs.distinct().map { (ref, role) -> HubContextMemberDraft(repo.bind(ref).id, role) }
         repo.updateContext(contextId, drafts, typeId, title)
     }
 
-    suspend fun context(contextId: String) = requireNotNull(repository).context(contextId)
-    suspend fun contexts(ref: HubEntityRef) = requireNotNull(repository).viewsFor(ref)
-    suspend fun contextTypes() = requireNotNull(repository).types()
-    suspend fun contextType(typeId: String) = requireNotNull(repository).type(typeId)
-    suspend fun saveContextType(type: HubContextType, fields: List<HubContextTypeField>) = requireNotNull(repository).saveType(type, fields)
-    suspend fun deleteContextType(typeId: String) = requireNotNull(repository).deleteType(typeId)
-    suspend fun saveCombinationAsType(contextId: String, name: String) = requireNotNull(repository).saveCombinationAsType(contextId, name)
-    suspend fun explore(scope: List<HubEntityRef>, limit: Int = 100, offset: Int = 0) = requireNotNull(repository).explore(scope, limit, offset)
+    suspend fun context(contextId: String) = requireRepository().context(contextId)
+    suspend fun contexts(ref: HubEntityRef) = requireRepository().viewsFor(ref)
+    suspend fun contextTypes() = requireRepository().types()
+    suspend fun contextType(typeId: String) = requireRepository().type(typeId)
+    suspend fun saveContextType(type: HubContextType, fields: List<HubContextTypeField>) = requireRepository().saveType(type, fields)
+    suspend fun deleteContextType(typeId: String) = requireRepository().deleteType(typeId)
+    suspend fun saveCombinationAsType(contextId: String, name: String) = requireRepository().saveCombinationAsType(contextId, name)
+    suspend fun explore(scope: List<HubEntityRef>, limit: Int = 100, offset: Int = 0) = requireRepository().explore(scope, limit, offset)
 
     suspend fun ensureTimerActivityType() {
         val now = Instant.now().toString()
-        requireNotNull(repository).saveSystemType(
+        requireRepository().saveSystemType(
             HubContextType(TIMER_ACTIVITY_TYPE, "Timer activity", now, now, locked = true),
             listOf(
                 HubContextTypeField(TIMER_ACTIVITY_TYPE, "session", 0, "Session", "anchor", "timer", "session", minCardinality = 1, maxCardinality = 1),
@@ -106,11 +108,11 @@ object HubContextRuntime {
         ensureTimerActivityType()
         val companions = peopleIds.map { HubEntityRef("people", "person", it) } +
             listOfNotNull(placeId?.let { HubEntityRef("places", "place", it) })
-        requireNotNull(repository).replaceContextForAnchor(HubEntityRef("timer", "session", sessionId.toString()), TIMER_ACTIVITY_TYPE, companions)
+        requireRepository().replaceContextForAnchor(HubEntityRef("timer", "session", sessionId.toString()), TIMER_ACTIVITY_TYPE, companions)
     }
 
     suspend fun linked(ref: HubEntityRef): List<HubEntitySummary> =
-        requireNotNull(repository).viewsFor(ref).flatMap { it.members }.filter { it.ref != ref }.distinctBy { it.ref }
+        requireRepository().viewsFor(ref).flatMap { it.members }.filter { it.ref != ref }.distinctBy { it.ref }
 
     suspend fun timerSelection(sessionId: Long): Pair<Set<String>, String?> {
         val linked = linked(HubEntityRef("timer", "session", sessionId.toString()))
@@ -119,7 +121,7 @@ object HubContextRuntime {
     }
 
     suspend fun temporalFactsForPlace(placeId: String): List<HubTemporalFact> {
-        val views = requireNotNull(repository).viewsFor(HubEntityRef("places", "place", placeId))
+        val views = requireRepository().viewsFor(HubEntityRef("places", "place", placeId))
         return views.mapNotNull { view ->
             val timer = view.members.singleOrNull { it.ref.moduleId == "timer" && it.ref.entityKind == "session" } ?: return@mapNotNull null
             val start = timer.attributes["start_ms"]?.toLongOrNull() ?: return@mapNotNull null
@@ -134,24 +136,48 @@ object HubContextRuntime {
         }
     }
 
-    suspend fun temporalFacts(): List<HubTemporalFact> = requireNotNull(repository).viewsByType(TIMER_ACTIVITY_TYPE).mapNotNull { view ->
+    suspend fun temporalFacts(): List<HubTemporalFact> = requireRepository().viewsByType(TIMER_ACTIVITY_TYPE).mapNotNull { view ->
         val timer = view.members.singleOrNull { it.ref.moduleId == "timer" && it.ref.entityKind == "session" } ?: return@mapNotNull null
         val place = view.members.singleOrNull { it.ref.moduleId == "places" && it.ref.entityKind == "place" } ?: return@mapNotNull null
         val start = timer.attributes["start_ms"]?.toLongOrNull() ?: return@mapNotNull null
         HubTemporalFact(view.context.id, timer.ref.canonicalId, place.ref.canonicalId, start, timer.attributes["end_ms"]?.toLongOrNull(), view.members.filter { it.ref.moduleId == "people" })
     }
 
-    fun contextChanges(): Flow<List<String>> = requireNotNull(repository).changes()
+    fun contextChanges(): Flow<List<String>> = requireRepository().changes()
 
     suspend fun canonicalDeleted(ref: HubEntityRef) {
-        requireNotNull(repository).binding(ref)?.let { requireNotNull(repository).canonicalDeleted(it.id) }
+        val repo = requireRepository()
+        repo.binding(ref)?.let { repo.canonicalDeleted(it.id) }
     }
 
     suspend fun canonicalDeletedIfInitialized(ref: HubEntityRef) {
-        repository?.binding(ref)?.let { repository?.canonicalDeleted(it.id) }
+        val repo = repository ?: return
+        repo.binding(ref)?.let { repo.canonicalDeleted(it.id) }
     }
 
     suspend fun canonicalLifecycleChangedIfInitialized(ref: HubEntityRef) {
-        repository?.binding(ref)?.let { repository?.refreshLifecycle(it.id) }
+        val repo = repository ?: return
+        repo.binding(ref)?.let { repo.refreshLifecycle(it.id) }
+    }
+
+    private fun requireRegistry(): HubAdapterRegistry =
+        requireNotNull(registry) { "Hub Context runtime is not initialized" }
+
+    private fun requireRepository(): HubContextRepository {
+        repository?.let { return it }
+        return synchronized(this) {
+            repository ?: run {
+                val context = requireNotNull(appContext) { "Hub Context runtime is not initialized" }
+                val resolvedRegistry = requireRegistry()
+                val appVersion = runCatching {
+                    context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+                }.getOrDefault(0L)
+                HubContextRepository(
+                    PersonalHubDatabase.get(context),
+                    resolvedRegistry,
+                    appVersion = appVersion,
+                ).also { repository = it }
+            }
+        }
     }
 }
