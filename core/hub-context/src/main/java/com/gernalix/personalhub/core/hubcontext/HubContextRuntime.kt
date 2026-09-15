@@ -151,17 +151,22 @@ object HubContextRuntime {
     }
 
     suspend fun canonicalDeletedIfInitialized(ref: HubEntityRef) {
-        val repo = repository ?: return
+        val repo = repositoryIfRuntimeInitialized() ?: return
         repo.binding(ref)?.let { repo.canonicalDeleted(it.id) }
     }
 
     suspend fun canonicalLifecycleChangedIfInitialized(ref: HubEntityRef) {
-        val repo = repository ?: return
+        val repo = repositoryIfRuntimeInitialized() ?: return
         repo.binding(ref)?.let { repo.refreshLifecycle(it.id) }
     }
 
     private fun requireRegistry(): HubAdapterRegistry =
         requireNotNull(registry) { "Hub Context runtime is not initialized" }
+
+    private fun repositoryIfRuntimeInitialized(): HubContextRepository? {
+        if (appContext == null || registry == null) return null
+        return requireRepository()
+    }
 
     private fun requireRepository(): HubContextRepository {
         repository?.let { return it }
