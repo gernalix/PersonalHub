@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ DEFAULT_PROCESSOR = (
     ROOT
     / "benchmark/build/intermediates/assets/debug/mergeDebugAssets/trace_processor_shell_aarch64"
 )
+DEFAULT_TRACE_ROOTS = (Path("/tmp"), ROOT / "benchmark/build")
 
 
 class PerfettoQueryError(RuntimeError):
@@ -30,6 +32,32 @@ def resolve_pixel_serial(*, timeout_s: float = 30.0) -> str:
     if target.get("kind") != "pixel" or not target.get("serial"):
         raise PerfettoQueryError("preflight did not resolve the physical Pixel")
     return str(target["serial"])
+
+
+def resolve_latest_trace(*, search_roots: Iterable[Path] = DEFAULT_TRACE_ROOTS) -> Path:
+    """Return the newest existing ``.pftrace`` from the known PH runtime roots."""
+
+    candidates: list[tuple[int, str, Path]] = []
+    for root in search_roots:
+        root = Path(root).expanduser()
+        if not root.is_dir():
+            continue
+        try:
+            traces = root.rglob("*.pftrace")
+            for trace in traces:
+                try:
+                    if not trace.is_file():
+                        continue
+                    resolved = trace.resolve()
+                    candidates.append((trace.stat().st_mtime_ns, str(resolved), resolved))
+                except OSError:
+                    continue
+        except OSError:
+            continue
+    if not candidates:
+        roots = ", ".join(str(Path(root).expanduser()) for root in search_roots)
+        raise PerfettoQueryError(f"no existing Perfetto trace found under: {roots}")
+    return max(candidates)[2]
 
 
 def _adb(serial: str, args: list[str]) -> str:
@@ -91,7 +119,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Query a Perfetto trace on the physical Pixel using the benchmark Android trace processor."
     )
-    parser.add_argument("trace", type=Path)
+    parser.add_argument("trace", nargs="?", type=Path)
+    parser.add_argument(
+        "--latest-trace",
+        action="store_true",
+        help="use the newest existing .pftrace from /tmp or benchmark/build",
+    )
     query_group = parser.add_mutually_exclusive_group(required=True)
     query_group.add_argument("--query")
     query_group.add_argument("--query-file", type=Path)
@@ -100,14 +133,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout", type=float, default=30.0)
     args = parser.parse_args(argv)
 
+    if args.latest_trace and args.trace is not None:
+        parser.error("trace and --latest-trace are mutually exclusive")
+    if not args.latest_trace and args.trace is None:
+        parser.error("provide trace or --latest-trace")
+
     try:
+        trace = resolve_latest_trace() if args.latest_trace else args.trace
+        assert trace is not None
         query = (
             args.query
             if args.query is not None
             else args.query_file.expanduser().read_text(encoding="utf-8")
         )
         output = run_query(
-            args.trace,
+            trace,
             query,
             processor=args.processor,
             serial=args.serial,
