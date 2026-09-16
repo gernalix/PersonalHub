@@ -43,6 +43,11 @@ jobs:
   play-preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      # Deliberately invalid, non-secret values keep release code paths structurally present
+      # during R8/resource shrinking without exposing the real local API credentials.
+      GOOGLE_MAPS_API_KEY: CI_PLAY_PREFLIGHT_NOT_A_REAL_KEY
+      GOOGLE_ROUTES_API_KEY: CI_PLAY_PREFLIGHT_NOT_A_REAL_KEY
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
