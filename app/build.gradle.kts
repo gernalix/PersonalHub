@@ -31,10 +31,10 @@ val signingArtifactRequested = gradle.startParameter.taskNames
     }
 if (signingArtifactRequested) {
     require(hasCanonicalSigning) {
-        "APK/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields."
+        "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields."
     }
     require(!gradle.startParameter.isConfigurationCacheRequested) {
-        "Signed APK/device tasks require --no-configuration-cache."
+        "Signed APK/AAB/device tasks require --no-configuration-cache."
     }
 }
 if (hasCanonicalSigning) {
@@ -90,6 +90,12 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        create("play") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
+            isDebuggable = false
         }
         create("qa") {
             initWith(getByName("debug"))
