@@ -22,16 +22,23 @@ val canonicalSigningValues = canonicalSigningNames.associateWith { name ->
     canonicalSigningProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
 }
 val hasCanonicalSigning = canonicalSigningValues.values.all { !it.isNullOrBlank() }
-val signingArtifactRequested = gradle.startParameter.taskNames
+val requestedTaskNames = gradle.startParameter.taskNames
     .map { it.substringAfterLast(":").lowercase() }
-    .any { name ->
-        name == "build" || name == "assemble" ||
-            listOf("assemble", "bundle", "package", "install", "connected").any(name::startsWith) ||
-            name.contains("androidtest")
-    }
-if (signingArtifactRequested) {
+val signingArtifactRequested = requestedTaskNames.any { name ->
+    name == "build" || name == "assemble" ||
+        listOf("assemble", "bundle", "package", "install", "connected").any(name::startsWith) ||
+        name.contains("androidtest")
+}
+val allowUnsignedPlayBundle = providers.gradleProperty("personalhub.allowUnsignedPlayBundle")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
+val unsignedPlayBundlePreflight = allowUnsignedPlayBundle.get() &&
+    requestedTaskNames.isNotEmpty() &&
+    requestedTaskNames.all { it == "bundleplay" }
+if (signingArtifactRequested && !unsignedPlayBundlePreflight) {
     require(hasCanonicalSigning) {
-        "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields."
+        "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
+            "Only CI may opt into the unsigned Play bundle preflight with -Ppersonalhub.allowUnsignedPlayBundle=true."
     }
     require(!gradle.startParameter.isConfigurationCacheRequested) {
         "Signed APK/AAB/device tasks require --no-configuration-cache."
