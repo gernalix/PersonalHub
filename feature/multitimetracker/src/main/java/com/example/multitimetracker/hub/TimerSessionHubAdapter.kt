@@ -17,15 +17,31 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     override val entityKind = "session"
     override val capabilities = setOf("time_interval", "activity")
     private val sessions = DefaultSessionCore(context.applicationContext)
+    private val appContext = context.applicationContext
+    private val fallbackFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    private val fallbackStringId by lazy(LazyThreadSafetyMode.NONE) {
+        appContext.resources.getIdentifier("hub_session_time_fallback", "string", appContext.packageName)
+    }
 
     override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let(sessions::readSessionById) != null
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
-    override suspend fun summaries(canonicalIds: Set<String>) = canonicalIds.mapNotNull { id -> id.toLongOrNull()?.let(sessions::readSessionById)?.let { id to it.summary() } }.toMap()
-    override suspend fun search(query: String, limit: Int) =
-        sessions.searchSessions(query, limit.coerceIn(1, 100)).map { it.summary() }
+
+    override suspend fun summaries(canonicalIds: Set<String>): Map<String, HubEntitySummary> {
+        val tagNamesById = loadTagNamesById()
+        return canonicalIds.mapNotNull { id ->
+            id.toLongOrNull()?.let(sessions::readSessionById)?.let { id to it.summary(tagNamesById) }
+        }.toMap()
+    }
+
+    override suspend fun search(query: String, limit: Int): List<HubEntitySummary> {
+        val tagNamesById = loadTagNamesById()
+        return sessions.searchSessions(query, limit.coerceIn(1, 100)).map { it.summary(tagNamesById) }
+    }
+
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/timer?sessionId=$canonicalId", "com.example.multitimetracker.MainActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
+        val tagNamesById = loadTagNamesById()
         val cursor = decodeHubTemporalCursor(query.cursor)
         val cursorId = cursor?.stableId?.toLongOrNull()
         val rows = sessions.readTemporalSessionsKeyset(
@@ -36,7 +52,7 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
             cursorId,
         )
         val page = rows.take(query.limit).map { row ->
-            (sessions.readSessionById(row.id) ?: row).temporal()
+            (sessions.readSessionById(row.id) ?: row).temporal(tagNamesById)
         }
         HubTemporalPage(
             page,
@@ -44,41 +60,41 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
         )
     }
 
-    private val fallbackFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-
-    private fun SessionUi.temporal() = HubTemporalRecord(
+    private fun SessionUi.temporal(tagNamesById: Map<Long, String>) = HubTemporalRecord(
         moduleId = moduleId,
         source = entityKind,
         stableId = id.toString(),
         kind = HubTemporalKind.INTERVAL,
         startMs = startMs,
         endMs = endMs,
-        title = hubLabel(),
-        subtitle = tagNames().takeIf { it.isNotEmpty() }?.joinToString(", "),
+        title = hubLabel(tagNamesById),
+        subtitle = tagNames(tagNamesById).takeIf { it.isNotEmpty() }?.joinToString(", "),
         entityRef = HubEntityRef(moduleId, entityKind, id.toString()),
     )
 
-    private fun SessionUi.summary() = HubEntitySummary(
+    private fun SessionUi.summary(tagNamesById: Map<Long, String>) = HubEntitySummary(
         HubEntityRef(moduleId, entityKind, id.toString()),
-        hubLabel(),
-        description = tagNames().takeIf { it.isNotEmpty() }?.joinToString(", "),
+        hubLabel(tagNamesById),
+        description = tagNames(tagNamesById).takeIf { it.isNotEmpty() }?.joinToString(", "),
         attributes = buildMap {
             put("start_ms", startMs.toString())
             endMs?.let { put("end_ms", it.toString()) }
         },
     )
 
-    private fun SessionUi.hubLabel(): String {
+    private fun SessionUi.hubLabel(tagNamesById: Map<Long, String>): String {
         title.trim().takeIf(String::isNotEmpty)?.let { return it }
-        tagNames().takeIf { it.isNotEmpty() }?.let { return it.joinToString(", ") }
-        return mergedString("hub_session_time_fallback", formatSessionStart())
+        tagNames(tagNamesById).takeIf { it.isNotEmpty() }?.let { return it.joinToString(", ") }
+        return mergedFallbackString(formatSessionStart())
     }
 
-    private fun SessionUi.tagNames(): List<String> {
-        if (tagIds.isEmpty()) return emptyList()
-        val namesById = SnapshotStore.load(context.applicationContext).orEmptyTags()
-            .associate { it.id to it.name.trim() }
-        return tagIds.sorted().mapNotNull { id -> namesById[id]?.takeIf(String::isNotEmpty) }
+    private fun SessionUi.tagNames(tagNamesById: Map<Long, String>): List<String> =
+        tagIds.sorted().mapNotNull { id -> tagNamesById[id] }
+
+    private suspend fun loadTagNamesById(): Map<Long, String> = withContext(Dispatchers.IO) {
+        SnapshotStore.load(appContext).orEmptyTags()
+            .mapNotNull { tag -> tag.name.trim().takeIf(String::isNotEmpty)?.let { tag.id to it } }
+            .toMap()
     }
 
     private fun SnapshotStore.Snapshot?.orEmptyTags() = this?.tags.orEmpty()
@@ -86,9 +102,6 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     private fun SessionUi.formatSessionStart(): String =
         Instant.ofEpochMilli(startMs).atZone(ZoneId.systemDefault()).format(fallbackFormatter)
 
-    private fun mergedString(name: String, value: String): String {
-        val appContext = context.applicationContext
-        val id = appContext.resources.getIdentifier(name, "string", appContext.packageName)
-        return if (id != 0) appContext.getString(id, value) else "Session on $value"
-    }
+    private fun mergedFallbackString(value: String): String =
+        if (fallbackStringId != 0) appContext.getString(fallbackStringId, value) else "Session on $value"
 }
