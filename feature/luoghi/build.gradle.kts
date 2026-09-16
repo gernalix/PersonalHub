@@ -70,10 +70,18 @@ fun requiresGoogleMapsApiKey(taskNames: List<String>): Boolean =
     }
 
 val requestedTaskNames = gradle.startParameter.taskNames.map { it.substringAfterLast(":").lowercase() }
-if (googleMapsApiKey.isBlank() && requiresGoogleMapsApiKey(requestedTaskNames)) {
+val allowUnsignedPlayBundle = providers.gradleProperty("personalhub.allowUnsignedPlayBundle")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
+val unsignedPlayPreflightTasks = setOf("processplaymainmanifest", "lintplay", "bundleplay")
+val unsignedPlayBundlePreflight = allowUnsignedPlayBundle.get() &&
+    "bundleplay" in requestedTaskNames &&
+    requestedTaskNames.all { it in unsignedPlayPreflightTasks }
+if (googleMapsApiKey.isBlank() && requiresGoogleMapsApiKey(requestedTaskNames) && !unsignedPlayBundlePreflight) {
     throw GradleException(
         "GOOGLE_MAPS_API_KEY is required for APK-producing or device-install tasks. " +
-            "Configure /home/daniele/.config/codex/secrets/map.env (MAP_API) or an accepted local property/environment variable.",
+            "Configure /home/daniele/.config/codex/secrets/map.env (MAP_API) or an accepted local property/environment variable. " +
+            "Only the CI Play packaging preflight may build with an empty key.",
     )
 }
 
@@ -128,19 +136,11 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.google.places)
-    implementation(libs.google.play.services.location)
-    implementation(libs.osmdroid.android)
+    implementation(libs.kotlinx.coroutines.android)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
-    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
-}
-
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-    arg("room.incremental", "true")
+    androidTestImplementation(libs.androidx.uiautomator)
 }
