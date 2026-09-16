@@ -11,6 +11,21 @@ import com.gernalix.sostanze.R
 import kotlinx.coroutines.runBlocking
 
 class SubstancesWidgetProvider : AppWidgetProvider() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            val pendingResult = goAsync()
+            Thread {
+                try {
+                    super.onReceive(context.applicationContext, intent)
+                } finally {
+                    pendingResult.finish()
+                }
+            }.start()
+            return
+        }
+        super.onReceive(context, intent)
+    }
+
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         updateWidgets(context.applicationContext, manager, appWidgetIds)
     }
