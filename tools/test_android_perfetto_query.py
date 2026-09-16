@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -20,6 +21,27 @@ class AndroidPerfettoQueryTests(unittest.TestCase):
 
         self.assertEqual("pixel-serial", serial)
         select.assert_called_once_with("pixel", False, timeout_s=15)
+
+    def test_resolve_latest_trace_chooses_newest_existing_trace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            older = root / "old" / "older.pftrace"
+            newer = root / "new" / "newer.pftrace"
+            older.parent.mkdir()
+            newer.parent.mkdir()
+            older.write_bytes(b"old")
+            newer.write_bytes(b"new")
+            os.utime(older, ns=(1_000_000_000, 1_000_000_000))
+            os.utime(newer, ns=(2_000_000_000, 2_000_000_000))
+
+            resolved = perfetto.resolve_latest_trace(search_roots=[root])
+
+        self.assertEqual(newer.resolve(), resolved)
+
+    def test_resolve_latest_trace_fails_without_trace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(perfetto.PerfettoQueryError, "no existing Perfetto trace"):
+                perfetto.resolve_latest_trace(search_roots=[Path(tmp)])
 
     def test_query_uses_query_file_instead_of_shell_quoting(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
