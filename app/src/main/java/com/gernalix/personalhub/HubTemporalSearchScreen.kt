@@ -14,6 +14,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -173,6 +174,7 @@ fun HubTemporalSearchScreen(
     autoSearch: Boolean = false,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val providers = remember { HubContextRuntime.temporalProviders() }
     val allModules = remember(providers) { providers.map { it.moduleId }.toSet() }
     var selected by rememberSaveable(initialModules, allModules) {
@@ -196,13 +198,13 @@ fun HubTemporalSearchScreen(
     var savedEpisodes by remember { mutableStateOf<List<SavedEpisodeEntry>>(emptyList()) }
     var editingEpisodeContextId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val entries = remember(records, boundedPeople) {
+    val entries = remember(records, boundedPeople, resources) {
         buildTemporalEntries(
             records,
             boundedPeople,
-            wordPulseAvailableLabel = { context.getString(R.string.temporal_wordpulse_fatigue_available, it) },
-            wordPulseUnavailableLabel = context.getString(R.string.temporal_wordpulse_fatigue_unavailable),
-            peopleTitle = context.getString(R.string.temporal_people),
+            wordPulseAvailableLabel = { resources.getString(R.string.temporal_wordpulse_fatigue_available, it) },
+            wordPulseUnavailableLabel = resources.getString(R.string.temporal_wordpulse_fatigue_unavailable),
+            peopleTitle = resources.getString(R.string.temporal_people),
         )
     }
 
