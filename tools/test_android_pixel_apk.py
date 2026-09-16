@@ -46,13 +46,32 @@ class AndroidPixelApkTests(unittest.TestCase):
         self.assertEqual("pixel-serial", target["serial"])
         select.assert_called_once_with("pixel", False, timeout_s=12)
 
-    def test_install_is_always_serial_scoped(self) -> None:
+    def test_install_is_serial_scoped_and_honors_timeout(self) -> None:
         completed = subprocess.CompletedProcess([], 0, "Success\n", "")
-        with mock.patch.object(installer.preflight, "run_adb", return_value=completed) as run_adb:
-            detail = installer.install(Path("/tmp/46.apk"), "pixel-serial")
+        with mock.patch.object(installer.preflight, "resolve_tool", return_value="/sdk/adb") as resolve_tool:
+            with mock.patch.object(installer.subprocess, "run", return_value=completed) as run:
+                detail = installer.install(Path("/tmp/46.apk"), "pixel-serial", timeout_s=180)
 
         self.assertEqual("Success", detail)
-        run_adb.assert_called_once_with(["-s", "pixel-serial", "install", "-r", "/tmp/46.apk"])
+        resolve_tool.assert_called_once_with("adb")
+        run.assert_called_once_with(
+            ["/sdk/adb", "-s", "pixel-serial", "install", "-r", "/tmp/46.apk"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=180.0,
+        )
+
+    def test_install_timeout_is_reported_without_retry(self) -> None:
+        with mock.patch.object(installer.preflight, "resolve_tool", return_value="/sdk/adb"):
+            with mock.patch.object(
+                installer.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(cmd=["/sdk/adb"], timeout=90),
+            ) as run:
+                with self.assertRaisesRegex(installer.PixelApkError, "adb_timeout"):
+                    installer.install(Path("/tmp/47.apk"), "pixel-serial", timeout_s=90)
+        self.assertEqual(run.call_count, 1)
 
 
 if __name__ == "__main__":
