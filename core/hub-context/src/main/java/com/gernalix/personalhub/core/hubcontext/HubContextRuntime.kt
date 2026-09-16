@@ -84,6 +84,7 @@ object HubContextRuntime {
     }
 
     suspend fun context(contextId: String) = requireRepository().context(contextId)
+    suspend fun titledContexts() = requireRepository().titledViews()
     suspend fun contexts(ref: HubEntityRef) = requireRepository().viewsFor(ref)
     suspend fun contextTypes() = requireRepository().types()
     suspend fun contextType(typeId: String) = requireRepository().type(typeId)

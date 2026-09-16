@@ -1,6 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="hub_session_fallback">Session %1$d</string>
+    <string name="hub_session_time_fallback">Session on %1$s</string>
     <string name="empty_string" translatable="false">​</string>
     <string name="placeholder_dash" translatable="false">—</string>
     <string name="cd_filters">Filters</string>

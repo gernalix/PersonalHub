@@ -94,6 +94,9 @@ interface HubContextDao {
     @Query("SELECT * FROM hub_contexts WHERE context_type_id=:typeId ORDER BY updated_at DESC")
     suspend fun contextsByType(typeId: String): List<HubContext>
 
+    @Query("SELECT * FROM hub_contexts WHERE trim(coalesce(title,'')) != '' ORDER BY updated_at DESC,id")
+    suspend fun titledContexts(): List<HubContext>
+
     @Query("SELECT c.* FROM hub_contexts c JOIN hub_context_members m ON m.context_id=c.id WHERE m.entity_id IN (:entityIds) GROUP BY c.id HAVING count(DISTINCT m.entity_id)=:scopeSize ORDER BY c.updated_at DESC")
     suspend fun contextsContainingAll(entityIds: List<String>, scopeSize: Int): List<HubContext>
 

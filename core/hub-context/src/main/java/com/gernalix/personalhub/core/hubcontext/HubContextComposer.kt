@@ -46,6 +46,7 @@ internal class HubComposerState(
     val anchor: HubEntityRef?,
     val editingContextId: String?,
     restoredMembers: List<ComposerMember> = emptyList(),
+    restoredTitle: String = "",
     restoredTypeId: String? = null,
     restoredQuery: String = "",
     restoredDraft: String = "",
@@ -57,6 +58,7 @@ internal class HubComposerState(
     private val initialScope: List<HubEntityRef> = listOfNotNull(anchor),
 ) {
     var members by mutableStateOf(restoredMembers)
+    var title by mutableStateOf(restoredTitle)
     var typeId by mutableStateOf(restoredTypeId)
     var query by mutableStateOf(restoredQuery)
     var createDraft by mutableStateOf(restoredDraft)
@@ -82,7 +84,9 @@ internal class HubComposerState(
                 val resolved = HubContextRuntime.summaries(refs)
                 refs.mapNotNull { ref -> resolved[ref]?.let(::ComposerMember) }
             }
-            typeId = editingContextId?.let { HubContextRuntime.context(it)?.context?.contextTypeId } ?: typeId
+            val editingContext = editingContextId?.let { HubContextRuntime.context(it)?.context }
+            typeId = editingContext?.contextTypeId ?: typeId
+            title = editingContext?.title.orEmpty().ifBlank { title }
             initialized = true
         }
         types = HubContextRuntime.contextTypes().filterNot { it.locked }
@@ -169,8 +173,9 @@ internal class HubComposerState(
     suspend fun save(): String {
         val refs = members.map { it.summary.ref to it.role }
         val id = editingContextId ?: savedContextId
-        val result = if (id == null) HubContextRuntime.createContext(refs, typeId) else {
-            HubContextRuntime.updateContext(id, refs, typeId)
+        val normalizedTitle = title.trim().takeIf(String::isNotEmpty)
+        val result = if (id == null) HubContextRuntime.createContext(refs, typeId, normalizedTitle) else {
+            HubContextRuntime.updateContext(id, refs, typeId, normalizedTitle)
             id
         }
         savedContextId = result
@@ -202,7 +207,7 @@ internal class HubComposerState(
                 listOf(
                     state.anchor?.let(::encodeRef), state.editingContextId,
                     state.members.map { encodeRef(it.summary.ref) + listOf(it.summary.label, it.summary.description, it.summary.lifecycle, it.role, it.automatic.toString()) },
-                    state.typeId, state.query, state.createDraft, state.selectedKind,
+                    state.title, state.typeId, state.query, state.createDraft, state.selectedKind,
                     state.resourceKind, state.resourceValue, state.resourcePermission,
                 )
             },
@@ -213,8 +218,8 @@ internal class HubComposerState(
                     (saved[2] as List<List<String?>>).map { row ->
                         ComposerMember(HubEntitySummary(HubEntityRef(row[0]!!, row[1]!!, row[2]!!), row[3]!!, row[4], row[5]!!), row[6]!!, row.getOrNull(7)?.toBoolean() == true)
                     },
-                    saved[3] as String?, saved[4] as String, saved[5] as String, saved[6] as String?,
-                    saved[7] as String, saved[8] as String, saved[9] as Boolean, initialized = true,
+                    saved[3] as String, saved[4] as String?, saved[5] as String, saved[6] as String, saved[7] as String?,
+                    saved[8] as String, saved[9] as String, saved[10] as Boolean, initialized = true,
                 )
             },
         )
@@ -234,9 +239,13 @@ internal fun rankComposerCandidates(
 )
 
 @Composable
-fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
+fun HubContextComposerScreen(
+    onBack: () -> Unit,
+    onSaved: () -> Unit = onBack,
+    editingContextId: String? = null,
+) {
     val androidContext = LocalContext.current
-    val state = rememberSaveable(saver = HubComposerState.Saver) { HubComposerState(null, null) }
+    val state = rememberSaveable(editingContextId, saver = HubComposerState.Saver) { HubComposerState(null, editingContextId) }
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var fromText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() - 60 * 60 * 1000L)) }
@@ -255,10 +264,18 @@ fun HubContextComposerScreen(onBack: () -> Unit, onSaved: () -> Unit = onBack) {
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onBack) { Text(stringResource(R.string.hub_cancel)) }
-            Text(stringResource(R.string.hub_composer_title_new), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(if (state.editingContextId == null) R.string.hub_composer_title_new else R.string.hub_composer_title_edit), style = MaterialTheme.typography.titleLarge)
             Button(onClick = { scope.launch { runCatching { state.save() }.onSuccess { onSaved() }.onFailure { state.error = it.message } } }, modifier = Modifier.testTag("hub-composer-save"), enabled = state.members.size >= 2) { Text(stringResource(R.string.hub_save)) }
         }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                OutlinedTextField(
+                    value = state.title,
+                    onValueChange = { state.title = it },
+                    modifier = Modifier.fillMaxWidth().testTag("hub-composer-title"),
+                    label = { Text(stringResource(R.string.hub_context_title_label)) },
+                )
+            }
             item {
                 Text(stringResource(R.string.hub_time_anchor), style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

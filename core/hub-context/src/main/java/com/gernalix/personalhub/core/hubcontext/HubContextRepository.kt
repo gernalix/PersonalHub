@@ -181,6 +181,7 @@ class HubContextRepository(
     }
 
     suspend fun viewsByType(typeId: String): List<HubContextView> = dao.contextsByType(typeId).let { views(it) }
+    suspend fun titledViews(): List<HubContextView> = dao.titledContexts().let { views(it) }
 
     fun changes() = dao.observeContextIds()
 

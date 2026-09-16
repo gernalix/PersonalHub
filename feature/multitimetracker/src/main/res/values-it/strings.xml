@@ -1,6 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="hub_session_fallback">Sessione %1$d</string>
+    <string name="hub_session_time_fallback">Sessione del %1$s</string>
     <string name="exact_alarm_permission_title">Le notifiche temporizzate richiedono accesso agli allarmi esatti</string>
     <string name="exact_alarm_permission_body">MultiTimeTracker usa gli allarmi esatti solo per le sessioni temporizzate. Senza questo accesso, i relativi promemoria locali possono arrivare in ritardo o solo quando riapri l’app.</string>
     <string name="cd_filters">Filtri</string>

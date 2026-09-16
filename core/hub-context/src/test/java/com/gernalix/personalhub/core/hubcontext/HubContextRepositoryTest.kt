@@ -162,6 +162,22 @@ class HubContextRepositoryTest {
         assertEquals(listOf(3), batches)
     }
 
+    @Test fun titledViewsListOnlyNamedContextsNewestFirst() = runBlocking {
+        val a = repository.bind(ref("a"))
+        val b = repository.bind(ref("b"))
+        val c = repository.bind(ref("c"))
+        val older = repository.createContext(listOf(draft(a), draft(b)), title = "Older episode")
+        repository.createContext(listOf(draft(a), draft(c)), title = "   ")
+        val newer = repository.createContext(listOf(draft(b), draft(c)), title = "Newer episode")
+        repository.updateContext(older, listOf(draft(a), draft(b)), title = "Older renamed")
+
+        val titled = repository.titledViews()
+
+        assertEquals(listOf("Older renamed", "Newer episode"), titled.map { it.context.title })
+        assertEquals(listOf(older, newer), titled.map { it.context.id })
+        assertEquals(setOf("a", "b"), titled.first().members.map { it.ref.canonicalId }.toSet())
+    }
+
     @Test fun systemTypesAreLockedWhileUserTypesRemainEditableAndDeletable() = runBlocking {
         val now = Instant.now().toString()
         val system = HubContextType("system", "System", now, now, locked = true)

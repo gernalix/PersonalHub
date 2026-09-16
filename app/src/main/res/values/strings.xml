@@ -3,6 +3,9 @@
     <string name="home_context">Context</string>
     <string name="home_search">Search</string>
     <string name="home_activity_register">Activity</string>
+    <string name="home_context_help">Link entities</string>
+    <string name="home_search_help">Find a time span</string>
+    <string name="home_activity_help">Changes and undo</string>
     <string name="temporal_title">Search by time</string>
     <string name="temporal_back">Back</string>
     <string name="temporal_from">From (YYYY-MM-DD HH:MM)</string>
@@ -14,9 +17,11 @@
     <string name="temporal_cancel_selection">Cancel</string>
     <string name="temporal_episode_title">Episode title</string>
     <string name="temporal_save_selection">Save selected</string>
+    <string name="temporal_saved_episodes">Saved episodes</string>
+    <string name="temporal_saved_episodes_empty">No titled episodes yet.</string>
     <string name="temporal_people">People</string>
-    <string name="temporal_wordpulse_fatigue_available">Average fatigue: %1$d/100</string>
-    <string name="temporal_wordpulse_fatigue_unavailable">Average fatigue: unavailable</string>
+    <string name="temporal_wordpulse_fatigue_available">Average fatigue signal: %1$d/100</string>
+    <string name="temporal_wordpulse_fatigue_unavailable">Fatigue signal: unavailable</string>
     <string name="app_name">PersonalHub</string>
     <string name="module_people">People</string>
     <string name="module_people_subtitle">Contacts, fields, events, tags</string>

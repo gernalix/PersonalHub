@@ -51,7 +51,7 @@ class HubTemporalSearchScreenTest {
 
         val wordPulse = entries.single()
 
-        assertEquals("Average fatigue: 60/100", wordPulse.title)
+        assertEquals("Average fatigue signal: 60/100", wordPulse.title)
         assertEquals(listOf("w1", "w2", "w3", "w4"), wordPulse.refs.map { it.canonicalId })
         assertTrue(wordPulse.selectable)
     }
@@ -60,7 +60,7 @@ class HubTemporalSearchScreenTest {
     fun wordPulseShowsUnavailableWhenNoCanonicalFatigueScoresExist() {
         val entries = buildTemporalEntries(listOf(wordPulse("w1", 10, null)))
 
-        assertEquals("Average fatigue: unavailable", entries.single().title)
+        assertEquals("Fatigue signal: unavailable", entries.single().title)
     }
 
     @Test

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -40,6 +41,12 @@ internal data class TemporalEntry(
     val selectable: Boolean = true,
 )
 
+internal data class SavedEpisodeEntry(
+    val contextId: String,
+    val title: String,
+    val members: String,
+)
+
 private val moduleTitles = mapOf(
     "people" to "People",
     "places" to "Places",
@@ -52,8 +59,8 @@ private val moduleTitles = mapOf(
 internal fun buildTemporalEntries(
     records: List<HubTemporalRecord>,
     boundedPeople: List<HubEntitySummary> = emptyList(),
-    wordPulseAvailableLabel: (Int) -> String = { "Average fatigue: $it/100" },
-    wordPulseUnavailableLabel: String = "Average fatigue: unavailable",
+    wordPulseAvailableLabel: (Int) -> String = { "Average fatigue signal: $it/100" },
+    wordPulseUnavailableLabel: String = "Fatigue signal: unavailable",
     peopleTitle: String = "People",
 ): List<TemporalEntry> {
     val regular = records.filterNot { it.moduleId == "wordpulse" }.map { record ->
@@ -186,6 +193,8 @@ fun HubTemporalSearchScreen(
     var episodeTitle by rememberSaveable { mutableStateOf("") }
     var selectedRefs by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var collapsedSections by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var savedEpisodes by remember { mutableStateOf<List<SavedEpisodeEntry>>(emptyList()) }
+    var editingEpisodeContextId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val entries = remember(records, boundedPeople) {
         buildTemporalEntries(
@@ -195,6 +204,34 @@ fun HubTemporalSearchScreen(
             wordPulseUnavailableLabel = context.getString(R.string.temporal_wordpulse_fatigue_unavailable),
             peopleTitle = context.getString(R.string.temporal_people),
         )
+    }
+
+    suspend fun loadSavedEpisodes() {
+        savedEpisodes = HubContextRuntime.titledContexts().mapNotNull { view ->
+            val title = view.context.title?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+            SavedEpisodeEntry(
+                contextId = view.context.id,
+                title = title,
+                members = view.members.joinToString(" · ") { it.label },
+            )
+        }
+        error = null
+    }
+
+    if (editingEpisodeContextId != null) {
+        HubContextComposerScreen(
+            onBack = { editingEpisodeContextId = null },
+            onSaved = {
+                editingEpisodeContextId = null
+                scope.launch { runCatching { loadSavedEpisodes() }.onFailure { error = it.message } }
+            },
+            editingContextId = editingEpisodeContextId,
+        )
+        return
+    }
+
+    LaunchedEffect(Unit) {
+        runCatching { loadSavedEpisodes() }.onFailure { error = it.message }
     }
 
     fun invalidateTemporalResults() {
@@ -306,6 +343,7 @@ fun HubTemporalSearchScreen(
                                 saving = false
                                 selectedRefs = emptyList()
                                 episodeTitle = ""
+                                loadSavedEpisodes()
                             }
                             .onFailure { error = it.message }
                     }
@@ -316,6 +354,28 @@ fun HubTemporalSearchScreen(
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item("saved-episodes-title") {
+                Text(stringResource(R.string.temporal_saved_episodes), style = MaterialTheme.typography.titleMedium)
+            }
+            if (savedEpisodes.isEmpty()) {
+                item("saved-episodes-empty") {
+                    Text(stringResource(R.string.temporal_saved_episodes_empty), style = MaterialTheme.typography.bodySmall)
+                }
+            } else {
+                items(savedEpisodes, key = { "episode:${it.contextId}" }) { episode ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { editingEpisodeContextId = episode.contextId }
+                            .testTag("temporal-saved-episode-${episode.contextId}"),
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(episode.title, style = MaterialTheme.typography.titleMedium)
+                            if (episode.members.isNotBlank()) Text(episode.members, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             if (entries.isEmpty()) item { Text(stringResource(R.string.temporal_empty), modifier = Modifier.testTag("temporal-empty")) }
             groupedTemporalEntries(entries).forEach { (section, sectionEntries) ->
                 item(section) {

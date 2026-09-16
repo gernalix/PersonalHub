@@ -103,9 +103,9 @@ fun PersonalHubApp() {
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item { OutlinedButton(onClick = { topDestination = "composer" }) { Text(stringResource(R.string.home_context)) } }
-                item { OutlinedButton(onClick = { topDestination = "search" }) { Text(stringResource(R.string.home_search)) } }
-                item { OutlinedButton(onClick = { topDestination = "activity" }) { Text(stringResource(R.string.home_activity_register)) } }
+                item { HomeUtilityButton(R.string.home_context, R.string.home_context_help) { topDestination = "composer" } }
+                item { HomeUtilityButton(R.string.home_search, R.string.home_search_help) { topDestination = "search" } }
+                item { HomeUtilityButton(R.string.home_activity_register, R.string.home_activity_help) { topDestination = "activity" } }
                 item { OutlinedButton(onClick = { showSettings = true }) { Text(stringResource(R.string.settings_title)) } }
             }
             HomeAutoExportStatusIndicator()
@@ -133,6 +133,20 @@ fun PersonalHubApp() {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun HomeUtilityButton(titleRes: Int, helpRes: Int, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick) {
+        Column {
+            Text(stringResource(titleRes))
+            Text(
+                stringResource(helpRes),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

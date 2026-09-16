@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.hub.TimerSessionHubAdapter
+import com.example.multitimetracker.model.Tag
+import com.example.multitimetracker.persistence.SnapshotStore
+import com.example.multitimetracker.util.CapsuleWriteApi
 import com.gernalix.luoghi.capsules.stats.StatsCapsule
 import com.gernalix.luoghi.capsules.visits.VisitMapper
 import com.gernalix.luoghi.data.LuoghiDatabase
@@ -34,6 +37,7 @@ class HubContextVerticalSliceTest {
         com.supercontacts.app.data.repository.AppContainer.resetForTests()
         PersonalHubDatabase.resetForTests()
         context.deleteDatabase(PersonalHubDatabase.DATABASE_NAME)
+        saveTimerTags(emptyList())
         initialize()
     }
 
@@ -41,6 +45,7 @@ class HubContextVerticalSliceTest {
         com.supercontacts.app.data.repository.AppContainer.resetForTests()
         PersonalHubDatabase.resetForTests()
         context.deleteDatabase(PersonalHubDatabase.DATABASE_NAME)
+        saveTimerTags(emptyList())
     }
 
     @Test fun createRenameEditMoveUnlinkDeleteAndReopenUseOneNaryFact() = runBlocking {
@@ -93,10 +98,58 @@ class HubContextVerticalSliceTest {
         assertTrue(HubContextRuntime.temporalFacts().isEmpty())
     }
 
+    @Test fun timerHubSummaryUsesTitleThenTagNamesThenHumanTimeFallback() = runBlocking {
+        saveTimerTags(listOf(tag(10, "Deep work"), tag(11, "Home")))
+        val sessions = DefaultSessionCore(context)
+        val titled = sessions.insertSession("Focus", 1_000L, 2_000L, setOf(10))
+        val tagged = sessions.insertSession("", 3_000L, 4_000L, setOf(10, 11))
+        val fallback = sessions.insertSession("", 1_770_897_600_000L, 1_770_897_660_000L, emptySet())
+
+        val summaries = timer.summaries(setOf(titled.toString(), tagged.toString(), fallback.toString()))
+
+        assertEquals("Focus", summaries.getValue(titled.toString()).label)
+        assertEquals("Deep work", summaries.getValue(titled.toString()).description)
+        assertEquals("Deep work, Home", summaries.getValue(tagged.toString()).label)
+        assertEquals("Deep work, Home", summaries.getValue(tagged.toString()).description)
+        assertTrue(summaries.getValue(fallback.toString()).label.startsWith("Session on 2026-02-12"))
+        assertNotEquals(fallback.toString(), summaries.getValue(fallback.toString()).label)
+        assertNotEquals("Session $fallback", summaries.getValue(fallback.toString()).label)
+
+        val temporal = timer.queryTemporal(com.gernalix.personalhub.core.hubcontext.HubTemporalQuery(2_500L, 4_500L, 10)).records
+        assertTrue(
+            temporal.joinToString { "${it.stableId}:${it.title}:${it.subtitle}" },
+            temporal.any { it.stableId == tagged.toString() && it.title == "Deep work, Home" && it.subtitle == "Deep work, Home" },
+        )
+    }
+
     private fun initialize() {
         people = PeopleHubAdapter(context)
         places = PlacesHubAdapter(context)
         timer = TimerSessionHubAdapter(context)
         HubContextRuntime.initialize(context, listOf(people, timer, places))
     }
+
+    @OptIn(CapsuleWriteApi::class)
+    private fun saveTimerTags(tags: List<Tag>) {
+        SnapshotStore.save(
+            context = context,
+            tasks = emptyList(),
+            tags = tags,
+            closedSessions = emptyList(),
+            tagSessions = emptyList(),
+            installAtMs = 0L,
+            appUsageMs = 0L,
+            activeSessionStart = emptyMap(),
+            activeTagStart = emptyList(),
+            tagParents = emptyList(),
+        )
+    }
+
+    private fun tag(id: Long, name: String) = Tag(
+        id = id,
+        name = name,
+        activeChildrenCount = 0,
+        totalMs = 0L,
+        lastStartedAtMs = null,
+    )
 }

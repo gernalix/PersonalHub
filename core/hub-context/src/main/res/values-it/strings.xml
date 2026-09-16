@@ -4,6 +4,7 @@
     <string name="hub_context_empty">Contesto</string>
     <string name="hub_composer_title_new">Collega entità</string>
     <string name="hub_composer_title_edit">Modifica contesto</string>
+    <string name="hub_context_title_label">Titolo</string>
     <string name="hub_composer_members">Membri</string>
     <string name="hub_composer_add_kind">Aggiungi altro</string>
     <string name="hub_remove">Rimuovi</string>

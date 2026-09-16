@@ -4,6 +4,7 @@
     <string name="hub_context_empty">Context</string>
     <string name="hub_composer_title_new">Link entities</string>
     <string name="hub_composer_title_edit">Edit context</string>
+    <string name="hub_context_title_label">Title</string>
     <string name="hub_composer_members">Members</string>
     <string name="hub_composer_add_kind">Add more</string>
     <string name="hub_remove">Remove</string>
