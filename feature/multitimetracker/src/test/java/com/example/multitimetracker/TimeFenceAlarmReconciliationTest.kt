@@ -95,6 +95,28 @@ class TimeFenceAlarmReconciliationTest {
         assertFalse(plan.expiredSessionIds.contains(2L))
     }
 
+    @Test
+    fun randomTimerRestoreSchedulesFutureDeadlineWithoutTimedTag() {
+        val plan = buildTimedSessionRestorePlan(
+            sessions = listOf(
+                session(
+                    id = 3L,
+                    expectedEndMs = 2_000L,
+                    tagIds = emptySet(),
+                )
+            ),
+            tags = emptyList(),
+            nowMs = 1_000L,
+            randomSessionIds = setOf(3L),
+        )
+
+        assertTrue(plan.expiredSessionIds.isEmpty())
+        assertEquals(1, plan.alarms.size)
+        assertEquals(3L, plan.alarms.single().sessionId)
+        assertEquals(2_000L, plan.alarms.single().fireAtMs)
+        assertFalse(plan.alarms.single().alarmStyle)
+    }
+
     private fun alertRule(timerMinutes: Int): TimeFenceRule = TimeFenceRule(
         id = 100L,
         message = "check timer",
@@ -106,13 +128,17 @@ class TimeFenceAlarmReconciliationTest {
         timerMinutes = timerMinutes,
     )
 
-    private fun session(id: Long, expectedEndMs: Long?): SessionUi = SessionUi(
+    private fun session(
+        id: Long,
+        expectedEndMs: Long?,
+        tagIds: Set<Long> = setOf(1L),
+    ): SessionUi = SessionUi(
         id = id,
         title = "Focus",
         startMs = 100L,
         endMs = null,
         expectedEndMs = expectedEndMs,
-        tagIds = setOf(1L),
+        tagIds = tagIds,
     )
 
     private fun tag(notificationType: TimedTagNotificationType): Tag = Tag(
