@@ -5,11 +5,15 @@ on:
     paths:
       - 'tools/android_consumer_preflight.py'
       - 'tools/test_android_consumer_preflight.py'
+      - 'tools/android_pixel_apk.py'
+      - 'tools/test_android_pixel_apk.py'
       - '.github/workflows/android-consumer-preflight.yml'
   pull_request:
     paths:
       - 'tools/android_consumer_preflight.py'
       - 'tools/test_android_consumer_preflight.py'
+      - 'tools/android_pixel_apk.py'
+      - 'tools/test_android_pixel_apk.py'
       - '.github/workflows/android-consumer-preflight.yml'
 
 permissions:
@@ -24,7 +28,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run bounded consumer preflight tests
+      - name: Run bounded Android tooling tests
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 tools/test_android_consumer_preflight.py
+        run: |
+          python3 tools/test_android_consumer_preflight.py
+          python3 tools/test_android_pixel_apk.py
