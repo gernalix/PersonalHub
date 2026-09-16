@@ -25,11 +25,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -49,7 +54,8 @@ import com.gernalix.luoghi.capsules.places.PlaceSortCriterion
 import com.gernalix.luoghi.capsules.places.PlaceSortDirection
 import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
-import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
+import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
+import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
 import com.gernalix.luoghi.ui.history.VisitTimelineItem
 import com.gernalix.luoghi.ui.places.PlaceListItem
 
@@ -192,8 +198,11 @@ fun HomeScreen(
 }
 
 @Composable
-private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptWithPlaceName>) {
+private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptDiagnostic>) {
     val clipboard = LocalClipboardManager.current
+    var outcomeFilter by remember { mutableStateOf("") }
+    var placeFilter by remember { mutableStateOf("") }
+    val filteredAttempts = filteredDiagnosticAttempts(attempts, outcomeFilter, placeFilter)
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -204,7 +213,24 @@ private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptWithPlaceName>)
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            attempts.take(5).forEach { attempt ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = outcomeFilter,
+                    onValueChange = { outcomeFilter = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text("Outcome") },
+                )
+                OutlinedTextField(
+                    value = placeFilter,
+                    onValueChange = { placeFilter = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text("Luogo") },
+                )
+            }
+            filteredAttempts.take(5).forEach { diagnostic ->
+                val attempt = diagnostic.attempt
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -216,12 +242,12 @@ private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptWithPlaceName>)
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            diagnosticDetail(attempt),
+                            diagnosticDetail(attempt, diagnostic.candidates),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    IconButton(onClick = { clipboard.setText(AnnotatedString(diagnosticReport(attempt))) }) {
+                    IconButton(onClick = { clipboard.setText(AnnotatedString(diagnosticReport(diagnostic))) }) {
                         Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.checkin_diagnostics_copy))
                     }
                 }
@@ -231,17 +257,46 @@ private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptWithPlaceName>)
 }
 
 @Composable
-private fun diagnosticDetail(attempt: CheckInAttemptWithPlaceName): String {
+private fun diagnosticDetail(
+    attempt: com.gernalix.luoghi.data.CheckInAttemptWithPlaceName,
+    candidates: List<CheckInAttemptCandidateEntity>,
+): String {
     val accuracy = attempt.accuracyM?.let { stringResource(R.string.checkin_diagnostics_accuracy_format, it) }
     return listOfNotNull(
         com.gernalix.luoghi.ui.common.localizedTime(attempt.startedAt),
         accuracy,
         attempt.errorMessage,
+        candidateSummary(candidates).takeIf { it.isNotBlank() },
     ).joinToString(" - ")
 }
 
-private fun diagnosticReport(attempt: CheckInAttemptWithPlaceName): String =
-    buildString {
+fun filteredDiagnosticAttempts(
+    attempts: List<CheckInAttemptDiagnostic>,
+    outcomeFilter: String,
+    placeFilter: String,
+): List<CheckInAttemptDiagnostic> {
+    val outcomeNeedle = outcomeFilter.trim().lowercase()
+    val placeNeedle = placeFilter.trim().lowercase()
+    return attempts.filter { diagnostic ->
+        val attempt = diagnostic.attempt
+        val outcomeMatches = outcomeNeedle.isBlank() || attempt.outcome.lowercase().contains(outcomeNeedle)
+        val placeValues = buildList {
+            add(attempt.placeName.orEmpty())
+            add(attempt.selectedPlaceId.orEmpty())
+            add(attempt.matchedPlaceId.orEmpty())
+            diagnostic.candidates.forEach { candidate ->
+                add(candidate.placeNameSnapshot.orEmpty())
+                add(candidate.placeId)
+            }
+        }
+        val placeMatches = placeNeedle.isBlank() || placeValues.any { it.lowercase().contains(placeNeedle) }
+        outcomeMatches && placeMatches
+    }
+}
+
+fun diagnosticReport(diagnostic: CheckInAttemptDiagnostic): String {
+    val attempt = diagnostic.attempt
+    return buildString {
         appendLine("attempt=${attempt.id}")
         appendLine("outcome=${attempt.outcome}")
         appendLine("stage=${attempt.stage}")
@@ -250,6 +305,14 @@ private fun diagnosticReport(attempt: CheckInAttemptWithPlaceName): String =
         appendLine("place=${attempt.placeName ?: attempt.selectedPlaceId ?: attempt.matchedPlaceId ?: ""}")
         appendLine("lat=${attempt.lat ?: ""} lon=${attempt.lon ?: ""} accuracyM=${attempt.accuracyM ?: ""}")
         appendLine("error=${attempt.errorCode ?: ""} ${attempt.errorMessage ?: ""}".trim())
+        appendLine("candidates=${candidateSummary(diagnostic.candidates)}")
+    }
+}
+
+fun candidateSummary(candidates: List<CheckInAttemptCandidateEntity>): String =
+    candidates.sortedWith(compareBy<CheckInAttemptCandidateEntity> { it.rank }.thenBy { it.distanceM }).joinToString("; ") { candidate ->
+        val name = candidate.placeNameSnapshot?.takeIf { it.isNotBlank() } ?: candidate.placeId
+        "$name distanceM=${candidate.distanceM} thresholdM=${candidate.thresholdM} rank=${candidate.rank} result=${candidate.result}"
     }
 
 @Composable

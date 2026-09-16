@@ -3,8 +3,8 @@ package com.gernalix.luoghi.capsules.checkin
 import com.gernalix.luoghi.capsules.location.LocationSample
 import com.gernalix.luoghi.capsules.places.PlaceMutation
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
+import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
 import com.gernalix.luoghi.data.CheckInAttemptEntity
-import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceRepository
@@ -14,7 +14,7 @@ class CheckInCapsule(
     private val repository: PlaceRepository,
 ) {
     val events: Flow<List<PlaceEventEntity>> = repository.events
-    val recentAttempts: Flow<List<CheckInAttemptWithPlaceName>> = repository.recentCheckInAttempts
+    val recentAttempts: Flow<List<CheckInAttemptDiagnostic>> = repository.recentCheckInAttempts
     val latestUndoableHistoryAction = repository.latestUndoableHistoryAction
     val latestRedoableHistoryAction = repository.latestRedoableHistoryAction
 

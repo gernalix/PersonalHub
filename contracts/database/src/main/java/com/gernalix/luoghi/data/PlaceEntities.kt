@@ -144,12 +144,6 @@ data class CheckInAttemptEntity(
             childColumns = ["attempt_id"],
             onDelete = ForeignKey.CASCADE,
         ),
-        ForeignKey(
-            entity = PlaceEntity::class,
-            parentColumns = ["uuid"],
-            childColumns = ["place_id"],
-            onDelete = ForeignKey.CASCADE,
-        ),
     ],
     indices = [
         Index("attempt_id"),
@@ -161,6 +155,7 @@ data class CheckInAttemptCandidateEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "attempt_id") val attemptId: String,
     @ColumnInfo(name = "place_id") val placeId: String,
+    @ColumnInfo(name = "place_name_snapshot") val placeNameSnapshot: String? = null,
     @ColumnInfo(name = "distance_m") val distanceM: Double,
     @ColumnInfo(name = "threshold_m") val thresholdM: Double,
     val rank: Int,

@@ -33,7 +33,7 @@ class PlaceRepository(
 ) {
     val places: Flow<List<PlaceEntity>> = dao.observePlaces()
     val events: Flow<List<PlaceEventEntity>> = dao.observeEvents()
-    val recentCheckInAttempts: Flow<List<CheckInAttemptWithPlaceName>> = dao.observeRecentCheckInAttempts(8)
+    val recentCheckInAttempts: Flow<List<CheckInAttemptDiagnostic>> = dao.observeRecentCheckInAttemptDiagnostics(8)
     val geofenceConfigs: Flow<List<PlaceGeofenceConfigEntity>> = dao.observeGeofenceConfigs()
     val globalStatsState: Flow<GlobalStatsStateEntity?> = dao.observeGlobalStatsState()
     val latestUndoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestUndoableAction()

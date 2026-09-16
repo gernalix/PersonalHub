@@ -10,9 +10,14 @@ import com.gernalix.luoghi.capsules.checkin.HistoryMutationResult
 import com.gernalix.luoghi.capsules.checkin.PlaceEventTypes
 import com.gernalix.luoghi.capsules.location.LocationSample
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
+import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
+import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
 import com.gernalix.luoghi.data.LuoghiDatabase
+import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceRepository
+import com.gernalix.luoghi.ui.home.diagnosticReport
+import com.gernalix.luoghi.ui.home.filteredDiagnosticAttempts
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -87,6 +92,7 @@ class CheckInAttemptJournalInstrumentedTest {
                 CheckInAttemptCandidateEntity(
                     attemptId = ambiguous.id,
                     placeId = candidate.place.uuid,
+                    placeNameSnapshot = candidate.place.nickname,
                     distanceM = candidate.distanceM,
                     thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
                     rank = index + 1,
@@ -102,6 +108,34 @@ class CheckInAttemptJournalInstrumentedTest {
             errorMessage = "Multiple places matched",
         )
         assertEquals(0, dao.listEvents().size)
+        val ambiguousCandidates = dao.checkInAttemptCandidates(ambiguous.id)
+        assertEquals(2, ambiguousCandidates.size)
+        assertTrue(ambiguousCandidates.any { it.placeId == "desk" && it.placeNameSnapshot == "Desk" })
+        val diagnostic = CheckInAttemptDiagnostic(
+            attempt = CheckInAttemptWithPlaceName(
+                id = ambiguous.id,
+                startedAt = ambiguous.startedAt,
+                finishedAt = ambiguous.finishedAt,
+                source = ambiguous.source,
+                stage = "AMBIGUOUS",
+                outcome = CheckInAttemptOutcomes.AMBIGUOUS,
+                lat = location.latitude,
+                lon = location.longitude,
+                accuracyM = location.accuracyM,
+                selectedPlaceId = null,
+                matchedPlaceId = null,
+                placeName = null,
+                errorCode = "AMBIGUOUS_MATCH",
+                errorMessage = "Multiple places matched",
+            ),
+            candidates = ambiguousCandidates,
+        )
+        assertEquals(listOf(diagnostic), filteredDiagnosticAttempts(listOf(diagnostic), "ambiguous", "desk"))
+        assertTrue(diagnosticReport(diagnostic).contains("Desk distanceM="))
+        assertEquals(PlaceDeleteResult.Deleted, repository.deletePlace("desk"))
+        val candidatesAfterDelete = dao.checkInAttemptCandidates(ambiguous.id)
+        assertEquals(2, candidatesAfterDelete.size)
+        assertEquals("Desk", candidatesAfterDelete.first { it.placeId == "desk" }.placeNameSnapshot)
 
         val success = repository.beginCheckInAttempt()
         repository.updateCheckInAttemptLocation(success.id, location)
@@ -120,7 +154,7 @@ class CheckInAttemptJournalInstrumentedTest {
         assertEquals(1, dao.countCheckInAttemptsByOutcome(CheckInAttemptOutcomes.SUCCESS))
         assertEquals(2, dao.countCheckInAttemptCandidates(ambiguous.id))
         assertEquals(listOf(PlaceEventTypes.CHECK_IN), dao.listEvents().map { it.eventType })
-        assertEquals(listOf("desk", "home"), dao.listPlaces().map { it.uuid }.sorted())
+        assertEquals(listOf("home"), dao.listPlaces().map { it.uuid }.sorted())
     }
 
     private fun place(uuid: String, nickname: String, lat: Double, lon: Double, radiusM: Double) =

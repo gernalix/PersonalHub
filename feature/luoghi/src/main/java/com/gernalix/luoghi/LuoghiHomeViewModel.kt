@@ -34,7 +34,7 @@ import com.gernalix.luoghi.backup.ValidatedBackup
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
-import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
+import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
 import com.gernalix.luoghi.export.BackupFolderStore
@@ -153,7 +153,7 @@ data class CheckInHomeState(
     val ambiguousCandidates: List<CheckInCandidate> = emptyList(),
     val pendingCheckInLocation: LocationSample? = null,
     val pendingAttemptId: String? = null,
-    val recentAttempts: List<CheckInAttemptWithPlaceName> = emptyList(),
+    val recentAttempts: List<CheckInAttemptDiagnostic> = emptyList(),
 )
 
 data class HistoryUiState(
@@ -1314,6 +1314,7 @@ private fun attemptCandidateRows(
         CheckInAttemptCandidateEntity(
             attemptId = attemptId,
             placeId = candidate.place.uuid,
+            placeNameSnapshot = candidate.place.nickname.takeIf { it.isNotBlank() } ?: candidate.place.address,
             distanceM = candidate.distanceM,
             thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
             rank = index + 1,

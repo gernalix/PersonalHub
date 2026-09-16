@@ -24,9 +24,14 @@ import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.visits.VisitMapper
 import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
+import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
+import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
+import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
+import com.gernalix.luoghi.ui.home.diagnosticReport
+import com.gernalix.luoghi.ui.home.filteredDiagnosticAttempts
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -327,6 +332,7 @@ class PlacesHistoryMapGeofencingTest {
                 CheckInAttemptCandidateEntity(
                     attemptId = attempt.id,
                     placeId = candidate.place.uuid,
+                    placeNameSnapshot = candidate.place.nickname,
                     distanceM = candidate.distanceM,
                     thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
                     rank = index + 1,
@@ -344,6 +350,37 @@ class PlacesHistoryMapGeofencingTest {
 
         assertEquals(1, dao.countCheckInAttemptsByOutcome(CheckInAttemptOutcomes.AMBIGUOUS))
         assertEquals(2, dao.countCheckInAttemptCandidates(attempt.id))
+        val savedCandidates = dao.checkInAttemptCandidates(attempt.id)
+        assertEquals(listOf("Near", "Far"), savedCandidates.map { it.placeNameSnapshot })
+        val diagnostic = CheckInAttemptDiagnostic(
+            attempt = CheckInAttemptWithPlaceName(
+                id = attempt.id,
+                startedAt = attempt.startedAt,
+                finishedAt = attempt.finishedAt,
+                source = attempt.source,
+                stage = "AMBIGUOUS",
+                outcome = CheckInAttemptOutcomes.AMBIGUOUS,
+                lat = 0.0,
+                lon = 0.0,
+                accuracyM = 4.0,
+                selectedPlaceId = null,
+                matchedPlaceId = null,
+                placeName = null,
+                errorCode = "AMBIGUOUS_MATCH",
+                errorMessage = "Multiple places matched",
+            ),
+            candidates = savedCandidates,
+        )
+        assertEquals(listOf(diagnostic), filteredDiagnosticAttempts(listOf(diagnostic), "ambiguous", "far"))
+        val report = diagnosticReport(diagnostic)
+        assertTrue(report.contains("Far distanceM="))
+        assertTrue(report.contains("thresholdM=100.0"))
+        assertTrue(report.contains("rank=2"))
+        assertTrue(report.contains("result=AMBIGUOUS"))
+        assertEquals(PlaceDeleteResult.Deleted, repository.deletePlace("far"))
+        val afterDelete = dao.checkInAttemptCandidates(attempt.id)
+        assertEquals(2, afterDelete.size)
+        assertEquals("Far", afterDelete.first { it.placeId == "far" }.placeNameSnapshot)
         assertEquals(0, dao.listEvents().size)
     }
 

@@ -3,9 +3,11 @@ package com.gernalix.luoghi.data
 import androidx.room.Dao
 import androidx.room.ColumnInfo
 import androidx.room.Delete
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Relation
 import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.Upsert
@@ -34,6 +36,15 @@ data class CheckInAttemptWithPlaceName(
     @ColumnInfo(name = "place_name") val placeName: String?,
     @ColumnInfo(name = "error_code") val errorCode: String?,
     @ColumnInfo(name = "error_message") val errorMessage: String?,
+)
+
+data class CheckInAttemptDiagnostic(
+    @Embedded val attempt: CheckInAttemptWithPlaceName,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "attempt_id",
+    )
+    val candidates: List<CheckInAttemptCandidateEntity>,
 )
 
 @Dao
@@ -292,6 +303,16 @@ interface PlaceDao {
         LIMIT :limit
     """)
     fun observeRecentCheckInAttempts(limit: Int): Flow<List<CheckInAttemptWithPlaceName>>
+
+    @Transaction
+    @Query("""
+        SELECT a.*, COALESCE(NULLIF(p.nickname, ''), p.address) AS place_name
+        FROM check_in_attempts a
+        LEFT JOIN places p ON p.uuid = COALESCE(a.selected_place_id, a.matched_place_id)
+        ORDER BY a.started_at DESC, a.id DESC
+        LIMIT :limit
+    """)
+    fun observeRecentCheckInAttemptDiagnostics(limit: Int): Flow<List<CheckInAttemptDiagnostic>>
 
     @Query("""
         SELECT * FROM check_in_attempt_candidates

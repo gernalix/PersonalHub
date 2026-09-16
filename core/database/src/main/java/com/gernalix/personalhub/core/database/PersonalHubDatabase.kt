@@ -84,7 +84,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class, HubActivityEntity::class,
-], version = 14, exportSchema = true)
+], version = 15, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -102,7 +102,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 14
+        const val SCHEMA_VERSION = 15
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -115,7 +115,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
         fun openStaging(context: Context, name: String) = build(context, name)
         private val MIGRATION_EDGES = setOf(
             1 to 2, 2 to 3, 3 to 4, 4 to 5, 5 to 6, 6 to 7,
-            7 to 8, 8 to 9, 9 to 10, 10 to 11, 11 to 12, 12 to 13, 13 to 14,
+            7 to 8, 8 to 9, 9 to 10, 10 to 11, 11 to 12, 12 to 13, 13 to 14, 14 to 15,
         )
         fun canMigrateFrom(version: Int): Boolean {
             if (version == SCHEMA_VERSION) return true
@@ -307,6 +307,40 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                             FOREIGN KEY(`place_id`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE
                                         )
                                     """.trimIndent())
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id` ON `check_in_attempt_candidates` (`attempt_id`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_place_id` ON `check_in_attempt_candidates` (`place_id`)")
+                                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id_place_id` ON `check_in_attempt_candidates` (`attempt_id`, `place_id`)")
+                                    db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
+                                }
+                            },
+            object : androidx.room.migration.Migration(14, 15) {
+                                override fun migrate(db: SupportSQLiteDatabase) {
+                                    db.execSQL("""
+                                        CREATE TABLE IF NOT EXISTS `check_in_attempt_candidates_new` (
+                                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                            `attempt_id` TEXT NOT NULL,
+                                            `place_id` TEXT NOT NULL,
+                                            `place_name_snapshot` TEXT,
+                                            `distance_m` REAL NOT NULL,
+                                            `threshold_m` REAL NOT NULL,
+                                            `rank` INTEGER NOT NULL,
+                                            `result` TEXT NOT NULL,
+                                            FOREIGN KEY(`attempt_id`) REFERENCES `check_in_attempts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                                        )
+                                    """.trimIndent())
+                                    db.execSQL("""
+                                        INSERT INTO `check_in_attempt_candidates_new` (
+                                            `id`, `attempt_id`, `place_id`, `place_name_snapshot`,
+                                            `distance_m`, `threshold_m`, `rank`, `result`
+                                        )
+                                        SELECT c.`id`, c.`attempt_id`, c.`place_id`,
+                                               COALESCE(NULLIF(p.`nickname`, ''), p.`address`),
+                                               c.`distance_m`, c.`threshold_m`, c.`rank`, c.`result`
+                                        FROM `check_in_attempt_candidates` c
+                                        LEFT JOIN `places` p ON p.`uuid` = c.`place_id`
+                                    """.trimIndent())
+                                    db.execSQL("DROP TABLE `check_in_attempt_candidates`")
+                                    db.execSQL("ALTER TABLE `check_in_attempt_candidates_new` RENAME TO `check_in_attempt_candidates`")
                                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id` ON `check_in_attempt_candidates` (`attempt_id`)")
                                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_place_id` ON `check_in_attempt_candidates` (`place_id`)")
                                     db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id_place_id` ON `check_in_attempt_candidates` (`attempt_id`, `place_id`)")
