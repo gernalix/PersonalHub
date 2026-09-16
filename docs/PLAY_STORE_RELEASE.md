@@ -18,6 +18,8 @@ app/build/outputs/bundle/play/app-play.aab
 
 The `play` variant inherits the optimized/minified `release` configuration and uses the same application ID, `com.gernalix.personalhub`. Signed artifact tasks require the canonical local signing configuration in `/home/daniele/.config/codex/secrets/android_signing.env`; signing credentials and the keystore must never be committed.
 
+GitHub-hosted CI is allowed one deliberately narrow exception: it may run **only** `bundlePlay` with `-Ppersonalhub.allowUnsignedPlayBundle=true`. This produces the same minified/shrunk Play package for deterministic packaging checks without exposing private signing material. The opt-in is rejected for APK, install, connected-test, generic build/assemble, or any other signing-sensitive task.
+
 The normal private `release` build remains available separately.
 
 ## Play policy surface
@@ -29,7 +31,8 @@ The Play-specific manifest overlay removes capabilities that are not required fo
 - phone-state access;
 - draw-over-other-apps;
 - full-screen-intent permission;
-- call-state/overlay receivers tied to those capabilities.
+- call-state/overlay receivers tied to those capabilities;
+- the background geofence receiver.
 
 Foreground approximate/precise location remains available for user-invoked location functionality. Exact scheduling continues to use `SCHEDULE_EXACT_ALARM`, which is user-controlled, rather than the restricted `USE_EXACT_ALARM` permission.
 
@@ -56,16 +59,19 @@ The same policy is reachable from PersonalHub Settings. Keep the policy and Play
 
 ## Automated remote checks
 
-GitHub Actions performs Play preflight checks that do not require private signing material:
+GitHub Actions performs all Play checks that do not require private signing material or a real Android runtime:
 
 - compile/analyze the `play` variant through `lintPlay`;
 - merge the Play manifest;
+- build the actual minified/shrunk Play AAB without signing secrets;
 - verify that restricted permissions/components are absent from the merged Play manifest;
-- verify package and target-SDK invariants.
+- verify package and target-SDK invariants;
+- verify that exactly one readable AAB is produced and that it stays below the repository's 200 MiB preflight ceiling;
+- fail closed if native `.so` libraries appear, so 16 KiB page-size compatibility cannot become an unreviewed release regression.
 
 Common unit/integration testing stays in the repository-wide CI gate rather than being duplicated by this Play-specific workflow.
 
-Do not upload signing secrets to public-repository CI merely to build the final AAB.
+Do not upload signing secrets to public-repository CI. The CI AAB is a packaging/preflight artifact only; it is not the release artifact uploaded to Play.
 
 ## Signing continuity and Play App Signing
 
@@ -77,18 +83,18 @@ The local release gate records the current signing certificate identity without 
 
 The final signed release gate requires local resources and therefore is intentionally not done in GitHub-hosted CI:
 
-1. synchronize the canonical PersonalHub checkout;
+1. synchronize the canonical PersonalHub checkout after all repository-wide CI work is complete;
 2. verify canonical signing material without printing secrets;
-3. build `bundlePlay` once;
-4. inspect the produced AAB/merged manifest and signing identity;
-5. install the AAB-derived APK set on an isolated emulator and perform a bounded smoke test;
-6. retain the verified AAB for Play Console upload.
+3. build `bundlePlay` once with the canonical signing identity;
+4. inspect the produced AAB/manifest and public certificate fingerprint;
+5. install an APK set derived from that exact AAB on the isolated `Pixel_8a` emulator and perform a bounded smoke test;
+6. retain the verified AAB and checksum for Play Console upload.
 
 This gate belongs in the Codex roadmap because the keystore, Android SDK/emulator and canonical local runtime are not available to the remote chat.
 
 ## Play Console work
 
-Play Console administration is not a Codex/local-code task. Before publishing, complete the current Play Console forms and assets as applicable, including:
+Play Console administration is separate from repository readiness. Before publishing, complete the current Play Console forms and assets as applicable, including:
 
 - store listing text and graphics;
 - Data safety;
