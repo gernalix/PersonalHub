@@ -165,7 +165,7 @@ class HubContextAllModulesDeviceTest {
         instrumentation.runOnMainSync {
             resumed = ActivityLifecycleMonitorRegistry.getInstance()
                 .getActivitiesInStage(Stage.RESUMED)
-                .any { it is HubContextQaActivity }
+                .any { it.javaClass.name == "com.gernalix.personalhub.HubContextQaActivity" }
         }
         return resumed
     }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -151,13 +150,6 @@ fun NowScreen(
     }
     val randomTimerStartEnabled = !state.isReadOnly && randomRunningSessionIds.isEmpty()
     val runningRowCount = regularRows.size + timedRows.size
-    val activeTags = remember(visibleTags, state.runningMinStartByTagId, state.tagLastUsedMsByTagId) {
-        NowCapsuleViewModel.computeActiveTags(
-            visibleTags = visibleTags,
-            runningMinStartByTagId = state.runningMinStartByTagId,
-            tagLastUsedMsByTagId = state.tagLastUsedMsByTagId,
-        )
-    }
     val rankedQuickStartTags = remember(
         visibleTags,
         state.chronologySessions,
@@ -257,7 +249,7 @@ fun NowScreen(
                                 regularRows = regularRows,
                                 timedRows = timedRows,
                                 tagNameById = tagNameById,
-                                activeTags = activeTags,
+                                activeTags = emptyList(),
                                 activeTagTotalsMsByTagId = state.activeTagTotalsMsByTagId,
                                 runningMinStartByTagId = state.runningMinStartByTagId,
                                 homeLoadState = state.homeLoadState,
@@ -301,7 +293,7 @@ fun NowScreen(
                                 regularRows = regularRows,
                                 timedRows = timedRows,
                                 tagNameById = tagNameById,
-                                activeTags = activeTags,
+                                activeTags = emptyList(),
                                 activeTagTotalsMsByTagId = state.activeTagTotalsMsByTagId,
                                 runningMinStartByTagId = state.runningMinStartByTagId,
                                 homeLoadState = state.homeLoadState,
@@ -341,24 +333,25 @@ fun NowScreen(
                         }
                     }
 
-                    Column(
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .padding(top = 4.dp, bottom = 8.dp),
+                            .padding(top = 4.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        QuickStartTagLauncher(
-                            tags = rankedQuickStartTags,
-                            enabled = !state.isReadOnly,
-                            onStartSession = ::startQuickSession,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .wrapContentHeight(),
-                        )
-                        QuickStartActionButtons(
+                        item(key = "now_quick_start_running") {
+                            QuickStartTagLauncher(
+                                tags = rankedQuickStartTags,
+                                enabled = !state.isReadOnly,
+                                onStartSession = ::startQuickSession,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        quickStartActions(
                             randomMaxMinutes = randomMaxMinutes,
-                            onRandomMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
+                            onRandomMaxMinutesChange = { randomMaxMinutes = it },
                             randomTimerStartEnabled = randomTimerStartEnabled,
                             onNewSession = { openNewSessionDraft() },
                             onStartRandomTimer = {
@@ -460,28 +453,6 @@ private fun androidx.compose.foundation.lazy.LazyListScope.quickStartActions(
         RandomTimerCard(
             maxMinutes = randomMaxMinutes,
             onMaxMinutesChange = { onRandomMaxMinutesChange(it.filter(Char::isDigit).take(4)) },
-            enabled = randomTimerStartEnabled,
-            onStart = onStartRandomTimer,
-        )
-    }
-}
-
-@Composable
-private fun QuickStartActionButtons(
-    randomMaxMinutes: String,
-    onRandomMaxMinutesChange: (String) -> Unit,
-    randomTimerStartEnabled: Boolean,
-    onNewSession: () -> Unit,
-    onStartRandomTimer: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        NewSessionButton(onClick = onNewSession)
-        RandomTimerCard(
-            maxMinutes = randomMaxMinutes,
-            onMaxMinutesChange = onRandomMaxMinutesChange,
             enabled = randomTimerStartEnabled,
             onStart = onStartRandomTimer,
         )

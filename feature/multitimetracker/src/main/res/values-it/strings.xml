@@ -19,7 +19,7 @@
     <string name="cd_export">Esporta</string>
     <string name="active_tags_header">Tag attivi</string>
     <string name="active_tasks_header">Sessioni attive</string>
-    <string name="active_sessions_header">Sessioni attive</string>
+    <string name="active_sessions_header">Sessioni in corso</string>
     <string name="other_sessions_header">Altre sessioni</string>
     <string name="edit">Modifica</string>
     <string name="add_tag_cd">Aggiungi tag</string>
