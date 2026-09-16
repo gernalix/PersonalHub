@@ -1,6 +1,7 @@
 package com.gernalix.personalhub.capsules.settings
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -39,6 +40,16 @@ fun HubSettings(onBack: () -> Unit) {
                 OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) { Text(stringResource(R.string.database_title)) }
                 OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
                 OutlinedButton(onClick = { page = "workflowy-days" }) { Text(stringResource(R.string.workflowy_days_title)) }
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(context.getString(R.string.privacy_policy_url)),
+                            ),
+                        )
+                    },
+                ) { Text(stringResource(R.string.privacy_policy_title)) }
             }
         }
     }
