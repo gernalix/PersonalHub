@@ -89,6 +89,11 @@
     <string name="checkin_ambiguous_place">More than one place matches this location.</string>
     <string name="checkin_choose_place">Choose place</string>
     <string name="checkin_candidate_format">%1$s - %2$.0f m</string>
+    <string name="checkin_diagnostics_title">Check-in diagnostics</string>
+    <string name="checkin_diagnostics_row_format">%1$s - %2$s</string>
+    <string name="checkin_diagnostics_no_place">no place</string>
+    <string name="checkin_diagnostics_accuracy_format">accuracy %1$.0f m</string>
+    <string name="checkin_diagnostics_copy">Copy diagnostic report</string>
     <string name="history">History</string>
     <string name="history_empty">No check-in history yet.</string>
     <string name="history_empty_place">No history for this place yet.</string>

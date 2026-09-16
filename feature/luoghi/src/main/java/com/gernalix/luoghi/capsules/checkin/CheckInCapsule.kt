@@ -2,6 +2,9 @@ package com.gernalix.luoghi.capsules.checkin
 
 import com.gernalix.luoghi.capsules.location.LocationSample
 import com.gernalix.luoghi.capsules.places.PlaceMutation
+import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
+import com.gernalix.luoghi.data.CheckInAttemptEntity
+import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceRepository
@@ -11,6 +14,7 @@ class CheckInCapsule(
     private val repository: PlaceRepository,
 ) {
     val events: Flow<List<PlaceEventEntity>> = repository.events
+    val recentAttempts: Flow<List<CheckInAttemptWithPlaceName>> = repository.recentCheckInAttempts
     val latestUndoableHistoryAction = repository.latestUndoableHistoryAction
     val latestRedoableHistoryAction = repository.latestRedoableHistoryAction
 
@@ -71,6 +75,54 @@ class CheckInCapsule(
         checkIn(uuid, location)
         return uuid
     }
+
+    suspend fun recoverInterruptedAttempts(): Int = repository.recoverInterruptedCheckInAttempts()
+
+    suspend fun beginAttempt(source: String = "Luoghi"): CheckInAttemptEntity =
+        repository.beginCheckInAttempt(source)
+
+    suspend fun updateAttemptLocation(attemptId: String, location: LocationSample) =
+        repository.updateCheckInAttemptLocation(attemptId, location)
+
+    suspend fun markAttemptStage(
+        attemptId: String,
+        stage: String,
+        outcome: String = CheckInAttemptOutcomes.IN_PROGRESS,
+        errorCode: String? = null,
+        errorMessage: String? = null,
+    ) = repository.markCheckInAttemptStage(
+        attemptId = attemptId,
+        stage = stage,
+        outcome = outcome,
+        errorCode = errorCode,
+        errorMessage = errorMessage,
+    )
+
+    suspend fun finishAttempt(
+        attemptId: String,
+        outcome: String,
+        stage: String,
+        selectedPlaceId: String? = null,
+        matchedPlaceId: String? = null,
+        errorCode: String? = null,
+        errorMessage: String? = null,
+    ) = repository.finishCheckInAttempt(
+        attemptId = attemptId,
+        outcome = outcome,
+        stage = stage,
+        selectedPlaceId = selectedPlaceId,
+        matchedPlaceId = matchedPlaceId,
+        errorCode = errorCode,
+        errorMessage = errorMessage,
+    )
+
+    suspend fun replaceAttemptCandidates(
+        attemptId: String,
+        candidates: List<CheckInAttemptCandidateEntity>,
+    ) = repository.replaceCheckInAttemptCandidates(attemptId, candidates)
+
+    suspend fun candidatesForAttempt(attemptId: String): List<CheckInAttemptCandidateEntity> =
+        repository.checkInAttemptCandidates(attemptId)
 
     suspend fun editEvent(eventId: Long, timestamp: Long, notes: String?, reason: String? = null): HistoryMutationResult =
         repository.editHistoryEvent(

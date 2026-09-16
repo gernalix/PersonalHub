@@ -19,6 +19,23 @@ data class PlaceVisitHubRow(
     @ColumnInfo(name = "end_ms") val endMs: Long?,
 )
 
+data class CheckInAttemptWithPlaceName(
+    val id: String,
+    @ColumnInfo(name = "started_at") val startedAt: Long,
+    @ColumnInfo(name = "finished_at") val finishedAt: Long?,
+    val source: String,
+    val stage: String,
+    val outcome: String,
+    val lat: Double?,
+    val lon: Double?,
+    @ColumnInfo(name = "accuracy_m") val accuracyM: Double?,
+    @ColumnInfo(name = "selected_place_id") val selectedPlaceId: String?,
+    @ColumnInfo(name = "matched_place_id") val matchedPlaceId: String?,
+    @ColumnInfo(name = "place_name") val placeName: String?,
+    @ColumnInfo(name = "error_code") val errorCode: String?,
+    @ColumnInfo(name = "error_message") val errorMessage: String?,
+)
+
 @Dao
 interface PlaceDao {
     @Query("SELECT * FROM places WHERE archived = 0 ORDER BY updated_at DESC, nickname COLLATE NOCASE ASC")
@@ -245,6 +262,43 @@ interface PlaceDao {
 
     @Query("SELECT * FROM place_events WHERE session_uuid = :sessionUuid ORDER BY timestamp ASC, id ASC")
     suspend fun eventsForSession(sessionUuid: String): List<PlaceEventEntity>
+
+    @Upsert
+    suspend fun upsertCheckInAttempt(attempt: CheckInAttemptEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCheckInAttemptCandidates(candidates: List<CheckInAttemptCandidateEntity>)
+
+    @Query("DELETE FROM check_in_attempt_candidates WHERE attempt_id = :attemptId")
+    suspend fun deleteCheckInAttemptCandidates(attemptId: String): Int
+
+    @Query("SELECT * FROM check_in_attempts WHERE outcome = 'IN_PROGRESS' ORDER BY started_at ASC")
+    suspend fun inProgressCheckInAttempts(): List<CheckInAttemptEntity>
+
+    @Query("SELECT COUNT(*) FROM check_in_attempts WHERE outcome = :outcome")
+    suspend fun countCheckInAttemptsByOutcome(outcome: String): Int
+
+    @Query("SELECT COUNT(*) FROM check_in_attempt_candidates WHERE attempt_id = :attemptId")
+    suspend fun countCheckInAttemptCandidates(attemptId: String): Int
+
+    @Query("SELECT * FROM check_in_attempts WHERE id = :attemptId LIMIT 1")
+    suspend fun checkInAttempt(attemptId: String): CheckInAttemptEntity?
+
+    @Query("""
+        SELECT a.*, COALESCE(NULLIF(p.nickname, ''), p.address) AS place_name
+        FROM check_in_attempts a
+        LEFT JOIN places p ON p.uuid = COALESCE(a.selected_place_id, a.matched_place_id)
+        ORDER BY a.started_at DESC, a.id DESC
+        LIMIT :limit
+    """)
+    fun observeRecentCheckInAttempts(limit: Int): Flow<List<CheckInAttemptWithPlaceName>>
+
+    @Query("""
+        SELECT * FROM check_in_attempt_candidates
+        WHERE attempt_id = :attemptId
+        ORDER BY rank ASC, distance_m ASC
+    """)
+    suspend fun checkInAttemptCandidates(attemptId: String): List<CheckInAttemptCandidateEntity>
 
     @Query("""
         SELECT e.session_uuid AS stable_id,e.place_id AS place_id,

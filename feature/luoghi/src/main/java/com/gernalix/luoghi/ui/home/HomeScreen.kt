@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -31,8 +32,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gernalix.luoghi.CHECKIN_BUTTON_TAG
@@ -46,6 +49,7 @@ import com.gernalix.luoghi.capsules.places.PlaceSortCriterion
 import com.gernalix.luoghi.capsules.places.PlaceSortDirection
 import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
+import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
 import com.gernalix.luoghi.ui.history.VisitTimelineItem
 import com.gernalix.luoghi.ui.places.PlaceListItem
 
@@ -123,6 +127,11 @@ fun HomeScreen(
                     action = stringResource(R.string.places_count_format, state.placeItems.size),
                 )
             }
+            if (state.checkIn.recentAttempts.isNotEmpty()) {
+                item(key = "checkin-diagnostics") {
+                    CheckInDiagnosticsPanel(state.checkIn.recentAttempts)
+                }
+            }
             item(key = "places-sort") {
                 PlacesSortBar(
                     sort = state.placeSort,
@@ -181,6 +190,67 @@ fun HomeScreen(
         }
     }
 }
+
+@Composable
+private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptWithPlaceName>) {
+    val clipboard = LocalClipboardManager.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(R.string.checkin_diagnostics_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            attempts.take(5).forEach { attempt ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(
+                                R.string.checkin_diagnostics_row_format,
+                                attempt.outcome,
+                                attempt.placeName ?: attempt.errorCode ?: stringResource(R.string.checkin_diagnostics_no_place),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            diagnosticDetail(attempt),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = { clipboard.setText(AnnotatedString(diagnosticReport(attempt))) }) {
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.checkin_diagnostics_copy))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun diagnosticDetail(attempt: CheckInAttemptWithPlaceName): String {
+    val accuracy = attempt.accuracyM?.let { stringResource(R.string.checkin_diagnostics_accuracy_format, it) }
+    return listOfNotNull(
+        com.gernalix.luoghi.ui.common.localizedTime(attempt.startedAt),
+        accuracy,
+        attempt.errorMessage,
+    ).joinToString(" - ")
+}
+
+private fun diagnosticReport(attempt: CheckInAttemptWithPlaceName): String =
+    buildString {
+        appendLine("attempt=${attempt.id}")
+        appendLine("outcome=${attempt.outcome}")
+        appendLine("stage=${attempt.stage}")
+        appendLine("startedAt=${attempt.startedAt}")
+        appendLine("finishedAt=${attempt.finishedAt}")
+        appendLine("place=${attempt.placeName ?: attempt.selectedPlaceId ?: attempt.matchedPlaceId ?: ""}")
+        appendLine("lat=${attempt.lat ?: ""} lon=${attempt.lon ?: ""} accuracyM=${attempt.accuracyM ?: ""}")
+        appendLine("error=${attempt.errorCode ?: ""} ${attempt.errorMessage ?: ""}".trim())
+    }
 
 @Composable
 private fun PlacesSortBar(

@@ -111,6 +111,63 @@ data class PlaceEventEntity(
 )
 
 @Entity(
+    tableName = "check_in_attempts",
+    indices = [
+        Index("started_at"),
+        Index("finished_at"),
+        Index("outcome"),
+        Index("matched_place_id"),
+    ],
+)
+data class CheckInAttemptEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    @ColumnInfo(name = "started_at") val startedAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "finished_at") val finishedAt: Long? = null,
+    val source: String = "Luoghi",
+    val stage: String = "STARTED",
+    val outcome: String = "IN_PROGRESS",
+    val lat: Double? = null,
+    val lon: Double? = null,
+    @ColumnInfo(name = "accuracy_m") val accuracyM: Double? = null,
+    @ColumnInfo(name = "selected_place_id") val selectedPlaceId: String? = null,
+    @ColumnInfo(name = "matched_place_id") val matchedPlaceId: String? = null,
+    @ColumnInfo(name = "error_code") val errorCode: String? = null,
+    @ColumnInfo(name = "error_message") val errorMessage: String? = null,
+)
+
+@Entity(
+    tableName = "check_in_attempt_candidates",
+    foreignKeys = [
+        ForeignKey(
+            entity = CheckInAttemptEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["attempt_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = PlaceEntity::class,
+            parentColumns = ["uuid"],
+            childColumns = ["place_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index("attempt_id"),
+        Index("place_id"),
+        Index(value = ["attempt_id", "place_id"], unique = true),
+    ],
+)
+data class CheckInAttemptCandidateEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "attempt_id") val attemptId: String,
+    @ColumnInfo(name = "place_id") val placeId: String,
+    @ColumnInfo(name = "distance_m") val distanceM: Double,
+    @ColumnInfo(name = "threshold_m") val thresholdM: Double,
+    val rank: Int,
+    val result: String,
+)
+
+@Entity(
     tableName = "history_audit_log",
     indices = [
         Index("action"),

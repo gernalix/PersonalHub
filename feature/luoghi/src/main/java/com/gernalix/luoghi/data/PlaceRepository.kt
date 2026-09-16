@@ -7,6 +7,7 @@ import com.gernalix.luoghi.capsules.checkin.HistoryMutationResult
 import com.gernalix.luoghi.capsules.checkin.HistorySessionAnomaly
 import com.gernalix.luoghi.capsules.checkin.HistorySessionCalculator
 import com.gernalix.luoghi.capsules.checkin.HistoryValidationError
+import com.gernalix.luoghi.capsules.checkin.CheckInAttemptOutcomes
 import com.gernalix.luoghi.capsules.checkin.PlaceEventTypes
 import com.gernalix.luoghi.capsules.location.LocationSample
 import com.gernalix.luoghi.capsules.safexport.PersistentMutationTracker
@@ -32,6 +33,7 @@ class PlaceRepository(
 ) {
     val places: Flow<List<PlaceEntity>> = dao.observePlaces()
     val events: Flow<List<PlaceEventEntity>> = dao.observeEvents()
+    val recentCheckInAttempts: Flow<List<CheckInAttemptWithPlaceName>> = dao.observeRecentCheckInAttempts(8)
     val geofenceConfigs: Flow<List<PlaceGeofenceConfigEntity>> = dao.observeGeofenceConfigs()
     val globalStatsState: Flow<GlobalStatsStateEntity?> = dao.observeGlobalStatsState()
     val latestUndoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestUndoableAction()
@@ -71,6 +73,100 @@ class PlaceRepository(
         }
         PersistentMutationTracker.record(context, "places.save")
         return resolvedUuid
+    }
+
+    suspend fun beginCheckInAttempt(source: String = "Luoghi"): CheckInAttemptEntity {
+        val attempt = CheckInAttemptEntity(source = source)
+        dao.upsertCheckInAttempt(attempt)
+        PersistentMutationTracker.record(context, "check_in_attempts.begin")
+        return attempt
+    }
+
+    suspend fun updateCheckInAttemptLocation(attemptId: String, location: LocationSample) {
+        val current = dao.checkInAttempt(attemptId) ?: return
+        dao.upsertCheckInAttempt(
+            current.copy(
+                stage = "LOCATION_CAPTURED",
+                lat = location.latitude,
+                lon = location.longitude,
+                accuracyM = location.accuracyM,
+            )
+        )
+        PersistentMutationTracker.record(context, "check_in_attempts.location")
+    }
+
+    suspend fun markCheckInAttemptStage(
+        attemptId: String,
+        stage: String,
+        outcome: String = CheckInAttemptOutcomes.IN_PROGRESS,
+        errorCode: String? = null,
+        errorMessage: String? = null,
+    ) {
+        val current = dao.checkInAttempt(attemptId) ?: return
+        dao.upsertCheckInAttempt(
+            current.copy(
+                stage = stage,
+                outcome = outcome,
+                errorCode = errorCode.cleanNullable(),
+                errorMessage = sanitizeAttemptError(errorMessage).cleanNullable(),
+            )
+        )
+        PersistentMutationTracker.record(context, "check_in_attempts.stage")
+    }
+
+    suspend fun replaceCheckInAttemptCandidates(
+        attemptId: String,
+        candidates: List<CheckInAttemptCandidateEntity>,
+    ) {
+        database.withTransaction {
+            dao.deleteCheckInAttemptCandidates(attemptId)
+            if (candidates.isNotEmpty()) dao.insertCheckInAttemptCandidates(candidates)
+        }
+        PersistentMutationTracker.record(context, "check_in_attempt_candidates.replace")
+    }
+
+    suspend fun checkInAttemptCandidates(attemptId: String): List<CheckInAttemptCandidateEntity> =
+        dao.checkInAttemptCandidates(attemptId)
+
+    suspend fun finishCheckInAttempt(
+        attemptId: String,
+        outcome: String,
+        stage: String,
+        selectedPlaceId: String? = null,
+        matchedPlaceId: String? = null,
+        errorCode: String? = null,
+        errorMessage: String? = null,
+    ) {
+        val current = dao.checkInAttempt(attemptId) ?: return
+        dao.upsertCheckInAttempt(
+            current.copy(
+                finishedAt = System.currentTimeMillis(),
+                stage = stage,
+                outcome = outcome,
+                selectedPlaceId = selectedPlaceId ?: current.selectedPlaceId,
+                matchedPlaceId = matchedPlaceId ?: current.matchedPlaceId,
+                errorCode = errorCode.cleanNullable(),
+                errorMessage = sanitizeAttemptError(errorMessage).cleanNullable(),
+            )
+        )
+        PersistentMutationTracker.record(context, "check_in_attempts.finish")
+    }
+
+    suspend fun recoverInterruptedCheckInAttempts(): Int {
+        val stale = dao.inProgressCheckInAttempts()
+        stale.forEach { attempt ->
+            dao.upsertCheckInAttempt(
+                attempt.copy(
+                    finishedAt = attempt.finishedAt ?: System.currentTimeMillis(),
+                    stage = "RECOVERY",
+                    outcome = CheckInAttemptOutcomes.INTERRUPTED,
+                    errorCode = "PROCESS_INTERRUPTED",
+                    errorMessage = "Attempt interrupted before completion",
+                )
+            )
+        }
+        if (stale.isNotEmpty()) PersistentMutationTracker.record(context, "check_in_attempts.recover")
+        return stale.size
     }
 
     suspend fun deletePlace(uuid: String): PlaceDeleteResult {
@@ -805,3 +901,10 @@ class PlaceRepository(
 }
 
 private fun String?.cleanNullable(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+
+private fun sanitizeAttemptError(message: String?): String? =
+    message
+        ?.lineSequence()
+        ?.firstOrNull()
+        ?.replace(Regex("""[/?][^\s:]+"""), "<path>")
+        ?.take(160)

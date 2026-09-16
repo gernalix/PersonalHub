@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressAutocompleteLatestGate
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressAutocompletePolicy
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressSuggestion
+import com.gernalix.luoghi.capsules.checkin.CheckInAttemptOutcomes
 import com.gernalix.luoghi.capsules.checkin.CheckInCandidate
 import com.gernalix.luoghi.capsules.checkin.CheckInMatchDecision
 import com.gernalix.luoghi.capsules.checkin.CheckInPolicy
@@ -32,6 +33,8 @@ import com.gernalix.luoghi.backup.RestoreSummary
 import com.gernalix.luoghi.backup.ValidatedBackup
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceDeleteResult
+import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
+import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
 import com.gernalix.luoghi.export.BackupFolderStore
@@ -149,6 +152,8 @@ data class CheckInHomeState(
     val messagePlaceName: String? = null,
     val ambiguousCandidates: List<CheckInCandidate> = emptyList(),
     val pendingCheckInLocation: LocationSample? = null,
+    val pendingAttemptId: String? = null,
+    val recentAttempts: List<CheckInAttemptWithPlaceName> = emptyList(),
 )
 
 data class HistoryUiState(
@@ -255,12 +260,14 @@ class LuoghiHomeViewModel(
 
     val state: StateFlow<HomeUiState> = combine(
         container.places.places,
-        combine(container.checkIns.events, container.geofences.configs) { events, geofenceConfigs -> events to geofenceConfigs },
+        combine(container.checkIns.events, container.geofences.configs, container.checkIns.recentAttempts) { events, geofenceConfigs, attempts ->
+            Triple(events, geofenceConfigs, attempts)
+        },
         container.stats.globalStatsState,
         mutableState,
         HubContextRuntime.contextChanges(),
     ) { places, eventAndGeofenceConfigs, globalStatsState, state, _ ->
-        val (events, geofenceConfigs) = eventAndGeofenceConfigs
+        val (events, geofenceConfigs, attempts) = eventAndGeofenceConfigs
         val nowMs = maxOf(state.nowMs, System.currentTimeMillis())
         val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
         val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
@@ -269,7 +276,7 @@ class LuoghiHomeViewModel(
             places = places,
             geofenceConfigs = geofenceConfigs.associateBy { it.placeUuid },
             visits = visits,
-            checkIn = state.checkIn.withDerivedVisit(places, events, visits),
+            checkIn = state.checkIn.withDerivedVisit(places, events, visits).copy(recentAttempts = attempts),
             nowMs = nowMs,
             stats = stats,
             routeDistances = state.routeDistances,
@@ -289,6 +296,7 @@ class LuoghiHomeViewModel(
 
     init {
         observeHistoryActions()
+        viewModelScope.launch { container.checkIns.recoverInterruptedAttempts() }
     }
 
     private fun observeHistoryActions() {
@@ -669,6 +677,7 @@ class LuoghiHomeViewModel(
     }
 
     fun newPlace() {
+        val pendingAttemptId = mutableState.value.checkIn.pendingAttemptId
         container.addressAutocomplete.resetSession()
         addressSearchJob?.cancel()
         addressLatestGate.invalidate()
@@ -682,8 +691,20 @@ class LuoghiHomeViewModel(
                     messagePlaceName = null,
                     ambiguousCandidates = emptyList(),
                     pendingCheckInLocation = null,
+                    pendingAttemptId = null,
                 ),
             )
+        }
+        if (pendingAttemptId != null) {
+            viewModelScope.launch {
+                container.checkIns.finishAttempt(
+                    attemptId = pendingAttemptId,
+                    outcome = CheckInAttemptOutcomes.USER_CANCELLED,
+                    stage = "USER_CANCELLED",
+                    errorCode = "USER_CANCELLED",
+                    errorMessage = "User cancelled pending check-in",
+                )
+            }
         }
     }
 
@@ -821,6 +842,7 @@ class LuoghiHomeViewModel(
         if (form.nickname.isBlank()) return
         viewModelScope.launch {
             val pendingLocation = mutableState.value.checkIn.pendingCheckInLocation
+            val pendingAttemptId = mutableState.value.checkIn.pendingAttemptId
             val mutation = PlaceMutation(
                 uuid = form.uuid,
                 nickname = form.nickname,
@@ -833,7 +855,28 @@ class LuoghiHomeViewModel(
             )
             val createdFromUnknownLocation = (pendingLocation != null) && (form.uuid == null)
             if (createdFromUnknownLocation) {
-                container.checkIns.checkInNewPlace(mutation, pendingLocation)
+                val createdUuid = runCatching { container.checkIns.checkInNewPlace(mutation, pendingLocation) }
+                    .onFailure { error ->
+                        if (pendingAttemptId != null) {
+                            container.checkIns.finishAttempt(
+                                attemptId = pendingAttemptId,
+                                outcome = CheckInAttemptOutcomes.PERSISTENCE_FAILED,
+                                stage = "NEW_PLACE_CHECK_IN_FAILED",
+                                errorCode = error::class.simpleName ?: "PERSISTENCE_FAILED",
+                                errorMessage = error.message,
+                            )
+                        }
+                    }
+                    .getOrThrow()
+                if (pendingAttemptId != null) {
+                    container.checkIns.finishAttempt(
+                        attemptId = pendingAttemptId,
+                        outcome = CheckInAttemptOutcomes.SUCCESS,
+                        stage = "NEW_PLACE_CHECKED_IN",
+                        selectedPlaceId = createdUuid,
+                        matchedPlaceId = createdUuid,
+                    )
+                }
             } else {
                 container.places.save(mutation)
             }
@@ -849,6 +892,7 @@ class LuoghiHomeViewModel(
                         message = if (createdFromUnknownLocation) CheckInMessage.CHECKED_IN else it.checkIn.message,
                         messagePlaceName = if (createdFromUnknownLocation) form.nickname.trim() else it.checkIn.messagePlaceName,
                         pendingCheckInLocation = null,
+                        pendingAttemptId = null,
                         ambiguousCandidates = emptyList(),
                         working = false,
                     ),
@@ -901,6 +945,16 @@ class LuoghiHomeViewModel(
     }
 
     fun onLocationPermissionDenied() {
+        viewModelScope.launch {
+            val attempt = container.checkIns.beginAttempt()
+            container.checkIns.finishAttempt(
+                attemptId = attempt.id,
+                outcome = CheckInAttemptOutcomes.PERMISSION_DENIED,
+                stage = "PERMISSION_DENIED",
+                errorCode = "LOCATION_PERMISSION_DENIED",
+                errorMessage = "Location permission denied",
+            )
+        }
         mutableState.update {
             it.copy(checkIn = it.checkIn.copy(message = CheckInMessage.LOCATION_PERMISSION_DENIED, messagePlaceName = null))
         }
@@ -909,10 +963,33 @@ class LuoghiHomeViewModel(
     fun selectAmbiguousCheckIn(placeUuid: String) {
         val checkInState = mutableState.value.checkIn
         val location = checkInState.pendingCheckInLocation ?: return
+        val attemptId = checkInState.pendingAttemptId
         val candidate = checkInState.ambiguousCandidates.firstOrNull { it.place.uuid == placeUuid } ?: return
         viewModelScope.launch {
             mutableState.update { it.copy(checkIn = it.checkIn.copy(working = true)) }
-            container.checkIns.checkIn(placeUuid, location)
+            val inserted = runCatching { container.checkIns.checkIn(placeUuid, location) }
+            inserted.onSuccess {
+                if (attemptId != null) {
+                    container.checkIns.finishAttempt(
+                        attemptId = attemptId,
+                        outcome = CheckInAttemptOutcomes.SUCCESS,
+                        stage = "AMBIGUOUS_SELECTION_CHECKED_IN",
+                        selectedPlaceId = placeUuid,
+                        matchedPlaceId = placeUuid,
+                    )
+                }
+            }.onFailure { error ->
+                if (attemptId != null) {
+                    container.checkIns.finishAttempt(
+                        attemptId = attemptId,
+                        outcome = CheckInAttemptOutcomes.PERSISTENCE_FAILED,
+                        stage = "AMBIGUOUS_SELECTION_FAILED",
+                        selectedPlaceId = placeUuid,
+                        errorCode = error::class.simpleName ?: "PERSISTENCE_FAILED",
+                        errorMessage = error.message,
+                    )
+                }
+            }.getOrThrow()
             mutableState.update {
                 it.copy(
                     checkIn = it.checkIn.copy(
@@ -921,6 +998,7 @@ class LuoghiHomeViewModel(
                         messagePlaceName = candidate.place.nickname,
                         ambiguousCandidates = emptyList(),
                         pendingCheckInLocation = null,
+                        pendingAttemptId = null,
                     )
                 )
             }
@@ -1021,6 +1099,7 @@ class LuoghiHomeViewModel(
 
     private fun checkInAtCurrentLocation() {
         viewModelScope.launch {
+            val attempt = container.checkIns.beginAttempt()
             mutableState.update {
                 it.copy(
                     checkIn = it.checkIn.copy(
@@ -1029,37 +1108,83 @@ class LuoghiHomeViewModel(
                         messagePlaceName = null,
                         ambiguousCandidates = emptyList(),
                         pendingCheckInLocation = null,
+                        pendingAttemptId = attempt.id,
                     )
                 )
             }
             val location = runCatching { container.location.currentLocation() }.getOrNull()
             if (location == null) {
+                container.checkIns.finishAttempt(
+                    attemptId = attempt.id,
+                    outcome = CheckInAttemptOutcomes.LOCATION_UNAVAILABLE,
+                    stage = "LOCATION_UNAVAILABLE",
+                    errorCode = "LOCATION_UNAVAILABLE",
+                    errorMessage = "Current location unavailable",
+                )
                 mutableState.update {
-                    it.copy(checkIn = it.checkIn.copy(working = false, message = CheckInMessage.LOCATION_UNAVAILABLE))
+                    it.copy(
+                        checkIn = it.checkIn.copy(
+                            working = false,
+                            message = CheckInMessage.LOCATION_UNAVAILABLE,
+                            pendingAttemptId = null,
+                        )
+                    )
                 }
                 return@launch
             }
+            container.checkIns.updateAttemptLocation(attempt.id, location)
 
             when (val decision = container.checkIns.choosePlace(state.value.places, location)) {
                 is CheckInMatchDecision.Matched -> {
+                    container.checkIns.replaceAttemptCandidates(
+                        attempt.id,
+                        attemptCandidateRows(attempt.id, decision.candidate, listOf(decision.candidate), "MATCHED"),
+                    )
                     val result = container.checkIns.manualCheckIn(decision.candidate.place.uuid, location = location)
                     if (result is HistoryMutationResult.Failure) {
+                        container.checkIns.finishAttempt(
+                            attemptId = attempt.id,
+                            outcome = CheckInAttemptOutcomes.PERSISTENCE_FAILED,
+                            stage = "MATCHED_CHECK_IN_FAILED",
+                            matchedPlaceId = decision.candidate.place.uuid,
+                            errorCode = result.error.name,
+                            errorMessage = result.error.name,
+                        )
                         applyHistoryResult(result, HistoryMessage.CHECKED_IN)
-                        mutableState.update { it.copy(checkIn = it.checkIn.copy(working = false)) }
+                        mutableState.update { it.copy(checkIn = it.checkIn.copy(working = false, pendingAttemptId = null)) }
                         return@launch
                     }
+                    container.checkIns.finishAttempt(
+                        attemptId = attempt.id,
+                        outcome = CheckInAttemptOutcomes.SUCCESS,
+                        stage = "MATCHED_CHECKED_IN",
+                        selectedPlaceId = decision.candidate.place.uuid,
+                        matchedPlaceId = decision.candidate.place.uuid,
+                    )
                     mutableState.update {
                         it.copy(
                             checkIn = it.checkIn.copy(
                                 working = false,
                                 message = CheckInMessage.CHECKED_IN,
                                 messagePlaceName = decision.candidate.place.nickname,
+                                pendingAttemptId = null,
                             )
                         )
                     }
                 }
 
                 is CheckInMatchDecision.Ambiguous -> {
+                    container.checkIns.replaceAttemptCandidates(
+                        attempt.id,
+                        attemptCandidateRows(attempt.id, null, decision.candidates, "AMBIGUOUS"),
+                    )
+                    container.checkIns.finishAttempt(
+                        attemptId = attempt.id,
+                        outcome = CheckInAttemptOutcomes.AMBIGUOUS,
+                        stage = "AMBIGUOUS",
+                        errorCode = "AMBIGUOUS_MATCH",
+                        errorMessage = "Multiple places matched the current location",
+                    )
                     mutableState.update {
                         it.copy(
                             checkIn = it.checkIn.copy(
@@ -1067,12 +1192,20 @@ class LuoghiHomeViewModel(
                                 message = CheckInMessage.AMBIGUOUS_PLACE,
                                 ambiguousCandidates = decision.candidates,
                                 pendingCheckInLocation = location,
+                                pendingAttemptId = attempt.id,
                             )
                         )
                     }
                 }
 
                 CheckInMatchDecision.UnknownPlace -> {
+                    container.checkIns.markAttemptStage(
+                        attemptId = attempt.id,
+                        stage = "NO_MATCH_FORM_OPEN",
+                        outcome = CheckInAttemptOutcomes.IN_PROGRESS,
+                        errorCode = "NO_MATCH",
+                        errorMessage = "No saved place matched the current location",
+                    )
                     container.addressAutocomplete.resetSession()
                     addressSearchJob?.cancel()
                     addressLatestGate.invalidate()
@@ -1091,6 +1224,7 @@ class LuoghiHomeViewModel(
                                 message = CheckInMessage.UNKNOWN_PLACE,
                                 ambiguousCandidates = emptyList(),
                                 pendingCheckInLocation = location,
+                                pendingAttemptId = attempt.id,
                             )
                         )
                     }
@@ -1169,6 +1303,23 @@ private suspend fun <T> preservingCancellation(block: suspend () -> T): Result<T
 } catch (error: Throwable) {
     Result.failure(error)
 }
+
+private fun attemptCandidateRows(
+    attemptId: String,
+    selected: CheckInCandidate?,
+    candidates: List<CheckInCandidate>,
+    result: String,
+): List<CheckInAttemptCandidateEntity> =
+    candidates.mapIndexed { index, candidate ->
+        CheckInAttemptCandidateEntity(
+            attemptId = attemptId,
+            placeId = candidate.place.uuid,
+            distanceM = candidate.distanceM,
+            thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
+            rank = index + 1,
+            result = if (candidate.place.uuid == selected?.place?.uuid) "MATCHED" else result,
+        )
+    }
 
 private fun CheckInHomeState.withDerivedVisit(
     places: List<PlaceEntity>,

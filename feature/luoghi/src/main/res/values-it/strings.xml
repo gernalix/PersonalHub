@@ -89,6 +89,11 @@
     <string name="checkin_ambiguous_place">Piu luoghi corrispondono a questa posizione.</string>
     <string name="checkin_choose_place">Scegli luogo</string>
     <string name="checkin_candidate_format">%1$s - %2$.0f m</string>
+    <string name="checkin_diagnostics_title">Diagnostica check-in</string>
+    <string name="checkin_diagnostics_row_format">%1$s - %2$s</string>
+    <string name="checkin_diagnostics_no_place">nessun luogo</string>
+    <string name="checkin_diagnostics_accuracy_format">accuratezza %1$.0f m</string>
+    <string name="checkin_diagnostics_copy">Copia report diagnostico</string>
     <string name="history">Cronologia</string>
     <string name="history_empty">Nessuno storico check-in.</string>
     <string name="history_empty_place">Nessuno storico per questo luogo.</string>

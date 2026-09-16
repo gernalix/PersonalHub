@@ -38,6 +38,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.luoghi.data.PlaceAliasEntity::class,
     com.gernalix.luoghi.data.PlaceLinkEntity::class,
     com.gernalix.luoghi.data.PlaceEventEntity::class,
+    com.gernalix.luoghi.data.CheckInAttemptEntity::class,
+    com.gernalix.luoghi.data.CheckInAttemptCandidateEntity::class,
     com.gernalix.luoghi.data.GlobalStatsStateEntity::class,
     com.gernalix.luoghi.data.RouteDistanceCacheEntity::class,
     com.gernalix.luoghi.data.HistoryAuditLogEntity::class,
@@ -82,7 +84,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class, HubActivityEntity::class,
-], version = 13, exportSchema = true)
+], version = 14, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -100,7 +102,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 13
+        const val SCHEMA_VERSION = 14
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -113,7 +115,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
         fun openStaging(context: Context, name: String) = build(context, name)
         private val MIGRATION_EDGES = setOf(
             1 to 2, 2 to 3, 3 to 4, 4 to 5, 5 to 6, 6 to 7,
-            7 to 8, 8 to 9, 9 to 10, 10 to 11, 11 to 12, 12 to 13,
+            7 to 8, 8 to 9, 9 to 10, 10 to 11, 11 to 12, 12 to 13, 13 to 14,
         )
         fun canMigrateFrom(version: Int): Boolean {
             if (version == SCHEMA_VERSION) return true
@@ -265,6 +267,49 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                         )
                                     """.trimIndent())
                                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_pvt_results_completed_at_utc_ms` ON `pvt_results` (`completed_at_utc_ms`)")
+                                    db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
+                                }
+                            },
+            object : androidx.room.migration.Migration(13, 14) {
+                                override fun migrate(db: SupportSQLiteDatabase) {
+                                    db.execSQL("""
+                                        CREATE TABLE IF NOT EXISTS `check_in_attempts` (
+                                            `id` TEXT NOT NULL,
+                                            `started_at` INTEGER NOT NULL,
+                                            `finished_at` INTEGER,
+                                            `source` TEXT NOT NULL,
+                                            `stage` TEXT NOT NULL,
+                                            `outcome` TEXT NOT NULL,
+                                            `lat` REAL,
+                                            `lon` REAL,
+                                            `accuracy_m` REAL,
+                                            `selected_place_id` TEXT,
+                                            `matched_place_id` TEXT,
+                                            `error_code` TEXT,
+                                            `error_message` TEXT,
+                                            PRIMARY KEY(`id`)
+                                        )
+                                    """.trimIndent())
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempts_started_at` ON `check_in_attempts` (`started_at`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempts_finished_at` ON `check_in_attempts` (`finished_at`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempts_outcome` ON `check_in_attempts` (`outcome`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempts_matched_place_id` ON `check_in_attempts` (`matched_place_id`)")
+                                    db.execSQL("""
+                                        CREATE TABLE IF NOT EXISTS `check_in_attempt_candidates` (
+                                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                            `attempt_id` TEXT NOT NULL,
+                                            `place_id` TEXT NOT NULL,
+                                            `distance_m` REAL NOT NULL,
+                                            `threshold_m` REAL NOT NULL,
+                                            `rank` INTEGER NOT NULL,
+                                            `result` TEXT NOT NULL,
+                                            FOREIGN KEY(`attempt_id`) REFERENCES `check_in_attempts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                                            FOREIGN KEY(`place_id`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE
+                                        )
+                                    """.trimIndent())
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id` ON `check_in_attempt_candidates` (`attempt_id`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_place_id` ON `check_in_attempt_candidates` (`place_id`)")
+                                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id_place_id` ON `check_in_attempt_candidates` (`attempt_id`, `place_id`)")
                                     db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                                 }
                             },

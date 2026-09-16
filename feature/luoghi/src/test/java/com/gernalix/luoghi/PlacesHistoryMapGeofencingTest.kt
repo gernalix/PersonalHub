@@ -3,6 +3,7 @@ package com.gernalix.luoghi
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.luoghi.capsules.checkin.CheckInMatchDecision
+import com.gernalix.luoghi.capsules.checkin.CheckInAttemptOutcomes
 import com.gernalix.luoghi.capsules.checkin.CheckInPolicy
 import com.gernalix.luoghi.capsules.checkin.HistoryMutationResult
 import com.gernalix.luoghi.capsules.checkin.HistoryValidationError
@@ -22,6 +23,7 @@ import com.gernalix.luoghi.capsules.places.PlaceSortDirection
 import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.visits.VisitMapper
 import com.gernalix.luoghi.data.LuoghiDatabase
+import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
@@ -303,6 +305,88 @@ class PlacesHistoryMapGeofencingTest {
             PlaceGeofenceResult.PermissionMissing,
             PlaceGeofenceRegistrar(context, dao).reconcile(),
         )
+    }
+
+    @Test
+    fun checkInAttemptJournalRecordsCandidatesAndDoesNotCreateVisitForFailure() = runBlocking {
+        val db = LuoghiDatabase.get(context)
+        val dao = db.placeDao()
+        val repository = com.gernalix.luoghi.data.PlaceRepository(context)
+        dao.upsertPlace(place("near", "Near", 0.0, 0.0, radiusM = 100.0))
+        dao.upsertPlace(place("far", "Far", 0.0, 0.0005, radiusM = 100.0))
+
+        val attempt = repository.beginCheckInAttempt()
+        val candidates = CheckInPolicy.choosePlace(
+            dao.listPlaces(),
+            LocationSample(0.0, 0.0, accuracyM = 4.0),
+        ) as CheckInMatchDecision.Ambiguous
+        repository.updateCheckInAttemptLocation(attempt.id, LocationSample(0.0, 0.0, accuracyM = 4.0))
+        repository.replaceCheckInAttemptCandidates(
+            attempt.id,
+            candidates.candidates.mapIndexed { index, candidate ->
+                CheckInAttemptCandidateEntity(
+                    attemptId = attempt.id,
+                    placeId = candidate.place.uuid,
+                    distanceM = candidate.distanceM,
+                    thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
+                    rank = index + 1,
+                    result = "AMBIGUOUS",
+                )
+            },
+        )
+        repository.finishCheckInAttempt(
+            attempt.id,
+            CheckInAttemptOutcomes.AMBIGUOUS,
+            stage = "AMBIGUOUS",
+            errorCode = "AMBIGUOUS_MATCH",
+            errorMessage = "Multiple places matched",
+        )
+
+        assertEquals(1, dao.countCheckInAttemptsByOutcome(CheckInAttemptOutcomes.AMBIGUOUS))
+        assertEquals(2, dao.countCheckInAttemptCandidates(attempt.id))
+        assertEquals(0, dao.listEvents().size)
+    }
+
+    @Test
+    fun checkInAttemptJournalRecordsSuccessAlongsideRealVisit() = runBlocking {
+        val db = LuoghiDatabase.get(context)
+        val dao = db.placeDao()
+        val repository = com.gernalix.luoghi.data.PlaceRepository(context)
+        dao.upsertPlace(place("home", "Home", 0.0, 0.0))
+
+        val attempt = repository.beginCheckInAttempt()
+        val location = LocationSample(0.0, 0.0, accuracyM = 3.0)
+        repository.updateCheckInAttemptLocation(attempt.id, location)
+        assertEquals(HistoryMutationResult.Success, repository.recordManualCheckIn("home", location = location))
+        repository.finishCheckInAttempt(
+            attempt.id,
+            CheckInAttemptOutcomes.SUCCESS,
+            stage = "MATCHED_CHECKED_IN",
+            selectedPlaceId = "home",
+            matchedPlaceId = "home",
+        )
+
+        assertEquals(1, dao.countCheckInAttemptsByOutcome(CheckInAttemptOutcomes.SUCCESS))
+        assertEquals(listOf(PlaceEventTypes.CHECK_IN), dao.listEvents().map { it.eventType })
+    }
+
+    @Test
+    fun checkInAttemptRecoveryMarksOnlyInProgressRowsOnce() = runBlocking {
+        val db = LuoghiDatabase.get(context)
+        val dao = db.placeDao()
+        val repository = com.gernalix.luoghi.data.PlaceRepository(context)
+        val pending = repository.beginCheckInAttempt()
+        repository.markCheckInAttemptStage(
+            pending.id,
+            stage = "NO_MATCH_FORM_OPEN",
+            errorCode = "NO_MATCH",
+            errorMessage = "No saved place matched",
+        )
+
+        assertEquals(1, repository.recoverInterruptedCheckInAttempts())
+        assertEquals(0, repository.recoverInterruptedCheckInAttempts())
+        assertEquals(1, dao.countCheckInAttemptsByOutcome(CheckInAttemptOutcomes.INTERRUPTED))
+        assertEquals(0, dao.listEvents().size)
     }
 
     private fun place(
