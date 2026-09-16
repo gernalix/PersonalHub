@@ -30,5 +30,8 @@
         <receiver
             android:name="com.supercontacts.app.CallOverlayDebugReceiver"
             tools:node="remove" />
+        <receiver
+            android:name="com.gernalix.luoghi.capsules.geofence.PlaceGeofenceReceiver"
+            tools:node="remove" />
     </application>
 </manifest>
