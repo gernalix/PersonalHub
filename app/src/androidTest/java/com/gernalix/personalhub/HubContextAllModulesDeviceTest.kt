@@ -202,7 +202,7 @@ class HubContextAllModulesDeviceTest {
 
     private fun waitForContextType(name: String): Boolean {
         repeat(50) {
-            if (runBlocking { HubContextRuntime.contextTypes().any { it.name == name }) return true
+            if (runBlocking { HubContextRuntime.contextTypes().any { it.name == name } }) return true
             android.os.SystemClock.sleep(100)
         }
         return false
