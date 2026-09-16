@@ -35,6 +35,7 @@ fun HubSettings(onBack: () -> Unit) {
         "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
         else -> {
             val context = LocalContext.current
+            val privacyPolicyUrl = stringResource(R.string.privacy_policy_url)
             SettingsPage(R.string.settings_title, ::back) {
                 OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
                 OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) { Text(stringResource(R.string.database_title)) }
@@ -45,7 +46,7 @@ fun HubSettings(onBack: () -> Unit) {
                         context.startActivity(
                             Intent(
                                 Intent.ACTION_VIEW,
-                                Uri.parse(context.getString(R.string.privacy_policy_url)),
+                                Uri.parse(privacyPolicyUrl),
                             ),
                         )
                     },
