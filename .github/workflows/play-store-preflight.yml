@@ -49,6 +49,17 @@ jobs:
       - name: Validate Play variant
         run: |
           chmod +x ./gradlew
+          set +e
           ./gradlew --no-daemon :app:processPlayMainManifest :app:lintPlay
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            report=$(find app/build -type f -name 'lint-results-play.txt' -print -quit 2>/dev/null || true)
+            if [ -n "$report" ]; then
+              echo '--- compact lint errors ---'
+              grep -n -E '^[^ ]+:[0-9]+: Error:|^Error:' "$report" | head -50 || true
+            fi
+            exit "$rc"
+          fi
       - name: Verify merged Play policy surface
         run: python3 tools/check_play_manifest.py
