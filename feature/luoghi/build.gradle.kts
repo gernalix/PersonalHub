@@ -136,6 +136,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.google.places)
+    implementation(libs.google.play.services.location)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.osmdroid.android)
     ksp(libs.androidx.room.compiler)
