@@ -48,6 +48,7 @@
     <string name="database_rolled_back">Importazione non riuscita. Il database precedente è stato ripristinato. Riavvio…</string>
     <string name="settings_title">Impostazioni</string>
     <string name="settings_back">Indietro</string>
+    <string name="privacy_policy_title">Informativa sulla privacy</string>
     <string name="home_shortcuts_title">Scorciatoie Home</string>
     <string name="home_shortcuts_description">Il menu con pressione prolungata del launcher può mostrare solo alcuni moduli. Da qui puoi aggiungere tutti i moduli alla Home.</string>
     <string name="home_shortcuts_add">Aggiungi alla Home</string>
