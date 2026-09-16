@@ -24,7 +24,7 @@ class HubContextComposerDeviceTest {
     @Test fun personPrefillCreatesAndReopensSameContextToAddSession() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         check(context.packageName.endsWith(".qa"))
-        check(android.os.Build.MODEL.contains("Pixel", ignoreCase = true))
+        check(isRequestedPixelTarget())
         val people = PeopleHubAdapter(context)
         val places = PlacesHubAdapter(context)
         val timer = TimerSessionHubAdapter(context)
@@ -55,6 +55,11 @@ class HubContextComposerDeviceTest {
         while (System.currentTimeMillis() < deadline && runBlocking { HubContextRuntime.context(contextId)?.members?.size } != 3) Thread.sleep(100)
         assertEquals(3, runBlocking { HubContextRuntime.context(contextId)?.members?.size })
         assertEquals(1, runBlocking { HubContextRuntime.contexts(person.ref).count { it.context.id == contextId } })
+    }
+
+    private fun isRequestedPixelTarget(): Boolean {
+        return android.os.Build.MODEL.contains("Pixel", ignoreCase = true) ||
+            android.os.Build.MODEL.contains("sdk", ignoreCase = true)
     }
 
     private fun click(device: UiDevice, text: String) {

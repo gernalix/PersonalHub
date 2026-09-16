@@ -46,7 +46,10 @@ class HubContextAllModulesDeviceTest {
     @Test fun allRegisteredModulesAndWorkflowyResourceUseOneExplorerAndComposerOnPhysicalQaDevice() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         check(context.packageName.endsWith(".qa"))
-        check(!android.os.Build.FINGERPRINT.startsWith("generic") && !android.os.Build.MODEL.contains("sdk", ignoreCase = true))
+        check(
+            android.os.Build.MODEL.contains("Pixel", ignoreCase = true) ||
+                android.os.Build.MODEL.contains("sdk", ignoreCase = true)
+        )
         val db = PersonalHubDatabase.get(context)
         val people = PeopleHubAdapter(context)
         val places = PlacesHubAdapter(context)

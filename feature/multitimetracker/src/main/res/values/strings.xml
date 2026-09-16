@@ -766,6 +766,8 @@
     <string name="session_dialog_timing_help">Open the time editor only if you need to fine tune start or end.</string>
     <string name="session_dialog_tags_section">Tags</string>
     <string name="session_dialog_tags_help">Selected tags: %1$d</string>
+    <string name="quick_start_show_all">Show all</string>
+    <string name="quick_start_hide_all">Hide</string>
     <string name="tags_intro_title">Keep tags tidy and easy to scan</string>
     <string name="tags_intro_body">Tap a tag to open one central panel for edit, timed settings, timeline visibility, archive, delete, and linked session review.</string>
     <string name="tags_intro_counts">%1$d visible • %2$d archived • %3$d in trash</string>

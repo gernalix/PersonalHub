@@ -762,6 +762,8 @@
     <string name="session_dialog_timing_help">Apri l\'editor dei tempi solo se devi rifinire inizio o fine.</string>
     <string name="session_dialog_tags_section">Tag</string>
     <string name="session_dialog_tags_help">Tag selezionati: %1$d</string>
+    <string name="quick_start_show_all">Mostra tutti</string>
+    <string name="quick_start_hide_all">Nascondi</string>
     <string name="tags_intro_title">Mantieni i tag leggibili e ordinati</string>
     <string name="tags_intro_body">Tocca un tag per aprire un solo pannello centrale con modifica, impostazioni timed, visibilita timeline, archivio, eliminazione e sessioni collegate.</string>
     <string name="tags_intro_counts">%1$d visibili • %2$d archiviati • %3$d nel cestino</string>

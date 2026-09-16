@@ -43,6 +43,10 @@ class QuickStartTagLauncherInstrumentedTest {
     private val alpha = tag(id = 1L, name = "Alpha")
     private val beta = tag(id = 2L, name = "Beta")
     private val gamma = tag(id = 3L, name = "Gamma")
+    private val delta = tag(id = 4L, name = "Delta")
+    private val epsilon = tag(id = 5L, name = "Epsilon")
+    private val zeta = tag(id = 6L, name = "Zeta")
+    private val eta = tag(id = 7L, name = "Eta")
 
     @Test
     fun shortTapStartsExactlyOneSingleTagSession() {
@@ -110,6 +114,22 @@ class QuickStartTagLauncherInstrumentedTest {
         composeRule.runOnIdle {
             assertEquals(listOf(listOf(alpha.id, beta.id)), starts)
         }
+    }
+
+    @Test
+    fun emptyQueryShowsSixTagsUntilShowAllAndSearchUsesAllTags() {
+        val starts = mutableListOf<List<Long>>()
+        setLauncher(starts, listOf(alpha, beta, gamma, delta, epsilon, zeta, eta))
+
+        composeRule.onNodeWithTag(tagTestTag(zeta.id)).assertIsDisplayed()
+        composeRule.onNodeWithTag(tagTestTag(eta.id)).assertDoesNotExist()
+        composeRule.onNodeWithTag("quick_start_show_all").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag(tagTestTag(eta.id)).assertIsDisplayed()
+
+        composeRule.onNodeWithTag("quick_start_search").performTextInput("Eta")
+        composeRule.onNodeWithTag(tagTestTag(alpha.id)).assertDoesNotExist()
+        composeRule.onNodeWithTag(tagTestTag(eta.id)).assertIsDisplayed()
+        composeRule.onNodeWithTag("quick_start_show_all").assertDoesNotExist()
     }
 
     @Test
@@ -265,11 +285,11 @@ class QuickStartTagLauncherInstrumentedTest {
         )
     }
 
-    private fun setLauncher(starts: MutableList<List<Long>>) {
+    private fun setLauncher(starts: MutableList<List<Long>>, tags: List<Tag> = listOf(alpha, beta, gamma)) {
         composeRule.setContent {
             MaterialTheme {
                 QuickStartTagLauncher(
-                    tags = listOf(alpha, beta, gamma),
+                    tags = tags,
                     enabled = true,
                     onStartSession = { selected -> starts += selected.map { it.id } },
                     modifier = Modifier.fillMaxSize(),

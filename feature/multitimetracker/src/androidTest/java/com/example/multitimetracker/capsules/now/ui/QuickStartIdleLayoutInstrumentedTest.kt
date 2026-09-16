@@ -5,9 +5,10 @@ import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -41,7 +42,7 @@ class QuickStartIdleLayoutInstrumentedTest {
     private val gamma = tag(id = 3L, name = "Gamma")
 
     @Test
-    fun noActiveSessionsShowsBodyQuickStartSearchAndFabWithoutLegacyEmptyCard() {
+    fun noActiveSessionsShowsBodyQuickStartSearchAndExplicitNewSessionActionWithoutLegacyEmptyCard() {
         val context = targetContext()
         setNowScreen(capsuleFor(HomeLoadState.ReadyEmpty))
 
@@ -53,8 +54,9 @@ class QuickStartIdleLayoutInstrumentedTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag(tagTestTag(alpha.id)).assertIsDisplayed()
         composeRule
-            .onNodeWithContentDescription(context.getString(R.string.new_session))
-            .assertIsDisplayed()
+            .onAllNodesWithText(context.getString(R.string.new_session))[0]
+            .assertExists()
+            .assertHasClickAction()
         composeRule
             .onNodeWithText(context.getString(R.string.now_running_empty_title))
             .assertDoesNotExist()
@@ -95,18 +97,18 @@ class QuickStartIdleLayoutInstrumentedTest {
     }
 
     @Test
-    fun idleFabRemainsAvailableAndOpensLegacyFullSessionEditor() {
+    fun idleNewSessionActionRemainsAvailableAndOpensLegacyFullSessionEditor() {
         val context = targetContext()
         setNowScreen(capsuleFor(HomeLoadState.ReadyEmpty))
 
         composeRule
-            .onNodeWithContentDescription(context.getString(R.string.new_session))
-            .assertIsDisplayed()
+            .onAllNodesWithText(context.getString(R.string.new_session))[0]
+            .assertExists()
             .performClick()
 
         composeRule
-            .onNodeWithText(context.getString(R.string.new_session))
-            .assertIsDisplayed()
+            .onAllNodesWithText(context.getString(R.string.new_session))[0]
+            .assertExists()
         composeRule
             .onNodeWithText(context.getString(R.string.session_dialog_tags_section))
             .assertIsDisplayed()

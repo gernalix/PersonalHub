@@ -42,7 +42,7 @@ import com.example.multitimetracker.ui.util.formatDuration
  * ===== FEATURE CAPSULE: Now.SessionList (UI) — START =====
  *
  * Scope:
- * - All LazyColumn items for NOW tab session-only list + Active tags section.
+ * - All LazyColumn items for NOW tab session-only list.
  * - No business logic here: mapping lives in [NowCapsuleViewModel].
  */
 object NowCapsuleUi {
@@ -122,21 +122,6 @@ object NowCapsuleUi {
         elapsedModeSessionIds: Set<Long>,
         onToggleTimedDisplayMode: (Long) -> Unit
     ) {
-        val activeTagShownMsByTagId = NowCapsuleViewModel.computeActiveTagShownMsByTagId(
-            activeTags = activeTags,
-            activeTagTotalsMsByTagId = activeTagTotalsMsByTagId,
-            runningMinStartByTagId = runningMinStartByTagId,
-            nowMs = nowMs
-        )
-        val activeTagChips = activeTags
-            .asSequence()
-            .map { tag -> ActiveTagChipUi(tag = tag, shownMs = activeTagShownMsByTagId[tag.id] ?: 0L) }
-            .sortedWith(compareByDescending<ActiveTagChipUi> { it.shownMs }.thenBy { it.tag.name.lowercase() })
-            .toList()
-        val activeTagsStillLoading = homeLoadState == HomeLoadState.ReadyWithData &&
-            activeTagChips.isEmpty() &&
-            (regularRows.asSequence() + timedRows.asSequence()).any { it.tagIds.isNotEmpty() }
-
         if (homeLoadState == HomeLoadState.Loading) {
             item(key = "now_loading_sessions") {
                 ScreenEmptyStateCard(
@@ -193,7 +178,7 @@ object NowCapsuleUi {
             if (regularRows.isNotEmpty()) {
                 item(key = "now_regular_sessions_section") {
                     SessionSection(
-                        title = stringResource(R.string.now_running_title),
+                        title = stringResource(R.string.active_sessions_header),
                         sessions = regularRows,
                         nowMs = nowMs,
                         tagNameById = tagNameById,
@@ -227,15 +212,6 @@ object NowCapsuleUi {
             }
         }
 
-        item(key = "now_active_tags_section") {
-            ActiveTagsSection(
-                activeTagChips = activeTagChips,
-                loading = activeTagsStillLoading,
-                showSeconds = showSeconds,
-                hideHoursIfZero = hideHoursIfZero,
-                onOpenTag = onOpenTag
-            )
-        }
     }
 
     @Composable

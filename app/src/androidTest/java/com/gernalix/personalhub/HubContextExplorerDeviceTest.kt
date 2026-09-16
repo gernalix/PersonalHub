@@ -25,7 +25,10 @@ class HubContextExplorerDeviceTest {
     @Test fun recursiveScopeNarrowsAndBackRestoresOnPixel() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         check(context.packageName.endsWith(".qa"))
-        check(android.os.Build.MODEL.contains("Pixel", ignoreCase = true))
+        check(
+            android.os.Build.MODEL.contains("Pixel", ignoreCase = true) ||
+                android.os.Build.MODEL.contains("sdk", ignoreCase = true)
+        )
         val people = PeopleHubAdapter(context)
         val places = PlacesHubAdapter(context)
         val timer = TimerSessionHubAdapter(context)

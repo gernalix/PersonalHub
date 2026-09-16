@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -21,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,12 +50,17 @@ internal fun QuickStartTagLauncher(
     var multiSelectMode by remember { mutableStateOf(false) }
     var selectedTagIds by remember { mutableStateOf(emptySet<Long>()) }
     var selectionMessage by remember { mutableStateOf<String?>(null) }
+    var showAll by remember { mutableStateOf(false) }
     val timedTagError = stringResource(R.string.timed_tag_single_per_session)
 
     val filteredTags = remember(tags, query) {
         val normalized = query.trim()
         if (normalized.isEmpty()) tags else tags.filter { it.name.contains(normalized, ignoreCase = true) }
     }
+    val visibleTags = remember(filteredTags, query, showAll) {
+        if (query.isBlank() && !showAll) filteredTags.take(6) else filteredTags
+    }
+    val canToggleAll = query.isBlank() && filteredTags.size > 6
 
     fun clearMultiSelect() {
         multiSelectMode = false
@@ -78,7 +82,7 @@ internal fun QuickStartTagLauncher(
     }
 
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
@@ -176,41 +180,49 @@ internal fun QuickStartTagLauncher(
                 )
             }
             else -> {
-                LazyColumn(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    item(key = "quick_start_tag_flow") {
-                        FlowRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        visibleTags.forEach { tag ->
+                            QuickStartTagChip(
+                                tag = tag,
+                                selected = tag.id in selectedTagIds,
+                                enabled = enabled,
+                                onClick = {
+                                    if (multiSelectMode) {
+                                        toggleSelection(tag)
+                                    } else {
+                                        onStartSession(listOf(tag))
+                                    }
+                                },
+                                onLongClick = {
+                                    if (!multiSelectMode) {
+                                        multiSelectMode = true
+                                    }
+                                    if (tag.id !in selectedTagIds) {
+                                        toggleSelection(tag)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    if (canToggleAll) {
+                        TextButton(
+                            onClick = { showAll = !showAll },
+                            modifier = Modifier.testTag("quick_start_show_all"),
                         ) {
-                            filteredTags.forEach { tag ->
-                                QuickStartTagChip(
-                                    tag = tag,
-                                    selected = tag.id in selectedTagIds,
-                                    enabled = enabled,
-                                    onClick = {
-                                        if (multiSelectMode) {
-                                            toggleSelection(tag)
-                                        } else {
-                                            onStartSession(listOf(tag))
-                                        }
-                                    },
-                                    onLongClick = {
-                                        if (!multiSelectMode) {
-                                            multiSelectMode = true
-                                        }
-                                        if (tag.id !in selectedTagIds) {
-                                            toggleSelection(tag)
-                                        }
-                                    },
+                            Text(
+                                text = stringResource(
+                                    if (showAll) R.string.quick_start_hide_all else R.string.quick_start_show_all
                                 )
-                            }
+                            )
                         }
                     }
                 }

@@ -14,13 +14,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -233,14 +233,6 @@ fun NowScreen(
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { openNewSessionDraft() },
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.new_session))
-            }
-        }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -257,7 +249,7 @@ fun NowScreen(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(top = 24.dp, bottom = 112.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         NowCapsuleUi.run {
                             render(
@@ -281,19 +273,18 @@ fun NowScreen(
                                 onToggleTimedDisplayMode = {},
                             )
                         }
-                        item {
-                            RandomTimerCard(
-                                maxMinutes = randomMaxMinutes,
-                                onMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
-                                enabled = randomTimerStartEnabled,
-                                onStart = {
-                                    capsule.createRandomTimer(
-                                        maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
-                                        startMs = effectiveTime.nowMs,
-                                    )
-                                },
-                            )
-                        }
+                        quickStartActions(
+                            randomMaxMinutes = randomMaxMinutes,
+                            onRandomMaxMinutesChange = { randomMaxMinutes = it },
+                            randomTimerStartEnabled = randomTimerStartEnabled,
+                            onNewSession = { openNewSessionDraft() },
+                            onStartRandomTimer = {
+                                capsule.createRandomTimer(
+                                    maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
+                                    startMs = effectiveTime.nowMs,
+                                )
+                            },
+                        )
                     }
                 } else if (runningRowCount > 0) {
                     LazyColumn(
@@ -301,8 +292,8 @@ fun NowScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                        contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         NowCapsuleUi.run {
                             render(
@@ -348,49 +339,42 @@ fun NowScreen(
                                 }
                             )
                         }
-                        item {
-                            RandomTimerCard(
-                                maxMinutes = randomMaxMinutes,
-                                onMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
-                                enabled = randomTimerStartEnabled,
-                                onStart = {
-                                    capsule.createRandomTimer(
-                                        maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
-                                        startMs = effectiveTime.nowMs,
-                                    )
-                                },
-                            )
-                        }
                     }
 
-                    QuickStartTagLauncher(
-                        tags = rankedQuickStartTags,
-                        enabled = !state.isReadOnly,
-                        onStartSession = ::startQuickSession,
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .padding(top = 4.dp, bottom = 80.dp),
-                    )
+                            .padding(top = 4.dp, bottom = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        QuickStartTagLauncher(
+                            tags = rankedQuickStartTags,
+                            enabled = !state.isReadOnly,
+                            onStartSession = ::startQuickSession,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentHeight(),
+                        )
+                        QuickStartActionButtons(
+                            randomMaxMinutes = randomMaxMinutes,
+                            onRandomMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
+                            randomTimerStartEnabled = randomTimerStartEnabled,
+                            onNewSession = { openNewSessionDraft() },
+                            onStartRandomTimer = {
+                                capsule.createRandomTimer(
+                                    maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
+                                    startMs = effectiveTime.nowMs,
+                                )
+                            },
+                        )
+                    }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        item {
-                            RandomTimerCard(
-                                maxMinutes = randomMaxMinutes,
-                                onMaxMinutesChange = { randomMaxMinutes = it.filter(Char::isDigit).take(4) },
-                                enabled = randomTimerStartEnabled,
-                                onStart = {
-                                    capsule.createRandomTimer(
-                                        maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
-                                        startMs = effectiveTime.nowMs,
-                                    )
-                                },
-                            )
-                        }
                         item {
                             QuickStartTagLauncher(
                                 tags = rankedQuickStartTags,
@@ -399,6 +383,18 @@ fun NowScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
+                        quickStartActions(
+                            randomMaxMinutes = randomMaxMinutes,
+                            onRandomMaxMinutesChange = { randomMaxMinutes = it },
+                            randomTimerStartEnabled = randomTimerStartEnabled,
+                            onNewSession = { openNewSessionDraft() },
+                            onStartRandomTimer = {
+                                capsule.createRandomTimer(
+                                    maxMinutes = randomMaxMinutes.toIntOrNull() ?: 60,
+                                    startMs = effectiveTime.nowMs,
+                                )
+                            },
+                        )
                     }
                 }
             }
@@ -447,6 +443,59 @@ fun NowScreen(
                 )
             }
         }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.quickStartActions(
+    randomMaxMinutes: String,
+    onRandomMaxMinutesChange: (String) -> Unit,
+    randomTimerStartEnabled: Boolean,
+    onNewSession: () -> Unit,
+    onStartRandomTimer: () -> Unit,
+) {
+    item(key = "now_new_session_action") {
+        NewSessionButton(onClick = onNewSession)
+    }
+    item(key = "now_random_timer_card") {
+        RandomTimerCard(
+            maxMinutes = randomMaxMinutes,
+            onMaxMinutesChange = { onRandomMaxMinutesChange(it.filter(Char::isDigit).take(4)) },
+            enabled = randomTimerStartEnabled,
+            onStart = onStartRandomTimer,
+        )
+    }
+}
+
+@Composable
+private fun QuickStartActionButtons(
+    randomMaxMinutes: String,
+    onRandomMaxMinutesChange: (String) -> Unit,
+    randomTimerStartEnabled: Boolean,
+    onNewSession: () -> Unit,
+    onStartRandomTimer: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        NewSessionButton(onClick = onNewSession)
+        RandomTimerCard(
+            maxMinutes = randomMaxMinutes,
+            onMaxMinutesChange = onRandomMaxMinutesChange,
+            enabled = randomTimerStartEnabled,
+            onStart = onStartRandomTimer,
+        )
+    }
+}
+
+@Composable
+private fun NewSessionButton(onClick: () -> Unit) {
+    Button(onClick = onClick) {
+        Icon(Icons.Filled.PlayArrow, contentDescription = null)
+        Text(
+            text = stringResource(R.string.new_session),
+            modifier = Modifier.padding(start = 8.dp),
+        )
     }
 }
 
