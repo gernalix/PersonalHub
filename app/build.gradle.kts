@@ -32,13 +32,14 @@ val signingArtifactRequested = requestedTaskNames.any { name ->
 val allowUnsignedPlayBundle = providers.gradleProperty("personalhub.allowUnsignedPlayBundle")
     .map { it.equals("true", ignoreCase = true) }
     .orElse(false)
+val unsignedPlayPreflightTasks = setOf("processplaymainmanifest", "lintplay", "bundleplay")
 val unsignedPlayBundlePreflight = allowUnsignedPlayBundle.get() &&
-    requestedTaskNames.isNotEmpty() &&
-    requestedTaskNames.all { it == "bundleplay" }
+    "bundleplay" in requestedTaskNames &&
+    requestedTaskNames.all { it in unsignedPlayPreflightTasks }
 if (signingArtifactRequested && !unsignedPlayBundlePreflight) {
     require(hasCanonicalSigning) {
         "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
-            "Only CI may opt into the unsigned Play bundle preflight with -Ppersonalhub.allowUnsignedPlayBundle=true."
+            "Only the CI Play preflight task set may opt into an unsigned bundle with -Ppersonalhub.allowUnsignedPlayBundle=true."
     }
     require(!gradle.startParameter.isConfigurationCacheRequested) {
         "Signed APK/AAB/device tasks require --no-configuration-cache."
