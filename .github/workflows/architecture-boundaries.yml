@@ -1,0 +1,47 @@
+name: Architecture boundaries
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'contracts/**'
+      - 'core/**'
+      - 'feature/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'tools/check_architecture_boundaries.py'
+      - 'docs/CAPSULE_BOUNDARIES.md'
+      - '.github/workflows/architecture-boundaries.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'contracts/**'
+      - 'core/**'
+      - 'feature/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'tools/check_architecture_boundaries.py'
+      - 'docs/CAPSULE_BOUNDARIES.md'
+      - '.github/workflows/architecture-boundaries.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personalhub-architecture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capsule-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify capsule boundaries
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 tools/check_architecture_boundaries.py
