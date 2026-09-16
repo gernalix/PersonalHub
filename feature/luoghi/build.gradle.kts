@@ -89,6 +89,15 @@ android {
         buildConfigField("String", "VERSION_NAME", "\"15\"")
         buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"${googleMapsApiKey.escapeForBuildConfig()}\"")
         buildConfigField("String", "GOOGLE_ROUTES_API_KEY", "\"${googleRoutesApiKey.escapeForBuildConfig()}\"")
+        buildConfigField("boolean", "PLAY_DISTRIBUTION", "false")
+    }
+
+    buildTypes {
+        create("play") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            buildConfigField("boolean", "PLAY_DISTRIBUTION", "true")
+        }
     }
 
     compileOptions {
