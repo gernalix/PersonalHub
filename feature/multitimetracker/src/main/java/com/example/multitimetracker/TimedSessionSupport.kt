@@ -112,7 +112,13 @@ object TimedSessionSupport {
         trackedSessionIds: MutableSet<Long>,
         nowMs: Long,
     ) {
-        val plan = buildTimedSessionRestorePlan(sessions = sessions, tags = tags, nowMs = nowMs)
+        val randomSessionIds = RandomTimerStore.randomSessionIds(context)
+        val plan = buildTimedSessionRestorePlan(
+            sessions = sessions,
+            tags = tags,
+            nowMs = nowMs,
+            randomSessionIds = randomSessionIds,
+        )
         val desiredIds = plan.alarms.mapTo(mutableSetOf()) { it.sessionId }
         plan.alarms.forEach { alarm ->
             TimeFenceTimerScheduler.scheduleTimedSession(
