@@ -13,6 +13,8 @@ on:
       - 'gradle.properties'
       - 'version.txt'
       - 'tools/check_play_manifest.py'
+      - 'tools/check_play_bundle.py'
+      - 'docs/PRIVACY_POLICY.md'
       - '.github/workflows/play-store-preflight.yml'
   pull_request:
     paths:
@@ -26,6 +28,8 @@ on:
       - 'gradle.properties'
       - 'version.txt'
       - 'tools/check_play_manifest.py'
+      - 'tools/check_play_bundle.py'
+      - 'docs/PRIVACY_POLICY.md'
       - '.github/workflows/play-store-preflight.yml'
 
 permissions:
@@ -38,7 +42,7 @@ concurrency:
 jobs:
   play-preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -46,11 +50,15 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
-      - name: Validate Play variant
+      - name: Validate and package Play variant
         run: |
           chmod +x ./gradlew
           set +e
-          ./gradlew --no-daemon :app:processPlayMainManifest :app:lintPlay
+          ./gradlew --no-daemon \
+            :app:processPlayMainManifest \
+            :app:lintPlay \
+            :app:bundlePlay \
+            -Ppersonalhub.allowUnsignedPlayBundle=true
           rc=$?
           set -e
           if [ "$rc" -ne 0 ]; then
@@ -63,3 +71,5 @@ jobs:
           fi
       - name: Verify merged Play policy surface
         run: python3 tools/check_play_manifest.py
+      - name: Verify Play App Bundle
+        run: python3 tools/check_play_bundle.py
