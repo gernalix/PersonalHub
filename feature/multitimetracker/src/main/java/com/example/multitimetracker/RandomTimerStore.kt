@@ -25,7 +25,8 @@ object RandomTimerStore {
             .mapNotNullTo(linkedSetOf()) { it.toLongOrNull() }
 
     fun isRandomSession(context: Context, sessionId: Long): Boolean =
-        sessionId in randomSessionIds(context)
+        sessionId.toString() in context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_IDS, emptySet()).orEmpty()
 
     fun targetMinutes(context: Context, sessionId: Long): Int? {
         if (!isRandomSession(context, sessionId)) return null
