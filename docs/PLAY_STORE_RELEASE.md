@@ -35,6 +35,17 @@ Foreground approximate/precise location remains available for user-invoked locat
 
 As of September 16, 2026, PersonalHub targets Android API 37, above the Google Play target-API requirement for new apps and updates. New Play releases use Android App Bundles (`.aab`).
 
+### Android 17 location-button policy
+
+Because PersonalHub targets API 37, keep the Android 17 foreground-location minimum-scope policy on the release checklist. Google has announced that transactional one-time precise-location use cases on apps targeting Android 17+ must move to the Android location button; enforcement is scheduled for January 27, 2027, with the precise-location Play declaration becoming available in November 2026.
+
+The current September 2026 Play release can still use the existing foreground precise-location flow. Before the January 2027 enforcement date, either:
+
+- migrate transactional precise-location actions to the Android location button and use the corresponding manifest restriction; or
+- retain standard `ACCESS_FINE_LOCATION` only if PersonalHub has a core persistent precise-location use case that can be justified in the Play declaration.
+
+Do not reintroduce background location merely to avoid this migration.
+
 ## Privacy
 
 Canonical privacy policy:
@@ -47,12 +58,20 @@ The same policy is reachable from PersonalHub Settings. Keep the policy and Play
 
 GitHub Actions performs Play preflight checks that do not require private signing material:
 
-- compile/lint/unit-test the `play` variant;
+- compile/analyze the `play` variant through `lintPlay`;
 - merge the Play manifest;
 - verify that restricted permissions/components are absent from the merged Play manifest;
 - verify package and target-SDK invariants.
 
+Common unit/integration testing stays in the repository-wide CI gate rather than being duplicated by this Play-specific workflow.
+
 Do not upload signing secrets to public-repository CI merely to build the final AAB.
+
+## Signing continuity and Play App Signing
+
+Google Play App Signing is mandatory for new Play apps. Before the first production upload, decide the certificate strategy deliberately. PersonalHub already has private/sideloaded builds using the canonical signing material. If Play-distributed builds must update those existing installations in place, the Play app-signing certificate must remain compatible with the certificate expected by those installed packages. Do not accept a new incompatible Play signing identity accidentally.
+
+The local release gate records the current signing certificate identity without exposing private key material so it can be compared with the Play App Signing setup.
 
 ## Local release gate
 
@@ -78,6 +97,7 @@ Play Console administration is not a Codex/local-code task. Before publishing, c
 - target audience/content declarations;
 - ads declaration;
 - app access instructions if any feature becomes access-restricted;
+- Play App Signing setup and certificate review;
 - any permission declarations Play Console requests for the uploaded bundle.
 
 Do not claim a policy declaration is complete until Play Console itself accepts it.
