@@ -19,6 +19,7 @@ FORBIDDEN_PERMISSIONS = {
 FORBIDDEN_COMPONENTS = {
     "com.supercontacts.app.CallStateReceiver",
     "com.supercontacts.app.CallOverlayDebugReceiver",
+    "com.gernalix.luoghi.capsules.geofence.PlaceGeofenceReceiver",
 }
 
 
