@@ -115,6 +115,7 @@ internal fun buildTimedSessionRestorePlan(
     sessions: List<SessionUi>,
     tags: List<Tag>,
     nowMs: Long,
+    randomSessionIds: Set<Long> = emptySet(),
 ): TimedSessionRestorePlan {
     val liveTagsById = tags.filterNot { it.isDeleted }.associateBy { it.id }
     val running = sessions.filter { it.endMs == null && it.expectedEndMs != null }
@@ -124,6 +125,15 @@ internal fun buildTimedSessionRestorePlan(
     val alarms = running.mapNotNull { session ->
         val expectedEndMs = session.expectedEndMs ?: return@mapNotNull null
         if (expectedEndMs <= nowMs) return@mapNotNull null
+
+        if (session.id in randomSessionIds) {
+            return@mapNotNull TimedSessionAlarmRestore(
+                sessionId = session.id,
+                fireAtMs = expectedEndMs,
+                alarmStyle = false,
+            )
+        }
+
         val timedTags = session.tagIds.mapNotNull(liveTagsById::get)
             .filter { (it.timedDurationMinutes ?: 0) > 0 }
         val timedTag = timedTags.singleOrNull() ?: return@mapNotNull null
