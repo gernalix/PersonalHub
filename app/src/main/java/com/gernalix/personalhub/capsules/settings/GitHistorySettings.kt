@@ -45,6 +45,7 @@ import com.gernalix.personalhub.core.database.capsules.gitdata.GitMilestone
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitRevision
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitStateDiff
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitSemanticDiff
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitSemanticChange
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitPatchPreview
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitRevertPreview
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
@@ -78,6 +79,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var compareAfter by remember { mutableStateOf("") }
     var diff by remember { mutableStateOf<List<GitStateDiff>>(emptyList()) }
     var semanticDiff by remember { mutableStateOf<GitSemanticDiff?>(null) }
+    var semanticDetail by remember { mutableStateOf<GitSemanticChange?>(null) }
     var proposalRef by remember { mutableStateOf("") }
     var patchId by remember { mutableStateOf("") }
     var proposalBranchName by remember { mutableStateOf("") }
@@ -225,6 +227,43 @@ fun GitHistorySettings(onBack: () -> Unit) {
             dismissButton = {
                 TextButton(onClick = { bulkConfirm = false }) {
                     Text(stringResource(R.string.git_history_cancel))
+                }
+            },
+        )
+    }
+
+    semanticDetail?.let { value ->
+        AlertDialog(
+            onDismissRequest = { semanticDetail = null },
+            title = {
+                Text(value.table + " · " + value.operation + " · " + value.rowKey)
+            },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        stringResource(
+                            R.string.git_history_diff_columns,
+                            value.changedColumns.joinToString(","),
+                        ),
+                    )
+                    Text(
+                        stringResource(R.string.git_history_before),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(value.before ?: "∅", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(R.string.git_history_after),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(value.after ?: "∅", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { semanticDetail = null }) {
+                    Text(stringResource(R.string.home_autoexport_close))
                 }
             },
         )
@@ -692,11 +731,13 @@ fun GitHistorySettings(onBack: () -> Unit) {
             },
         ) { Text(stringResource(R.string.git_history_semantic_compare)) }
         semanticDiff?.changes?.take(100)?.forEach { item ->
-            Text(
-                item.table + " · " + item.operation + " · " +
-                    item.rowKey + " · " + item.changedColumns.joinToString(","),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            TextButton(onClick = { semanticDetail = item }) {
+                Text(
+                    item.table + " · " + item.operation + " · " +
+                        item.rowKey + " · " + item.changedColumns.joinToString(","),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
         semanticDiff?.let { result ->
             val hidden = (result.changes.size - 100).coerceAtLeast(0)
