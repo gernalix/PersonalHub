@@ -30,12 +30,23 @@ object GitDataTracking {
     // Current-state restore still includes these tables, but their churn is implementation detail,
     // not a semantic user edit. In particular, Timer snapshot JSON would make history enormous.
     private val semanticEventExcluded = setOf(
+        // Whole-state/runtime projections and integrity/cache machinery.
         "snapshot",
         "snapshot_history",
         "snapshot_payloads",
         "audit_events",
         "integrity_stats",
         "ui_prefs_mirror",
+        "backup_metadata",
+        "global_stats_state",
+        "route_distance_cache",
+        "notification_state",
+        // Legacy activity/audit stores remain in current-state restore for compatibility, but Git
+        // History is the durable audit source while enabled. Recording edits to these tables would
+        // create a recursive "history of history".
+        "history_audit_log",
+        "history_actions",
+        "hub_activity_log",
     )
 
     fun tables(db: SupportSQLiteDatabase): List<String> =
