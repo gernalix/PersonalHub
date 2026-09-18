@@ -328,7 +328,11 @@ object DatabaseVault {
                         }
                         "hub_git_dirty_${table}_$op" -> {
                             require(table !in GitDataTracking.operationalTables && table !in SyncJournal.excluded)
-                            val columns = GitDataTracking.columns(db, table)
+                            val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columnsCursor ->
+                                buildList {
+                                    while (columnsCursor.moveToNext()) add(columnsCursor.getString(1))
+                                }
+                            }
                             val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columnsCursor ->
                                 buildList {
                                     while (columnsCursor.moveToNext()) {
