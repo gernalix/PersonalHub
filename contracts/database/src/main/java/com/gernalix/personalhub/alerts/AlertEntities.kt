@@ -64,25 +64,3 @@ data class AlertPlaceTagTargetEntity(
     @ColumnInfo(name = "rule_id") val ruleId: String,
     @ColumnInfo(name = "place_tag_id") val placeTagId: Long,
 )
-
-/**
- * Reserved canonical target table for the Timer migration.
- * It deliberately has no FK to PlaceTagEntity: Timer tags are a separate namespace.
- */
-@Entity(
-    tableName = "alert_timer_tag_targets",
-    primaryKeys = ["rule_id", "timer_tag_id"],
-    foreignKeys = [
-        ForeignKey(
-            entity = AlertRuleEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["rule_id"],
-            onDelete = ForeignKey.CASCADE,
-        ),
-    ],
-    indices = [Index("rule_id"), Index("timer_tag_id")],
-)
-data class AlertTimerTagTargetEntity(
-    @ColumnInfo(name = "rule_id") val ruleId: String,
-    @ColumnInfo(name = "timer_tag_id") val timerTagId: Long,
-)
