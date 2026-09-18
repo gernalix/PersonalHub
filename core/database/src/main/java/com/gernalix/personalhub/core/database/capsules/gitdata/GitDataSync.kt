@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.gernalix.personalhub.core.database.DatabaseGate
+import com.gernalix.personalhub.core.database.HubActivityCapture
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import org.json.JSONArray
 import org.json.JSONObject
@@ -63,11 +64,13 @@ object GitDataSync {
         GitDataSettings.setEnabled(app, enabled)
         val db = PersonalHubDatabase.get(app).openHelper.writableDatabase
         if (enabled) {
+            HubActivityCapture.uninstall(db)
             installTracking(app, enqueueAll = true)
             scheduleRecovery(app)
             checkForChanges(app)
         } else {
             GitDataTracking.uninstall(db)
+            HubActivityCapture.install(db, appVersion(app))
             WorkManager.getInstance(app).cancelUniqueWork(WORK)
             WorkManager.getInstance(app).cancelUniqueWork(RECOVERY_WORK)
             GitDataSettings.setRuntimeState(app, "off")
