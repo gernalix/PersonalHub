@@ -224,4 +224,6 @@
     <string name="git_history_preview_patch">Anteprima patch in sandbox</string>
     <string name="git_history_patch_preview_summary">%1$d operazioni · +%2$d / ~%3$d / -%4$d · tabelle: %5$s</string>
     <string name="git_history_discard_proposal">Elimina branch proposta</string>
+    <string name="git_history_restore_ref">Commit / tag / branch più vecchio</string>
+    <string name="git_history_restore_ref_action">Carica revisione da ripristinare</string>
 </resources>
