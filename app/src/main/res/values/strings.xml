@@ -242,4 +242,5 @@
     <string name="git_history_known_good">Known good date (YYYY-MM-DD)</string>
     <string name="git_history_known_bad">Known bad date (YYYY-MM-DD)</string>
     <string name="git_history_bisect_action">Find suspect edits</string>
+    <string name="git_history_semantic_truncated">Diff reached the safety limit; narrow the revisions or inspect individual tables for the remaining changes.</string>
 </resources>
