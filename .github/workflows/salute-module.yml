@@ -46,5 +46,6 @@ jobs:
           chmod +x ./gradlew
           ./gradlew --no-daemon --console=plain \
             :feature:salute:testDebugUnitTest \
+            :app:testDebugUnitTest \
             :app:compileDebugKotlin \
             checkArchitectureBoundaries
