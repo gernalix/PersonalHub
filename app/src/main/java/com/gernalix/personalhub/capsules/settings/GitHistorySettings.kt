@@ -691,14 +691,20 @@ fun GitHistorySettings(onBack: () -> Unit) {
                 }
             },
         ) { Text(stringResource(R.string.git_history_semantic_compare)) }
-        semanticDiff?.events?.take(100)?.forEach { item ->
+        semanticDiff?.changes?.take(100)?.forEach { item ->
             Text(
-                item.table + " · " + item.operation + " · " + item.changedColumns,
+                item.table + " · " + item.operation + " · " +
+                    item.rowKey + " · " + item.changedColumns.joinToString(","),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        semanticDiff?.events?.takeIf { it.size > 100 }?.let {
-            Text(stringResource(R.string.git_history_semantic_more, it.size - 100))
+        semanticDiff?.let { result ->
+            val hidden = (result.changes.size - 100).coerceAtLeast(0)
+            if (hidden > 0) {
+                Text(stringResource(R.string.git_history_semantic_more, hidden))
+            } else if (result.truncated) {
+                Text(stringResource(R.string.git_history_semantic_truncated))
+            }
         }
 
         HorizontalDivider()
