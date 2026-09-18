@@ -248,6 +248,19 @@ object GitHistoryStore {
     fun countsByTable(db: SupportSQLiteDatabase, limit: Int = 50): List<GitHistoryCount> =
         counts(db, "table_name", limit)
 
+    fun countsBySource(db: SupportSQLiteDatabase, limit: Int = 20): List<GitHistoryCount> =
+        counts(db, "source", limit)
+
+    fun countsByEntity(db: SupportSQLiteDatabase, limit: Int = 20): List<GitHistoryCount> =
+        db.query(
+            "SELECT table_name || ':' || row_key,COUNT(*) FROM " + TABLE +
+                " GROUP BY table_name,row_key ORDER BY COUNT(*) DESC LIMIT " + limit,
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(GitHistoryCount(cursor.getString(0), cursor.getLong(1)))
+            }
+        }
+
     private fun counts(
         db: SupportSQLiteDatabase,
         column: String,
