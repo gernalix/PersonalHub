@@ -30,7 +30,7 @@ data class GitHistoryCount(val key: String, val count: Long)
  * Compact, disposable local projection of immutable Git history.
  *
  * Full before/after payloads live in Git. This table exists only to keep History, blame and
- * statistics instant on-device; it can be rebuilt from history/*.jsonl without data loss.
+ * statistics instant on-device; it can be rebuilt from the history JSONL files without data loss.
  */
 object GitHistoryStore {
     const val TABLE = "hub_git_history_index"
