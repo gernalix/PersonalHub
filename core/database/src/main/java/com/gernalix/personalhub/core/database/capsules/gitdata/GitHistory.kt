@@ -437,6 +437,7 @@ object GitHistory {
                         )
                     }
             }
+            GitHistoryStore.rebuildFieldStats(db)
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
