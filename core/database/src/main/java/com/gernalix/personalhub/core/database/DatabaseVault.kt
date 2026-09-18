@@ -293,7 +293,7 @@ object DatabaseVault {
                     val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
                     val expected = when (name) {
                         "hub_dirty_${table}_$op" -> {
-                            require(table !in setOf("hub_sync_pending", "hub_sync_known"))
+                            require(table !in SyncJournal.excluded)
                             "CREATE TRIGGER `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
                         }
                         "hub_sync_${table}_$op" -> {
