@@ -230,4 +230,7 @@
     <string name="git_history_revert_preview_blocked">Il controllo sandbox ha bloccato il ripristino: %1$s</string>
     <string name="git_data_sync_pending_patches">Patch verificate in attesa di revisione in Cronologia: %1$s</string>
     <string name="temporal_git_history">Modifiche dati</string>
+    <string name="git_history_stats_tables">Tabelle: %1$s</string>
+    <string name="git_history_stats_year">Modifiche quest’anno: %1$d</string>
+    <string name="git_history_stats_value_lifetime">Durata media del valore di un campo: %1$d ore</string>
 </resources>
