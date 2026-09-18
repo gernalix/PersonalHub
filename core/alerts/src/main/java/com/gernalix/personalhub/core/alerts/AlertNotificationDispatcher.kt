@@ -1,3 +1,5 @@
+@file:android.annotation.SuppressLint("MissingPermission")
+
 package com.gernalix.personalhub.core.alerts
 
 import android.app.NotificationChannel
@@ -44,6 +46,12 @@ object AlertNotificationDispatcher {
             Intent(Intent.ACTION_VIEW, link).apply {
                 addCategory(Intent.CATEGORY_BROWSABLE)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                val workflowy = link.scheme.equals("workflowy", ignoreCase = true) ||
+                    (link.scheme.equals("https", ignoreCase = true) &&
+                        link.host.equals("workflowy.com", ignoreCase = true))
+                if (workflowy && isPackageInstalled(context, WORKFLOWY_PACKAGE)) {
+                    setPackage(WORKFLOWY_PACKAGE)
+                }
             }
         } else {
             context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
@@ -54,6 +62,11 @@ object AlertNotificationDispatcher {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         return PendingIntent.getActivity(context, notificationId, intent, flags)
     }
+
+    private fun isPackageInstalled(context: Context, packageName: String): Boolean =
+        runCatching { context.packageManager.getPackageInfo(packageName, 0) }.isSuccess
+
+    private const val WORKFLOWY_PACKAGE = "com.workflowy.android"
 
     private fun ensureChannel(context: Context, manager: NotificationManager) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || manager.getNotificationChannel(CHANNEL_ID) != null) return
