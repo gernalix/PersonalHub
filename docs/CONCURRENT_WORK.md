@@ -10,9 +10,9 @@ Independent tasks may run at the same time only when each task:
 2. never writes to the canonical/default branch;
 3. runs only branch-local host checks during implementation;
 4. pushes its branch and opens a PR when ready;
-5. stops before merging.
+5. does not merge while still acting as the implementation worker.
 
-A worker must not acquire the PersonalHub task lock merely to edit code on its isolated branch.
+A worker must not acquire the PersonalHub task lock merely to edit code on its isolated branch. After the PR is ready, the same Codex session may immediately transition into the integrating role: it must acquire the lease first, refresh the canonical branch once, perform the semantic review below, and only then merge. This preserves one-at-a-time integration without forcing a second Codex session for every task.
 
 ## Integration queue
 
