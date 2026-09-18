@@ -4,6 +4,8 @@ package com.example.multitimetracker.persistence
 import android.content.ContentValues
 import android.content.Context
 import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory
 import android.util.Log
 import com.example.multitimetracker.util.CapsuleAudit
 import com.example.multitimetracker.util.CapsuleWriteApi
@@ -940,7 +942,9 @@ object SnapshotSqlite {
                 put("json", json)
                 put("saved_at_ms", now)
             }
-            writeTimeMachineHistoryEvent(db, json, now)
+            if (!gitHistoryEnabled(context)) {
+                writeTimeMachineHistoryEvent(db, json, now)
+            }
             val rowId = db.insertWithOnConflict(TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
             if (rowId == -1L) {
                 throw IllegalStateException("Snapshot write returned -1")
@@ -1041,6 +1045,10 @@ object SnapshotSqlite {
     }
 
     fun readSnapshotAsOf(context: Context, targetMs: Long): String? {
+        if (gitHistoryEnabled(context)) {
+            return runCatching { GitHistory.readTimerSnapshotAsOf(context, targetMs) }
+                .getOrNull()
+        }
         val db = helper(context).readableDatabase
         return try {
             readHistoryJsonAsOf(db, targetMs) ?: db.rawQuery(
@@ -1341,6 +1349,11 @@ object SnapshotSqlite {
             db.close()
         }
     }
+
+    private fun gitHistoryEnabled(context: Context): Boolean =
+        runCatching {
+            GitDataSettings.configuration(context.applicationContext).enabled
+        }.getOrDefault(false)
 
     fun internalDbFile(context: Context): java.io.File {
         return context.applicationContext.getDatabasePath(DB_NAME)
