@@ -1,363 +1,322 @@
-# Salute module — Git contract and Timeline design
+# Salute module — canonical PH integration
 
-Status: design contract for the PersonalHub Salute module. This document defines the implementation target; it does not make PersonalHub a writer of health data.
+Status: target architecture for branch `feature/salute-canonical-domain`.
 
-## Purpose
+See also:
 
-Salute is a read-only PersonalHub module for health data produced outside PersonalHub, primarily by the ChatGPT → `gernalix/salute` workflow from Min Sundhedsplatform / MyChart material supplied by the user.
+- [Canonical data model](health/HEALTH_DATA_MODEL.md)
+- [ChatGPT → PH workflow](health/chatgpt-to-ph-workflow.svg)
+- [Minimal Android UI](health/android-minimal-ui.svg)
 
-The module must not recreate a second manual health-data entry workflow. PersonalHub is a consumer and viewer only.
+## Decision
 
-## Ownership and source of truth
+Salute is a first-class PersonalHub module, but intentionally **thin and read-only in the Android UI**.
 
-- Canonical health source: private GitHub repository `gernalix/salute`.
-- Canonical artifact: `salute.db`.
-- Producer: the external ChatGPT/GitHub workflow documented in the salute repository.
-- PersonalHub role: read-only replica/cache and UI.
-- PersonalHub must never push, edit, merge, restore, rewrite or generate `salute.db`.
-- Health rows must not be copied into `personalhub.db`.
-- The cached `salute.db` is an external read-only artifact, not a second PersonalHub-owned feature database and not a Room schema.
-- No Salute mutation enters PersonalHub autoexport, Git History, Datasette sync or the activity undo log.
+Its purpose is not to create another manual health-tracking app. Its value is that health becomes a canonical PH domain and therefore participates in the existing infrastructure:
 
-This read-only external cache is an explicit exception to the otherwise single-writable-database rule: `personalhub.db` remains the only PersonalHub-owned writable runtime database.
+- Git semantic history;
+- granular/group revert;
+- Time Machine / revision restore;
+- Datasette;
+- Obsidian projection;
+- Hub Context;
+- temporal search;
+- People / Places / Substances / Soldi relations.
 
-## Reuse of the existing Git channel
+The final source of truth is `personalhub.db`.
 
-Reuse the existing authenticated GitHub transport and Android Keystore credential path, but do **not** reuse `GitDataSync` semantics.
+The previous architecture based on a separate remotely downloaded `salute.db` is superseded by this document and must be removed during implementation.
 
-`GitDataSync` is tied to bidirectional PersonalHub logical-state/history synchronization and must never be pointed at the health repository.
+## User interaction model
 
-Implementation should expose a narrow core read-only artifact API built on the existing GitHub transport primitives:
+### Writes
 
-```text
-GitReadOnlyArtifactClient
-  checkRemoteHead(repository)
-  fetchFile(repository, path, ref)
-```
+No Add/Edit/Delete/FAB controls.
 
-The feature receives bytes/status only. The raw GitHub token must remain inside the existing encrypted core Git settings/transport boundary and must never be exposed to `:feature:salute`.
-
-Repository configuration:
-- default repository: `https://github.com/gernalix/salute`
-- artifact path: `salute.db`
-- branch: repository default branch resolved remotely; never hardcode `main`
-- authentication: reuse the existing encrypted GitHub token when it has read access to the health repository
-- transport: HTTPS GitHub API only
-
-A missing/insufficient token is a configuration error; do not fall back to a public URL or copy health data into another transport.
-
-## Pull-only synchronization contract
-
-Trigger a remote-head check:
-- when Salute opens;
-- on explicit Refresh;
-- on app startup only when the last check is stale (target: >= 15 minutes);
-- optional low-frequency WorkManager refresh may be added later, but no aggressive polling.
-
-Algorithm:
-
-1. Resolve the remote default branch and HEAD commit.
-2. If HEAD equals the last successfully installed health revision, return without downloading the DB.
-3. Download `salute.db` into an app-private staging file.
-4. Reject symlinks/path escapes and enforce a bounded file size. Initial maximum: 25 MiB.
-5. Verify SQLite magic/header.
-6. Open the staging file read-only.
-7. Validate:
-   - `PRAGMA quick_check` or `integrity_check` = `ok`;
-   - `PRAGMA foreign_key_check` returns no rows;
-   - required metadata/contract version is supported;
-   - required tables/views and required columns exist.
-8. Close the staging connection.
-9. Atomically replace the active cache while preserving the last known-good copy until the new file has been reopened successfully.
-10. Persist the installed Git revision and sync timestamp outside `salute.db`.
-11. Open only the validated active file read-only.
-
-On any failure:
-- keep the last known-good database;
-- surface a compact non-destructive sync error;
-- never replace the active DB with the failed staging file;
-- never attempt to “repair” or rewrite the remote DB from PersonalHub.
-
-Recommended private storage:
+Normal health writes originate from:
 
 ```text
-noBackupFilesDir/salute/salute.db
-noBackupFilesDir/salute/salute.db.bak
+MinSP / MyChart
+      ↓
+user supplies screenshot/text to ChatGPT
+      ↓
+ChatGPT normalizes + translates + analyses
+      ↓
+PH semantic Git patch
+      ↓
+GitPatchEngine transaction
+      ↓
+personalhub.db
 ```
 
-The cache is reproducible from Git and contains sensitive health information, so it should not enter Android cloud backup.
+The Android feature never bypasses this path.
 
-## Producer/consumer database contract
+### Reads
 
-PersonalHub should depend only on stable consumer surfaces, not on arbitrary internal salute tables.
+Primary human-reading interface: **Obsidian**.
 
-Required metadata:
-- `metadata.schema_version`
-- add/maintain a distinct `consumer_contract_version`; PH currently requires contract v2 (`2`)
+Secondary/ad-hoc analysis: **Datasette**.
 
-Required views:
-- `v_all_health_data`
-- `v_medical_journal`
-- `v_health_timeline` (stable PH-facing projection)
-- `v_test_turnaround`
-- `v_health_measurement_history`
-- `v_health_journal_detail`
-- `v_health_snapshot_evidence`
+Mobile fallback and cross-domain navigation: **PersonalHub Salute**.
 
-### `v_all_health_data`
+## Why Salute belongs inside PH
 
-Required columns:
+Health is not isolated from the other modules.
+
+Every health event is temporal and can participate in global temporal search.
+
+Canonical relationships include:
+
+- clinician → People;
+- clinic/hospital/lab/pharmacy → Places;
+- prescribed/renewed medication → Substances;
+- pharmacy purchase → Soldi;
+- health event + doctor + place + medication → Hub Context.
+
+No duplicate `health_doctors`, `health_places` or `health_drugs` tables should be introduced.
+
+## Data model
+
+The authoritative specification is [HEALTH_DATA_MODEL.md](health/HEALTH_DATA_MODEL.md).
+
+Core target entities:
 
 ```text
-data
-data_ms
-categoria
-esame
-risultato
-unita
-flag
-campione
+health_import_batches
+health_events
+health_samples
+health_examinations
+health_measurements
+health_journal_entries
+health_ai_snapshots
+health_ai_evidence
 ```
 
-### `v_medical_journal`
+### Samples
 
-Required columns:
+Every physical collection has one stable `sample_id`.
 
-```text
-data
-data_ms
-tipo
-reparto
-struttura
-clinico
-ruolo
-titolo
-nota
-commento_ai
-```
+All analyses generated from the same blood draw point to the same sample.
 
-### `v_health_timeline`
+Sample grouping must use source evidence (accession/specimen id, collection timestamp/context, explicit shared collection), not date-only guesses.
 
-The producer should expose one compact union view for the Timeline screen. PH should not reconstruct medical semantics from internal normalized tables when a stable projection can do it at the source.
+### AI comments
 
-Contract v1 columns:
+Required scopes:
 
-```text
-data            TEXT     -- Italian EEE d-M-yy
-data_ms         INTEGER  -- sorting key
-tipo            TEXT     -- "Esami" | "Journal"
-titolo          TEXT
-sottotitolo     TEXT
-valore          TEXT
-flag            TEXT
-dettaglio       TEXT
-commento_ai     TEXT
-source_kind     TEXT     -- stable machine value: "measurement" | "journal"
-source_id       INTEGER  -- stable id within the source table/view domain
-```
+- one comment for every measurement;
+- one summary comment for every sample;
+- one meta-comment for every medical journal note;
+- optional global health-state snapshots.
 
-`source_kind` and `source_id` are navigation keys, not labels. They may be hidden from the normal UI.
+All AI comments are visibly and structurally separate from clinician/source data.
 
-For laboratory data, the Timeline UI may group multiple rows sharing the same clinical date/session into one visual card, but the underlying view should remain lossless enough to open every measurement.
+For medical notes, the AI meta-comment may explicitly agree, partially agree, question or declare insufficient evidence for the clinician's assessment, with a concrete rationale and explicit uncertainty.
 
+The AI must compare against the complete health record available **up to that clinical time** and must not use future evidence when reconstructing a historical snapshot.
 
 ## Blood-test turnaround
 
-For blood tests the producer records two separate timestamps:
-
-- sample collection: `test_events.event_epoch_ms`;
-- result receipt by ChatGPT: `measurements.received_epoch_ms`.
-
-The second timestamp is a proxy for when the user became aware of the result through Min Sundhedsplatform. It is not silently relabeled as the hospital's official publication timestamp.
-
-A turnaround is valid only when the collection timestamp has `event_time_precision = 'datetime'`. If only the day is known, PersonalHub must show no turnaround rather than compute one from technical midnight.
-
-Consumer view `v_test_turnaround`:
+For blood tests PH stores separate concepts:
 
 ```text
-data_prelievo
-data_ms
-categoria
-esame
-ricevuto_ms
-delta_ms
-delta
+collection time
+result availability / receipt time
+import time
 ```
 
-`delta` is already formatted as whole days and hours, e.g. `1g 7h`. The Esami screen may calculate aggregate statistics from `delta_ms`; the first implementation shows the arithmetic mean across rows with a known delta.
-
-Timeline and measurement detail show `tempo_referto` when present.
-
-## Read-only query layer
-
-`:feature:salute` should own a small repository around Android's read-only SQLite API, not Room:
+The useful clinical-system latency is:
 
 ```text
-HealthRepository
-  timeline(...)
-  measurementHistory(...)
-  journalDetail(...)
-  journalEvidence(...)
-  turnaroundSummary(...)
-  syncStatus()
-  refresh()
+result receipt - blood collection
 ```
 
-Rules:
-- open with read-only flags;
-- no `INSERT`, `UPDATE`, `DELETE`, `CREATE`, migrations or writable WAL;
-- no automatic schema mutation;
-- fail closed on a newer unsupported consumer contract;
-- close/reopen connections around atomic cache replacement.
+When MinSP supplies an official publication timestamp, use it.
 
-## Module navigation
+Otherwise a MinSP notification timestamp may be used.
 
-Home tile: **Salute**
+If neither is supplied, the ChatGPT message receipt timestamp may be stored only as an explicit `chat_received_proxy`.
 
-Default destination: **Timeline**
+Never present a proxy as an official hospital timestamp.
+
+Display delta:
+
+```text
+1g 7h
+0g 19h
+3g 0h
+```
+
+No decimals.
+
+If only the collection date is known, do not calculate a turnaround from technical midnight.
+
+## Git/history semantics
+
+One ChatGPT ingestion = one `health_import_batches.id` = preferred Git history `group_id`.
+
+A blood-sample import can therefore be reverted as:
+
+- one measurement;
+- one AI comment;
+- the complete sample;
+- the complete ChatGPT import;
+- an arbitrary cumulative selection through existing History UI.
+
+Salute must not implement a second history engine.
+
+## Obsidian
+
+Obsidian is a deterministic generated projection of canonical PH data.
+
+Expected structure:
+
+```text
+PersonalHub/Salute/
+  Samples/
+  Journal/
+  Esami/
+  Dashboard/
+```
+
+Generated notes preserve canonical ids and create links/backlinks to People, Places and Substances.
+
+Bases should handle common tables/filtering; Datasette remains the tool for arbitrary SQL.
+
+Obsidian content must be reproducible from `personalhub.db`. Manual Obsidian edits must not silently become canonical PH data.
+
+Logseq DB is not part of this workflow.
+
+## Minimal Android surface
+
+The Pixel UI is intentionally small because it is not the primary reading surface.
 
 Top-level destinations:
-1. Timeline
-2. Esami
-3. Diario
-
-No Add/Edit/Delete/FAB actions.
-
-A Refresh action is allowed because it updates the local read-only cache from Git, not health content.
-
-## Timeline screen
-
-### Top bar
 
 ```text
-<  Salute                            ↻
-   aggiornato: oggi 15:42
+Recenti
+Esami
+Campioni
+Diario
 ```
 
-The sync status is secondary. Do not show raw commit SHAs unless the user opens diagnostics.
+No module-specific synchronization UI: Salute uses global PH Git/Datasette infrastructure.
 
-### Filters
+### Recenti
 
-Keep the default screen sparse. One compact segmented/filter row is enough:
+Unified timeline ordered strictly by epoch-ms.
 
-```text
-[Tutto] [Esami] [Diario] [Anomalie]
-```
+Cards show only high-value information:
 
-Optional search filters title, clinician, department, examination and note text.
+- title/type;
+- value/flag where relevant;
+- doctor/place where relevant;
+- turnaround when known;
+- AI-analysis availability.
 
-### Ordering
+### Campione
 
-Primary ordering: `data_ms DESC`.
+Show:
 
-Never sort by the formatted `data` string.
+- collection date/time;
+- place;
+- result count and abnormal count;
+- sample turnaround;
+- whole-sample AI summary;
+- compact result list.
 
-Group visually by formatted date:
+Tap a measurement for its longitudinal detail.
 
-```text
-VEN 18-9-26
-...
-GIO 3-9-26
-...
-```
+### Measurement
 
-### Laboratory card
+Minimal detail:
 
-Prefer a compact card:
+- current result;
+- historical values;
+- measurement-level AI comment;
+- sample link;
+- evidence links.
 
-```text
-Fosfatasi alcalina                         114 U/L ↑
-Organi
-```
+Charts are optional later; they are not required for the initial thin UI.
 
-Normal values should remain visually quiet. Abnormal flags should be visible without turning the whole Timeline into an alert dashboard.
+### Journal
 
-When many measurements belong to the same laboratory session/date, collapse them into one summary card when practical:
-
-```text
-Esami di laboratorio
-12 risultati · 1 fuori range
-Albumina 39 · Emoglobina 8.8 · Fosfatasi alcalina 114 ↑
-```
-
-Tap → measurement/session detail, including longitudinal history for each analyte.
-
-### Medical-journal card
-
-```text
-Consultazione telefonica
-Ambulatorio psichiatrico · Spl. <nome>
-Prime 2–3 righe della nota tradotta…
-```
-
-Tap → journal detail.
-
-### Journal detail
-
-Keep authorship visually unambiguous:
+Visually enforce authorship boundaries:
 
 ```text
 NOTA CLINICA
-<traduzione italiana fedele>
+<Italian translation>
 
-ANALISI AI
-<commento_ai longitudinale>
+META-PARERE AI
+<stance + rationale + uncertainty>
 
 EVIDENZE
-<misure/note storiche collegate allo snapshot>
+<linked health/cross-module evidence>
 
 ORIGINALE DANESE
-<collapsed by default>
+<collapsed>
 ```
 
-The AI section must never be styled as if it were text written by the clinician.
+Doctor/place/medication chips deep-link to their canonical PH modules.
 
-### Measurement detail
+## Hub Context / temporal integration
 
-Show:
-- current value + unit + flag;
-- chronological history of the same analyte;
-- simple trend chart only with >= 2 numeric measurements;
-- sample/material where relevant;
-- related longitudinal AI snapshots when available.
+Salute should expose adapters for at least:
 
-The chart x-axis uses `data_ms`; formatted dates are presentation only.
+- event;
+- sample;
+- measurement;
+- journal.
 
-## Empty/error states
+Health events should also expose a Hub temporal provider so global temporal search can discover them without special-casing the UI.
 
-No local cache:
-- “Dati Salute non ancora scaricati”
-- primary action: “Sincronizza”
+## Migration from the current external implementation
 
-Remote unchanged:
-- no toast; update the lightweight status timestamp only if useful.
+Current main already contains an external read-only Salute implementation that downloads `gernalix/salute/salute.db`.
 
-Remote/validation failure with an old valid cache:
-- keep showing the old data;
-- compact banner: “Aggiornamento Salute non riuscito · dati precedenti ancora disponibili”
+That implementation is transitional.
 
-Unsupported newer contract:
-- do not partially read the DB;
-- show “Aggiorna PersonalHub per leggere questa versione di Salute”.
+The canonical migration must:
 
-## Privacy and safety
+1. migrate existing recoverable health records into PH tables;
+2. validate exact counts/values/provenance;
+3. remove the external DB cache and its Salute-specific transport dependency;
+4. keep `gernalix/salute` only as migration/reference history unless explicitly retained for archival purposes;
+5. switch `:feature:salute` to `PersonalHubDatabase.healthDao()` / canonical PH query surfaces;
+6. keep the existing Home tile but simplify the UI.
 
-- Treat health cache as sensitive app-private data.
-- Never log note bodies, lab values, Git token or full health queries in production logs.
-- Do not expose `salute.db` through Android backup/export flows intended for `personalhub.db`.
-- No health-data screenshots or fixtures in the public PersonalHub repository.
-- Tests use synthetic fixtures only.
-- The UI must distinguish documented clinical content from ChatGPT-generated interpretation.
+## Implementation sequencing
 
-## Initial implementation acceptance criteria
+Do not allocate a conflicting Room schema number from this documentation-only branch.
 
-1. Salute appears as a PersonalHub module and opens Timeline.
-2. The module has no mutation controls.
-3. It can fetch private `salute.db` through the existing GitHub auth/transport boundary.
-4. It never pushes to the health repository.
-5. It caches the file under app-private no-backup storage.
-6. Invalid/incompatible downloads never replace the last known-good cache.
-7. `v_health_timeline` is sorted by `data_ms DESC` and displays blood-test turnaround when available.
-8. Journal detail visually separates clinician note, AI snapshot, evidence and Danish original.
-9. Measurement detail can show longitudinal history of the same analyte.
-10. PersonalHub architecture-boundary tests remain green and `personalhub.db` remains the sole writable PH database.
+The roadmap already has a global timestamp migration immediately ahead of Salute.
+
+Required order:
+
+1. global PH epoch-ms migration;
+2. rebase `feature/salute-canonical-domain`;
+3. allocate next free Room schema version;
+4. implement Salute entities/DAO/views/migration;
+5. implement ChatGPT patch contract and import migration;
+6. wire Hub Context / temporal search;
+7. wire deterministic Obsidian projection;
+8. replace external HealthRepository with canonical PH repository;
+9. run Room schema export/migration tests, Git History tests, Datasette tests, architecture boundaries and Android QA.
+
+## Initial acceptance criteria
+
+1. `personalhub.db` is the only canonical runtime DB.
+2. Salute has no user-facing CRUD.
+3. Existing health data migrates without loss.
+4. Same physical blood draw → one stable `sample_id`.
+5. Every measurement has a measurement AI comment.
+6. Every sample has an aggregate sample AI comment.
+7. Every journal entry retains Danish original + Italian translation + AI meta-comment.
+8. Blood-test turnaround is derived correctly and displayed in whole days/hours.
+9. Doctor/place/medication links resolve to canonical PH entities.
+10. Health events participate in global temporal search and Hub Context.
+11. Git History can revert one health record or an entire import group.
+12. Datasette exposes health tables/views.
+13. Obsidian projection is deterministic and regenerable.
+14. Android Salute remains read-only and intentionally minimal.
+15. No health source text/value is logged in production diagnostics.
