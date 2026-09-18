@@ -1,6 +1,7 @@
 package com.gernalix.personalhub.core.database.capsules.sync
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
@@ -24,7 +25,15 @@ data class DatasetteExplorerConfiguration(val baseUrl: String, val database: Str
 object DatasetteSettings {
     const val DEFAULT_EXPLORER_DATABASE = "personalhub_read"
     private const val ALIAS = "personalhub.datasette"
-    private fun file(context: Context) = AtomicFile(File(context.noBackupFilesDir, "datasette.enc"))
+    private fun file(context: Context): AtomicFile {
+        val profileId = DatabaseProfiles.activeProfileId(context)
+        val name = if (profileId == DatabaseProfiles.DEFAULT_PROFILE_ID) {
+            "datasette.enc"
+        } else {
+            "datasette-$profileId.enc"
+        }
+        return AtomicFile(File(context.noBackupFilesDir, name))
+    }
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
