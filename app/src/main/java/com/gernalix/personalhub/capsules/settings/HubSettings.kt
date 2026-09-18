@@ -142,10 +142,7 @@ private fun DatabaseProfilesSettings(onBack: () -> Unit) {
                                 scope.launch {
                                     val switched = withContext(Dispatchers.IO) {
                                         runCatching {
-                                            ProfileRuntimeCoordinator.retireActiveProfile(context)
-                                            val changed = DatabaseProfiles.switch(context, profile.id)
-                                            if (changed) ProfileRuntimeCoordinator.restoreActiveProfile(context)
-                                            changed
+                                            ProfileRuntimeCoordinator.switchActiveProfile(context, profile.id)
                                         }
                                     }
                                     busy = false
