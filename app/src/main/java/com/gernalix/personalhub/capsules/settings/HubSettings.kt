@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.capsules.settings
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -15,10 +16,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.DatabaseActivity
+import com.gernalix.personalhub.DatabaseRestartActivity
 import com.gernalix.personalhub.R
 import com.gernalix.personalhub.capsules.shortcuts.HomeShortcutsSettings
+import com.gernalix.personalhub.core.database.ImportRolledBack
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSettings
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -27,11 +32,17 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HubSettings(onBack: () -> Unit) {
     var page by rememberSaveable { mutableStateOf("root") }
+    var enableGitAfterConfigure by rememberSaveable { mutableStateOf(false) }
     fun back() { if (page == "root") onBack() else page = "root" }
     BackHandler { back() }
     when (page) {
         "shortcuts" -> HomeShortcutsSettings { page = "root" }
         "sync" -> SyncSettings { page = "root" }
+        "git-data" -> GitDataSyncSettings(
+            onBack = { page = "root"; enableGitAfterConfigure = false },
+            enableAfterSave = enableGitAfterConfigure,
+            onConfigured = { enableGitAfterConfigure = false },
+        )
         "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
         else -> {
             val context = LocalContext.current
@@ -40,6 +51,12 @@ fun HubSettings(onBack: () -> Unit) {
                 OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
                 OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) { Text(stringResource(R.string.database_title)) }
                 OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
+                GitDataSyncToggle(
+                    onConfigure = { requestedEnable ->
+                        enableGitAfterConfigure = requestedEnable
+                        page = "git-data"
+                    },
+                )
                 OutlinedButton(onClick = { page = "workflowy-days" }) { Text(stringResource(R.string.workflowy_days_title)) }
                 OutlinedButton(
                     onClick = {
@@ -137,4 +154,213 @@ private fun ConnectionSettings(onBack: () -> Unit, onSaved: () -> Unit) {
         }) { Text(stringResource(R.string.datasette_save)) }
         if (failed) Text(stringResource(R.string.datasette_error), color = MaterialTheme.colorScheme.error)
     }
+}
+
+
+@Composable
+private fun GitDataSyncToggle(onConfigure: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var config by remember {
+        mutableStateOf(runCatching { GitDataSettings.configuration(context) }.getOrNull())
+    }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(stringResource(R.string.git_data_sync_title), Modifier.weight(1f))
+            Switch(
+                checked = config?.enabled == true,
+                enabled = !busy,
+                onCheckedChange = { enabled ->
+                    if (enabled && config?.configured != true) {
+                        onConfigure(true)
+                    } else {
+                        busy = true
+                        scope.launch {
+                            failed = withContext(Dispatchers.IO) {
+                                runCatching { GitDataSync.setEnabled(context, enabled) }.isFailure
+                            }
+                            config = runCatching {
+                                GitDataSettings.configuration(context)
+                            }.getOrNull()
+                            busy = false
+                        }
+                    }
+                },
+            )
+        }
+        Text(stringResource(R.string.git_data_sync_description))
+        TextButton(onClick = { onConfigure(false) }, enabled = !busy) {
+            Text(stringResource(R.string.git_data_sync_configure))
+        }
+        if (failed) {
+            Text(
+                stringResource(R.string.git_data_sync_error),
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GitDataSyncSettings(
+    onBack: () -> Unit,
+    enableAfterSave: Boolean,
+    onConfigured: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val initial = remember {
+        runCatching { GitDataSettings.configuration(context) }.getOrNull()
+    }
+    var repository by remember { mutableStateOf(initial?.repositoryUrl ?: "") }
+    var token by remember { mutableStateOf("") }
+    var revision by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<Int?>(null) }
+    var status by remember { mutableStateOf(GitDataSync.status(context)) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            status = GitDataSync.status(context)
+            delay(1000)
+        }
+    }
+
+    fun runOperation(block: suspend () -> Unit) {
+        busy = true
+        failed = false
+        message = null
+        scope.launch {
+            val error = withContext(Dispatchers.IO) {
+                runCatching { block() }.exceptionOrNull()
+            }
+            busy = false
+            if (error == null) {
+                message = R.string.git_data_sync_complete
+            } else {
+                failed = true
+                if (error is ImportRolledBack) restartDatabaseGraph(context, true)
+            }
+        }
+    }
+
+    SettingsPage(R.string.git_data_sync_title, onBack) {
+        Text(stringResource(R.string.git_data_sync_description))
+        OutlinedTextField(
+            repository,
+            { repository = it },
+            label = { Text(stringResource(R.string.git_data_sync_repository)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            token,
+            { token = it },
+            label = { Text(stringResource(R.string.git_data_sync_token)) },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (initial?.hasToken == true) {
+            Text(stringResource(R.string.git_data_sync_token_saved))
+        }
+        Button(
+            enabled = !busy,
+            onClick = {
+                runOperation {
+                    GitDataSync.save(context, repository, token)
+                    if (enableAfterSave) GitDataSync.setEnabled(context, true)
+                    token = ""
+                    onConfigured()
+                }
+            },
+        ) {
+            Text(stringResource(R.string.git_data_sync_save))
+        }
+
+        HorizontalDivider()
+        Text(stringResource(R.string.git_data_sync_actions), style = MaterialTheme.typography.titleMedium)
+        OutlinedButton(
+            enabled = !busy && status.enabled && status.configured,
+            onClick = { runOperation { GitDataSync.syncNow(context) } },
+        ) {
+            Text(stringResource(R.string.git_data_sync_push_pull_now))
+        }
+        OutlinedButton(
+            enabled = !busy && status.enabled && status.configured,
+            onClick = { runOperation { GitDataSync.pullNow(context) } },
+        ) {
+            Text(stringResource(R.string.git_data_sync_pull_now))
+        }
+
+        HorizontalDivider()
+        Text(stringResource(R.string.git_data_sync_restore_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.git_data_sync_restore_description))
+        OutlinedTextField(
+            revision,
+            { revision = it },
+            label = { Text(stringResource(R.string.git_data_sync_revision)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            enabled = !busy && status.enabled && status.configured && revision.isNotBlank(),
+            onClick = {
+                busy = true
+                failed = false
+                message = null
+                scope.launch {
+                    val error = withContext(Dispatchers.IO) {
+                        runCatching {
+                            GitDataSync.restoreRevision(context, revision)
+                        }.exceptionOrNull()
+                    }
+                    busy = false
+                    if (error == null) {
+                        restartDatabaseGraph(context, false)
+                    } else {
+                        failed = true
+                        if (error is ImportRolledBack) restartDatabaseGraph(context, true)
+                    }
+                }
+            },
+        ) {
+            Text(stringResource(R.string.git_data_sync_restore))
+        }
+
+        Text(
+            stringResource(
+                when {
+                    !status.enabled -> R.string.git_data_sync_off
+                    status.runtimeState == "syncing" || status.runtimeState == "pulling" ||
+                        status.runtimeState == "restoring" -> R.string.git_data_sync_working
+                    status.runtimeState == "retry" -> R.string.git_data_sync_retry
+                    else -> R.string.git_data_sync_complete
+                },
+            ),
+        )
+        status.lastError?.takeIf { it.isNotBlank() }?.let {
+            Text(stringResource(R.string.git_data_sync_error), color = MaterialTheme.colorScheme.error)
+        }
+        message?.let { Text(stringResource(it)) }
+        if (busy) CircularProgressIndicator()
+    }
+}
+
+private fun restartDatabaseGraph(context: android.content.Context, rolledBack: Boolean) {
+    val activity = context as? Activity ?: return
+    activity.startActivity(
+        Intent(activity, DatabaseRestartActivity::class.java)
+            .putExtra("rolled_back", rolledBack)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+    activity.finishAffinity()
+    android.os.Process.killProcess(android.os.Process.myPid())
 }
