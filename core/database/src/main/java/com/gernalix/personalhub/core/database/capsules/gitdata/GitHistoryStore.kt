@@ -34,6 +34,7 @@ data class GitHistoryCount(val key: String, val count: Long)
  */
 object GitHistoryStore {
     const val TABLE = "hub_git_history_index"
+    const val FIELD_STATS_TABLE = "hub_git_history_field_stats"
 
     fun install(db: SupportSQLiteDatabase) {
         db.execSQL(
@@ -46,6 +47,14 @@ object GitHistoryStore {
         )
         ensureColumn(db, "source", "TEXT NOT NULL DEFAULT 'unknown'")
         ensureColumn(db, "reason", "TEXT")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `" + FIELD_STATS_TABLE + "` (" +
+                "`table_name` TEXT NOT NULL, `row_key` TEXT NOT NULL, " +
+                "`column_name` TEXT NOT NULL, `last_occurred_at` INTEGER NOT NULL, " +
+                "`interval_sum_ms` INTEGER NOT NULL DEFAULT 0, " +
+                "`interval_count` INTEGER NOT NULL DEFAULT 0, " +
+                "PRIMARY KEY(`table_name`,`row_key`,`column_name`))",
+        )
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS `index_hub_git_history_time` ON `" +
                 TABLE + "`(`occurred_at`,`id`)",
@@ -87,6 +96,13 @@ object GitHistoryStore {
                     committed.historyPath,
                     commitSha,
                 ),
+            )
+            updateFieldStats(
+                db = db,
+                table = event.table,
+                rowKey = event.rowKey,
+                changedColumns = committed.changedColumns,
+                occurredAt = event.occurredAt,
             )
         }
     }
@@ -260,41 +276,79 @@ object GitHistoryStore {
             cursor.getLong(0)
         }
 
-    /**
-     * Average lifetime of a field value, measured as the interval between successive edits to the
-     * same table/row/column. Streams the index ordered by entity, so memory stays bounded.
-     */
-    fun averageFieldValueLifetimeMs(db: SupportSQLiteDatabase): Long? =
+    fun averageFieldValueLifetimeMs(db: SupportSQLiteDatabase): Long? {
+        ensureFieldStatsReady(db)
+        return db.query(
+            "SELECT SUM(interval_sum_ms),SUM(interval_count) FROM " + FIELD_STATS_TABLE,
+        ).use { cursor ->
+            require(cursor.moveToFirst())
+            val count = if (cursor.isNull(1)) 0L else cursor.getLong(1)
+            if (count == 0L) null else cursor.getLong(0) / count
+        }
+    }
+
+    fun rebuildFieldStats(db: SupportSQLiteDatabase) {
+        db.execSQL("DELETE FROM " + FIELD_STATS_TABLE)
         db.query(
             "SELECT table_name,row_key,changed_columns,occurred_at FROM " + TABLE +
                 " ORDER BY table_name,row_key,occurred_at,id",
         ).use { cursor ->
-            var currentEntity: String? = null
-            val lastByColumn = mutableMapOf<String, Long>()
-            var total = 0.0
-            var count = 0L
             while (cursor.moveToNext()) {
-                val entity = cursor.getString(0) + "\u001F" + cursor.getString(1)
-                if (entity != currentEntity) {
-                    currentEntity = entity
-                    lastByColumn.clear()
-                }
-                val occurredAt = cursor.getLong(3)
-                cursor.getString(2)
-                    .split(',')
-                    .filter { it.isNotBlank() }
-                    .forEach { column ->
-                        lastByColumn[column]?.let { previous ->
-                            if (occurredAt >= previous) {
-                                total += (occurredAt - previous).toDouble()
-                                count++
-                            }
-                        }
-                        lastByColumn[column] = occurredAt
-                    }
+                updateFieldStats(
+                    db = db,
+                    table = cursor.getString(0),
+                    rowKey = cursor.getString(1),
+                    changedColumns = cursor.getString(2),
+                    occurredAt = cursor.getLong(3),
+                )
             }
-            if (count == 0L) null else (total / count.toDouble()).toLong()
         }
+    }
+
+    private fun ensureFieldStatsReady(db: SupportSQLiteDatabase) {
+        val statsRows = db.query("SELECT COUNT(*) FROM " + FIELD_STATS_TABLE).use {
+            require(it.moveToFirst())
+            it.getLong(0)
+        }
+        if (statsRows > 0L) return
+        val historyRows = db.query("SELECT COUNT(*) FROM " + TABLE).use {
+            require(it.moveToFirst())
+            it.getLong(0)
+        }
+        if (historyRows > 0L) rebuildFieldStats(db)
+    }
+
+    private fun updateFieldStats(
+        db: SupportSQLiteDatabase,
+        table: String,
+        rowKey: String,
+        changedColumns: String,
+        occurredAt: Long,
+    ) {
+        changedColumns.split(',').filter { it.isNotBlank() }.forEach { column ->
+            val previous = db.query(
+                "SELECT last_occurred_at,interval_sum_ms,interval_count FROM " +
+                    FIELD_STATS_TABLE +
+                    " WHERE table_name=? AND row_key=? AND column_name=? LIMIT 1",
+                arrayOf(table, rowKey, column),
+            ).use { cursor ->
+                if (!cursor.moveToFirst()) null
+                else Triple(cursor.getLong(0), cursor.getLong(1), cursor.getLong(2))
+            }
+            val validDelta = previous
+                ?.first
+                ?.takeIf { occurredAt >= it }
+                ?.let { occurredAt - it }
+            val sum = (previous?.second ?: 0L) + (validDelta ?: 0L)
+            val count = (previous?.third ?: 0L) + if (validDelta == null) 0L else 1L
+            db.execSQL(
+                "INSERT OR REPLACE INTO " + FIELD_STATS_TABLE +
+                    "(table_name,row_key,column_name,last_occurred_at,interval_sum_ms,interval_count)" +
+                    " VALUES(?,?,?,?,?,?)",
+                arrayOf(table, rowKey, column, occurredAt, sum, count),
+            )
+        }
+    }
 
     fun countsByEntity(db: SupportSQLiteDatabase, limit: Int = 20): List<GitHistoryCount> =
         db.query(
