@@ -246,6 +246,15 @@ object GitDataSettings {
     }
 
     @Synchronized
+    internal fun replaceAppliedPatchIds(context: Context, ids: Collection<String>) {
+        val value = read(context)
+        val array = JSONArray()
+        ids.toSortedSet().forEach(array::put)
+        value.put("applied_patches", array)
+        write(context, value)
+    }
+
+    @Synchronized
     internal fun markPatchApplied(context: Context, patchId: String) {
         val value = read(context)
         val existing = appliedPatchIds(context).toMutableSet()
