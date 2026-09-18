@@ -69,18 +69,24 @@ internal object GitDataFormat {
                 val entries = if (full) linkedMapOf() else cachedEntries.toMutableMap()
                 for (table in changed.sorted()) {
                     require(table in allTables) { "Unknown Git sync table: $table" }
-                    val bytes = exportTable(db, table, files)
-                    val path = tablePath(table)
-                    files[path] = bytes
-                    entries[table] = JSONObject()
-                        .put("name", table)
-                        .put("path", path)
-                        .put("sha256", sha256(bytes))
-                        .put("rows", rowCount(bytes))
+                    val snapshot = exportTableShards(db, table, files)
+                    val previous = cachedEntries[table]
+                    val previousHashes = previous?.optJSONArray("shards")?.let { shards ->
+                        buildMap {
+                            for (i in 0 until shards.length()) {
+                                val shard = shards.getJSONObject(i)
+                                put(shard.getString("path"), shard.getString("sha256"))
+                            }
+                        }
+                    }.orEmpty()
+                    snapshot.files.forEach { (path, bytes) ->
+                        if (previousHashes[path] != sha256(bytes)) files[path] = bytes
+                    }
+                    entries[table] = snapshot.entry
                 }
 
                 val manifest = JSONObject()
-                    .put("format_version", 1)
+                    .put("format_version", 2)
                     .put("schema_version", PersonalHubDatabase.SCHEMA_VERSION)
                     .put("app_version", appVersion(context))
                     .put("generation", generation)
@@ -263,11 +269,16 @@ internal object GitDataFormat {
             it.getLong(0)
         }
 
-    private fun exportTable(
+    private data class TableSnapshot(
+        val entry: JSONObject,
+        val files: Map<String, ByteArray>,
+    )
+
+    private fun exportTableShards(
         db: SQLiteDatabase,
         table: String,
-        files: MutableMap<String, ByteArray>,
-    ): ByteArray {
+        objectFiles: MutableMap<String, ByteArray>,
+    ): TableSnapshot {
         requireSafeIdentifier(table)
         val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
             buildList {
@@ -278,22 +289,58 @@ internal object GitDataFormat {
         }
         require(columns.isNotEmpty()) { "Missing table: $table" }
         val primary = columns.filter { it.second > 0 }.sortedBy { it.second }.map { it.first }
-        val order = if (primary.isNotEmpty()) {
-            primary.joinToString(",") { "`$it`" }
-        } else {
-            "rowid"
+        val order = if (primary.isNotEmpty()) primary.joinToString(",") { "`$it`" } else "rowid"
+        val totalRows = db.rawQuery("SELECT COUNT(*) FROM `$table`", null).use {
+            require(it.moveToFirst())
+            it.getInt(0)
         }
-        val output = StringBuilder()
+        val shardCount = when {
+            totalRows <= 500 -> 1
+            totalRows <= 5_000 -> 8
+            totalRows <= 50_000 -> 32
+            else -> 128
+        }
+        val builders = Array(shardCount) { StringBuilder() }
+        val counts = IntArray(shardCount)
         db.rawQuery("SELECT * FROM `$table` ORDER BY $order", null).use { cursor ->
             while (cursor.moveToNext()) {
                 val row = JSONObject()
                 for (index in 0 until cursor.columnCount) {
-                    row.put(cursor.getColumnName(index), encodeCursorValue(cursor, index, files))
+                    row.put(
+                        cursor.getColumnName(index),
+                        encodeCursorValue(cursor, index, objectFiles),
+                    )
                 }
-                output.append(row.toString()).append('\n')
+                val key = if (primary.isEmpty()) row.toString()
+                    else primary.joinToString("|") { row.opt(it)?.toString().orEmpty() }
+                val hash = sha256(key.toByteArray(Charsets.UTF_8))
+                val shard = if (shardCount == 1) 0
+                    else java.lang.Long.parseUnsignedLong(hash.take(8), 16).rem(shardCount).toInt()
+                builders[shard].append(row.toString()).append('\n')
+                counts[shard]++
             }
         }
-        return output.toString().toByteArray(Charsets.UTF_8)
+        val shardFiles = linkedMapOf<String, ByteArray>()
+        val shardManifest = JSONArray()
+        builders.indices.forEach { index ->
+            val path = "state/tables/" + table + "/" + "%03d".format(index) + ".jsonl"
+            val bytes = builders[index].toString().toByteArray(Charsets.UTF_8)
+            shardFiles[path] = bytes
+            shardManifest.put(
+                JSONObject()
+                    .put("path", path)
+                    .put("sha256", sha256(bytes))
+                    .put("rows", counts[index]),
+            )
+        }
+        return TableSnapshot(
+            entry = JSONObject()
+                .put("name", table)
+                .put("rows", totalRows)
+                .put("shard_count", shardCount)
+                .put("shards", shardManifest),
+            files = shardFiles,
+        )
     }
 
     private fun rowCount(bytes: ByteArray): Int {
@@ -650,11 +697,23 @@ internal object GitStateRestorer {
                     val entry = tables.getJSONObject(i)
                     val table = entry.getString("name")
                     GitDataFormat.requireSafeIdentifier(table)
-                    val bytes = transport.readFile(entry.getString("path"), revision)
-                    require(GitDataFormat.sha256(bytes) == entry.getString("sha256")) {
-                        "State file hash mismatch: $table"
+                    val shards = entry.optJSONArray("shards")
+                    if (shards == null) {
+                        val bytes = transport.readFile(entry.getString("path"), revision)
+                        require(GitDataFormat.sha256(bytes) == entry.getString("sha256")) {
+                            "State file hash mismatch: $table"
+                        }
+                        importTable(db, table, bytes, transport, revision)
+                    } else {
+                        for (j in 0 until shards.length()) {
+                            val shard = shards.getJSONObject(j)
+                            val bytes = transport.readFile(shard.getString("path"), revision)
+                            require(GitDataFormat.sha256(bytes) == shard.getString("sha256")) {
+                                "State shard hash mismatch: $table"
+                            }
+                            importTable(db, table, bytes, transport, revision)
+                        }
                     }
-                    importTable(db, table, bytes, transport, revision)
                 }
                 runCatching {
                     db.execSQL(
