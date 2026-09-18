@@ -5,8 +5,6 @@
 package com.example.multitimetracker.ui
 import android.os.Trace
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.unit.dp
 import com.example.multitimetracker.ui.util.formatDuration
 
@@ -22,16 +20,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.ManageHistory
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.QueryBuilder
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -71,14 +65,9 @@ import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.MainViewModel
 import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.model.UiState
-import com.example.multitimetracker.model.TimeMachinePeriodSelection
-import com.example.multitimetracker.model.TimeMachineTagComparisonRow
-import com.example.multitimetracker.model.TimeMachineTagTotalRow
-import com.example.multitimetracker.model.effectiveTimeContext
 import com.example.multitimetracker.export.BackupFolderStore
 import com.example.multitimetracker.capsules.alerts.ui.AlertsScreen
 import com.example.multitimetracker.capsules.alerts.state.AlertsUiState
-import com.example.multitimetracker.capsules.auditlog.state.AuditLogUiState
 import com.example.multitimetracker.capsules.system.ui.AppRootSystemPrefs
 import com.example.multitimetracker.capsules.system.ui.DevToolsDialog
 import com.example.multitimetracker.capsules.system.ui.DevToolsRuntimeState
@@ -91,7 +80,6 @@ import com.example.multitimetracker.capsules.now.ui.NowScreen
 import com.example.multitimetracker.capsules.quickevents.ui.QuickEventsScreen
 import com.example.multitimetracker.core.quickevent.QuickEventTarget
 import com.example.multitimetracker.capsules.chains.ui.ChainsScreen
-import com.example.multitimetracker.capsules.auditlog.ui.AuditLogScreen
 import com.example.multitimetracker.capsules.timeline.ui.TimelineScreen
 import com.example.multitimetracker.R
 import androidx.compose.ui.res.stringResource
@@ -108,7 +96,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -118,32 +105,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import com.example.multitimetracker.ui.components.AppSettingsDialog
 import com.example.multitimetracker.ui.components.AlertPopupHost
-import com.example.multitimetracker.ui.components.DateTimePickerCommitMode
 import com.example.multitimetracker.ui.components.LocalOpenAppMenu
-import com.example.multitimetracker.ui.components.MttDateTimePickerDialog
-import com.gernalix.personalhub.contracts.database.DataExplorerContract
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
-private enum class Tab { NOW, QUICK_EVENTS, TAGS, TIMELINE, DA_QUANDO, ALERT, CHAINS, AUDIT }
-private enum class TimeMachinePickerMode { MOMENT, PERIOD }
-private enum class TimeMachinePickTarget { MOMENT, START, END }
+private enum class Tab { NOW, QUICK_EVENTS, TAGS, TIMELINE, DA_QUANDO, ALERT, CHAINS }
 private enum class DrawerDestination {
     NOW,
     QUICK_EVENTS,
     TAGS,
     TIMELINE,
-    TIME_MACHINE,
     SINCE_WHEN,
     ALERTS,
     CHAINS,
-    AUDIT_LOG,
-    IMPORT,
-    EXPORT,
     STATISTICS,
-    DATA_EXPLORER,
     SETTINGS,
     INFO
 }
@@ -173,7 +146,6 @@ fun AppRoot(
     val tagsState by vm.tagsCapsule.uiState.collectAsState()
     val sinceWhenState by vm.sinceWhenCapsule.uiState.collectAsState()
     val alertsState by vm.alertsCapsule.uiState.collectAsState()
-    val auditLogState by vm.auditLogCapsule.uiState.collectAsState()
 
     val showSeconds = rememberSaveable { mutableStateOf(AppRootSystemPrefs.getShowSeconds(context)) }
     val hideHoursIfZero = rememberSaveable { mutableStateOf(AppRootSystemPrefs.getHideHoursIfZero(context)) }
@@ -191,7 +163,6 @@ fun AppRoot(
         tagsState = tagsState,
         sinceWhenState = sinceWhenState,
         alertsState = alertsState,
-        auditLogState = auditLogState,
         vm = vm,
         showSeconds = showSeconds.value,
         hideHoursIfZero = hideHoursIfZero.value,
@@ -243,7 +214,6 @@ private fun VarTabScaffold(
     tagsState: TagsUiState,
     sinceWhenState: SinceWhenUiState,
     alertsState: AlertsUiState,
-    auditLogState: AuditLogUiState,
     vm: MainViewModel,
     showSeconds: Boolean,
     onShowSecondsChange: (Boolean) -> Unit,
@@ -264,10 +234,6 @@ private fun VarTabScaffold(
     var showInfo by remember { mutableStateOf(false) }
     var diagnosticsReport by remember { mutableStateOf<String?>(null) }
     var diagnosticsError by remember { mutableStateOf<String?>(null) }
-    var showTimeMachineDialog by remember { mutableStateOf(false) }
-    var timeMachineDraftMs by remember { mutableStateOf<Long?>(null) }
-    var showCompareWithToday by remember { mutableStateOf(false) }
-    var selectedPeriod by remember { mutableStateOf<TimeMachinePeriodSelection?>(null) }
 
     val focusTagIdState = rememberSaveable { mutableStateOf<Long?>(null) }
     val tab = tabState.value
@@ -297,24 +263,21 @@ private fun VarTabScaffold(
 
     val context = LocalContext.current
     val developerSurfaceEnabled = AppRootSystemPrefs.isDeveloperSurfaceAvailable()
-    val effectiveTime = remember(state.nowMs, state.timeMachineTargetMs) { state.effectiveTimeContext() }
     val devToolsRuntimeState = remember(
         tagsState.tasks,
         tagsState.tags,
         tagsState.closedSessions,
-        effectiveTime.nowMs,
+        state.nowMs,
     ) {
         DevToolsRuntimeState(
             sessionOnlyModeEnabled = true,
             tasks = tagsState.tasks,
             tags = tagsState.tags,
             closedSessions = tagsState.closedSessions,
-            effectiveNowMs = effectiveTime.nowMs,
+            effectiveNowMs = state.nowMs,
         )
     }
     val diagnosticsLoading = stringResource(R.string.diagnostics_loading)
-    val timeMachineFormatter = remember { DateTimeFormatter.ofPattern("dd-MM-yy HH:mm", Locale.getDefault()) }
-    var pendingAfterFolderPick by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     fun beginTabTrace(target: Tab) {
         if (!isCloneBenchmark) return
@@ -345,26 +308,6 @@ private fun VarTabScaffold(
         }
     }
 
-    // v435: SAF folder picker usable from Settings (Change SAF folder).
-    val safTreeLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { treeUri ->
-        if (treeUri != null) {
-            vm.setBackupRootFolder(context, treeUri)
-            pendingAfterFolderPick?.invoke()
-        }
-        pendingAfterFolderPick = null
-    }
-
-    val importDbLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            vm.importDatabaseFromUri(context, uri)
-        }
-    }
-
-    val importVerifyReport by vm.importVerificationReport.collectAsState()
     val persistenceFailureReport by vm.persistenceFailureReport.collectAsState()
 
     LaunchedEffect(showDiagnostics) {
@@ -372,7 +315,7 @@ private fun VarTabScaffold(
         diagnosticsReport = null
         diagnosticsError = null
         try {
-            val nowMs = effectiveTime.nowMs
+            val nowMs = state.nowMs
             // Build on a background dispatcher; report is a pure string.
             val report = buildSessionDiagnosticsReport(context, devToolsRuntimeState, nowMs)
             diagnosticsReport = report
@@ -413,59 +356,6 @@ if (developerSurfaceEnabled && showDevReport) {
         }
     )
 }
-
-    if (importVerifyReport != null) {
-        val report = importVerifyReport ?: ""
-        AlertDialog(
-            onDismissRequest = { vm.setImportVerificationReport(null) },
-            title = { Text(stringResource(R.string.import_verify_title)) },
-            text = {
-                val scroll = rememberScrollState()
-                SelectionContainer {
-                    Text(
-                        text = report,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(420.dp)
-                            .verticalScroll(scroll)
-                    )
-                }
-            },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { vm.setImportVerificationReport(null) }) {
-                        Text(stringResource(R.string.chiudi))
-                    }
-                    TextButton(onClick = {
-                        vm.restoreLastPreImportBackup(context)
-                    }) {
-                        Text(stringResource(R.string.import_verify_restore_backup))
-                    }
-                }
-            },
-            dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
-                        cm?.setPrimaryClip(ClipData.newPlainText("import_verify", report))
-                        Toast.makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
-                    }) {
-                        Text(stringResource(R.string.copy))
-                    }
-                    if (developerSurfaceEnabled) {
-                        TextButton(onClick = {
-                            vm.setImportVerificationReport(null)
-                            showDiagnostics = true
-                        }) {
-                            Text(stringResource(R.string.import_verify_debug))
-                        }
-                    }
-                }
-            }
-        )
-    }
-
-
 
     if (persistenceFailureReport != null) {
         val report = persistenceFailureReport ?: ""
@@ -559,18 +449,18 @@ if (developerSurfaceEnabled && showDevReport) {
         }
         val tagsCount = remember(tagsState.tags) { tagsState.tags.count { !it.isDeleted && !it.isArchived } }
         val archivedTagsCount = remember(tagsState.tags) { tagsState.tags.count { !it.isDeleted && it.isArchived } }
-        val totalMs = remember(tagsState.chronologySessions, tagsState.runningSessions, effectiveTime.nowMs) {
+        val totalMs = remember(tagsState.chronologySessions, tagsState.runningSessions, state.nowMs) {
             val closed = tagsState.chronologySessions
                 .asSequence()
                 .filter { it.deletedAtMs == null }
                 // SessionUi.endMs is nullable (null = running). For closed sessions it is non-null.
-                .map { ((it.endMs ?: effectiveTime.nowMs) - it.startMs) }
+                .map { ((it.endMs ?: state.nowMs) - it.startMs) }
                 .map { it.coerceAtLeast(0L) }
                 .sum()
             val running = tagsState.runningSessions
                 .asSequence()
                 .filter { it.deletedAtMs == null }
-                .map { effectiveTime.nowMs - it.startMs }
+                .map { state.nowMs - it.startMs }
                 .map { it.coerceAtLeast(0L) }
                 .sum()
             closed + running
@@ -613,38 +503,6 @@ if (developerSurfaceEnabled && showDevReport) {
         )
     }
 
-    if (showCompareWithToday && state.timeMachineTargetMs != null) {
-        val rowsState = produceState<List<TimeMachineTagComparisonRow>?>(initialValue = null, state.timeMachineTargetMs, state.nowMs) {
-            value = withContext(Dispatchers.Default) { vm.buildCompareWithTodayRows() }
-        }
-        TimeMachineCompareDialog(
-            selectedDayLabel = vm.currentTimeMachineDayLabel().orEmpty(),
-            rows = rowsState.value,
-            showSeconds = showSeconds,
-            hideHoursIfZero = hideHoursIfZero,
-            onDismiss = { showCompareWithToday = false }
-        )
-    }
-
-    selectedPeriod?.let { period ->
-        val rowsState = produceState<List<TimeMachineTagTotalRow>?>(initialValue = null, period, state.nowMs) {
-            value = withContext(Dispatchers.Default) { vm.buildPeriodTagTotals(period) }
-        }
-        TimeMachinePeriodTotalsDialog(
-            period = period,
-            rows = rowsState.value,
-            showSeconds = showSeconds,
-            hideHoursIfZero = hideHoursIfZero,
-            onDismiss = { selectedPeriod = null }
-        )
-    }
-
-    val timeMachineBannerText = remember(state.timeMachineTargetMs) {
-        state.timeMachineTargetMs?.let { targetMs ->
-            val formatted = timeMachineFormatter.format(Instant.ofEpochMilli(targetMs).atZone(ZoneId.systemDefault()))
-            context.getString(R.string.time_machine_banner, formatted)
-        }
-    }
     val drawerGroups = remember {
         listOf(
             listOf(
@@ -654,17 +512,12 @@ if (developerSurfaceEnabled && showDevReport) {
                 DrawerItemSpec(DrawerDestination.TIMELINE, R.string.chronology, Icons.Filled.History)
             ),
             listOf(
-                DrawerItemSpec(DrawerDestination.TIME_MACHINE, R.string.time_machine_title, Icons.Filled.ManageHistory),
                 DrawerItemSpec(DrawerDestination.SINCE_WHEN, R.string.tab_da_quando, Icons.Filled.QueryBuilder),
                 DrawerItemSpec(DrawerDestination.ALERTS, R.string.alert, Icons.Filled.Notifications),
-                DrawerItemSpec(DrawerDestination.CHAINS, R.string.catene, Icons.Filled.Link),
-                DrawerItemSpec(DrawerDestination.AUDIT_LOG, R.string.audit_log, Icons.AutoMirrored.Filled.List)
+                DrawerItemSpec(DrawerDestination.CHAINS, R.string.catene, Icons.Filled.Link)
             ),
             listOf(
-                DrawerItemSpec(DrawerDestination.IMPORT, R.string.cd_import, Icons.Filled.CloudDownload),
-                DrawerItemSpec(DrawerDestination.EXPORT, R.string.cd_export, Icons.Filled.CloudUpload),
                 DrawerItemSpec(DrawerDestination.STATISTICS, R.string.statistics, Icons.Filled.Assessment),
-                DrawerItemSpec(DrawerDestination.DATA_EXPLORER, R.string.data_explorer, Icons.Filled.Storage),
                 DrawerItemSpec(DrawerDestination.SETTINGS, R.string.cd_settings, Icons.Filled.Settings),
                 DrawerItemSpec(DrawerDestination.INFO, R.string.drawer_info, Icons.Filled.Info)
             )
@@ -680,18 +533,11 @@ if (developerSurfaceEnabled && showDevReport) {
             DrawerDestination.SINCE_WHEN -> tab == Tab.DA_QUANDO
             DrawerDestination.ALERTS -> tab == Tab.ALERT
             DrawerDestination.CHAINS -> tab == Tab.CHAINS
-            DrawerDestination.AUDIT_LOG -> tab == Tab.AUDIT
-            DrawerDestination.TIME_MACHINE -> state.isReadOnly
             else -> false
         }
     }
 
-    fun isDrawerItemEnabled(destination: DrawerDestination): Boolean {
-        return when (destination) {
-            DrawerDestination.IMPORT -> !state.isReadOnly
-            else -> true
-        }
-    }
+    fun isDrawerItemEnabled(@Suppress("UNUSED_PARAMETER") destination: DrawerDestination): Boolean = true
 
     fun openDrawerDestination(destination: DrawerDestination) {
         when (destination) {
@@ -705,23 +551,10 @@ if (developerSurfaceEnabled && showDevReport) {
                 beginTabTrace(Tab.TIMELINE)
                 tabState.value = Tab.TIMELINE
             }
-            DrawerDestination.TIME_MACHINE -> {
-                if (state.isReadOnly) {
-                    vm.exitTimeMachine()
-                } else {
-                    timeMachineDraftMs = effectiveTime.nowMs
-                    showTimeMachineDialog = true
-                }
-            }
             DrawerDestination.SINCE_WHEN -> tabState.value = Tab.DA_QUANDO
             DrawerDestination.ALERTS -> tabState.value = Tab.ALERT
             DrawerDestination.CHAINS -> tabState.value = Tab.CHAINS
-            DrawerDestination.AUDIT_LOG -> tabState.value = Tab.AUDIT
-            DrawerDestination.IMPORT, DrawerDestination.EXPORT ->
-                com.gernalix.personalhub.core.database.DatabaseNavigation.open(context)
             DrawerDestination.STATISTICS -> showStatistics = true
-            DrawerDestination.DATA_EXPLORER ->
-                context.startActivity(DataExplorerContract.intent(context.packageName, "sessions"))
             DrawerDestination.SETTINGS -> showSettings = true
             DrawerDestination.INFO -> showInfo = true
         }
@@ -806,36 +639,6 @@ if (developerSurfaceEnabled && showDevReport) {
         ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
-                topBar = {
-                    if (timeMachineBannerText != null) {
-                        Column {
-                            Surface(
-                                color = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .statusBarsPadding()
-                                    .clickable { vm.exitTimeMachine() }
-                            ) {
-                                Text(
-                                    text = timeMachineBannerText,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                OutlinedButton(onClick = { showCompareWithToday = true }) {
-                                    Text(stringResource(R.string.time_machine_compare_with_today))
-                                }
-                            }
-                        }
-                    }
-                },
                 bottomBar = {
                     Column {
                         Row(
@@ -894,11 +697,6 @@ if (developerSurfaceEnabled && showDevReport) {
                         onShowSecondsChange = onShowSecondsChange,
                         hideHoursIfZero = hideHoursIfZero,
                         onHideHoursIfZeroChange = onHideHoursIfZeroChange,
-                        onChangeSafFolder = {
-                            if (!state.isReadOnly) {
-                                safTreeLauncher.launch(null)
-                            }
-                        },
                         onDismiss = { showSettings = false }
                     )
                 }
@@ -1012,23 +810,6 @@ if (developerSurfaceEnabled && showDevReport) {
                             modifier = Modifier.padding(inner)
                         )
                     }
-                    Tab.AUDIT -> stateHolder.SaveableStateProvider("audit") {
-                        AuditLogScreen(
-                            capsule = vm.auditLogCapsule,
-                            state = auditLogState,
-                            onOpenDiagnostics = if (developerSurfaceEnabled) {
-                                { showDiagnostics = true }
-                            } else {
-                                null
-                            },
-                            onOpenDevTools = if (developerSurfaceEnabled) {
-                                { showDevTools = true }
-                            } else {
-                                null
-                            },
-                            modifier = Modifier.padding(inner)
-                        )
-                    }
                 }
 
                 AlertPopupHost(
@@ -1039,278 +820,4 @@ if (developerSurfaceEnabled && showDevReport) {
         }
         }
     }
-    if (showTimeMachineDialog) {
-        TimeMachineDialog(
-            initialMs = timeMachineDraftMs ?: effectiveTime.nowMs,
-            onDismiss = {
-                timeMachineDraftMs = null
-                showTimeMachineDialog = false
-            },
-            onConfirmMoment = { targetMs ->
-                vm.enterTimeMachine(minOf(targetMs, effectiveTime.liveNowMs))
-                timeMachineDraftMs = null
-                showTimeMachineDialog = false
-            },
-            onConfirmPeriod = { period ->
-                selectedPeriod = period
-                timeMachineDraftMs = null
-                showTimeMachineDialog = false
-            }
-        )
-    }
-}
-
-@Composable
-private fun TimeMachineDialog(
-    initialMs: Long,
-    onDismiss: () -> Unit,
-    onConfirmMoment: (Long) -> Unit,
-    onConfirmPeriod: (TimeMachinePeriodSelection) -> Unit
-) {
-    val zoneId = remember { ZoneId.systemDefault() }
-    val formatter = remember { DateTimeFormatter.ofPattern("dd-MM-yy HH:mm", Locale.getDefault()) }
-    var mode by rememberSaveable { mutableStateOf(TimeMachinePickerMode.MOMENT.name) }
-    var selectedMomentMs by remember { mutableStateOf(initialMs) }
-    var selectedStartMs by remember { mutableStateOf(initialMs) }
-    var selectedEndMs by remember { mutableStateOf(initialMs + 60 * 60 * 1000L) }
-    var pickTarget by remember { mutableStateOf<TimeMachinePickTarget?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.time_machine_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                val pickerMode = runCatching { TimeMachinePickerMode.valueOf(mode) }
-                    .getOrElse { TimeMachinePickerMode.MOMENT }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = pickerMode == TimeMachinePickerMode.MOMENT,
-                        onClick = { mode = TimeMachinePickerMode.MOMENT.name },
-                        label = { Text(stringResource(R.string.time_machine_mode_moment)) }
-                    )
-                    FilterChip(
-                        selected = pickerMode == TimeMachinePickerMode.PERIOD,
-                        onClick = { mode = TimeMachinePickerMode.PERIOD.name },
-                        label = { Text(stringResource(R.string.time_machine_mode_period)) }
-                    )
-                }
-
-                if (pickerMode == TimeMachinePickerMode.MOMENT) {
-                    val formattedTarget = formatter.format(Instant.ofEpochMilli(selectedMomentMs).atZone(zoneId))
-                    Text(stringResource(R.string.time_machine_picker_label, formattedTarget))
-                    OutlinedButton(onClick = { pickTarget = TimeMachinePickTarget.MOMENT }) {
-                        Text(stringResource(R.string.time_machine_pick_datetime))
-                    }
-                } else {
-                    val formattedStart = formatter.format(Instant.ofEpochMilli(selectedStartMs).atZone(zoneId))
-                    val formattedEnd = formatter.format(Instant.ofEpochMilli(selectedEndMs).atZone(zoneId))
-                    Text(stringResource(R.string.time_machine_period_start, formattedStart))
-                    OutlinedButton(onClick = { pickTarget = TimeMachinePickTarget.START }) {
-                        Text(stringResource(R.string.time_machine_pick_start))
-                    }
-                    Text(stringResource(R.string.time_machine_period_end, formattedEnd))
-                    OutlinedButton(onClick = { pickTarget = TimeMachinePickTarget.END }) {
-                        Text(stringResource(R.string.time_machine_pick_end))
-                    }
-                    if (selectedEndMs <= selectedStartMs) {
-                        Text(
-                            text = stringResource(R.string.time_machine_period_invalid),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            val pickerMode = runCatching { TimeMachinePickerMode.valueOf(mode) }
-                .getOrElse { TimeMachinePickerMode.MOMENT }
-            TextButton(
-                onClick = {
-                    if (pickerMode == TimeMachinePickerMode.MOMENT) {
-                        onConfirmMoment(selectedMomentMs)
-                    } else {
-                        onConfirmPeriod(
-                            TimeMachinePeriodSelection(
-                                startMs = minOf(selectedStartMs, selectedEndMs),
-                                endMs = maxOf(selectedStartMs, selectedEndMs)
-                            )
-                        )
-                    }
-                },
-                enabled = pickerMode == TimeMachinePickerMode.MOMENT || selectedEndMs > selectedStartMs
-            ) {
-                Text(
-                    stringResource(
-                        if (pickerMode == TimeMachinePickerMode.MOMENT) {
-                            R.string.time_machine_enter_moment
-                        } else {
-                            R.string.time_machine_show_period
-                        }
-                    )
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.annulla))
-            }
-        }
-    )
-
-    pickTarget?.let { target ->
-        MttDateTimePickerDialog(
-            title = stringResource(
-                when (target) {
-                    TimeMachinePickTarget.MOMENT -> R.string.time_machine_pick_datetime
-                    TimeMachinePickTarget.START -> R.string.time_machine_pick_start
-                    TimeMachinePickTarget.END -> R.string.time_machine_pick_end
-                }
-            ),
-            initialTimestampMs = when (target) {
-                TimeMachinePickTarget.MOMENT -> selectedMomentMs
-                TimeMachinePickTarget.START -> selectedStartMs
-                TimeMachinePickTarget.END -> selectedEndMs
-            },
-            commitMode = DateTimePickerCommitMode.END_OF_MINUTE,
-            onDismiss = { pickTarget = null },
-            onConfirm = { picked ->
-                when (target) {
-                    TimeMachinePickTarget.MOMENT -> selectedMomentMs = picked
-                    TimeMachinePickTarget.START -> selectedStartMs = picked
-                    TimeMachinePickTarget.END -> selectedEndMs = picked
-                }
-                pickTarget = null
-            }
-        )
-    }
-}
-
-@Composable
-private fun TimeMachinePeriodTotalsDialog(
-    period: TimeMachinePeriodSelection,
-    rows: List<TimeMachineTagTotalRow>?,
-    showSeconds: Boolean,
-    hideHoursIfZero: Boolean,
-    onDismiss: () -> Unit
-) {
-    val formatter = remember { DateTimeFormatter.ofPattern("dd-MM-yy HH:mm", Locale.getDefault()) }
-    val zoneId = remember { ZoneId.systemDefault() }
-    val start = remember(period.startMs) { formatter.format(Instant.ofEpochMilli(period.startMs).atZone(zoneId)) }
-    val end = remember(period.endMs) { formatter.format(Instant.ofEpochMilli(period.endMs).atZone(zoneId)) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.time_machine_mode_period)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(stringResource(R.string.time_machine_period_range, start, end))
-                when {
-                    rows == null -> Text(stringResource(R.string.loading))
-                    rows.isEmpty() -> Text(stringResource(R.string.time_machine_no_period_totals))
-                    else -> rows.forEach { row ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = row.tagName,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(formatDuration(row.totalMs, showSeconds, hideHoursIfZero))
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.chiudi))
-            }
-        }
-    )
-}
-
-@Composable
-private fun TimeMachineCompareDialog(
-    selectedDayLabel: String,
-    rows: List<TimeMachineTagComparisonRow>?,
-    showSeconds: Boolean,
-    hideHoursIfZero: Boolean,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.time_machine_compare_with_today)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(stringResource(R.string.time_machine_compare_range, selectedDayLabel))
-                when {
-                    rows == null -> Text(stringResource(R.string.loading))
-                    rows.isEmpty() -> Text(stringResource(R.string.time_machine_compare_empty))
-                    else -> rows.forEach { row ->
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(row.tagName, style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                stringResource(
-                                    R.string.time_machine_compare_selected_day,
-                                    formatDuration(row.selectedDayTotalMs, showSeconds, hideHoursIfZero)
-                                )
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.time_machine_compare_today,
-                                    formatDuration(row.todayTotalMs, showSeconds, hideHoursIfZero)
-                                )
-                            )
-                            Text(
-                                stringResource(
-                                    R.string.time_machine_compare_difference,
-                                    signedDurationText(row.differenceMs, showSeconds, hideHoursIfZero)
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.chiudi))
-            }
-        }
-    )
-}
-
-private fun signedDurationText(
-    durationMs: Long,
-    showSeconds: Boolean,
-    hideHoursIfZero: Boolean
-): String {
-    val sign = when {
-        durationMs > 0L -> "+"
-        durationMs < 0L -> "-"
-        else -> "0 "
-    }
-    if (durationMs == 0L) {
-        return formatDuration(0L, showSeconds, hideHoursIfZero)
-    }
-    return sign + formatDuration(kotlin.math.abs(durationMs), showSeconds, hideHoursIfZero)
 }
