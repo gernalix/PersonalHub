@@ -890,4 +890,5 @@
     <string name="hub_context_new_place">+ New place</string>
     <string name="hub_context_place_radius_hint">New places use a 75 m radius.</string>
     <string name="hub_context_save_failed">Context could not be saved.</string>
+    <string name="data_explorer">Data Explorer</string>
 </resources>
