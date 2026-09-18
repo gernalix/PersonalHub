@@ -1,1 +1,66 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application>
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Sostanze"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity-alias
+            android:name="com.gernalix.personalhub.shortcut.SubstancesShortcutActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:host="module" android:path="/substances" android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
+            android:name=".widget.SubstancesWidgetClickActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <activity
+            android:name=".widget.SubstancesWidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Sostanze" />
+
+        <receiver
+            android:name=".widget.SubstancesWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/substances_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".notifications.SostanzeNotificationReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notifications.SostanzeNotificationRestoreReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
