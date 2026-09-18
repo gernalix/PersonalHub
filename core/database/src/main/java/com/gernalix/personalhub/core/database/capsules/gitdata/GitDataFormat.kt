@@ -388,15 +388,19 @@ internal object GitPatchEngine {
             "Patch targets a different database schema"
         }
         val operations = patch.getJSONArray("operations")
+        val patchId = patch.optString("patch_id").ifBlank { "remote-patch" }
+        val author = patch.optString("author").ifBlank { "chatgpt" }
         val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
         db.beginTransaction()
         try {
+            GitDataTracking.setEditContext(db, author, patchId)
             for (i in 0 until operations.length()) applyOperation(db, operations.getJSONObject(i))
             db.query("PRAGMA foreign_key_check").use {
                 require(!it.moveToFirst()) { "Patch would break database relationships" }
             }
             db.setTransactionSuccessful()
         } finally {
+            GitDataTracking.clearEditContext(db)
             db.endTransaction()
         }
     }
