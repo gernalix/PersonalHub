@@ -62,6 +62,7 @@ fun PlaceDetailScreen(
     onHistory: () -> Unit,
     onCheckInNow: () -> Unit,
     onAddManualVisit: () -> Unit,
+    onAlerts: () -> Unit,
     onGeofenceSettings: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -166,6 +167,10 @@ fun PlaceDetailScreen(
                     FilledTonalButton(onClick = onMap, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Outlined.Map, contentDescription = null)
                         Text(stringResource(R.string.show_on_map), modifier = Modifier.padding(start = 8.dp))
+                    }
+                    FilledTonalButton(onClick = onAlerts, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Outlined.Settings, contentDescription = null)
+                        Text(stringResource(R.string.place_alerts), modifier = Modifier.padding(start = 8.dp))
                     }
                     FilledTonalButton(onClick = onGeofenceSettings, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Outlined.Settings, contentDescription = null)
