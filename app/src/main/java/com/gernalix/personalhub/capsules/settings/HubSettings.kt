@@ -302,6 +302,14 @@ private fun GitDataSyncSettings(
         ) {
             Text(stringResource(R.string.git_data_sync_push_pull_now))
         }
+        if (status.runtimeState == "attention") {
+            Button(
+                enabled = !busy && status.enabled && status.configured,
+                onClick = { runOperation { GitDataSync.forcePushNow(context) } },
+            ) {
+                Text(stringResource(R.string.git_data_sync_force_push))
+            }
+        }
         OutlinedButton(
             enabled = !busy && status.enabled && status.configured,
             onClick = { runOperation { GitDataSync.pullNow(context) } },
@@ -351,11 +359,12 @@ private fun GitDataSyncSettings(
                     status.runtimeState == "syncing" || status.runtimeState == "pulling" ||
                         status.runtimeState == "restoring" -> R.string.git_data_sync_working
                     status.runtimeState == "retry" -> R.string.git_data_sync_retry
+                    status.runtimeState == "attention" -> R.string.git_data_sync_attention
                     else -> R.string.git_data_sync_complete
                 },
             ),
         )
-        status.lastError?.takeIf { it.isNotBlank() }?.let {
+        status.lastError?.takeIf { it.isNotBlank() && status.runtimeState != "attention" }?.let {
             Text(stringResource(R.string.git_data_sync_error), color = MaterialTheme.colorScheme.error)
         }
         message?.let { Text(stringResource(it)) }
