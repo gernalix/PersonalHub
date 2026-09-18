@@ -66,7 +66,7 @@ Automatic push pauses when a batch is unusually destructive: at least 100 delete
 
 Git is transport/history, not the database merge engine. PersonalHub never delegates database semantics to a raw Git merge.
 
-Granular import uses hash-verified declarative patches with patch id, schema compatibility, author and optimistic expect preconditions. Patches run transactionally, cannot modify operational tables or primary keys, and finish with FK validation. One patch can be cherry-picked from a branch, tag or commit without merging that Git tree. Before applying it, PH can run the patch against a coherent disposable database copy and report insert/update/delete counts and affected tables; the production database is untouched. Proposal branches under `data/` can be discarded explicitly after review.
+Granular import uses hash-verified declarative patches with patch id, schema compatibility, author and optimistic expect preconditions. Pull/sync only discovers and verifies unapplied patches; it never applies them silently. Verified patch ids are surfaced as awaiting review. Patches run transactionally, cannot modify operational tables or primary keys, and finish with FK validation. One patch can be cherry-picked from a branch, tag or commit without merging that Git tree. Before applying it, PH can run the patch against a coherent disposable database copy and report insert/update/delete counts and affected tables; the production database is untouched. Proposal branches under `data/` can be discarded explicitly after review.
 
 History can revert one logical edit. Events sharing group_id are reversed together in reverse order, preserving dependency direction. The revert is itself a new immutable event.
 
