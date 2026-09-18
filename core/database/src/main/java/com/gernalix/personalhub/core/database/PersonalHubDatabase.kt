@@ -113,21 +113,9 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
         fun create(context: Context) = get(context)
         fun openTemporary(context: Context, name: String) = build(context, name)
         fun openStaging(context: Context, name: String) = build(context, name)
-        private val MIGRATION_EDGES = setOf(
-            1 to 2, 2 to 3, 3 to 4, 4 to 5, 5 to 6, 6 to 7,
-            7 to 8, 8 to 9, 9 to 10, 10 to 11, 11 to 12, 12 to 13, 13 to 14, 14 to 15,
-        )
-        fun canMigrateFrom(version: Int): Boolean {
-            if (version == SCHEMA_VERSION) return true
-            if (version <= 0 || version > SCHEMA_VERSION) return false
-            val reachable = mutableSetOf(version)
-            while (true) {
-                val next = MIGRATION_EDGES.filter { it.first in reachable }.map { it.second }.toSet() - reachable
-                if (next.isEmpty()) return false
-                if (SCHEMA_VERSION in next) return true
-                reachable += next
-            }
-        }
+        fun canMigrateFrom(version: Int): Boolean =
+            version in 1..SCHEMA_VERSION
+
         internal fun productionMigrationEdges(context: Context) =
             productionMigrations(context).map { it.startVersion to it.endVersion }.toSet()
         fun closeInstance() = synchronized(this) { instance?.close(); instance = null }
@@ -147,8 +135,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     val schema = org.json.JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/3.json").bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
                                     for (i in 0 until schema.length()) {
                                         val entity = schema.getJSONObject(i)
-                                        val indices = entity.optJSONArray("indices") ?: continue
-                                        for (j in 0 until indices.length()) db.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
+                                        val indices = entity.optJSONArray("indices") ?: continue                                        for (j in 0 until indices.length()) db.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
                                     }
                                 }
                             },
@@ -297,8 +284,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     db.execSQL("""
                                         CREATE TABLE IF NOT EXISTS `check_in_attempt_candidates` (
                                             `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                                            `attempt_id` TEXT NOT NULL,
-                                            `place_id` TEXT NOT NULL,
+                                            `attempt_id` TEXT NOT NULL,                                            `place_id` TEXT NOT NULL,
                                             `distance_m` REAL NOT NULL,
                                             `threshold_m` REAL NOT NULL,
                                             `rank` INTEGER NOT NULL,
@@ -347,7 +333,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                                 }
                             },
-        )
+        ) + DeclarativeMigrations.load(context)
 
         private fun build(context: Context, name: String): PersonalHubDatabase {
             DatabaseGate.configureAutoExport(context)
