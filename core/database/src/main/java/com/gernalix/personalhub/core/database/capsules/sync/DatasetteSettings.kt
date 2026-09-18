@@ -80,8 +80,16 @@ object DatasetteSettings {
         }
     }
 
-    @Synchronized fun explorerUrl(context: Context): String? =
-        explorerConfiguration(context).takeIf { it.configured }?.let { "${it.baseUrl}/${it.database}/" }
+    @Synchronized fun explorerUrl(context: Context, table: String? = null): String? {
+        val normalizedTable = table?.trim()?.takeIf { it.isNotEmpty() }
+        require(normalizedTable == null || validName(normalizedTable)) { "Invalid explorer table" }
+        return explorerConfiguration(context).takeIf { it.configured }?.let { configuration ->
+            buildString {
+                append(configuration.baseUrl).append('/').append(configuration.database).append('/')
+                normalizedTable?.let(::append)
+            }
+        }
+    }
 
     @Synchronized fun saveExplorerDatabase(context: Context, database: String) {
         val normalized = database.trim().ifBlank { DEFAULT_EXPLORER_DATABASE }
