@@ -44,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
+import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.personalhub.core.database.DataExplorerSnapshot
 import com.gernalix.personalhub.core.database.DataExplorerSnapshots
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSettings
@@ -80,6 +81,7 @@ class DataExplorerActivity : ComponentActivity() {
     private fun DataExplorerScreen() {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
+        val requestedTable = remember { DataExplorerContract.table(intent) }
         var page by rememberSaveable { mutableStateOf("home") }
         var snapshot by remember { mutableStateOf<DataExplorerSnapshot?>(null) }
         var busy by remember { mutableStateOf(false) }
@@ -91,7 +93,7 @@ class DataExplorerActivity : ComponentActivity() {
             )
         }
         var remoteUrl by remember {
-            mutableStateOf(runCatching { DatasetteSettings.explorerUrl(context) }.getOrNull())
+            mutableStateOf(runCatching { DatasetteSettings.explorerUrl(context, requestedTable) }.getOrNull())
         }
         val liteAvailable = remember { hasEmbeddedLite() }
 
@@ -102,7 +104,7 @@ class DataExplorerActivity : ComponentActivity() {
         when (page) {
             "local" -> snapshot?.let {
                 ExplorerWebView(
-                    url = localLiteUrl(it.file),
+                    url = localLiteUrl(it.file, requestedTable),
                     snapshotDirectory = it.file.parentFile,
                     localOnly = true,
                     onBack = { page = "home" },
@@ -172,7 +174,7 @@ class DataExplorerActivity : ComponentActivity() {
                                 runCatching {
                                     withContext(Dispatchers.IO) {
                                         DatasetteSettings.saveExplorerDatabase(context, remoteDatabase)
-                                        DatasetteSettings.explorerUrl(context)
+                                        DatasetteSettings.explorerUrl(context, requestedTable)
                                     }
                                 }.onSuccess { url ->
                                     remoteDatabase = DatasetteSettings.explorerDatabase(context)
@@ -214,10 +216,12 @@ class DataExplorerActivity : ComponentActivity() {
         }
     }
 
-    private fun localLiteUrl(snapshot: File): String {
+    private fun localLiteUrl(snapshot: File, table: String?): String {
         val databaseUrl =
             "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/snapshot/${Uri.encode(snapshot.name)}"
-        return "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/assets/datasette-lite/index.html?url=${Uri.encode(databaseUrl)}"
+        val fragment = table?.let { "#/personalhub/${Uri.encode(it)}" }.orEmpty()
+        return "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/assets/datasette-lite/index.html" +
+            "?url=${Uri.encode(databaseUrl)}&analytics=off$fragment"
     }
 
     @SuppressLint("SetJavaScriptEnabled")
