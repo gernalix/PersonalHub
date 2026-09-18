@@ -5,6 +5,8 @@ import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.capsules.sync.*
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryStore
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -377,7 +379,13 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                         }.getOrDefault(false)
                         if (gitHistoryEnabled) {
                             HubActivityCapture.uninstall(db)
+                            GitHistoryStore.install(db)
+                            // Install history triggers before feature code can perform the first
+                            // post-open write. GitDataSync.start() later handles scheduling and a
+                            // full reconciliation when the cached manifest requires it.
+                            GitDataTracking.install(db, enqueueAll = false)
                         } else {
+                            GitDataTracking.uninstall(db)
                             HubActivityCapture.install(db, appVersion)
                         }
                         tables.forEach { table ->
