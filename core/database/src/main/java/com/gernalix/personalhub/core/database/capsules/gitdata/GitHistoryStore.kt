@@ -78,6 +78,10 @@ object GitHistoryStore {
         val metaById = meta.associateBy { it.id }
         events.forEach { event ->
             val committed = metaById[event.id] ?: return@forEach
+            val alreadyIndexed = db.query(
+                "SELECT 1 FROM " + TABLE + " WHERE id=? LIMIT 1",
+                arrayOf(event.id),
+            ).use { it.moveToFirst() }
             db.execSQL(
                 "INSERT OR REPLACE INTO " + TABLE + "(" +
                     "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,changed_columns," +
@@ -97,13 +101,15 @@ object GitHistoryStore {
                     commitSha,
                 ),
             )
-            updateFieldStats(
-                db = db,
-                table = event.table,
-                rowKey = event.rowKey,
-                changedColumns = committed.changedColumns,
-                occurredAt = event.occurredAt,
-            )
+            if (!alreadyIndexed) {
+                updateFieldStats(
+                    db = db,
+                    table = event.table,
+                    rowKey = event.rowKey,
+                    changedColumns = committed.changedColumns,
+                    occurredAt = event.occurredAt,
+                )
+            }
         }
     }
 
