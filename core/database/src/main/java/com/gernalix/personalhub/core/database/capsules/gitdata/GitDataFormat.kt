@@ -69,7 +69,7 @@ internal object GitDataFormat {
                 val entries = if (full) linkedMapOf() else cachedEntries.toMutableMap()
                 for (table in changed.sorted()) {
                     require(table in allTables) { "Unknown Git sync table: $table" }
-                    val bytes = exportTable(db, table)
+                    val bytes = exportTable(db, table, files)
                     val path = tablePath(table)
                     files[path] = bytes
                     entries[table] = JSONObject()
@@ -263,7 +263,11 @@ internal object GitDataFormat {
             it.getLong(0)
         }
 
-    private fun exportTable(db: SQLiteDatabase, table: String): ByteArray {
+    private fun exportTable(
+        db: SQLiteDatabase,
+        table: String,
+        files: MutableMap<String, ByteArray>,
+    ): ByteArray {
         requireSafeIdentifier(table)
         val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
             buildList {
@@ -284,7 +288,7 @@ internal object GitDataFormat {
             while (cursor.moveToNext()) {
                 val row = JSONObject()
                 for (index in 0 until cursor.columnCount) {
-                    row.put(cursor.getColumnName(index), encodeCursorValue(cursor, index))
+                    row.put(cursor.getColumnName(index), encodeCursorValue(cursor, index, files))
                 }
                 output.append(row.toString()).append('\n')
             }
@@ -299,7 +303,11 @@ internal object GitDataFormat {
         return count
     }
 
-    private fun encodeCursorValue(cursor: Cursor, index: Int): Any =
+    private fun encodeCursorValue(
+        cursor: Cursor,
+        index: Int,
+        files: MutableMap<String, ByteArray>,
+    ): Any =
         when (cursor.getType(index)) {
             Cursor.FIELD_TYPE_NULL -> JSONObject.NULL
             Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(index)
@@ -309,10 +317,16 @@ internal object GitDataFormat {
                 else JSONObject().put("\$real", value.toString())
             }
             Cursor.FIELD_TYPE_STRING -> cursor.getString(index)
-            Cursor.FIELD_TYPE_BLOB -> JSONObject().put(
-                "\$base64",
-                Base64.encodeToString(cursor.getBlob(index), Base64.NO_WRAP),
-            )
+            Cursor.FIELD_TYPE_BLOB -> {
+                val bytes = cursor.getBlob(index)
+                val hash = sha256(bytes)
+                val path = "objects/sha256/" + hash.take(2) + "/" + hash + ".bin"
+                files.putIfAbsent(path, bytes)
+                JSONObject()
+                    .put("\$object", hash)
+                    .put("path", path)
+                    .put("size", bytes.size)
+            }
             else -> error("Unsupported SQLite value")
         }
 
@@ -640,7 +654,7 @@ internal object GitStateRestorer {
                     require(GitDataFormat.sha256(bytes) == entry.getString("sha256")) {
                         "State file hash mismatch: $table"
                     }
-                    importTable(db, table, bytes)
+                    importTable(db, table, bytes, transport, revision)
                 }
                 runCatching {
                     db.execSQL(
@@ -664,7 +678,13 @@ internal object GitStateRestorer {
         }
     }
 
-    private fun importTable(db: SQLiteDatabase, table: String, bytes: ByteArray) {
+    private fun importTable(
+        db: SQLiteDatabase,
+        table: String,
+        bytes: ByteArray,
+        transport: GitHubDataTransport,
+        revision: String,
+    ) {
         val allowed = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
             buildSet {
                 while (cursor.moveToNext()) add(cursor.getString(1))
@@ -676,7 +696,17 @@ internal object GitStateRestorer {
             val values = ContentValues()
             row.keys().forEach { column ->
                 require(column in allowed) { "State contains unknown column: $table.$column" }
-                GitDataFormat.putValue(values, column, row.get(column))
+                val value = row.get(column)
+                if (value is JSONObject && value.has("\$object")) {
+                    val path = value.getString("path")
+                    val blob = transport.readFile(path, revision)
+                    require(GitDataFormat.sha256(blob) == value.getString("\$object")) {
+                        "State object hash mismatch: $path"
+                    }
+                    values.put(column, blob)
+                } else {
+                    GitDataFormat.putValue(values, column, value)
+                }
             }
             db.insertOrThrow(table, null, values)
         }
