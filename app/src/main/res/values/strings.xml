@@ -206,4 +206,10 @@
     <string name="git_history_bulk_revert_title">Revert this author’s edits?</string>
     <string name="git_history_bulk_revert_confirm">All non-reverted %1$s edits from %2$s onward will be reversed atomically when possible. Nothing in Git history will be deleted.</string>
     <string name="git_history_bulk_revert_action">Revert edits</string>
+    <string name="git_history_proposal_branch_name">New proposal branch name</string>
+    <string name="git_history_create_proposal_branch">Create safe data proposal branch</string>
+    <string name="git_history_proposal_pr_title">Pull request title</string>
+    <string name="git_history_proposal_pr_body">Pull request notes</string>
+    <string name="git_history_create_pr">Create data pull request</string>
+    <string name="git_history_pr_created">Pull request created: %1$s</string>
 </resources>
