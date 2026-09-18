@@ -213,4 +213,5 @@
     <string name="git_history_proposal_pr_body">Note pull request</string>
     <string name="git_history_create_pr">Crea pull request dati</string>
     <string name="git_history_pr_created">Pull request creata: %1$s</string>
+    <string name="git_history_column_filter">Campo / colonna per blame (opzionale)</string>
 </resources>
