@@ -51,8 +51,10 @@ object AlertNotificationDispatcher {
             .setContentIntent(contentIntent)
             .build()
 
-        manager.notify(notificationId, notification)
-        return true
+        return runCatching {
+            manager.notify(notificationId, notification)
+            true
+        }.getOrDefault(false)
     }
 
     private fun contentPendingIntent(context: Context, notificationId: Int, message: String): PendingIntent {
