@@ -20,7 +20,7 @@ import kotlin.concurrent.withLock
 object GitDataSync {
     internal const val WORK = "personalhub-git-data-sync"
     internal const val RECOVERY_WORK = "personalhub-git-data-recovery"
-    internal const val PUSH_DELAY_MS = 2_000L
+    internal const val PUSH_DELAY_MS = 60_000L
 
     private val operations = ReentrantLock(true)
     @Volatile private var started = false
