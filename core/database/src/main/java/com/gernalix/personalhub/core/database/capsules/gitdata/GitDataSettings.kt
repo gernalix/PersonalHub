@@ -1,6 +1,7 @@
 package com.gernalix.personalhub.core.database.capsules.gitdata
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
@@ -57,8 +58,15 @@ object GitDataSettings {
     private const val STATUS_PREFS = "personalhub_git_data_status"
     private const val STATE_MANIFEST = "git-data-state-manifest.json"
 
-    private fun encryptedFile(context: Context) =
-        AtomicFile(File(context.noBackupFilesDir, "git-data.enc"))
+    private fun encryptedFile(context: Context): AtomicFile {
+        val profileId = DatabaseProfiles.activeProfileId(context)
+        val name = if (profileId == DatabaseProfiles.DEFAULT_PROFILE_ID) {
+            "git-data.enc"
+        } else {
+            "git-data-$profileId.enc"
+        }
+        return AtomicFile(File(context.noBackupFilesDir, name))
+    }
 
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -112,7 +120,10 @@ object GitDataSettings {
     }
 
     private fun statusPrefs(context: Context) =
-        context.getSharedPreferences(STATUS_PREFS, Context.MODE_PRIVATE)
+        context.getSharedPreferences(
+            STATUS_PREFS + DatabaseProfiles.preferenceSuffix(context),
+            Context.MODE_PRIVATE,
+        )
 
     @Synchronized
     fun configuration(context: Context): GitDataConfiguration {
@@ -153,8 +164,15 @@ object GitDataSettings {
     @Synchronized
     internal fun token(context: Context): String = read(context).optString("token")
 
-    internal fun stateManifestFile(context: Context) =
-        File(context.noBackupFilesDir, STATE_MANIFEST)
+    internal fun stateManifestFile(context: Context): File {
+        val profileId = DatabaseProfiles.activeProfileId(context)
+        val name = if (profileId == DatabaseProfiles.DEFAULT_PROFILE_ID) {
+            STATE_MANIFEST
+        } else {
+            "git-data-state-manifest-$profileId.json"
+        }
+        return File(context.noBackupFilesDir, name)
+    }
 
     internal fun readCachedStateManifest(context: Context): JSONObject? =
         stateManifestFile(context).takeIf { it.isFile }?.let {

@@ -20,8 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.AutoExportStatus
 import com.gernalix.personalhub.core.database.DatabaseVault
-import java.text.DateFormat
-import java.util.Date
+import com.gernalix.personalhub.contracts.database.HubTimestamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -77,8 +76,7 @@ internal fun HomeAutoExportStatusIndicator() {
         val never = stringResource(R.string.home_autoexport_never)
         val none = stringResource(R.string.home_autoexport_no_error)
         val lastSuccess = if (ui.lastSuccessfulExportAt > 0) {
-            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                .format(Date(ui.lastSuccessfulExportAt))
+            HubTimestamp.format(ui.lastSuccessfulExportAt)
         } else {
             never
         }

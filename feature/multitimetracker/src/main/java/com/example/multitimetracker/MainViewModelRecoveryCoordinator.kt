@@ -3,7 +3,6 @@ package com.example.multitimetracker
 
 import android.content.Context
 import com.example.multitimetracker.persistence.DataIntegrityGate
-import com.example.multitimetracker.persistence.MultiDbVaults
 import com.example.multitimetracker.persistence.PersistentSaveOrigin
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.persistence.SqliteVault
@@ -18,7 +17,6 @@ internal class MainViewModelRecoveryCoordinator(
     private val integrityBlock: () -> DataIntegrityGate.GateResult?,
     private val setIntegrityBlock: (DataIntegrityGate.GateResult?) -> Unit,
     private val setImportVerificationReport: (String?) -> Unit,
-    private val showVaultActivationVerified: (Context, String) -> Unit,
     private val resetToFreshInstallState: (Long) -> Unit,
     private val setHomeLoadState: (HomeLoadState) -> Unit,
     private val appForegroundStartMs: () -> Long?,
@@ -74,7 +72,6 @@ internal class MainViewModelRecoveryCoordinator(
                 pendingSource = pendingStartupRestoreSource,
                 snapshotLoaded = true,
             )
-            reportPendingVaultActivationIfNeeded(context)
             AppRestarter.cancelPendingRestart()
             return
         }
@@ -102,7 +99,6 @@ internal class MainViewModelRecoveryCoordinator(
             pendingSource = pendingStartupRestoreSource,
             snapshotLoaded = false,
         )
-        reportPendingVaultActivationIfNeeded(context)
         AppRestarter.cancelPendingRestart()
         StartupPerfTrace.mark("initialize_done")
     }
@@ -214,28 +210,6 @@ internal class MainViewModelRecoveryCoordinator(
             blockingTitle = context.getString(R.string.integrity_gate_title),
             blockingBody = runtimeFailure,
             technicalReport = runtimeFailure,
-        )
-    }
-
-    private fun reportPendingVaultActivationIfNeeded(context: Context) {
-        val notice = MultiDbVaults.consumePendingActivationNotice(
-            context = context,
-            activeSignature = snapshotCoordinator.computeBackupSignature(),
-        ) ?: return
-
-        val runtimeFailure = snapshotCoordinator.verifyCurrentPersistedSnapshotActivated(context)
-        val activeVaultMatches = MultiDbVaults.getActiveVaultName(context).equals(notice.vaultName, ignoreCase = true)
-        if (activeVaultMatches && runtimeFailure == null) {
-            showVaultActivationVerified(context, notice.vaultName)
-            return
-        }
-
-        val baseMessage = context.getString(
-            R.string.multidb_switch_runtime_verify_failed_fmt,
-            notice.vaultName,
-        )
-        setImportVerificationReport(
-            if (runtimeFailure.isNullOrBlank()) baseMessage else baseMessage + "\n\n" + runtimeFailure
         )
     }
 

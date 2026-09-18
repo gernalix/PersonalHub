@@ -62,6 +62,18 @@
     <string name="database_last_export">Last verified export: %1$s</string>
     <string name="database_back">Back</string>
     <string name="database_rolled_back">Import failed. The previous database was restored. Restarting…</string>
+
+    <string name="home_active_profile">Profile: %1$s</string>
+    <string name="database_profiles_title">Profiles</string>
+    <string name="database_profiles_description">Each profile contains a complete isolated PersonalHub database. Switching profiles changes People, Places, Timer, Soldi, Substances, WordPulse and Hub relationships together.</string>
+    <string name="database_profile_active">Active</string>
+    <string name="database_profile_switch">Open</string>
+    <string name="database_profile_delete">Delete</string>
+    <string name="database_profile_rename">Rename</string>
+    <string name="database_profile_name">Profile name</string>
+    <string name="database_profile_create_empty">Create empty</string>
+    <string name="database_profile_clone">Clone current</string>
+    <string name="database_profile_error">Profile operation failed.</string>
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="home_shortcuts_title">Home shortcuts</string>

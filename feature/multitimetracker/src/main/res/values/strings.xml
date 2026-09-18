@@ -590,50 +590,8 @@
     <string name="app_version_footer">v%1$s</string>
 
     <!-- v394: Multi-DB vaults -->
-    <string name="multidb_open">Vaults</string>
-    <string name="multidb_open_current_fmt">Vaults: %1$s</string>
-    <string name="multidb_title">Vaults</string>
-    <string name="multidb_vault_badge_fmt">🗄️ %1$s</string>
-    <string name="multidb_requires_backup_folder">To use database vaults, first choose a data folder.</string>
-    <string name="multidb_current_vault_fmt">Current vault: %1$s</string>
-    <string name="multidb_switch_to">Switch to:</string>
-    <string name="multidb_vault_active_fmt">%1$s (active)</string>
-    <string name="multidb_active_badge">Active</string>
-    <string name="multidb_switch_action">Switch</string>
-    <string name="multidb_switched_restart_toast_fmt">Switched to "%1$s". Please fully close and reopen the app.</string>
-    <string name="multidb_switch_pending_restart_fmt">Vault "%1$s" was imported, but it is not active until the app restarts.</string>
-    <string name="multidb_switched_verified_toast_fmt">Vault "%1$s" is now active.</string>
-    <string name="multidb_switch_runtime_verify_failed_fmt">Vault switch to "%1$s" finished, but the app could not verify that vault as active after restart.</string>
-    <string name="multidb_switch_failed_toast">Switch failed.</string>
-    <string name="multidb_switch_failed_toast_fmt">Switch failed: %1$s</string>
-    <string name="multidb_switch_failed_unknown">Unknown error.</string>
-    <string name="multidb_create_new">Create new vault:</string>
-    <string name="multidb_new_name_hint">Vault name (e.g. work)</string>
-    <string name="multidb_created_toast_fmt">Created vault "%1$s".</string>
-    <string name="multidb_rename_vault">Rename vault</string>
-    <string name="multidb_renamed_toast_fmt">Renamed vault to "%1$s".</string>
-    <string name="multidb_rename_failed_fmt">Could not rename vault "%1$s".</string>
-    <string name="multidb_delete_vault">Delete vault</string>
-    <string name="multidb_delete_vault_confirm_fmt">Delete vault "%1$s" and all its files?</string>
-    <string name="multidb_deleted_toast_fmt">Deleted vault "%1$s".</string>
-    <string name="multidb_default_vault_protected">The default vault cannot be renamed or deleted.</string>
-    <string name="multidb_delete_active_forbidden">Switch to another vault before deleting this one.</string>
-    <string name="multidb_vault_already_exists_fmt">A vault named "%1$s" already exists.</string>
-    <string name="multidb_vault_missing_dir_fmt">Vault folder missing: %1$s</string>
-    <string name="multidb_create_failed_toast_fmt">Create failed: %1$s</string>
     <string name="create">Create</string>
 
-    <string name="multidb_create_vaults_dir_failed">Failed to create “vaults” folder.</string>
-    <string name="multidb_create_vault_dir_failed_fmt">Failed to create vault folder: %1$s</string>
-    <string name="multidb_create_db_failed_fmt">Failed to create DB file for vault: %1$s</string>
-    <string name="multidb_vault_missing_db_fmt">Vault “%1$s” has no multitimer.db yet. Create it by exporting first.</string>
-    <string name="multidb_missing_db_title">Vault needs initialization</string>
-    <string name="multidb_missing_db_message_fmt">The vault “%1$s” does not contain a database yet.\n\nChoose what you want:</string>
-    <string name="multidb_missing_db_create_empty_button">Create empty database and switch</string>
-    <string name="multidb_missing_db_clone_button">Copy current data and switch</string>
-    <string name="multidb_restarting_toast">Restarting…</string>
-    <string name="multidb_initializing_vault">Initializing vault…</string>
-    <string name="multidb_panic_stop_detected">Safety stop: the imported database looks empty compared to the previous one. Import cancelled and rolled back.</string>
 
 
     <!-- v423: Data Integrity Gate (fail-fast) -->
@@ -645,13 +603,7 @@
     <string name="integrity_gate_restore_ok">Restore verified and activated.</string>
     <string name="integrity_gate_restore_failed">Restore failed.</string>
 
-    <string name="multidb_panic_stop_rollback_done">Panic stop: the vault switch would cause catastrophic data loss. Your previous database was restored automatically.</string>
-    <string name="multidb_panic_stop_failed">Panic stop: the vault switch looks unsafe, but automatic rollback failed. The app will stay blocked to protect your data.</string>
-    <string name="multidb_integrity_failed_rollback_done">Safety stop: integrity checks failed after switching vault. Your previous database was restored automatically.</string>
-    <string name="multidb_integrity_failed_rollback_failed">Safety stop: integrity checks failed after switching vault, and automatic rollback failed. The app will stay blocked to protect your data.</string>
 
-    <string name="multidb_busy_working_fmt">Working… (%1$s)</string>
-    <string name="multidb_creating_vault">creating vault</string>
 
     <!-- v435: Settings SAF -->
     <string name="change_saf_folder">Change data folder</string>

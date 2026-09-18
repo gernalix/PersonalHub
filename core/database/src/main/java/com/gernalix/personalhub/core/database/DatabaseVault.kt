@@ -35,7 +35,13 @@ object DatabaseVault {
     private var transferHooks: TransferHooks = noTransferHooks
     private var exportPublisherFactory: (Context, Uri) -> ExportPublisher = { context, uri -> DocumentFileExportPublisher(context, uri) }
     private var directorySyncForTests: ((File) -> Unit)? = null
-    internal fun preferences(context: Context) = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
+    private fun rootPreferences(context: Context) =
+        context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
+
+    internal fun preferences(context: Context) = context.getSharedPreferences(
+        "personalhub_transfer" + DatabaseProfiles.preferenceSuffix(context),
+        Context.MODE_PRIVATE,
+    )
     internal fun setTransferHooksForTests(hooks: TransferHooks?) {
         transferHooks = hooks ?: noTransferHooks
     }
@@ -45,7 +51,7 @@ object DatabaseVault {
     internal fun setDirectorySyncForTests(sync: ((File) -> Unit)?) {
         directorySyncForTests = sync
     }
-    fun folder(context: Context): String? = preferences(context).getString("tree_uri", null)
+    fun folder(context: Context): String? = rootPreferences(context).getString("tree_uri", null)
     fun error(context: Context): String? = preferences(context).getString("error", null)
     fun lastExport(context: Context): Long = preferences(context).getLong("exported_at", 0)
     fun exportedGeneration(context: Context): Long = preferences(context).getLong("exported_generation", -1)
@@ -162,6 +168,7 @@ object DatabaseVault {
         syncCopy(backup, recovery)
         sidecars(target)
         atomicMove(recovery, target)
+        DatabaseProfiles.rollbackPendingSwitch(context)
         check(marker.delete())
         syncDirectory(context.filesDir)
         preferences(context).edit().putString("error", "Interrupted import was rolled back").commit()
@@ -362,8 +369,8 @@ object DatabaseVault {
     fun configureFolder(context: Context, uri: Uri) {
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         require(DocumentFile.fromTreeUri(context, uri)?.canWrite() == true) { "Export folder is not writable" }
+        check(rootPreferences(context).edit().putString("tree_uri", uri.toString()).commit())
         preferences(context).edit()
-            .putString("tree_uri", uri.toString())
             .putLong("exported_generation", -1)
             .remove(CANONICAL_DOCUMENT_URI)
             .remove(BACKUP_DOCUMENT_URI)
@@ -407,9 +414,12 @@ object DatabaseVault {
         }
     }
 
-    private fun documentUriPreference(name: String) = when (name) {
-        PersonalHubDatabase.DB_NAME -> CANONICAL_DOCUMENT_URI
-        "personalhub.db.bak" -> BACKUP_DOCUMENT_URI
+    private fun canonicalExportName(context: Context) = DatabaseProfiles.exportStem(context) + ".db"
+    private fun backupExportName(context: Context) = canonicalExportName(context) + ".bak"
+
+    private fun documentUriPreference(context: Context, name: String) = when (name) {
+        canonicalExportName(context) -> CANONICAL_DOCUMENT_URI
+        backupExportName(context) -> BACKUP_DOCUMENT_URI
         else -> error("Unsupported stable export name: $name")
     }
 
@@ -418,7 +428,7 @@ object DatabaseVault {
         publisher: ExportPublisher,
         name: String,
     ): ExportFile? {
-        val preference = documentUriPreference(name)
+        val preference = documentUriPreference(context, name)
         prefs.getString(preference, null)?.let { identity ->
             publisher.open(identity)?.let { stored ->
                 require(stored.name == name) { "Stored $name identity now names ${stored.name}" }
@@ -443,7 +453,7 @@ object DatabaseVault {
             runCatching { created.delete() }
             error("Provider created ${created.name ?: "an unnamed document"} instead of $name")
         }
-        require(prefs.edit().putString(documentUriPreference(name), created.identity).commit()) {
+        require(prefs.edit().putString(documentUriPreference(context, name), created.identity).commit()) {
             "Cannot persist $name identity"
         }
         return created
@@ -459,28 +469,30 @@ object DatabaseVault {
         val uri = folder(context)?.let(Uri::parse) ?: return false
         val prefs = preferences(context)
         val stage = File(context.cacheDir, "personalhub-export-${UUID.randomUUID()}.db")
+        val canonicalName = canonicalExportName(context)
+        val backupName = backupExportName(context)
         try {
             val generation = snapshot(context, stage)
             val publisher = exportPublisherFactory(context, uri)
-            val previous = existingStableExportFile(prefs, publisher, PersonalHubDatabase.DB_NAME)
+            val previous = existingStableExportFile(prefs, publisher, canonicalName)
             if (previous != null) {
                 val previousSnapshot = File(context.cacheDir, "personalhub-previous-${UUID.randomUUID()}.db")
                 try {
                     publisher.readTo(previous, previousSnapshot)
                     val previousGeneration = runCatching { validate(context, previousSnapshot) }.getOrNull()
                     if (previousGeneration != null) {
-                        val backup = stableExportFile(prefs, publisher, "personalhub.db.bak")
+                        val backup = stableExportFile(prefs, publisher, backupName)
                         publisher.writeFrom(previousSnapshot, backup)
-                        val actualBackup = refreshedStableExportFile(publisher, backup, "personalhub.db.bak")
+                        val actualBackup = refreshedStableExportFile(publisher, backup, backupName)
                         verifyExportFile(context, publisher, previousSnapshot, actualBackup, previousGeneration)
                     }
                 } finally {
                     previousSnapshot.delete()
                 }
             }
-            val canonical = stableExportFile(prefs, publisher, PersonalHubDatabase.DB_NAME)
+            val canonical = stableExportFile(prefs, publisher, canonicalName)
             publisher.writeFrom(stage, canonical)
-            val actualCanonical = refreshedStableExportFile(publisher, canonical, PersonalHubDatabase.DB_NAME)
+            val actualCanonical = refreshedStableExportFile(publisher, canonical, canonicalName)
             verifyExportFile(context, publisher, stage, actualCanonical, generation)
             require(
                 prefs.edit().putLong("exported_generation", generation)
@@ -588,6 +600,83 @@ object DatabaseVault {
             }
         } finally { stage.delete(); sidecars(stage) }
     } } }
+
+    internal fun snapshotProfileCopy(context: Context, file: File) = operations.withLock {
+        file.parentFile?.mkdirs()
+        snapshot(context, file)
+    }
+
+    internal fun createEmptyProfileDatabase(context: Context, file: File) = operations.withLock {
+        require(!file.exists()) { "Profile database already exists" }
+        file.parentFile?.mkdirs()
+        val temporary = PersonalHubDatabase.openStaging(context, file.absolutePath)
+        try {
+            temporary.openHelper.writableDatabase
+        } finally {
+            temporary.close()
+        }
+        validate(context, file)
+    }
+
+    /**
+     * Saves the current profile and atomically mounts the target profile as personalhub.db.
+     * Unlike a normal import, sync identities are never copied across profiles.
+     */
+    internal fun switchProfileDatabase(
+        context: Context,
+        currentProfileFile: File,
+        targetProfileFile: File,
+    ) = GitDataSync.pauseSync {
+        DatasetteSync.pauseUploads {
+            operations.withLock {
+                require(targetProfileFile.isFile) { "Profile database is missing" }
+                val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
+                val stage = File(target.parentFile, "personalhub-profile-${UUID.randomUUID()}.db")
+                try {
+                    syncCopy(targetProfileFile, stage)
+                    val importedVersion = SQLiteDatabase.openDatabase(
+                        stage.path,
+                        null,
+                        SQLiteDatabase.OPEN_READONLY,
+                    ).use { it.version }
+                    if (importedVersion < PersonalHubDatabase.SCHEMA_VERSION) {
+                        PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
+                            try { temporary.openHelper.writableDatabase } finally { temporary.close() }
+                        }
+                    }
+                    validate(context, stage)
+                    DatabaseGate.replace {
+                        val backup = File(
+                            target.parentFile,
+                            "$PRE_IMPORT_BACKUP_PREFIX${UUID.randomUUID()}$PRE_IMPORT_BACKUP_SUFFIX",
+                        )
+                        try {
+                            currentProfileFile.parentFile?.mkdirs()
+                            snapshot(context, currentProfileFile)
+                            snapshot(context, backup)
+                            PersonalHubDatabase.closeInstance()
+                            writeImportMarker(context, backup)
+                            sidecars(target)
+                            atomicMove(stage, target)
+                            validate(context, target)
+                            DatabaseProfiles.markPendingTargetActive(context)
+                            check(marker(context).delete())
+                            syncDirectory(context.filesDir)
+                            cleanupOrphanedPreImportBackups(context)
+                        } catch (error: Throwable) {
+                            PersonalHubDatabase.closeInstance()
+                            if (marker(context).exists()) recoverInterruptedImport(context)
+                            DatabaseGate.resume()
+                            throw ImportRolledBack(error)
+                        }
+                    }
+                } finally {
+                    stage.delete()
+                    sidecars(stage)
+                }
+            }
+        }
+    }
 
     fun importDatabaseFile(context: Context, file: File) {
         require(file.isFile) { "Database import source is missing" }

@@ -5,6 +5,7 @@ import android.database.Cursor
 import android.util.Base64
 import androidx.work.*
 import com.gernalix.personalhub.core.database.DatabaseGate
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import org.json.JSONObject
 import java.time.Instant
@@ -55,7 +56,10 @@ object DatasetteSync {
 
     fun <T> pauseUploads(block: () -> T): T = uploads.withLock(block)
     private fun db(context: Context) = PersonalHubDatabase.get(context).openHelper.writableDatabase
-    private fun statusPrefs(context: Context) = context.getSharedPreferences("personalhub_sync_status", Context.MODE_PRIVATE)
+    private fun statusPrefs(context: Context) = context.getSharedPreferences(
+        "personalhub_sync_status" + DatabaseProfiles.preferenceSuffix(context),
+        Context.MODE_PRIVATE,
+    )
     fun status(context: Context): String = statusPrefs(context).getString("state", "idle") ?: "idle"
     fun pending(context: Context): Long = db(context).query("SELECT count(*) FROM hub_sync_pending").use { it.moveToFirst(); it.getLong(0) }
 
