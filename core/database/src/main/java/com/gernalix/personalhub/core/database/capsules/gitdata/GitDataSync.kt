@@ -179,7 +179,8 @@ object GitDataSync {
     }
 
     fun applyPatchFromRevision(context: Context, ref: String, patchId: String) = operations.withLock {
-        val app = context.applicationContext        val config = requireConfiguration(app)
+        val app = context.applicationContext
+        val config = requireConfiguration(app)
         require(ref.matches(Regex("[A-Za-z0-9._/-]+"))) { "Invalid Git ref" }
         require(patchId.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid patch id" }
         val transport = transport(app, config)
