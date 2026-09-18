@@ -1046,8 +1046,11 @@ object SnapshotSqlite {
 
     fun readSnapshotAsOf(context: Context, targetMs: Long): String? {
         if (gitHistoryEnabled(context)) {
-            return runCatching { GitHistory.readTimerSnapshotAsOf(context, targetMs) }
+            runCatching { GitHistory.readTimerSnapshotAsOf(context, targetMs) }
                 .getOrNull()
+                ?.let { return it }
+            // Pre-Git dates remain readable from the retained legacy Time Machine until an
+            // explicit, verified historical migration makes those rows redundant.
         }
         val db = helper(context).readableDatabase
         return try {
