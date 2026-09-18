@@ -219,6 +219,29 @@ object DatabaseVault {
             }
             syncCopy(target, snapshot)
             PersonalHubDatabase.closeInstance()
+            if (!PersonalHubDatabase.hasProductionMigrationPath(context, sourceVersion)) {
+                val remoteStage = File(
+                    target.parentFile,
+                    "personalhub-remote-migration-${UUID.randomUUID()}.db",
+                )
+                try {
+                    syncCopy(target, remoteStage)
+                    require(
+                        GitDataSync.migrateStagingFromRemote(
+                            context = context,
+                            file = remoteStage,
+                            from = sourceVersion,
+                            to = PersonalHubDatabase.SCHEMA_VERSION,
+                        ),
+                    ) { "No packaged or remote migration path is available" }
+                    validate(context, remoteStage)
+                    sidecars(target)
+                    atomicMove(remoteStage, target)
+                } finally {
+                    remoteStage.delete()
+                    sidecars(remoteStage)
+                }
+            }
             val temporary = PersonalHubDatabase.openTemporary(context, target.absolutePath)
             try { temporary.openHelper.writableDatabase } finally { temporary.close() }
             validate(context, target)
