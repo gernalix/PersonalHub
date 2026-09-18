@@ -146,9 +146,40 @@ object GitDataSync {
      * Cherry-picks one declarative data patch from any commit/branch/tag without merging Git trees.
      * This is the safe PersonalHub equivalent of accepting one change from a data proposal PR.
      */
-    fun applyPatchFromRevision(context: Context, ref: String, patchId: String) = operations.withLock {
+    fun previewPatchFromRevision(
+        context: Context,
+        ref: String,
+        patchId: String,
+    ): GitPatchPreview = operations.withLock {
         val app = context.applicationContext
         val config = requireConfiguration(app)
+        require(ref.matches(Regex("[A-Za-z0-9._/-]+"))) { "Invalid Git ref" }
+        require(patchId.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid patch id" }
+        val transport = transport(app, config)
+        val controlBytes = transport.readFile(GIT_CONTROL_MANIFEST, ref)
+        val control = JSONObject(String(controlBytes, Charsets.UTF_8)).also(::validateControl)
+        val patches = control.optJSONArray("patches") ?: JSONArray()
+        var match: JSONObject? = null
+        for (i in 0 until patches.length()) {
+            val candidate = patches.getJSONObject(i)
+            if (candidate.getString("id") == patchId) {
+                match = candidate
+                break
+            }
+        }
+        val spec = requireNotNull(match) { "Patch is not present in selected revision" }
+        require(spec.optLong("minimum_app_version", 0L) <= appVersion(app)) {
+            "Patch requires a newer PersonalHub app"
+        }
+        val bytes = transport.readFile(spec.getString("path"), ref)
+        require(GitDataFormat.sha256(bytes) == spec.getString("sha256")) {
+            "Patch hash mismatch"
+        }
+        GitPatchEngine.preview(app, bytes)
+    }
+
+    fun applyPatchFromRevision(context: Context, ref: String, patchId: String) = operations.withLock {
+        val app = context.applicationContext        val config = requireConfiguration(app)
         require(ref.matches(Regex("[A-Za-z0-9._/-]+"))) { "Invalid Git ref" }
         require(patchId.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid patch id" }
         val transport = transport(app, config)
@@ -297,8 +328,7 @@ object GitDataSync {
             val item = migrations.getJSONObject(i)
             require(item.getInt("from") < item.getInt("to")) { "Invalid migration edge" }
             require(item.getString("sha256").matches(Regex("[A-Fa-f0-9]{64}"))) {
-                "Invalid migration hash"
-            }
+                "Invalid migration hash"            }
             require(item.getString("path").startsWith("migrations/")) {
                 "Migration must live under migrations/"
             }
