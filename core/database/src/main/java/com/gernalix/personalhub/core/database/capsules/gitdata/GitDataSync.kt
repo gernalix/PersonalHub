@@ -14,6 +14,7 @@ import com.gernalix.personalhub.core.database.HubActivityCapture
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -209,6 +210,46 @@ object GitDataSync {
         GitPatchEngine.apply(app, bytes)
         GitDataSettings.markPatchApplied(app, patchId)
         checkForChanges(app)
+    }
+
+    /**
+     * Startup fallback for an APK-supported schema whose one-shot transform lives in the optional
+     * data repository rather than permanent Kotlin. The caller owns the staging file and performs
+     * atomic replacement only after its normal validation succeeds.
+     */
+    internal fun migrateStagingFromRemote(
+        context: Context,
+        file: File,
+        from: Int,
+        to: Int,
+    ): Boolean = operations.withLock {
+        if (from == to) return@withLock true
+        val app = context.applicationContext
+        val config = runCatching { GitDataSettings.configuration(app) }.getOrNull()
+            ?: return@withLock false
+        if (!config.enabled || !config.configured) return@withLock false
+        val transport = transport(app, config)
+        val head = transport.remoteHead()
+        val bytes = transport.readFileOrNull(GIT_CONTROL_MANIFEST, head.commitSha)
+            ?: return@withLock false
+        val control = JSONObject(String(bytes, Charsets.UTF_8)).also(::validateControl)
+        require(control.optLong("minimum_app_version", 0L) <= appVersion(app)) {
+            "Remote Git control requires a newer PersonalHub app"
+        }
+        require(to <= PersonalHubDatabase.SCHEMA_VERSION) {
+            "Remote migration targets a schema unsupported by this APK"
+        }
+        if (!GitRemoteMigrationEngine.canMigrate(control, from, to)) return@withLock false
+        GitRemoteMigrationEngine.migrate(
+            context = app,
+            transport = transport,
+            ref = head.commitSha,
+            control = control,
+            file = file,
+            from = from,
+            to = to,
+        )
+        true
     }
 
     fun pullNow(context: Context) = operations.withLock {
