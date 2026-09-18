@@ -68,6 +68,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var rowKey by remember { mutableStateOf("") }
     var columnFilter by remember { mutableStateOf("") }
     var dayFilter by remember { mutableStateOf("") }
+    var operationFilter by remember { mutableStateOf<String?>(null) }
     var history by remember { mutableStateOf<List<GitHistoryItem>>(emptyList()) }
     var stats by remember { mutableStateOf<GitHistoryStats?>(null) }
     var revisions by remember { mutableStateOf<List<GitRevision>>(emptyList()) }
@@ -91,6 +92,9 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var detail by remember { mutableStateOf<GitHistoryDetail?>(null) }
     var bulkFromDate by remember { mutableStateOf(LocalDate.now().minusDays(1).toString()) }
     var bulkConfirm by remember { mutableStateOf(false) }
+    var knownGoodDate by remember { mutableStateOf("") }
+    var knownBadDate by remember { mutableStateOf("") }
+    var suspectEvents by remember { mutableStateOf<List<GitHistoryItem>>(emptyList()) }
 
     fun refresh() {
         scope.launch {
@@ -142,7 +146,10 @@ fun GitHistorySettings(onBack: () -> Unit) {
                             rowKey = normalizedRow.ifBlank { null },
                         )
                     }
-                    localHistory to GitHistory.stats(context)
+                    val filteredHistory = operationFilter?.let { operation ->
+                        localHistory.filter { it.operation.equals(operation, ignoreCase = true) }
+                    } ?: localHistory
+                    filteredHistory to GitHistory.stats(context)
                 }
             }
             localResult.onSuccess { (local, localStats) ->
@@ -172,7 +179,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(author) { refresh() }
+    LaunchedEffect(author, operationFilter) { refresh() }
 
     if (bulkConfirm && author != null) {
         AlertDialog(
@@ -353,6 +360,19 @@ fun GitHistorySettings(onBack: () -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf<String?>(null, "INSERT", "UPDATE", "DELETE").forEach { operation ->
+                FilterChip(
+                    selected = operationFilter == operation,
+                    onClick = { operationFilter = operation },
+                    label = {
+                        Text(
+                            operation ?: stringResource(R.string.git_history_all_operations),
+                        )
+                    },
+                )
+            }
+        }
         OutlinedButton(onClick = ::refresh, enabled = !busy) {
             Text(stringResource(R.string.git_history_apply_filters))
         }
@@ -413,6 +433,60 @@ fun GitHistorySettings(onBack: () -> Unit) {
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+
+        HorizontalDivider()
+        Text(stringResource(R.string.git_history_bisect_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.git_history_bisect_description), style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(
+            knownGoodDate,
+            { knownGoodDate = it },
+            label = { Text(stringResource(R.string.git_history_known_good)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            knownBadDate,
+            { knownBadDate = it },
+            label = { Text(stringResource(R.string.git_history_known_bad)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedButton(
+            enabled = !busy && table.isNotBlank() &&
+                knownGoodDate.isNotBlank() && knownBadDate.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val zone = ZoneId.systemDefault()
+                            val good = LocalDate.parse(knownGoodDate)
+                                .plusDays(1)
+                                .atStartOfDay(zone)
+                                .toInstant()
+                                .toEpochMilli() - 1L
+                            val bad = LocalDate.parse(knownBadDate)
+                                .plusDays(1)
+                                .atStartOfDay(zone)
+                                .toInstant()
+                                .toEpochMilli() - 1L
+                            GitHistory.suspectChanges(context, table.trim(), good, bad)
+                        }
+                    }
+                    busy = false
+                    result.onSuccess { suspectEvents = it }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_bisect_action)) }
+        suspectEvents.take(100).forEach { item ->
+            Text(
+                formatHubHistorySuspect(item),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        suspectEvents.takeIf { it.size > 100 }?.let {
+            Text(stringResource(R.string.git_history_semantic_more, it.size - 100))
         }
 
         HorizontalDivider()
@@ -816,6 +890,11 @@ fun GitHistorySettings(onBack: () -> Unit) {
         }
     }
 }
+
+private fun formatHubHistorySuspect(item: GitHistoryItem): String =
+    DateFormat.getDateTimeInstance().format(Date(item.occurredAt)) +
+        " · " + item.author + " · " + item.operation + " · " +
+        item.table + " · " + item.changedColumns
 
 private fun restartHistoryGraph(context: android.content.Context, rolledBack: Boolean) {
     val activity = context as? Activity ?: return
