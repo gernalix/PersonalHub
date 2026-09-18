@@ -132,6 +132,9 @@ object GitHistory {
     fun resolveRevision(context: Context, ref: String): GitRevision =
         remote(context).revision(ref.trim())
 
+    fun revisionAtOrBefore(context: Context, targetMs: Long): GitRevision? =
+        remote(context).revisionAtOrBefore(targetMs)
+
     /**
      * Timer compatibility bridge while its former local Time Machine is retired.
      * Reads the canonical snapshot row from the newest Git state committed at/before targetMs.
