@@ -74,8 +74,14 @@ internal object GitDataFormat {
                 val entries = if (full) linkedMapOf() else cachedEntries.toMutableMap()
                 for (table in changed.sorted()) {
                     require(table in allTables) { "Unknown Git sync table: $table" }
-                    val snapshot = exportTableShards(db, table, files)
                     val previous = cachedEntries[table]
+                    val snapshot = exportTableShards(
+                        db = db,
+                        table = table,
+                        objectFiles = files,
+                        previous = previous.takeUnless { full },
+                        tableEvents = events.filter { it.table == table },
+                    )
                     val previousHashes = previous?.optJSONArray("shards")?.let { shards ->
                         buildMap {
                             for (i in 0 until shards.length()) {
@@ -296,7 +302,10 @@ internal object GitDataFormat {
         db: SQLiteDatabase,
         table: String,
         objectFiles: MutableMap<String, ByteArray>,
-    ): TableSnapshot {        requireSafeIdentifier(table)
+        previous: JSONObject? = null,
+        tableEvents: List<GitEditEvent> = emptyList(),
+    ): TableSnapshot {
+        requireSafeIdentifier(table)
         val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) add(
@@ -317,6 +326,38 @@ internal object GitDataFormat {
             totalRows <= 50_000 -> 32
             else -> 128
         }
+        val previousShards = previous?.optJSONArray("shards")
+        val previousShardCount = previous?.optInt("shard_count", -1) ?: -1
+        val affected = if (
+            previousShards != null &&
+            previousShardCount == shardCount &&
+            primary.isNotEmpty() &&
+            tableEvents.isNotEmpty()
+        ) {
+            affectedShards(
+                events = tableEvents,
+                columns = columns.map { it.first },
+                primary = primary,
+                shardCount = shardCount,
+            )
+        } else {
+            null
+        }
+        if (affected != null) {
+            return exportSelectedShards(
+                db = db,
+                table = table,
+                columns = columns.map { it.first },
+                primary = primary,
+                order = order,
+                totalRows = totalRows,
+                shardCount = shardCount,
+                selected = affected,
+                previousShards = previousShards,
+                objectFiles = objectFiles,
+            )
+        }
+
         val builders = Array(shardCount) { StringBuilder() }
         val counts = IntArray(shardCount)
         db.rawQuery("SELECT * FROM `$table` ORDER BY $order", null).use { cursor ->
@@ -330,9 +371,7 @@ internal object GitDataFormat {
                 }
                 val key = if (primary.isEmpty()) row.toString()
                     else primary.joinToString("|") { row.opt(it)?.toString().orEmpty() }
-                val hash = sha256(key.toByteArray(Charsets.UTF_8))
-                val shard = if (shardCount == 1) 0
-                    else java.lang.Long.parseUnsignedLong(hash.take(8), 16).rem(shardCount).toInt()
+                val shard = shardForKey(key, shardCount)
                 builders[shard].append(row.toString()).append('\n')
                 counts[shard]++
             }
@@ -358,6 +397,139 @@ internal object GitDataFormat {
                 .put("shards", shardManifest),
             files = shardFiles,
         )
+    }
+
+    private fun affectedShards(
+        events: List<GitEditEvent>,
+        columns: List<String>,
+        primary: List<String>,
+        shardCount: Int,
+    ): Set<Int>? {
+        val result = linkedSetOf<Int>()
+        events.forEach { event ->
+            listOf(event.beforePayload, event.afterPayload).forEach { payload ->
+                val row = decodedPayload(payload, columns) ?: return@forEach
+                val key = primary.joinToString("|") { column ->
+                    shardKeyValue(row[column]) ?: return null
+                }
+                result += shardForKey(key, shardCount)
+            }
+        }
+        return result.takeIf { it.isNotEmpty() }
+    }
+
+    private fun exportSelectedShards(
+        db: SQLiteDatabase,
+        table: String,
+        columns: List<String>,
+        primary: List<String>,
+        order: String,
+        totalRows: Int,
+        shardCount: Int,
+        selected: Set<Int>,
+        previousShards: JSONArray,
+        objectFiles: MutableMap<String, ByteArray>,
+    ): TableSnapshot {
+        val builders = selected.associateWith { StringBuilder() }.toMutableMap()
+        val counts = selected.associateWith { 0 }.toMutableMap()
+        val selectPrimary = primary.joinToString(",") { "`$it`" }
+        db.rawQuery("SELECT $selectPrimary FROM `$table` ORDER BY $order", null).use { cursor ->
+            while (cursor.moveToNext()) {
+                val keyValues = Array<Any?>(primary.size) { index ->
+                    sqliteScalar(cursor, index) ?: return exportTableShards(
+                        db = db,
+                        table = table,
+                        objectFiles = objectFiles,
+                    )
+                }
+                val key = keyValues.joinToString("|") { value ->
+                    shardKeyValue(value) ?: return exportTableShards(
+                        db = db,
+                        table = table,
+                        objectFiles = objectFiles,
+                    )
+                }
+                val shard = shardForKey(key, shardCount)
+                if (shard !in selected) continue
+                val where = primary.joinToString(" AND ") { "`$it`=?" }
+                val args = keyValues.map { it.toString() }.toTypedArray()
+                db.rawQuery("SELECT * FROM `$table` WHERE $where LIMIT 2", args).use { rowCursor ->
+                    require(rowCursor.moveToFirst()) { "Missing row while rebuilding Git shard" }
+                    val row = JSONObject()
+                    for (index in 0 until rowCursor.columnCount) {
+                        row.put(
+                            rowCursor.getColumnName(index),
+                            encodeCursorValue(rowCursor, index, objectFiles),
+                        )
+                    }
+                    require(!rowCursor.moveToNext()) { "Primary key is not unique: $table" }
+                    builders.getValue(shard).append(row.toString()).append('\n')
+                    counts[shard] = counts.getValue(shard) + 1
+                }
+            }
+        }
+
+        val previousByIndex = buildMap<Int, JSONObject> {
+            for (i in 0 until previousShards.length()) {
+                val item = previousShards.getJSONObject(i)
+                val index = item.getString("path")
+                    .substringAfterLast('/')
+                    .substringBefore(".jsonl")
+                    .toInt()
+                put(index, JSONObject(item.toString()))
+            }
+        }.toMutableMap()
+        val shardFiles = linkedMapOf<String, ByteArray>()
+        selected.sorted().forEach { index ->
+            val path = "state/tables/" + table + "/" + "%03d".format(index) + ".jsonl"
+            val bytes = builders.getValue(index).toString().toByteArray(Charsets.UTF_8)
+            shardFiles[path] = bytes
+            previousByIndex[index] = JSONObject()
+                .put("path", path)
+                .put("sha256", sha256(bytes))
+                .put("rows", counts.getValue(index))
+        }
+        require(previousByIndex.keys == (0 until shardCount).toSet()) {
+            "Cached Git shard manifest is incomplete: $table"
+        }
+        return TableSnapshot(
+            entry = JSONObject()
+                .put("name", table)
+                .put("rows", totalRows)
+                .put("shard_count", shardCount)
+                .put(
+                    "shards",
+                    JSONArray().apply {
+                        (0 until shardCount).forEach { put(previousByIndex.getValue(it)) }
+                    },
+                ),
+            files = shardFiles,
+        )
+    }
+
+    private fun sqliteScalar(cursor: Cursor, index: Int): Any? =
+        when (cursor.getType(index)) {
+            Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(index)
+            Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(index).takeIf { it.isFinite() }
+            Cursor.FIELD_TYPE_STRING -> cursor.getString(index)
+            // Nullable/BLOB primary keys are uncommon and need type-exact binding; fall back to
+            // the full deterministic exporter rather than risk assigning the wrong shard.
+            Cursor.FIELD_TYPE_NULL, Cursor.FIELD_TYPE_BLOB -> null
+            else -> null
+        }
+
+    private fun shardKeyValue(value: Any?): String? =
+        when (value) {
+            is String -> value
+            is Byte, is Short, is Int, is Long, is Float, is Double -> value.toString()
+            is Boolean -> value.toString()
+            else -> null
+        }
+
+    private fun shardForKey(key: String, shardCount: Int): Int {
+        if (shardCount == 1) return 0
+        val hash = sha256(key.toByteArray(Charsets.UTF_8))
+        return java.lang.Long.parseUnsignedLong(hash.take(8), 16).rem(shardCount).toInt()
     }
 
     private fun rowCount(bytes: ByteArray): Int {
