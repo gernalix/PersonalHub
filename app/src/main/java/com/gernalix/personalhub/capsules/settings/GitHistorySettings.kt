@@ -88,6 +88,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var revertPreview by remember { mutableStateOf<GitRevertPreview?>(null) }
     var restore by remember { mutableStateOf<GitRevision?>(null) }
     var restoreRef by remember { mutableStateOf("") }
+    var restoreDate by remember { mutableStateOf("") }
     var detail by remember { mutableStateOf<GitHistoryDetail?>(null) }
     var bulkFromDate by remember { mutableStateOf(LocalDate.now().minusDays(1).toString()) }
     var bulkConfirm by remember { mutableStateOf(false) }
@@ -522,6 +523,35 @@ fun GitHistorySettings(onBack: () -> Unit) {
                 }
             }
         }
+        OutlinedTextField(
+            restoreDate,
+            { restoreDate = it },
+            label = { Text(stringResource(R.string.git_history_restore_date)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedButton(
+            enabled = !busy && restoreDate.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val day = LocalDate.parse(restoreDate)
+                            val target = day.plusDays(1)
+                                .atStartOfDay(ZoneId.systemDefault())
+                                .toInstant()
+                                .toEpochMilli() - 1L
+                            requireNotNull(GitHistory.revisionAtOrBefore(context, target)) {
+                                "No Git state exists at or before this date"
+                            }
+                        }
+                    }
+                    busy = false
+                    result.onSuccess { restore = it }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_restore_date_action)) }
         OutlinedTextField(
             restoreRef,
             { restoreRef = it },
