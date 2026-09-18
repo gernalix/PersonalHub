@@ -20,6 +20,8 @@ import com.gernalix.personalhub.DatabaseRestartActivity
 import com.gernalix.personalhub.R
 import com.gernalix.personalhub.capsules.shortcuts.HomeShortcutsSettings
 import com.gernalix.personalhub.core.database.ImportRolledBack
+import com.gernalix.personalhub.core.database.DatabaseProfileInitMode
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSettings
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
@@ -37,6 +39,7 @@ fun HubSettings(onBack: () -> Unit) {
     BackHandler { back() }
     when (page) {
         "shortcuts" -> HomeShortcutsSettings { page = "root" }
+        "profiles" -> DatabaseProfilesSettings { page = "root" }
         "sync" -> SyncSettings { page = "root" }
         "git-data" -> GitDataSyncSettings(
             onBack = { page = "root"; enableGitAfterConfigure = false },
@@ -50,6 +53,7 @@ fun HubSettings(onBack: () -> Unit) {
             val privacyPolicyUrl = stringResource(R.string.privacy_policy_url)
             SettingsPage(R.string.settings_title, ::back) {
                 OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
+                OutlinedButton(onClick = { page = "profiles" }) { Text(stringResource(R.string.database_profiles_title)) }
                 OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) { Text(stringResource(R.string.database_title)) }
                 OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
                 GitDataSyncToggle(
@@ -74,6 +78,102 @@ fun HubSettings(onBack: () -> Unit) {
                 ) { Text(stringResource(R.string.privacy_policy_title)) }
             }
         }
+    }
+}
+
+@Composable
+private fun DatabaseProfilesSettings(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var profiles by remember { mutableStateOf(DatabaseProfiles.list(context)) }
+    var activeId by remember { mutableStateOf(DatabaseProfiles.activeProfileId(context)) }
+    var newName by rememberSaveable { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+
+    fun create(mode: DatabaseProfileInitMode) {
+        if (newName.isBlank()) return
+        busy = true
+        failed = false
+        scope.launch {
+            val error = withContext(Dispatchers.IO) {
+                runCatching { DatabaseProfiles.create(context, newName, mode) }.exceptionOrNull()
+            }
+            busy = false
+            failed = error != null
+            if (error == null) {
+                newName = ""
+                profiles = DatabaseProfiles.list(context)
+            }
+        }
+    }
+
+    SettingsPage(R.string.database_profiles_title, onBack) {
+        Text(stringResource(R.string.database_profiles_description))
+        profiles.forEach { profile ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(profile.name, style = MaterialTheme.typography.titleMedium)
+                    if (profile.id == activeId) {
+                        Text(stringResource(R.string.database_profile_active))
+                    }
+                }
+                if (profile.id != activeId) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            enabled = !busy,
+                            onClick = {
+                                busy = true
+                                failed = false
+                                scope.launch {
+                                    val switched = withContext(Dispatchers.IO) {
+                                        runCatching { DatabaseProfiles.switch(context, profile.id) }
+                                    }
+                                    busy = false
+                                    if (switched.isSuccess && switched.getOrDefault(false)) {
+                                        activeId = profile.id
+                                        restartDatabaseGraph(context, false)
+                                    } else {
+                                        failed = switched.isFailure
+                                    }
+                                }
+                            },
+                        ) { Text(stringResource(R.string.database_profile_switch)) }
+                        TextButton(
+                            enabled = !busy,
+                            onClick = {
+                                runCatching { DatabaseProfiles.delete(context, profile.id) }
+                                    .onSuccess { profiles = DatabaseProfiles.list(context) }
+                                    .onFailure { failed = true }
+                            },
+                        ) { Text(stringResource(R.string.database_profile_delete)) }
+                    }
+                }
+            }
+            HorizontalDivider()
+        }
+
+        OutlinedTextField(
+            value = newName,
+            onValueChange = { newName = it },
+            label = { Text(stringResource(R.string.database_profile_name)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = !busy && newName.isNotBlank(), onClick = { create(DatabaseProfileInitMode.EMPTY) }) {
+                Text(stringResource(R.string.database_profile_create_empty))
+            }
+            OutlinedButton(enabled = !busy && newName.isNotBlank(), onClick = { create(DatabaseProfileInitMode.CLONE_CURRENT) }) {
+                Text(stringResource(R.string.database_profile_clone))
+            }
+        }
+        if (busy) CircularProgressIndicator()
+        if (failed) Text(stringResource(R.string.database_profile_error), color = MaterialTheme.colorScheme.error)
     }
 }
 
