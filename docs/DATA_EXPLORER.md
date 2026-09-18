@@ -48,24 +48,22 @@ Remote mode already uses the relational `personalhub_read` projection for this p
 Local and remote acceptance therefore includes forward FK links, reverse/backlink navigation and readable labels for the same canonical relationships. Technical IDs remain available in row detail/API/SQL but should not replace human labels in normal table browsing.
 
 
-## Cross-module entity hubs
+## Cross-module relation graph
 
-Foreign-key navigation must work as a graph, not only as isolated one-hop links.
+Foreign-key navigation must work as a peer-to-peer graph, not as a hierarchy with one privileged module or entity type.
 
-Known direct relationships that are stored as ordinary columns (for example finance transaction → person/place, prescription → doctor/finance transaction, intake → prescription) are projected as real SQLite foreign keys even when Room cannot declare the cross-feature constraint directly.
+Known direct relationships stored as ordinary columns are projected as real SQLite foreign keys even when Room cannot safely declare the cross-feature constraint directly.
 
-Relationships created through PersonalHub Context use the Context graph as their source of truth. The read-only presentation must materialize those memberships into typed relational bridge rows with real foreign keys to the concrete presentation tables. A person page such as Carlo must therefore expose a **Related across PersonalHub** section grouped by module, using Datasette-native links/backlinks for every resolved target:
+Relationships created through PersonalHub Context use the Context graph as their source of truth. The read-only presentation materializes every resolvable pair of Context members into the symmetric derived table `hub_entity_relations`. For each pair it creates both directions, source → target and target → source, and stores native foreign keys to the concrete presentation rows.
 
-- Soldi: transactions and recurring entries associated with the person;
-- Places: places linked through Context;
-- Substances: substances/intakes/prescriptions linked through Context or explicit references;
-- Timer: sessions linked through Context;
-- WordPulse: sessions linked through Context;
-- People: other people linked through the same Contexts when applicable.
+Therefore any supported record can be the starting point: a Place can lead to a Timer session, Soldi transaction or Substance; a transaction can lead back to the Place or onward to another Context member; a Substance can lead to related sessions, resources, people or other entities. People are one peer among the others, not a hub.
+
+The graph currently resolves every Hub entity kind registered by PersonalHub that has a concrete presentation table, including People, Timer sessions, Places, Soldi transactions, Substances, intakes, WordPulse sessions and Hub resources. Adding another Hub entity kind later must extend this mapping without changing the peer-to-peer model.
 
 The bridge is derived presentation data only. It must never create new canonical associations, infer relationships from names, or write back to `personalhub.db`. Unresolved/deleted bindings remain explicit and must not silently point to a different record.
 
-The normal Datasette row page must retain its native related-row navigation. The PH mobile row template may additionally aggregate those same FK-backed relationships into module sections/cards for one-tap cross-module exploration; the links themselves must still resolve to actual Datasette rows rather than client-side synthetic objects.
+The normal Datasette row page must retain native forward foreign-key links and reverse related-row navigation. The PH mobile row template may aggregate those same FK-backed relationships into a **Related across PersonalHub** section grouped by module/entity kind for readability, but every displayed relationship must still resolve to a real Datasette row and remain queryable through Datasette SQL/API/filtering.
+
 
 ## Mobile presentation
 
