@@ -5,6 +5,7 @@ Status: target architecture for branch `feature/salute-canonical-domain`.
 See also:
 
 - [Canonical data model](health/HEALTH_DATA_MODEL.md)
+- [ChatGPT health patch contract](health/CHATGPT_PATCH_CONTRACT.md)
 - [ChatGPT → PH workflow](health/chatgpt-to-ph-workflow.svg)
 - [Minimal Android UI](health/android-minimal-ui.svg)
 
