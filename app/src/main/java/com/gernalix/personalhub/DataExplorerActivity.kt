@@ -268,7 +268,7 @@ class DataExplorerActivity : ComponentActivity() {
                     settings.setSupportMultipleWindows(false)
                     settings.setGeolocationEnabled(false)
                     settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                    CookieManager.getInstance().setAcceptCookie(!localOnly)
+                    CookieManager.getInstance().setAcceptCookie(true)
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(
                             view: WebView?,
