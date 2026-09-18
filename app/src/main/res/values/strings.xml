@@ -91,8 +91,8 @@
     <string name="git_data_sync_token_saved">An access token is saved securely. Leave blank to keep it.</string>
     <string name="git_data_sync_save">Save Git connection</string>
     <string name="git_data_sync_actions">Synchronization</string>
-    <string name="git_data_sync_push_pull_now">Pull changes and push local data now</string>
-    <string name="git_data_sync_pull_now">Pull remote patches now</string>
+    <string name="git_data_sync_push_pull_now">Check remote control and push local data now</string>
+    <string name="git_data_sync_pull_now">Check and verify remote patches now</string>
     <string name="git_data_sync_restore_title">Restore from Git</string>
     <string name="git_data_sync_restore_description">Rebuild the database from the selected revision, validate it, and atomically replace the current database. PersonalHub restarts after a successful restore.</string>
     <string name="git_data_sync_revision">Git revision (commit SHA, tag, or branch)</string>
@@ -229,4 +229,5 @@
     <string name="git_history_restore_ref_action">Load revision for restore</string>
     <string name="git_history_revert_preview_safe">Sandbox check passed: this revert is currently applicable.</string>
     <string name="git_history_revert_preview_blocked">Sandbox check blocked the revert: %1$s</string>
+    <string name="git_data_sync_pending_patches">Verified patches awaiting review in History: %1$s</string>
 </resources>
