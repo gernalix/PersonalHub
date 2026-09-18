@@ -90,7 +90,7 @@ object GitDataSync {
         )
     }
 
-    fun syncNow(context: Context) = operations.withLock {
+    fun syncNow(context: Context, force: Boolean = false) = operations.withLock {
         val app = context.applicationContext
         val config = requireConfiguration(app)
         GitDataSettings.setRuntimeState(app, "syncing")
@@ -102,6 +102,14 @@ object GitDataSync {
             if (bundle == null) {
                 GitDataSettings.markPulled(app, head.commitSha)
                 GitDataSettings.setRuntimeState(app, "complete")
+                return@withLock
+            }
+            val safety = GitDataSafety.evaluate(bundle)
+            if (safety.suspicious && !force) {
+                GitDataSettings.recordAttention(
+                    app,
+                    requireNotNull(safety.reason) + ". Review History and use Force push if intentional.",
+                )
                 return@withLock
             }
             val files = bundle.files.toMutableMap()
@@ -122,6 +130,8 @@ object GitDataSync {
             throw error
         }
     }
+
+    fun forcePushNow(context: Context) = syncNow(context, force = true)
 
     fun pullNow(context: Context) = operations.withLock {
         val app = context.applicationContext
