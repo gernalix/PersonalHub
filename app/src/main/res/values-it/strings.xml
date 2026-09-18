@@ -92,8 +92,8 @@
     <string name="git_data_sync_token_saved">Un token di accesso è salvato in modo sicuro. Lascia vuoto per conservarlo.</string>
     <string name="git_data_sync_save">Salva connessione Git</string>
     <string name="git_data_sync_actions">Sincronizzazione</string>
-    <string name="git_data_sync_push_pull_now">Scarica modifiche e invia i dati locali ora</string>
-    <string name="git_data_sync_pull_now">Scarica le patch remote ora</string>
+    <string name="git_data_sync_push_pull_now">Controlla il controllo remoto e invia i dati locali ora</string>
+    <string name="git_data_sync_pull_now">Controlla e verifica le patch remote ora</string>
     <string name="git_data_sync_restore_title">Ripristina da Git</string>
     <string name="git_data_sync_restore_description">Ricostruisce il database dalla revisione selezionata, lo valida e sostituisce atomicamente il database corrente. PersonalHub si riavvia dopo un ripristino riuscito.</string>
     <string name="git_data_sync_revision">Revisione Git (commit SHA, tag o branch)</string>
@@ -228,4 +228,5 @@
     <string name="git_history_restore_ref_action">Carica revisione da ripristinare</string>
     <string name="git_history_revert_preview_safe">Controllo sandbox superato: questo ripristino è attualmente applicabile.</string>
     <string name="git_history_revert_preview_blocked">Il controllo sandbox ha bloccato il ripristino: %1$s</string>
+    <string name="git_data_sync_pending_patches">Patch verificate in attesa di revisione in Cronologia: %1$s</string>
 </resources>
