@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -38,11 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.luoghi.CHECKIN_BUTTON_TAG
 import com.gernalix.luoghi.CheckInHomeState
 import com.gernalix.luoghi.CheckInMessage
@@ -78,12 +81,18 @@ fun HomeScreen(
     onNewPlace: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    val context = LocalContext.current
     val recentVisits = state.visits.take(3)
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.home_title)) },
                 actions = {
+                    IconButton(
+                        onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "places")) },
+                    ) {
+                        Icon(Icons.Outlined.Storage, contentDescription = "Datasette")
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.settings_title))
                     }
