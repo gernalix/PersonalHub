@@ -8,10 +8,13 @@ import com.gernalix.luoghi.data.CheckInAttemptEntity
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceRepository
+import com.gernalix.personalhub.core.alerts.AlertTrigger
+import com.gernalix.personalhub.core.alerts.PlaceAlertEngine
 import kotlinx.coroutines.flow.Flow
 
 class CheckInCapsule(
     private val repository: PlaceRepository,
+    private val alertEngine: PlaceAlertEngine? = null,
 ) {
     val events: Flow<List<PlaceEventEntity>> = repository.events
     val recentAttempts: Flow<List<CheckInAttemptDiagnostic>> = repository.recentCheckInAttempts
@@ -21,37 +24,53 @@ class CheckInCapsule(
     fun choosePlace(places: List<PlaceEntity>, location: LocationSample): CheckInMatchDecision =
         CheckInPolicy.choosePlace(places, location)
 
-    suspend fun checkIn(placeUuid: String, location: LocationSample, source: String = "Luoghi"): Long =
-        repository.recordPlaceEvent(
+    suspend fun checkIn(placeUuid: String, location: LocationSample, source: String = "Luoghi"): Long {
+        val id = repository.recordPlaceEvent(
             placeUuid = placeUuid,
             eventType = PlaceEventTypes.CHECK_IN,
             location = location,
             source = source,
         )
+        alertEngine?.onPlaceEvent(placeUuid, AlertTrigger.PLACE_CHECK_IN)
+        return id
+    }
 
     suspend fun manualCheckIn(
         placeUuid: String,
         timestamp: Long = System.currentTimeMillis(),
         location: LocationSample? = null,
         source: String = "Luoghi manual",
-    ): HistoryMutationResult =
-        repository.recordManualCheckIn(placeUuid, timestamp, location, source)
+    ): HistoryMutationResult {
+        val result = repository.recordManualCheckIn(placeUuid, timestamp, location, source)
+        if (result is HistoryMutationResult.Success) {
+            alertEngine?.onPlaceEvent(placeUuid, AlertTrigger.PLACE_CHECK_IN, timestamp)
+        }
+        return result
+    }
 
-    suspend fun checkOut(placeUuid: String, location: LocationSample?, source: String = "Luoghi"): Long =
-        repository.recordPlaceEvent(
+    suspend fun checkOut(placeUuid: String, location: LocationSample?, source: String = "Luoghi"): Long {
+        val id = repository.recordPlaceEvent(
             placeUuid = placeUuid,
             eventType = PlaceEventTypes.CHECK_OUT,
             location = location,
             source = source,
         )
+        alertEngine?.onPlaceEvent(placeUuid, AlertTrigger.PLACE_CHECK_OUT)
+        return id
+    }
 
     suspend fun manualCheckOut(
         placeUuid: String,
         timestamp: Long = System.currentTimeMillis(),
         location: LocationSample? = null,
         source: String = "Luoghi manual",
-    ): HistoryMutationResult =
-        repository.closeCanonicalVisit(placeUuid, timestamp, location, source)
+    ): HistoryMutationResult {
+        val result = repository.closeCanonicalVisit(placeUuid, timestamp, location, source)
+        if (result is HistoryMutationResult.Success) {
+            alertEngine?.onPlaceEvent(placeUuid, AlertTrigger.PLACE_CHECK_OUT, timestamp)
+        }
+        return result
+    }
 
     suspend fun manualVisit(
         placeUuid: String,
@@ -72,6 +91,7 @@ class CheckInCapsule(
             notes = mutation.notes,
             sourceApp = mutation.sourceApp,
         )
+        repository.setPlaceTags(uuid, mutation.tagNames)
         checkIn(uuid, location)
         return uuid
     }
