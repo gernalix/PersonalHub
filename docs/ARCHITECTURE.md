@@ -1,5 +1,7 @@
 # PersonalHub architecture
 
+See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch/migration and restore architecture.
+
 PersonalHub contains People, Timer, Places, Substances and WordPulse. The application package is `com.gernalix.personalhub`.
 
 ## Database capsule
