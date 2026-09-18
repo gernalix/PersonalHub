@@ -40,7 +40,6 @@ object AlertMatching {
         if (
             rule.cooldownMs > 0L &&
             lastFiredAt != null &&
-            nowMs >= lastFiredAt &&
             nowMs - lastFiredAt < rule.cooldownMs
         ) {
             return false
