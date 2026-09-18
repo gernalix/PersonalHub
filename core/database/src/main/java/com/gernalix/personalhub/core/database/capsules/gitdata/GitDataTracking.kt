@@ -20,6 +20,7 @@ data class GitEditEvent(
 
 object GitDataTracking {
     const val TABLE = "hub_git_pending"
+    @Volatile private var active = false
     const val EVENTS_TABLE = "hub_git_events"
     const val CONTEXT_TABLE = "hub_git_edit_context"
     const val APPLIED_PATCHES_TABLE = "hub_git_applied_patches"
@@ -122,6 +123,7 @@ object GitDataTracking {
             }
         }
         if (enqueueAll) enqueueAll(db)
+        active = true
     }
 
     private fun ensureColumn(db: SupportSQLiteDatabase, table: String, column: String, definition: String) {
@@ -131,6 +133,7 @@ object GitDataTracking {
     }
 
     fun uninstall(db: SupportSQLiteDatabase) {
+        active = false
         tables(db).forEach { table ->
             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
                 db.execSQL("DROP TRIGGER IF EXISTS `hub_git_dirty_${table}_$op`")
@@ -230,6 +233,7 @@ object GitDataTracking {
     }
 
     fun ensureAutomaticEditContext(db: SupportSQLiteDatabase) {
+        if (!active) return
         val installed = db.query(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
             arrayOf(CONTEXT_TABLE),
@@ -248,6 +252,7 @@ object GitDataTracking {
     }
 
     fun clearEditContextIfInstalled(db: SupportSQLiteDatabase) {
+        if (!active) return
         val installed = db.query(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
             arrayOf(CONTEXT_TABLE),
