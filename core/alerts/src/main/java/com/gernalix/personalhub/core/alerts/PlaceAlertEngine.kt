@@ -33,23 +33,30 @@ class PlaceAlertEngine(
         val tagTargets = alertDao.placeTagTargets(rules.map { it.id })
             .groupBy { it.ruleId }
             .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.placeTagId.toString() } }
+        val event = AlertEventSpec(
+            domain = AlertDomain.PLACE,
+            trigger = eventTrigger,
+            entityId = placeUuid,
+            tagIds = actualTagIds,
+        )
 
         var firedCount = 0
         for (rule in rules) {
             val ruleTrigger = runCatching { AlertTrigger.valueOf(rule.trigger) }.getOrNull() ?: continue
-            if (!AlertMatching.placeTrigger(ruleTrigger, eventTrigger)) continue
-            if (rule.cooldownMs > 0L && rule.lastFiredAt != null && firedAtMs - rule.lastFiredAt < rule.cooldownMs) continue
-
             val targetKind = runCatching { AlertTargetKind.valueOf(rule.targetKind) }.getOrNull() ?: continue
-            val targetMatches = when (targetKind) {
-                AlertTargetKind.ENTITY -> rule.entityId == placeUuid
-                AlertTargetKind.TAGS -> {
-                    val required = tagTargets[rule.id].orEmpty()
-                    val mode = runCatching { AlertMatchMode.valueOf(rule.matchMode) }.getOrDefault(AlertMatchMode.ALL)
-                    AlertMatching.tags(mode, required, actualTagIds)
-                }
-            }
-            if (!targetMatches) continue
+            val matchMode = runCatching { AlertMatchMode.valueOf(rule.matchMode) }.getOrDefault(AlertMatchMode.ALL)
+            val spec = AlertRuleSpec(
+                domain = AlertDomain.PLACE,
+                trigger = ruleTrigger,
+                targetKind = targetKind,
+                entityId = rule.entityId,
+                requiredTagIds = tagTargets[rule.id].orEmpty(),
+                matchMode = matchMode,
+                enabled = rule.enabled && rule.deletedAt == null,
+                cooldownMs = rule.cooldownMs,
+                lastFiredAtMs = rule.lastFiredAt,
+            )
+            if (!AlertMatching.ruleMatches(spec, event, firedAtMs)) continue
 
             val fire = AlertFire(
                 ruleId = rule.id,
