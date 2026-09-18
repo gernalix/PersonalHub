@@ -298,21 +298,21 @@ private fun GitDataSyncSettings(
         Text(stringResource(R.string.git_data_sync_actions), style = MaterialTheme.typography.titleMedium)
         OutlinedButton(
             enabled = !busy && status.enabled && status.configured,
-            onClick = { runOperation { GitDataSync.syncNow(context) } },
+            onClick = { runOperation(block = { GitDataSync.syncNow(context) }) },
         ) {
             Text(stringResource(R.string.git_data_sync_push_pull_now))
         }
         if (status.runtimeState == "attention") {
             Button(
                 enabled = !busy && status.enabled && status.configured,
-                onClick = { runOperation { GitDataSync.forcePushNow(context) } },
+                onClick = { runOperation(block = { GitDataSync.forcePushNow(context) }) },
             ) {
                 Text(stringResource(R.string.git_data_sync_force_push))
             }
         }
         OutlinedButton(
             enabled = !busy && status.enabled && status.configured,
-            onClick = { runOperation { GitDataSync.pullNow(context) } },
+            onClick = { runOperation(block = { GitDataSync.pullNow(context) }) },
         ) {
             Text(stringResource(R.string.git_data_sync_pull_now))
         }
