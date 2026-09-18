@@ -293,7 +293,7 @@
     <string name="place_tags_hint">Separati da virgole, per esempio Lidl, groceries</string>
     <string name="place_alerts">Alert</string>
     <string name="place_alerts_title">Alert · %1$s</string>
-    <string name="place_alert_message">Testo dell'alert</string>
+    <string name="place_alert_message">Testo dell’alert</string>
     <string name="place_alert_link_hint">Se tutto il testo è un singolo link http(s) o Workflowy, toccando la notifica il link si apre direttamente.</string>
     <string name="place_alert_when">Quando</string>
     <string name="place_alert_both">Entrambi</string>
