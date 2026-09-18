@@ -46,6 +46,7 @@ fun PlaceEditorDialog(
     onNicknameChange: (String) -> Unit,
     onRadiusChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -68,6 +69,7 @@ fun PlaceEditorDialog(
                     onNicknameChange = onNicknameChange,
                     onRadiusChange = onRadiusChange,
                     onNotesChange = onNotesChange,
+                    onTagsChange = onTagsChange,
                 )
             }
         },
@@ -91,6 +93,7 @@ private fun PlaceEditor(
     onNicknameChange: (String) -> Unit,
     onRadiusChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
 ) {
     Column {
         OutlinedTextField(
@@ -115,6 +118,13 @@ private fun PlaceEditor(
             value = form.notes,
             onValueChange = onNotesChange,
             label = { Text(stringResource(R.string.notes)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = form.tagsText,
+            onValueChange = onTagsChange,
+            label = { Text(stringResource(R.string.place_tags)) },
+            supportingText = { Text(stringResource(R.string.place_tags_hint)) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
