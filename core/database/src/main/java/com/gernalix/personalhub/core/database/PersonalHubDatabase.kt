@@ -119,6 +119,22 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
 
         internal fun productionMigrationEdges(context: Context) =
             productionMigrations(context).map { it.startVersion to it.endVersion }.toSet()
+        internal fun hasProductionMigrationPath(context: Context, from: Int): Boolean {
+            if (from == SCHEMA_VERSION) return true
+            if (from !in 1 until SCHEMA_VERSION) return false
+            val edges = productionMigrationEdges(context)
+            val reachable = mutableSetOf(from)
+            while (true) {
+                val next = edges
+                    .filter { it.first in reachable }
+                    .map { it.second }
+                    .filter { it <= SCHEMA_VERSION }
+                    .toSet() - reachable
+                if (next.isEmpty()) return false
+                if (SCHEMA_VERSION in next) return true
+                reachable += next
+            }
+        }
         fun closeInstance() = synchronized(this) { instance?.close(); instance = null }
         fun resetForTests() = closeInstance()
         private fun productionMigrations(context: Context): Array<androidx.room.migration.Migration> = arrayOf(
