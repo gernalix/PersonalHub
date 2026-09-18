@@ -48,6 +48,8 @@ import com.gernalix.personalhub.core.database.capsules.gitdata.GitStateDiff
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import java.text.DateFormat
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,6 +76,8 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var patchId by remember { mutableStateOf("") }
     var restore by remember { mutableStateOf<GitRevision?>(null) }
     var detail by remember { mutableStateOf<GitHistoryDetail?>(null) }
+    var bulkFromDate by remember { mutableStateOf(LocalDate.now().minusDays(1).toString()) }
+    var bulkConfirm by remember { mutableStateOf(false) }
 
     fun refresh() {
         scope.launch {
@@ -118,6 +122,55 @@ fun GitHistorySettings(onBack: () -> Unit) {
     }
 
     LaunchedEffect(author) { refresh() }
+
+    if (bulkConfirm && author != null) {
+        AlertDialog(
+            onDismissRequest = { bulkConfirm = false },
+            title = { Text(stringResource(R.string.git_history_bulk_revert_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.git_history_bulk_revert_confirm,
+                        requireNotNull(author),
+                        bulkFromDate,
+                    ),
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val selectedAuthor = requireNotNull(author)
+                        val start = runCatching {
+                            LocalDate.parse(bulkFromDate)
+                                .atStartOfDay(ZoneId.systemDefault())
+                                .toInstant()
+                                .toEpochMilli()
+                        }.getOrNull()
+                        bulkConfirm = false
+                        if (start == null) {
+                            error = true
+                        } else {
+                            scope.launch {
+                                busy = true
+                                val result = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        GitHistory.revertAuthorRange(context, selectedAuthor, start)
+                                    }
+                                }
+                                busy = false
+                                result.onSuccess { refresh() }.onFailure { error = true }
+                            }
+                        }
+                    },
+                ) { Text(stringResource(R.string.git_history_bulk_revert_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { bulkConfirm = false }) {
+                    Text(stringResource(R.string.git_history_cancel))
+                }
+            },
+        )
+    }
 
     detail?.let { value ->
         AlertDialog(
@@ -237,6 +290,21 @@ fun GitHistorySettings(onBack: () -> Unit) {
         )
         OutlinedButton(onClick = ::refresh, enabled = !busy) {
             Text(stringResource(R.string.git_history_apply_filters))
+        }
+        if (author != null) {
+            OutlinedTextField(
+                bulkFromDate,
+                { bulkFromDate = it },
+                label = { Text(stringResource(R.string.git_history_bulk_from_date)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedButton(
+                onClick = { bulkConfirm = true },
+                enabled = !busy && bulkFromDate.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.git_history_bulk_revert_author, requireNotNull(author)))
+            }
         }
 
         HorizontalDivider()
