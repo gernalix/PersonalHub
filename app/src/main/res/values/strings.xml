@@ -69,6 +69,7 @@
     <string name="database_profile_active">Active</string>
     <string name="database_profile_switch">Open</string>
     <string name="database_profile_delete">Delete</string>
+    <string name="database_profile_rename">Rename</string>
     <string name="database_profile_name">Profile name</string>
     <string name="database_profile_create_empty">Create empty</string>
     <string name="database_profile_clone">Clone current</string>
