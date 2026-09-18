@@ -89,9 +89,16 @@ class GatedOpenHelperFactory : SupportSQLiteOpenHelper.Factory {
 }
 
 private class GatedDatabase(private val delegate: SupportSQLiteDatabase) : SupportSQLiteDatabase by delegate {
-    private fun beginMutating(block: () -> Unit) = DatabaseGate.begin {
-        block()
-        GitDataTracking.ensureAutomaticEditContext(delegate)
+    private fun beginMutating(block: () -> Unit) {
+        DatabaseGate.begin { block() }
+        try {
+            GitDataTracking.ensureAutomaticEditContext(delegate)
+        } catch (error: Throwable) {
+            // DatabaseGate.begin has already registered and locked the transaction. End it without
+            // setTransactionSuccessful so SQLite rolls it back, then propagate the provenance error.
+            DatabaseGate.end { delegate.endTransaction() }
+            throw error
+        }
     }
 
     override fun beginTransaction() = beginMutating { delegate.beginTransaction() }
