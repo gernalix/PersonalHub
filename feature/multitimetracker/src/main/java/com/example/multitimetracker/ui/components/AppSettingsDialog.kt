@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -31,7 +30,6 @@ fun AppSettingsDialog(
     onShowSecondsChange: (Boolean) -> Unit,
     hideHoursIfZero: Boolean,
     onHideHoursIfZeroChange: (Boolean) -> Unit,
-    onChangeSafFolder: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -39,16 +37,6 @@ fun AppSettingsDialog(
         title = { Text(stringResource(R.string.cd_settings)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // v435: allow changing the SAF root folder from Settings (not only during export).
-                FilledTonalButton(
-                    onClick = onChangeSafFolder,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.change_saf_folder))
-                }
-
-                com.example.multitimetracker.ui.components.AppDivider()
-
                 SettingRow(
                     title = stringResource(R.string.keep_screen_on),
                     checked = keepScreenOn,
