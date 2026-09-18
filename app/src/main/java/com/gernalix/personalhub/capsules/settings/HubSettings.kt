@@ -43,6 +43,7 @@ fun HubSettings(onBack: () -> Unit) {
             enableAfterSave = enableGitAfterConfigure,
             onConfigured = { enableGitAfterConfigure = false },
         )
+        "git-history" -> GitHistorySettings { page = "root" }
         "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
         else -> {
             val context = LocalContext.current
@@ -57,6 +58,9 @@ fun HubSettings(onBack: () -> Unit) {
                         page = "git-data"
                     },
                 )
+                OutlinedButton(onClick = { page = "git-history" }) {
+                    Text(stringResource(R.string.git_history_title))
+                }
                 OutlinedButton(onClick = { page = "workflowy-days" }) { Text(stringResource(R.string.workflowy_days_title)) }
                 OutlinedButton(
                     onClick = {
