@@ -62,6 +62,17 @@
     <string name="database_last_export">Ultima esportazione verificata: %1$s</string>
     <string name="database_back">Indietro</string>
     <string name="database_rolled_back">Importazione non riuscita. Il database precedente è stato ripristinato. Riavvio…</string>
+
+    <string name="home_active_profile">Profilo: %1$s</string>
+    <string name="database_profiles_title">Profili</string>
+    <string name="database_profiles_description">Ogni profilo contiene un database PersonalHub completo e isolato. Cambiando profilo cambiano insieme Persone, Luoghi, Timer, Soldi, Sostanze, WordPulse e le relazioni Hub.</string>
+    <string name="database_profile_active">Attivo</string>
+    <string name="database_profile_switch">Apri</string>
+    <string name="database_profile_delete">Elimina</string>
+    <string name="database_profile_name">Nome profilo</string>
+    <string name="database_profile_create_empty">Crea vuoto</string>
+    <string name="database_profile_clone">Clona attuale</string>
+    <string name="database_profile_error">Operazione profilo fallita.</string>
     <string name="settings_title">Impostazioni</string>
     <string name="settings_back">Indietro</string>
     <string name="privacy_policy_title">Informativa sulla privacy</string>
