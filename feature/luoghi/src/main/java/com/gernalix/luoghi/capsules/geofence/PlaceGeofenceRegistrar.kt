@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import com.gernalix.luoghi.capsules.checkin.CheckInPolicy
 import com.gernalix.luoghi.data.PlaceDao
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingRequest
 import com.google.android.gms.location.LocationServices
@@ -64,7 +65,7 @@ class PlaceGeofenceRegistrar(
         ).asUnit()
     }
 
-    private suspend fun removeGeofences() {
+    suspend fun removeGeofences() {
         client.removeGeofences(pendingIntent()).asUnit()
     }
 
@@ -73,12 +74,14 @@ class PlaceGeofenceRegistrar(
             (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_MUTABLE else 0)
         val intent = Intent(appContext, PlaceGeofenceReceiver::class.java).apply {
             action = PlaceGeofenceReceiver.ACTION_GEOFENCE_TRANSITION
-            data = Uri.parse("places://geofence/transitions")
+            data = Uri.parse("places://geofence/${DatabaseProfiles.activeProfileId(appContext)}/transitions")
+            putExtra(PROFILE_ID, DatabaseProfiles.activeProfileId(appContext))
         }
         return PendingIntent.getBroadcast(appContext, 0, intent, flags)
     }
 
     companion object {
+        const val PROFILE_ID = "profile_id"
         fun hasBackgroundLocationPermission(context: Context): Boolean =
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

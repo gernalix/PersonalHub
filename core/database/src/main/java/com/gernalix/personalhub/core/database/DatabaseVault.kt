@@ -161,7 +161,14 @@ object DatabaseVault {
     /** Run before any feature/database initialization. An interrupted replacement restores the last good DB. */
     fun recoverInterruptedImport(context: Context) {
         val marker = marker(context)
-        if (!marker.isFile) return
+        if (!marker.isFile) {
+            // A process can die after the profile intent is persisted but before the database
+            // replacement journal exists. In that window neither the canonical DB nor the active
+            // profile has changed, so only the orphaned intent needs to be retired. The same rule
+            // is safe after the journal commit point, where both already refer to the target.
+            DatabaseProfiles.clearPendingSwitch(context)
+            return
+        }
         val backup = validPendingBackup(context, marker) ?: return retireInvalidImportMarker(context, marker)
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
         val recovery = File(target.parentFile, "personalhub-recover.tmp")
@@ -424,6 +431,7 @@ object DatabaseVault {
     }
 
     private fun existingStableExportFile(
+        context: Context,
         prefs: android.content.SharedPreferences,
         publisher: ExportPublisher,
         name: String,
@@ -443,11 +451,12 @@ object DatabaseVault {
     }
 
     private fun stableExportFile(
+        context: Context,
         prefs: android.content.SharedPreferences,
         publisher: ExportPublisher,
         name: String,
     ): ExportFile {
-        existingStableExportFile(prefs, publisher, name)?.let { return it }
+        existingStableExportFile(context, prefs, publisher, name)?.let { return it }
         val created = publisher.create(name)
         if (created.name != name) {
             runCatching { created.delete() }
@@ -474,14 +483,14 @@ object DatabaseVault {
         try {
             val generation = snapshot(context, stage)
             val publisher = exportPublisherFactory(context, uri)
-            val previous = existingStableExportFile(prefs, publisher, canonicalName)
+            val previous = existingStableExportFile(context, prefs, publisher, canonicalName)
             if (previous != null) {
                 val previousSnapshot = File(context.cacheDir, "personalhub-previous-${UUID.randomUUID()}.db")
                 try {
                     publisher.readTo(previous, previousSnapshot)
                     val previousGeneration = runCatching { validate(context, previousSnapshot) }.getOrNull()
                     if (previousGeneration != null) {
-                        val backup = stableExportFile(prefs, publisher, backupName)
+                        val backup = stableExportFile(context, prefs, publisher, backupName)
                         publisher.writeFrom(previousSnapshot, backup)
                         val actualBackup = refreshedStableExportFile(publisher, backup, backupName)
                         verifyExportFile(context, publisher, previousSnapshot, actualBackup, previousGeneration)
@@ -490,7 +499,7 @@ object DatabaseVault {
                     previousSnapshot.delete()
                 }
             }
-            val canonical = stableExportFile(prefs, publisher, canonicalName)
+            val canonical = stableExportFile(context, prefs, publisher, canonicalName)
             publisher.writeFrom(stage, canonical)
             val actualCanonical = refreshedStableExportFile(publisher, canonical, canonicalName)
             verifyExportFile(context, publisher, stage, actualCanonical, generation)
@@ -604,6 +613,17 @@ object DatabaseVault {
     internal fun snapshotProfileCopy(context: Context, file: File) = operations.withLock {
         file.parentFile?.mkdirs()
         snapshot(context, file)
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { copy ->
+            listOf(
+                "hub_sync_pending", "hub_sync_known", "sync_queue", "sync_shadow", "sync_meta",
+                GitDataTracking.TABLE, GitDataTracking.EVENTS_TABLE, GitDataTracking.CONTEXT_TABLE,
+                GitDataTracking.APPLIED_PATCHES_TABLE, GitHistoryStore.TABLE,
+                GitHistoryStore.FIELD_STATS_TABLE,
+            ).forEach { table ->
+                if (rawTableExists(copy, "main", table)) copy.execSQL("DELETE FROM `$table`")
+            }
+        }
+        validate(context, file)
     }
 
     internal fun createEmptyProfileDatabase(context: Context, file: File) = operations.withLock {
@@ -652,15 +672,23 @@ object DatabaseVault {
                         )
                         try {
                             currentProfileFile.parentFile?.mkdirs()
+                            transferHooks.beforeProfileSnapshot()
                             snapshot(context, currentProfileFile)
+                            transferHooks.afterProfileSnapshot()
                             snapshot(context, backup)
                             PersonalHubDatabase.closeInstance()
                             writeImportMarker(context, backup)
                             sidecars(target)
+                            transferHooks.beforeProfileDatabaseRename()
                             atomicMove(stage, target)
+                            transferHooks.afterProfileDatabaseRename()
                             validate(context, target)
+                            transferHooks.beforeActiveProfileUpdate()
                             DatabaseProfiles.markPendingTargetActive(context)
+                            transferHooks.afterActiveProfileUpdate()
+                            transferHooks.beforeProfileMarkerRetirement()
                             check(marker(context).delete())
+                            transferHooks.afterProfileMarkerRetirement()
                             syncDirectory(context.filesDir)
                             cleanupOrphanedPreImportBackups(context)
                         } catch (error: Throwable) {
@@ -711,6 +739,14 @@ object DatabaseVault {
 
     internal interface TransferHooks {
         fun beforeImportMarkerPublish(temp: File, final: File) = Unit
+        fun beforeProfileSnapshot() = Unit
+        fun afterProfileSnapshot() = Unit
+        fun beforeProfileDatabaseRename() = Unit
+        fun afterProfileDatabaseRename() = Unit
+        fun beforeActiveProfileUpdate() = Unit
+        fun afterActiveProfileUpdate() = Unit
+        fun beforeProfileMarkerRetirement() = Unit
+        fun afterProfileMarkerRetirement() = Unit
     }
 
     interface ExportFile {

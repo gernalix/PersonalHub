@@ -12,12 +12,13 @@ class TimeFenceRestoreReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         when (intent?.action) {
             Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_MY_PACKAGE_REPLACED -> restoreTimedSessions(context)
+            Intent.ACTION_MY_PACKAGE_REPLACED -> restoreActiveProfile(context)
             else -> return
         }
     }
 
-    private fun restoreTimedSessions(context: Context) {
+    companion object {
+    fun restoreActiveProfile(context: Context) {
         val appContext = context.applicationContext
         val snapshot = SnapshotStore.load(appContext) ?: return
         val runningSessions = runCatching {
@@ -51,5 +52,6 @@ class TimeFenceRestoreReceiver : BroadcastReceiver() {
                         )
                     }
             }
+    }
     }
 }

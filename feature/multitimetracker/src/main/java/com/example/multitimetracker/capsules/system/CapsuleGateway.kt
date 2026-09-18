@@ -2,7 +2,6 @@
 package com.example.multitimetracker.capsules.system
 
 import com.example.multitimetracker.capsules.alerts.controller.AlertsCapsuleViewModel
-import com.example.multitimetracker.capsules.auditlog.controller.AuditLogCapsuleViewModel
 import com.example.multitimetracker.capsules.chains.controller.ChainsCapsuleViewModel
 import com.example.multitimetracker.capsules.now.controller.NowCapsuleViewModel
 import com.example.multitimetracker.capsules.quickevents.controller.QuickEventsCapsuleViewModel
@@ -26,9 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 class CapsuleGateway(
     runtimeScope: CoroutineScope,
     alertsAccess: AlertsCapsuleAccess,
-    auditLogAccess: AuditLogCapsuleAccess,
     chainsAccess: ChainsCapsuleAccess,
-    importExportAccess: ImportExportCapsuleAccess,
     nowAccess: NowCapsuleAccess,
     quickEventsAccess: QuickEventsCapsuleAccess,
     sessionOwnerAccess: SessionOwnerCapsuleAccess,
@@ -39,9 +36,7 @@ class CapsuleGateway(
     private val host: SystemCapsuleHost = SystemCapsuleHost(
         runtimeScope = runtimeScope,
         alertsAccess = alertsAccess,
-        auditLogAccess = auditLogAccess,
         chainsAccess = chainsAccess,
-        importExportAccess = importExportAccess,
         nowAccess = nowAccess,
         quickEventsAccess = quickEventsAccess,
         sessionOwnerAccess = sessionOwnerAccess,
@@ -51,7 +46,6 @@ class CapsuleGateway(
     )
 
     val alerts: AlertsCapsuleViewModel get() = host.alerts
-    val importExport: ImportExportCapsule get() = host.importExport
     val now: NowCapsuleViewModel get() = host.now
     val quickEvents: QuickEventsCapsuleViewModel get() = host.quickEvents
     val sessionOwner: SessionOwnerCapsuleViewModel get() = host.sessionOwner
@@ -59,5 +53,4 @@ class CapsuleGateway(
     val tags: TagsCapsuleViewModel get() = host.tags
     val timeline: TimelineCapsuleViewModel get() = host.timeline
     val chains: ChainsCapsuleViewModel get() = host.chains
-    val auditLog: AuditLogCapsuleViewModel get() = host.auditLog
 }

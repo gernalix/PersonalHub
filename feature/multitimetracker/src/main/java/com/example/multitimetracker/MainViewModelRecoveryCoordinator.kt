@@ -5,9 +5,7 @@ import android.content.Context
 import com.example.multitimetracker.persistence.DataIntegrityGate
 import com.example.multitimetracker.persistence.PersistentSaveOrigin
 import com.example.multitimetracker.persistence.SnapshotStore
-import com.example.multitimetracker.persistence.SqliteVault
 import com.example.multitimetracker.perf.StartupPerfTrace
-import com.example.multitimetracker.util.AppRestarter
 import com.example.multitimetracker.model.HomeLoadState
 
 internal class MainViewModelRecoveryCoordinator(
@@ -16,7 +14,6 @@ internal class MainViewModelRecoveryCoordinator(
     private val setInitialized: (Boolean) -> Unit,
     private val integrityBlock: () -> DataIntegrityGate.GateResult?,
     private val setIntegrityBlock: (DataIntegrityGate.GateResult?) -> Unit,
-    private val setImportVerificationReport: (String?) -> Unit,
     private val resetToFreshInstallState: (Long) -> Unit,
     private val setHomeLoadState: (HomeLoadState) -> Unit,
     private val appForegroundStartMs: () -> Long?,
@@ -47,17 +44,10 @@ internal class MainViewModelRecoveryCoordinator(
         }
         setIntegrityBlock(null)
 
-        val pendingStartupRestoreSource = SqliteVault.consumePendingStartupRestore(context)
         val snapshotLoaded = try {
-            var loaded = StartupPerfTrace.section("load_persisted_snapshot") {
+            StartupPerfTrace.section("load_persisted_snapshot") {
                 snapshotCoordinator.loadPersistedSnapshotIfAvailable(context)
             }
-            if (!loaded && SqliteVault.restoreInstrumentationSafetyBackupIfCurrentEmpty(context)) {
-                loaded = StartupPerfTrace.section("load_instrumentation_safety_backup") {
-                    snapshotCoordinator.loadPersistedSnapshotIfAvailable(context)
-                }
-            }
-            loaded
         } catch (error: Throwable) {
             snapshotCoordinator.markPersistenceFailed()
             setIntegrityBlock(initializationFailedBlock(context, error))
@@ -67,12 +57,6 @@ internal class MainViewModelRecoveryCoordinator(
         }
         if (snapshotLoaded) {
             setInitialized(true)
-            reportPendingStartupRestoreIfNeeded(
-                context = context,
-                pendingSource = pendingStartupRestoreSource,
-                snapshotLoaded = true,
-            )
-            AppRestarter.cancelPendingRestart()
             return
         }
 
@@ -94,67 +78,7 @@ internal class MainViewModelRecoveryCoordinator(
         }
         setInitialized(true)
         snapshotCoordinator.scheduleAutoBackup()
-        reportPendingStartupRestoreIfNeeded(
-            context = context,
-            pendingSource = pendingStartupRestoreSource,
-            snapshotLoaded = false,
-        )
-        AppRestarter.cancelPendingRestart()
         StartupPerfTrace.mark("initialize_done")
-    }
-
-    fun tryRecoverFromPreImportBackup(context: Context): Boolean {
-        val ok = runCatching { SqliteVault.restoreInternalDbFromPreImportBackup(context) }.getOrDefault(false)
-        if (!ok) {
-            setIntegrityBlock(recoveryFailedBlock(context))
-            return false
-        }
-        if (ok) {
-            val gate = DataIntegrityGate.runCriticalChecks(context)
-            if (!gate.ok) {
-                setIntegrityBlock(gate)
-                return false
-            }
-            val runtimeFailure = restoreRecoveredRuntime(context)
-            if (runtimeFailure != null) {
-                setIntegrityBlock(runtimeFailure)
-                return false
-            }
-            setIntegrityBlock(null)
-        }
-        return ok
-    }
-
-    fun tryRecoverFromUserFolder(context: Context): Boolean {
-        val ok = runCatching { SqliteVault.overwriteInternalDbFromUserFolder(context) }.isSuccess
-        if (!ok) {
-            setIntegrityBlock(recoveryFailedBlock(context))
-            return false
-        }
-        if (ok) {
-            val gate = DataIntegrityGate.runCriticalChecks(context)
-            if (!gate.ok) {
-                setIntegrityBlock(gate)
-                return false
-            }
-            val runtimeFailure = restoreRecoveredRuntime(context)
-            if (runtimeFailure != null) {
-                setIntegrityBlock(runtimeFailure)
-                return false
-            }
-            setIntegrityBlock(null)
-        }
-        return ok
-    }
-
-    private fun recoveryFailedBlock(context: Context): DataIntegrityGate.GateResult {
-        val unreadable = context.getString(R.string.import_snapshot_unreadable)
-        return DataIntegrityGate.GateResult(
-            ok = false,
-            blockingTitle = context.getString(R.string.integrity_gate_title),
-            blockingBody = unreadable,
-            technicalReport = unreadable,
-        )
     }
 
     private fun initializationFailedBlock(
@@ -178,51 +102,8 @@ internal class MainViewModelRecoveryCoordinator(
         val start = appForegroundStartMs() ?: stateAppUsageRunningSinceMs() ?: return
         clearForegroundUsageTracking()
 
-        if (AppRestarter.consumeBackgroundPersistSkip()) {
-            clearRunningUsageWithoutPersist()
-            return
-        }
-
         val delta = (nowMs - start).coerceAtLeast(0L)
         applyBackgroundUsageDelta(delta)
     }
 
-    private fun restoreRecoveredRuntime(context: Context): DataIntegrityGate.GateResult? {
-        if (SnapshotStore.load(context) == null) {
-            val unreadable = context.getString(R.string.import_snapshot_unreadable)
-            return DataIntegrityGate.GateResult(
-                ok = false,
-                blockingTitle = context.getString(R.string.integrity_gate_title),
-                blockingBody = unreadable,
-                technicalReport = unreadable,
-            )
-        }
-        setInitialized(false)
-        snapshotCoordinator.reloadFromSnapshot(context)
-        initialize(context)
-
-        val initFailure = integrityBlock()
-        if (initFailure?.ok == false) return initFailure
-
-        val runtimeFailure = snapshotCoordinator.verifyCurrentPersistedSnapshotActivated(context) ?: return null
-        return DataIntegrityGate.GateResult(
-            ok = false,
-            blockingTitle = context.getString(R.string.integrity_gate_title),
-            blockingBody = runtimeFailure,
-            technicalReport = runtimeFailure,
-        )
-    }
-
-    private fun reportPendingStartupRestoreIfNeeded(
-        context: Context,
-        pendingSource: String?,
-        snapshotLoaded: Boolean,
-    ) {
-        if (pendingSource.isNullOrBlank()) return
-        if (!snapshotLoaded) {
-            setImportVerificationReport(context.getString(R.string.import_snapshot_unreadable))
-            return
-        }
-        setImportVerificationReport(snapshotCoordinator.verifyCurrentPersistedSnapshotActivated(context))
-    }
 }

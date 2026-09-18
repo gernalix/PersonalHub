@@ -6,7 +6,6 @@ import android.content.Context
 import com.example.multitimetracker.R
 import com.example.multitimetracker.model.Tag
 import com.example.multitimetracker.model.TimeEngine
-import com.example.multitimetracker.persistence.AuditLogSqlite
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.util.CapsuleWriteApi
 import org.json.JSONObject
@@ -60,22 +59,7 @@ object QuickSessionRunner {
                 com.example.multitimetracker.core.session.DefaultSessionCore(context)
                     .ensureRunningSessionRow(title = title, startMs = startMs, tagIds = tagIds, nowMs = nowMs)
         },
-        auditInsert: (String, Long, Long) -> Unit = { title, tempTagId, now ->
-            AuditLogSqlite.insert(
-                context = context,
-                isSystem = false,
-                action = "SESSION_START_NEW",
-                entityType = "SESSION",
-                entityId = null,
-                summary = context.getString(R.string.audit_session_start_new_widget, title),
-                payload = JSONObject()
-                    .put("startTs", now)
-                    .put("title", title)
-                    .put("tagIds", org.json.JSONArray().apply { put(tempTagId) })
-                    .put("fromWidget", true)
-                    .put("undoable", true)
-            )
-        },
+        auditInsert: (String, Long, Long) -> Unit = { _, _, _ -> Unit },
         notifyChanged: (Context) -> Unit = ::notifySnapshotChanged,
     ): Result {
         return runCatching { runOrThrow(context, sessionStarter, auditInsert, notifyChanged) }
@@ -153,4 +137,3 @@ object QuickSessionRunner {
         return Result.Success(sessionId, title)
     }
 }
-

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.DatabaseActivity
 import com.gernalix.personalhub.DatabaseRestartActivity
 import com.gernalix.personalhub.R
+import com.gernalix.personalhub.ProfileRuntimeCoordinator
 import com.gernalix.personalhub.capsules.shortcuts.HomeShortcutsSettings
 import com.gernalix.personalhub.core.database.ImportRolledBack
 import com.gernalix.personalhub.core.database.DatabaseProfileInitMode
@@ -140,7 +141,12 @@ private fun DatabaseProfilesSettings(onBack: () -> Unit) {
                                 failed = false
                                 scope.launch {
                                     val switched = withContext(Dispatchers.IO) {
-                                        runCatching { DatabaseProfiles.switch(context, profile.id) }
+                                        runCatching {
+                                            ProfileRuntimeCoordinator.retireActiveProfile(context)
+                                            val changed = DatabaseProfiles.switch(context, profile.id)
+                                            if (changed) ProfileRuntimeCoordinator.restoreActiveProfile(context)
+                                            changed
+                                        }
                                     }
                                     busy = false
                                     if (switched.isSuccess && switched.getOrDefault(false)) {

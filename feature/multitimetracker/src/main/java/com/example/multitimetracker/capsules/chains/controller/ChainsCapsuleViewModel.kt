@@ -33,14 +33,12 @@ class ChainsCapsuleViewModel(
     override val capsuleId: String = "chains"
     private val chainSubmitGuard = SingleSubmitGuard()
     private val liveSnapshot = MutableStateFlow(ChainsSnapshot.EMPTY)
-    private val timeMachineSnapshot = MutableStateFlow<ChainsSnapshot?>(null)
 
     val uiState: StateFlow<ChainsUiState> = combine(
         access.hostStateFlow(),
         liveSnapshot,
-        timeMachineSnapshot,
-    ) { host, live, projected ->
-        buildUiState(host = host, snapshot = projected ?: live)
+    ) { host, live ->
+        buildUiState(host = host, snapshot = live)
     }.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
@@ -53,14 +51,6 @@ class ChainsCapsuleViewModel(
 
     fun replaceSnapshot(snapshot: ChainsSnapshot) {
         liveSnapshot.value = snapshot
-    }
-
-    fun showTimeMachineSnapshot(snapshot: ChainsSnapshot) {
-        timeMachineSnapshot.value = snapshot
-    }
-
-    fun clearTimeMachineSnapshot() {
-        timeMachineSnapshot.value = null
     }
 
     fun addChain(name: String, steps: List<TaskChainStep> = emptyList()) {

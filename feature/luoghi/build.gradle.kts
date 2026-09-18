@@ -116,6 +116,14 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+    sourceSets {
+        named("testDebug") {
+            assets.srcDir(rootProject.file("core/database/src/main/assets"))
+        }
+    }
 }
 
 dependencies {

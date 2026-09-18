@@ -65,7 +65,6 @@ import com.example.multitimetracker.BuildConfig
 import com.example.multitimetracker.MainViewModel
 import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.model.UiState
-import com.example.multitimetracker.export.BackupFolderStore
 import com.example.multitimetracker.capsules.alerts.ui.AlertsScreen
 import com.example.multitimetracker.capsules.alerts.state.AlertsUiState
 import com.example.multitimetracker.capsules.system.ui.AppRootSystemPrefs
@@ -596,19 +595,11 @@ if (developerSurfaceEnabled && showDevReport) {
                                 NavigationDrawerItem(
                                     selected = isDrawerItemSelected(item.destination),
                                     onClick = {
-                                        if (itemEnabled) {
-                                            scope.launch {
-                                                drawerState.close()
-                                                drawerContentMounted = false
-                                            }
-                                            openDrawerDestination(item.destination)
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                context.getString(R.string.drawer_read_only_unavailable),
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                        scope.launch {
+                                            drawerState.close()
+                                            drawerContentMounted = false
                                         }
+                                        openDrawerDestination(item.destination)
                                     },
                                     icon = {
                                         Icon(

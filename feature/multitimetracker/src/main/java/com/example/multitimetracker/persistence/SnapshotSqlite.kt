@@ -4,8 +4,6 @@ package com.example.multitimetracker.persistence
 import android.content.ContentValues
 import android.content.Context
 import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
-import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
-import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory
 import android.util.Log
 import com.example.multitimetracker.util.CapsuleAudit
 import com.example.multitimetracker.util.CapsuleWriteApi
@@ -942,9 +940,6 @@ object SnapshotSqlite {
                 put("json", json)
                 put("saved_at_ms", now)
             }
-            if (!gitHistoryEnabled(context)) {
-                writeTimeMachineHistoryEvent(db, json, now)
-            }
             val rowId = db.insertWithOnConflict(TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
             if (rowId == -1L) {
                 throw IllegalStateException("Snapshot write returned -1")
@@ -955,38 +950,6 @@ object SnapshotSqlite {
             db.close()
         }
         PersistentMutationTracker.record(context, "SnapshotSqlite.writeSnapshot")
-    }
-
-    private fun writeTimeMachineHistoryEvent(db: SQLiteDatabase, json: String, now: Long) {
-        ensureSnapshotHistorySchema(db)
-        val latest = readLatestHistoryEntry(db)
-        val latestJson = latest?.let { readHistoryEntryJson(db, it) }
-        val deltaJson = latestJson?.let { SnapshotHistoryCodec.diffOrNull(it, json) }
-        if (latest != null && deltaJson == null) return
-
-        val lastCheckpointMs = readLastCheckpointMs(db)
-        val checkpoint = SnapshotHistoryCodec.shouldStoreCheckpoint(lastCheckpointMs, now, deltaJson)
-        if (checkpoint || latestJson == null) {
-            val hash = SnapshotHistoryCodec.sha256(json)
-            val payloadId = upsertSnapshotPayload(db, hash, json, now)
-            val historyCv = ContentValues().apply {
-                put("json", "")
-                put("saved_at_ms", now)
-                put("kind", HISTORY_KIND_CHECKPOINT)
-                put("payload_id", payloadId)
-                put("payload_hash", hash)
-            }
-            db.insertOrThrow(HISTORY_TABLE, null, historyCv)
-        } else {
-            val historyCv = ContentValues().apply {
-                put("json", "")
-                put("saved_at_ms", now)
-                put("kind", HISTORY_KIND_DELTA)
-                put("base_history_id", latest.id)
-                put("delta_json", deltaJson)
-            }
-            db.insertOrThrow(HISTORY_TABLE, null, historyCv)
-        }
     }
 
     private fun upsertSnapshotPayload(
@@ -1044,82 +1007,6 @@ object SnapshotSqlite {
         }
     }
 
-    fun readSnapshotAsOf(context: Context, targetMs: Long): String? {
-        if (gitHistoryEnabled(context)) {
-            val remote = try {
-                GitHistory.readTimerSnapshotAsOf(context, targetMs)
-            } catch (error: Throwable) {
-                Log.w(TAG, "Git Time Machine unavailable", error)
-                return null
-            }
-            remote?.let { return it }
-            // A successful Git lookup with no revision means the target predates Git history.
-            // Only then may the retained legacy Time Machine answer the request.
-        }
-        val db = helper(context).readableDatabase
-        return try {
-            readHistoryJsonAsOf(db, targetMs) ?: db.rawQuery(
-                "SELECT json FROM $TABLE WHERE saved_at_ms <= ? ORDER BY saved_at_ms DESC LIMIT 1",
-                arrayOf(targetMs.toString())
-            ).use { current ->
-                if (current.moveToFirst()) current.getString(0) else null
-            }
-        } finally {
-            db.close()
-        }
-    }
-
-    private fun readHistoryJsonAsOf(db: SQLiteDatabase, targetMs: Long): String? {
-        ensureSnapshotHistorySchema(db)
-        val target = db.rawQuery(
-            "SELECT id, saved_at_ms, kind, json, payload_id, delta_json FROM $HISTORY_TABLE WHERE saved_at_ms <= ? ORDER BY saved_at_ms DESC, id DESC LIMIT 1",
-            arrayOf(targetMs.toString())
-        ).use { c ->
-            if (c.moveToFirst()) c.toHistoryEntry() else null
-        } ?: return null
-
-        if (target.kind == HISTORY_KIND_LEGACY || !target.json.isNullOrEmpty()) {
-            return target.json
-        }
-        if (target.kind == HISTORY_KIND_CHECKPOINT) {
-            return readHistoryEntryJson(db, target)
-        }
-
-        val base = db.rawQuery(
-            """
-            SELECT id, saved_at_ms, kind, json, payload_id, delta_json
-            FROM $HISTORY_TABLE
-            WHERE id <= ?
-              AND (kind = ? OR kind = ? OR (json IS NOT NULL AND length(json) > 0))
-            ORDER BY id DESC
-            LIMIT 1
-            """.trimIndent(),
-            arrayOf(target.id.toString(), HISTORY_KIND_CHECKPOINT, HISTORY_KIND_LEGACY)
-        ).use { c ->
-            if (c.moveToFirst()) c.toHistoryEntry() else null
-        } ?: return null
-
-        var json = readHistoryEntryJson(db, base) ?: return null
-        db.rawQuery(
-            """
-            SELECT id, saved_at_ms, kind, json, payload_id, delta_json
-            FROM $HISTORY_TABLE
-            WHERE id > ? AND id <= ?
-            ORDER BY id ASC
-            """.trimIndent(),
-            arrayOf(base.id.toString(), target.id.toString())
-        ).use { c ->
-            while (c.moveToNext()) {
-                val entry = c.toHistoryEntry()
-                json = when (entry.kind) {
-                    HISTORY_KIND_DELTA -> entry.deltaJson?.let { SnapshotHistoryCodec.applyDelta(json, it) } ?: json
-                    else -> readHistoryEntryJson(db, entry) ?: json
-                }
-            }
-        }
-        return json
-    }
-
     private fun readLatestHistoryEntry(db: SQLiteDatabase): HistoryEntry? {
         return db.rawQuery(
             "SELECT id, saved_at_ms, kind, json, payload_id, delta_json FROM $HISTORY_TABLE ORDER BY id DESC LIMIT 1",
@@ -1163,7 +1050,7 @@ object SnapshotSqlite {
         )
     }
 
-    fun compactTimeMachineStorage(context: Context): Boolean {
+    fun compactSnapshotHistoryStorage(context: Context): Boolean {
         val db = helper(context).writableDatabase
         var changed = false
         try {
@@ -1182,7 +1069,7 @@ object SnapshotSqlite {
                 while (c.moveToNext()) legacyRows.add(c.toHistoryEntry())
             }
             if (legacyRows.isEmpty()) {
-                Log.i(TAG, "time machine compaction: no legacy snapshot_history rows remain")
+                Log.i(TAG, "legacy snapshot compaction: no rows remain")
                 return false
             }
 
@@ -1232,7 +1119,7 @@ object SnapshotSqlite {
                 "SELECT COUNT(*) FROM $HISTORY_TABLE WHERE json IS NOT NULL AND length(json) > 0",
                 emptyArray()
             ).use { c -> if (c.moveToFirst()) c.getLong(0) else -1L }
-            Log.i(TAG, "time machine compaction: compacted=${legacyRows.size} remainingLegacy=$remaining")
+            Log.i(TAG, "legacy snapshot compaction: compacted=${legacyRows.size} remaining=$remaining")
         } finally {
             db.close()
         }
@@ -1325,7 +1212,7 @@ object SnapshotSqlite {
         return after < before
     }
 
-    fun vacuumTimeMachineStorageIfCompacted(context: Context): Boolean {
+    fun vacuumSnapshotHistoryIfCompacted(context: Context): Boolean {
         val db = helper(context).writableDatabase
         return try {
             ensureSnapshotHistorySchema(db)
@@ -1334,7 +1221,7 @@ object SnapshotSqlite {
                 emptyArray()
             ).use { c -> c.moveToFirst() }
             if (legacyRowsRemain) {
-                Log.i(TAG, "time machine vacuum skipped: legacy snapshot_history rows remain")
+                Log.i(TAG, "legacy snapshot vacuum skipped: rows remain")
                 return false
             }
             val pageSize = db.rawQuery("PRAGMA page_size", emptyArray()).use { c ->
@@ -1345,22 +1232,17 @@ object SnapshotSqlite {
             }
             val reclaimBytes = pageSize * freelistCount
             if (reclaimBytes < MIN_VACUUM_RECLAIM_BYTES) {
-                Log.i(TAG, "time machine vacuum skipped: reclaimBytes=$reclaimBytes")
+                Log.i(TAG, "legacy snapshot vacuum skipped: reclaimBytes=$reclaimBytes")
                 return false
             }
-            Log.i(TAG, "time machine vacuum start")
+            Log.i(TAG, "legacy snapshot vacuum start")
             db.execSQL("VACUUM")
-            Log.i(TAG, "time machine vacuum complete")
+            Log.i(TAG, "legacy snapshot vacuum complete")
             true
         } finally {
             db.close()
         }
     }
-
-    private fun gitHistoryEnabled(context: Context): Boolean =
-        runCatching {
-            GitDataSettings.configuration(context.applicationContext).enabled
-        }.getOrDefault(false)
 
     fun internalDbFile(context: Context): java.io.File {
         return context.applicationContext.getDatabasePath(DB_NAME)

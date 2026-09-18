@@ -6,6 +6,7 @@ import android.content.Intent
 import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.PlaceGeofenceTransitionLogEntity
 import com.gernalix.luoghi.data.PlaceRepository
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,7 @@ class PlaceGeofenceReceiver : BroadcastReceiver() {
     }
 
     private suspend fun handlePlatformEvent(context: Context, intent: Intent) {
+        if (!isForActiveProfile(context, intent)) return
         val event = GeofencingEvent.fromIntent(intent) ?: return
         if (event.hasError()) return
         val transition = PlaceGeofenceTransition.fromGeofenceTransition(event.geofenceTransition) ?: return
@@ -48,6 +50,9 @@ class PlaceGeofenceReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        internal fun isForActiveProfile(context: Context, intent: Intent): Boolean =
+            intent.getStringExtra(PlaceGeofenceRegistrar.PROFILE_ID) == DatabaseProfiles.activeProfileId(context)
+
         const val ACTION_GEOFENCE_TRANSITION = "com.gernalix.luoghi.action.GEOFENCE_TRANSITION"
         const val ACTION_RESTORE = "com.gernalix.luoghi.action.GEOFENCE_RESTORE"
         private const val DEDUPE_WINDOW_MS = 2 * 60 * 1_000L

@@ -9,7 +9,6 @@
     <string name="cd_open_app_menu">Open navigation drawer</string>
     <string name="cd_open_help">Open help</string>
     <string name="now">Now</string>
-    <string name="export_data">Export data</string>
     <string name="import_data">Import data</string>
     <string name="add">Add</string>
     <string name="show_summary">Show summary</string>
@@ -96,14 +95,6 @@
     <string name="audit_session_meta_updated">Audit session meta updated: %1$s</string>
     <string name="audit_session_deleted">Audit session deleted: %1$s</string>
     <string name="audit_session_ignored_short">Audit session ignored (short)</string>
-    <string name="audit_filter_alerts">Audit filter alerts</string>
-    <string name="audit_filter_chains">Audit filter chains</string>
-    <string name="audit_filter_system">Audit filter system</string>
-    <string name="audit_filter_tags">Audit filter tags</string>
-    <string name="audit_filter_tasks">Sessions</string>
-    <string name="audit_filter_undone">Audit filter undone</string>
-    <string name="audit_filters">Audit filters</string>
-    <string name="audit_log">Audit log</string>
     <string name="audit_running_start_edited">Audit running start edited</string>
     <string name="audit_session_times_edited">Audit session times edited</string>
     <string name="audit_task_start_new">Audit session start (new)</string>
@@ -153,8 +144,6 @@
     <string name="eliminare_task">Delete session</string>
     <string name="eliminata">Eliminata</string>
     <string name="enable_undo">Enable undo</string>
-    <string name="export_cd">Export</string>
-    <string name="export_no_sessions_hint">No sessions found. Tag metadata will still be exported.</string>
     <string name="extend_session_to_now">Extend session to now</string>
     <string name="extend_session_to_now_body">Extend session to now body</string>
     <string name="extend_session_to_now_title">Extend session to now title</string>
@@ -170,7 +159,6 @@
     <string name="ignore_short_threshold_hint">Ignore short threshold hint</string>
     <string name="import_cd">Import</string>
     <string name="import_done">Import verified and activated.</string>
-    <string name="import_failed">Import failed: %1$s</string>
     <string name="impostazioni">Impostazioni</string>
     <string name="indietro">Indietro</string>
     <string name="inizio">Start</string>
@@ -344,7 +332,6 @@
     <string name="drawer_vaults">Vaults</string>
     <string name="drawer_info">Info</string>
     <string name="info_app_name">MultiTimeTracker</string>
-    <string name="drawer_read_only_unavailable">Unavailable in Time Machine</string>
 
     <!-- Chains -->
     <string name="chain_add_title">Add chain</string>
@@ -414,11 +401,6 @@
     <string name="backup_signature_changed">changed</string>
     <string name="backup_db_not_found">Backup DB not found in the selected folder.</string>
     <string name="audit_import">Imported %1$s</string>
-    <string name="audit_export_manual">Manual export: %1$s</string>
-    <string name="audit_export_completed">Export completed: %1$s</string>
-    <string name="audit_import_completed">Import completed: %1$s</string>
-    <string name="export_done_zip">Export done: %1$s</string>
-    <string name="export_already_running">Export already running</string>
     <string name="session_only_no_matching_running_session">Couldn’t find the running session for this row.</string>
     <string name="session_deleted_toast">Session deleted.</string>
     <string name="task_already_created_recently">Session already created (tap ignored).</string>
@@ -477,22 +459,13 @@
     <string name="import_prompt_body">I found CSV backups from a previous installation in your data folder. Do you want to import them now?\nFiles: %1$s</string>
     <string name="import_prompt_confirm">Yes, import</string>
     <string name="import_prompt_dismiss">No, delete</string>
-    <string name="import_toast_success">Import completed</string>
-    <string name="import_toast_failed">Import failed</string>
-    <string name="import_toast_deleted">Previous data deleted</string>
     <string name="import_legacy_csv_disabled">Legacy CSV auto-import is disabled. Use database import instead.</string>
-    <string name="export_share_title">MultiTimeTracker export</string>
     <string name="tracking_active">Tracking active</string>
     <string name="tracking_active_one_session">Tracking active: 1 session</string>
     <string name="tracking_active_n_sessions">Tracking active: %1$d sessions</string>
     <string name="timezone_utc_z">UTC/Z</string>
     <string name="cleanup_failed_fmt">Cleanup failed: %1$s</string>
     <string name="tag_hierarchy_cycle_not_allowed">Cycle not allowed in tag hierarchy</string>
-    <string name="export_nothing_to_export">No sessions to export (start and stop at least one session)</string>
-    <string name="import_completed_counts_fmt">Import completed: %1$d sessions, %2$d tags</string>
-    <string name="import_failed_fmt">Import failed: %1$s</string>
-    <string name="backup_folder_error_fmt">Data folder error: %1$s%2$s</string>
-    <string name="export_failed_fmt">Export failed: %1$s</string>
     <string name="session_history_title">Session history</string>
     <string name="session_history_placeholder">Session history is now shown directly inside the tag details flow for a cleaner overview.</string>
     <string name="tags_add_tag">Add tag</string>
@@ -506,18 +479,6 @@
     <string name="quick_session_title_prefix">Quick-%1$s</string>
 
     <string name="audit_session_start_new_widget">Started session from widget: %1$s</string>
-    <string name="backup_folder_not_configured">Data folder not set up yet.</string>
-    <string name="backup_folder_access_failed">Could not open the selected data folder.</string>
-    <string name="backup_folder_missing_read">The selected data folder is missing read access.</string>
-    <string name="backup_folder_missing_write">The selected data folder is missing write access.</string>
-    <string name="export_tmp_folder_create_failed">Could not create temporary export folder.</string>
-    <string name="export_zip_create_failed_fmt">Could not create ZIP file: %1$s</string>
-    <string name="export_zip_open_failed_fmt">Could not open ZIP output stream: %1$s</string>
-    <string name="export_zip_empty_tmp_folder">Export produced no files to zip</string>
-    <string name="vault_create_bak_failed_fmt">Could not create backup file: %1$s</string>
-    <string name="vault_create_db_failed_fmt">Could not create file: %1$s</string>
-    <string name="vault_open_output_failed_fmt">Could not open output stream for %1$s</string>
-    <string name="vault_open_input_failed_fmt">Could not open input stream for %1$s</string>
     <string name="backup_db_empty">Backup DB is empty.</string>
     <string name="backup_db_integrity_check_failed">Integrity check failed.</string>
     <string name="backup_db_open_failed_fmt">Could not open DB: %1$s</string>
@@ -525,7 +486,6 @@
     <string name="backup_db_swap_failed">Could not swap the imported DB into place.</string>
     <string name="backup_db_integrity_failed_fmt">Backup DB failed validation: %1$s</string>
     <string name="import_snapshot_unreadable">Import failed: the selected backup could not be read safely.</string>
-    <string name="export_share_failed_fmt">Export failed: %1$s</string>
     <string name="start_time_cannot_be_future" formatted="false">Start time can’t be in the future</string>
     <string name="task_history_running_since_fmt">Running: %1$s</string>
     <string name="task_history_no_sessions">No sessions yet.</string>
@@ -599,7 +559,6 @@
     <string name="integrity_gate_body">The database looks inconsistent. To prevent silent data loss, the app is blocked until you restore a safe copy.</string>
     <string name="integrity_gate_body_generic">The database looks inconsistent. The app is blocked until you restore a safe copy.</string>
     <string name="integrity_gate_restore_preimport">Restore last pre-import backup</string>
-    <string name="integrity_gate_restore_from_folder">Restore from Backup Folder</string>
     <string name="integrity_gate_restore_ok">Restore verified and activated.</string>
     <string name="integrity_gate_restore_failed">Restore failed.</string>
 
@@ -669,32 +628,6 @@
     <string name="life_period_unit_hours">Hours</string>
     <string name="life_period_unit_minutes">Minutes</string>
     <string name="life_period_unit_seconds">Seconds</string>
-    <string name="time_machine_title">Time Machine</string>
-    <string name="time_machine_enter">Enter Time Machine</string>
-    <string name="time_machine_enter_moment">Enter moment</string>
-    <string name="time_machine_exit">Exit Time Machine</string>
-    <string name="time_machine_pick_datetime">Choose date and time</string>
-    <string name="time_machine_picker_label">Target: %1$s</string>
-    <string name="time_machine_banner">Time Machine: %1$s. Every change is disabled. Tap here to exit.</string>
-    <string name="time_machine_write_blocked">Time Machine is active: changes are disabled.</string>
-    <string name="time_machine_target_in_future">Choose a past date and time.</string>
-    <string name="time_machine_no_snapshot">No historical state is available for that moment.</string>
-    <string name="time_machine_mode_moment">Moment</string>
-    <string name="time_machine_mode_period">Period</string>
-    <string name="time_machine_pick_start">Choose start</string>
-    <string name="time_machine_pick_end">Choose end</string>
-    <string name="time_machine_period_start">Start: %1$s</string>
-    <string name="time_machine_period_end">End: %1$s</string>
-    <string name="time_machine_period_invalid">End must be after start.</string>
-    <string name="time_machine_show_period">Show period</string>
-    <string name="time_machine_period_range">%1$s to %2$s</string>
-    <string name="time_machine_no_period_totals">No tag totals for this period.</string>
-    <string name="time_machine_compare_with_today">Compare with today</string>
-    <string name="time_machine_compare_range">Selected day: %1$s</string>
-    <string name="time_machine_compare_empty">No tag totals to compare.</string>
-    <string name="time_machine_compare_selected_day">Selected day: %1$s</string>
-    <string name="time_machine_compare_today">Today: %1$s</string>
-    <string name="time_machine_compare_difference">Difference: %1$s</string>
     <string name="now_intro_title">Track what is active right now</string>
     <string name="now_intro_body">Use the play button to create a session quickly. Tap a running row to stop it, or swipe and long-press to edit it.</string>
     <string name="now_intro_counts">%1$d running sessions • %2$d active tags</string>
@@ -842,5 +775,4 @@
     <string name="hub_context_new_place">+ New place</string>
     <string name="hub_context_place_radius_hint">New places use a 75 m radius.</string>
     <string name="hub_context_save_failed">Context could not be saved.</string>
-    <string name="data_explorer">Data Explorer</string>
 </resources>

@@ -5,6 +5,7 @@
 package com.example.multitimetracker.widget
 
 import android.app.Activity
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -15,6 +16,7 @@ import android.os.VibratorManager
 import android.widget.Toast
 import com.example.multitimetracker.MainActivity
 import com.example.multitimetracker.R
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 
 /**
  * A tiny transparent Activity used as a reliable place to trigger haptics and toast.
@@ -49,6 +51,14 @@ class QuickSessionWidgetClickActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val appCtx = applicationContext
+        val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        val configuredProfile = appCtx.getSharedPreferences("quick_task_widget_prefs", Context.MODE_PRIVATE)
+            .getString("profile_$appWidgetId", null)
+        if (configuredProfile != DatabaseProfiles.activeProfileId(appCtx)) {
+            Toast.makeText(appCtx, getString(R.string.widget_quick_event_unavailable), Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
 
         // Start a new running session immediately.
         val result = QuickSessionRunner.run(appCtx)

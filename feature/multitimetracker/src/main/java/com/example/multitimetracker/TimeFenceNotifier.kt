@@ -16,6 +16,7 @@ import android.os.VibratorManager
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import com.example.multitimetracker.model.TimedTagNotificationType
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 
 object TimeFenceNotifier {
 
@@ -155,8 +156,14 @@ object TimeFenceNotifier {
         val acknowledgeIntent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
             action = TimeFenceTimerReceiver.ACTION_ACK_TIMED_SESSION
             putExtra(TimeFenceTimerReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+            putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, DatabaseProfiles.activeProfileId(context))
         }
-        val acknowledgePi = PendingIntent.getBroadcast(context, notificationId, acknowledgeIntent, piFlags)
+        val acknowledgePi = PendingIntent.getBroadcast(
+            context,
+            notificationId xor DatabaseProfiles.activeProfileId(context).hashCode(),
+            acknowledgeIntent,
+            piFlags,
+        )
         val category = if (isAlarm) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER
 
         val notification = NotificationCompat.Builder(context, channelId)

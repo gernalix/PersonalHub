@@ -16,13 +16,9 @@ import com.example.multitimetracker.core.contracts.TaggedSessionRecord
 import com.example.multitimetracker.core.contracts.ClosedSessionRecord
 import com.example.multitimetracker.export.AuthoritativeExportPayload
 import com.example.multitimetracker.export.AuthoritativeExportPayloadBuilder
-import com.example.multitimetracker.export.CsvImporter
-import com.example.multitimetracker.capsules.system.ImportExportCapsule
-import com.example.multitimetracker.capsules.system.ImportExportSnapshot
 import com.example.multitimetracker.capsules.alerts.controller.AlertsCapsuleViewModel
 import com.example.multitimetracker.capsules.alerts.public.TimeFenceEvent
 import com.example.multitimetracker.capsules.alerts.state.AlertsHostState
-import com.example.multitimetracker.capsules.auditlog.state.AuditLogUiState
 import com.example.multitimetracker.capsules.chains.public.ChainsSnapshot
 import com.example.multitimetracker.capsules.chains.state.ChainsHostState
 import com.example.multitimetracker.capsules.now.controller.NowCapsuleViewModel
@@ -53,13 +49,7 @@ import com.example.multitimetracker.model.QuickEventFieldDefinition
 import com.example.multitimetracker.model.QuickEventFieldValue
 import com.example.multitimetracker.model.QuickEventMacroAction
 import com.example.multitimetracker.model.TimedTagNotificationType
-import com.example.multitimetracker.model.TemporalContext
-import com.example.multitimetracker.model.TimeMachinePeriodSelection
-import com.example.multitimetracker.model.TimeMachineTagComparisonRow
-import com.example.multitimetracker.model.TimeMachineTagTotalRow
-import com.example.multitimetracker.model.computeTimeMachineTagTotals
 import com.example.multitimetracker.model.homeLoadStateFor
-import com.example.multitimetracker.persistence.AuditLogSqlite
 import com.example.multitimetracker.persistence.SnapshotSqlite
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.persistence.UiPrefsStore
@@ -78,8 +68,6 @@ import java.util.Calendar
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.time.Instant
-import java.time.ZoneId
 import java.util.Locale
 import org.json.JSONObject
 
@@ -113,11 +101,6 @@ internal fun chainSubmitKey(name: String, steps: List<TaskChainStep>): String =
 
 @OptIn(CapsuleWriteApi::class)
 class MainViewModel : ViewModel() {
-    private data class TimeMachineState(
-        val targetMs: Long,
-        val uiState: UiState
-    )
-
     // FEATURE CAPSULE: Session Core Bridge — START
     // All session-only table access must go through SessionCore (interface), never SessionRepository directly.
     private fun sessionCore(ctx: android.content.Context): com.example.multitimetracker.core.session.SessionCore =
@@ -153,30 +136,6 @@ private fun logAppVersionIfNeeded(context: Context) {
     val lastLogged = UiPrefsStore.getLastLoggedAppVersionCode(context)
 
     if (lastLogged != null && lastLogged == currentCode) return
-
-    val isInstall = lastLogged == null
-    val action = if (isInstall) "APP_INSTALL" else "APP_UPDATE"
-
-    val payload = JSONObject()
-        .put("versionName", currentName)
-        .put("versionCode", currentCode)
-    if (!isInstall) payload.put("prevVersionCode", lastLogged)
-
-    val summary = if (isInstall) {
-        // On Android, VERSION_NAME and VERSION_CODE are often identical in this project (e.g. "19" / 19).
-        // Keep the user-facing message clean and avoid repeating the same number twice.
-        context.getString(R.string.audit_app_install, currentName)
-    } else {
-        context.getString(R.string.audit_app_update, currentName)
-    }
-
-    AuditLogSqlite.insert(
-        context = context,
-        action = action,
-        summary = summary,
-        payload = payload,
-        isSystem = true,
-    )
 
     UiPrefsStore.setLastLoggedAppVersionCode(context, currentCode)
 }
@@ -290,7 +249,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 payload: org.json.JSONObject?,
                 undoable: Boolean
             ) {
-                auditLogCapsule.logUserEvent(action, entityType, entityId, summary, payload, undoable)
+                // Canonical database triggers feed the PersonalHub activity register.
             }
 
             override fun logSystemEvent(
@@ -300,23 +259,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 summary: String,
                 payload: org.json.JSONObject?
             ) {
-                auditLogCapsule.logSystemEvent(action, entityType, entityId, summary, payload)
-            }
-        },
-        auditLogAccess = object : com.example.multitimetracker.capsules.system.AuditLogCapsuleAccess {
-            override fun uiStateFlow(): StateFlow<AuditLogUiState> = auditLogFeatureState
-            override fun appContextOrNull(): Context? = appContext
-            override fun blockWriteIfNeeded(): Boolean = this@MainViewModel.blockWriteIfNeeded()
-            override fun timeMachineTargetMs(): Long? = _timeMachine.value?.targetMs
-            override fun deleteSession(sessionId: Long) = sessionOwnerCapsule.deleteSession(sessionId)
-            override fun deleteTag(tagId: Long) = tagsCapsule.deleteTag(tagId, deleteTasks = false)
-            override fun setTagParents(tagId: Long, parentIds: Set<Long>) =
-                tagsCapsule.setTagParents(tagId, parentIds)
-            override fun restoreStoppedSessionFromAudit(sessionId: Long, startMs: Long, endMs: Long, eventId: Long) {
-                sessionOwnerCapsule.restoreStoppedSessionFromAudit(sessionId, startMs, endMs, eventId)
-            }
-            override fun refreshRuntimeAfterUndo() {
-                this@MainViewModel.refreshRuntimeAfterUndo()
+                // Canonical database triggers feed the PersonalHub activity register.
             }
         },
         chainsAccess = object : com.example.multitimetracker.capsules.system.ChainsCapsuleAccess {
@@ -342,7 +285,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 payload: JSONObject?,
                 undoable: Boolean
             ) {
-                auditLogCapsule.logUserEvent(action, entityType, entityId, summary, payload, undoable)
+                // Canonical database triggers feed the PersonalHub activity register.
             }
             override fun persist() = this@MainViewModel.persist()
             override fun scheduleAutoBackup() = this@MainViewModel.scheduleAutoBackup()
@@ -350,63 +293,11 @@ private fun logAppVersionIfNeeded(context: Context) {
                 this@MainViewModel.scheduleSessionsRefresh(context, nowMs)
             }
         },
-        importExportAccess = object : com.example.multitimetracker.capsules.system.ImportExportCapsuleAccess {
-            override fun exportSnapshot(): ImportExportSnapshot {
-                val payload = buildAuthoritativeExportPayload()
-
-                return ImportExportSnapshot(
-                    tasks = payload.tasks,
-                    tags = payload.tags,
-                    closedSessions = payload.closedSessions,
-                    tagSessions = payload.tagSessions,
-                    tagParentsByChild = payload.tagParentsByChild,
-                    lifePeriods = payload.lifePeriods,
-                    timeFenceRules = payload.timeFenceRules,
-                    chains = payload.chains,
-                    activeChainRun = payload.activeChainRun,
-                    appUsageMs = payload.appUsageMs,
-                    quickEventTemplates = payload.quickEventTemplates,
-                    quickEventEntries = payload.quickEventEntries,
-                    quickEventFieldDefinitions = payload.quickEventFieldDefinitions,
-                    quickEventFieldValues = payload.quickEventFieldValues,
-                    quickEventMacros = payload.quickEventMacros,
-                    quickEventMacroActions = payload.quickEventMacroActions
-                )
-            }
-            override fun applyImportedCsvSnapshot(snapshot: CsvImporter.ImportedSnapshot) {
-                snapshotCoordinator.applyImportedCsvSnapshot(snapshot)
-            }
-            override fun activateImportedSnapshotFromStore(
-                ctx: Context,
-                snap: SnapshotStore.Snapshot
-            ): String? {
-                return this@MainViewModel.activateImportedSnapshotFromStore(ctx, snap)
-            }
-
-            override fun persist(): Unit = this@MainViewModel.persist()
-            override fun scheduleAutoBackup(): Unit = this@MainViewModel.scheduleAutoBackup()
-            override fun computeBackupSignature(): String = this@MainViewModel.computeBackupSignature()
-            override fun setLastBackupSignature(sig: String): Unit { snapshotCoordinator.setLastBackupSignature(sig) }
-            override fun buildManualExportZipName(nowMs: Long): String = this@MainViewModel.buildManualExportZipName(nowMs)
-            override fun setImportVerificationReport(report: String?) { this@MainViewModel.setImportVerificationReport(report) }
-        },
         nowAccess = object : com.example.multitimetracker.capsules.system.NowCapsuleAccess {
             override fun uiStateFlow(): StateFlow<NowUiState> = nowFeatureState
 
             override fun addTag(name: String) {
                 tagsCapsule.addTag(name)
-            }
-
-            override fun exportBackup(context: Context) {
-                this@MainViewModel.exportBackup(context)
-            }
-
-            override fun importDbFromUri(context: Context, uri: Uri) {
-                this@MainViewModel.importDatabaseFromUri(context, uri)
-            }
-
-            override fun setBackupRootFolder(context: Context, uri: Uri) {
-                this@MainViewModel.setBackupRootFolder(context, uri)
             }
         },
         tagsAccess = object : com.example.multitimetracker.capsules.system.TagsCapsuleAccess {
@@ -467,7 +358,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 payload: JSONObject?,
                 undoable: Boolean
             ) {
-                auditLogCapsule.logUserEvent(action, entityType, entityId, summary, payload, undoable)
+                // Canonical database triggers feed the PersonalHub activity register.
             }
             override fun rememberCurrentStateAsPersisted(): Unit = this@MainViewModel.rememberCurrentStateAsPersisted()
             override fun clearPersistenceFailureReport() {
@@ -500,7 +391,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 payload: JSONObject?,
                 undoable: Boolean
             ) {
-                auditLogCapsule.logUserEvent(action, entityType, entityId, summary, payload, undoable)
+                // Canonical database triggers feed the PersonalHub activity register.
             }
             override fun persist() = this@MainViewModel.persist()
             override fun scheduleAutoBackup() = this@MainViewModel.scheduleAutoBackup()
@@ -550,7 +441,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 payload: JSONObject?,
                 undoable: Boolean
             ) {
-                auditLogCapsule.logUserEvent(action, entityType, entityId, summary, payload, undoable)
+                // Canonical database triggers feed the PersonalHub activity register.
             }
             override fun logSystemEvent(
                 action: String,
@@ -559,7 +450,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 summary: String,
                 payload: JSONObject?
             ) {
-                auditLogCapsule.logSystemEvent(action, entityType, entityId, summary, payload)
+                // Canonical database triggers feed the PersonalHub activity register.
             }
             override fun scheduleSessionsRefresh(context: Context, nowMs: Long) {
                 this@MainViewModel.scheduleSessionsRefresh(context, nowMs)
@@ -598,8 +489,6 @@ private fun logAppVersionIfNeeded(context: Context) {
     }
 
     private val alertsCapsuleVm: AlertsCapsuleViewModel get() = capsuleGateway.alerts
-    private val importExportCapsule: ImportExportCapsule get() = capsuleGateway.importExport
-
     val alertsCapsule: AlertsCapsuleViewModel get() = capsuleGateway.alerts
     val nowCapsule: NowCapsuleViewModel get() = capsuleGateway.now
     val sessionOwnerCapsule: com.example.multitimetracker.capsules.sessions.controller.SessionOwnerCapsuleViewModel get() = capsuleGateway.sessionOwner
@@ -608,7 +497,6 @@ private fun logAppVersionIfNeeded(context: Context) {
     val timelineCapsule: com.example.multitimetracker.capsules.timeline.controller.TimelineCapsuleViewModel get() = capsuleGateway.timeline
     val quickEventsCapsule: com.example.multitimetracker.capsules.quickevents.controller.QuickEventsCapsuleViewModel get() = capsuleGateway.quickEvents
     val chainsCapsule: com.example.multitimetracker.capsules.chains.controller.ChainsCapsuleViewModel get() = capsuleGateway.chains
-    val auditLogCapsule: com.example.multitimetracker.capsules.auditlog.controller.AuditLogCapsuleViewModel get() = capsuleGateway.auditLog
 
     private fun capsuleRuntimeParticipants(): List<CapsuleRuntimeParticipant> = listOf(
         nowCapsule,
@@ -619,7 +507,6 @@ private fun logAppVersionIfNeeded(context: Context) {
         quickEventsCapsule,
         chainsCapsule,
         alertsCapsule,
-        auditLogCapsule,
     ).filterIsInstance<CapsuleRuntimeParticipant>()
 
     private fun notifyCapsuleRuntimeChanged(context: Context?, change: CapsuleRuntimeChange) {
@@ -628,14 +515,6 @@ private fun logAppVersionIfNeeded(context: Context) {
                 when (change) {
                     CapsuleRuntimeChange.SNAPSHOT_RELOAD ->
                         context?.let(participant::refreshAfterSnapshot)
-                    CapsuleRuntimeChange.POST_IMPORT ->
-                        context?.let(participant::refreshAfterImport)
-                    CapsuleRuntimeChange.RECOVERY_RESTORE ->
-                        context?.let(participant::recoverAfterRestore)
-                    CapsuleRuntimeChange.VAULT_CHANGED ->
-                        participant.refreshForVaultChange(context)
-                    CapsuleRuntimeChange.TIME_MACHINE_CHANGED ->
-                        participant.refreshForTimeMachineChange(context)
                 }
             }.onFailure { error ->
                 Log.e("MainViewModel", "capsule runtime callback failed capsule=${participant.capsuleId} change=$change", error)
@@ -655,17 +534,6 @@ private var initialized = false
         if (appContext == null) {
             appContext = context.applicationContext
         }
-
-        auditLogCapsule.initializeFromPrefs()
-    }
-
-    // === FEATURE CAPSULE: AuditLog.FiltersPrefs (ViewModel) END ===
-
-    // v314: Import verification report (shown in UI with Copy + also logged in audit).
-    private val _importVerificationReport = MutableStateFlow<String?>(null)
-    val importVerificationReport: StateFlow<String?> = _importVerificationReport
-    fun setImportVerificationReport(report: String?) {
-        _importVerificationReport.value = report
     }
 
     private val _persistenceFailureReport = MutableStateFlow<String?>(null)
@@ -681,35 +549,17 @@ private var initialized = false
             nowMs = System.currentTimeMillis()
         )
     )
-    private val _timeMachine = MutableStateFlow<TimeMachineState?>(null)
-    val state: StateFlow<UiState> = combine(_state, _timeMachine) { live, timeMachine ->
-        val context = TemporalContext(timeMachine?.targetMs)
-        val effectiveTime = context.effectiveTime(live.nowMs)
-        if (timeMachine == null) {
-            live.copy(
-                timeMachineTargetMs = null,
-                isReadOnly = effectiveTime.isReadOnly
-            )
-        } else {
-            timeMachine.uiState
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Eagerly,
-        initialValue = _state.value
-    )
+    val state: StateFlow<UiState> = _state
 
     private val tagsHostState: StateFlow<TagsHostState> = state.map { source ->
         TagsHostState(
             nowMs = source.nowMs,
-            effectiveNowMs = TemporalContext(source.timeMachineTargetMs).effectiveTime(source.nowMs).nowMs,
-            timeMachineTargetMs = source.timeMachineTargetMs,
+            effectiveNowMs = source.nowMs,
             isReadOnly = source.isReadOnly,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TagsHostState(
         nowMs = _state.value.nowMs,
-        effectiveNowMs = TemporalContext(_state.value.timeMachineTargetMs).effectiveTime(_state.value.nowMs).nowMs,
-        timeMachineTargetMs = null,
+        effectiveNowMs = _state.value.nowMs,
         isReadOnly = false,
     ))
 
@@ -723,7 +573,6 @@ private var initialized = false
             tagLastUsedMsByTagId = tagsState.tagLastUsedMsByTagId,
             tagParentsByChild = tagsState.tagParentsByChild,
             nowMs = source.nowMs,
-            timeMachineTargetMs = source.timeMachineTargetMs,
             isReadOnly = source.isReadOnly,
             homeLoadState = source.homeLoadState,
         )
@@ -736,7 +585,6 @@ private var initialized = false
         tagLastUsedMsByTagId = emptyMap(),
         tagParentsByChild = emptyMap(),
         nowMs = _state.value.nowMs,
-        timeMachineTargetMs = null,
         isReadOnly = false,
         homeLoadState = HomeLoadState.Loading,
     ))
@@ -746,14 +594,12 @@ private var initialized = false
             tags = tagsCapsule.tags(),
             tagLastUsedMsByTagId = sessionOwnerCapsule.runtimeStateValue().tagLastUsedMsByTagId,
             nowMs = source.nowMs,
-            timeMachineTargetMs = source.timeMachineTargetMs,
             isReadOnly = source.isReadOnly,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, QuickEventsHostState(
         tags = emptyList(),
         tagLastUsedMsByTagId = emptyMap(),
         nowMs = _state.value.nowMs,
-        timeMachineTargetMs = null,
         isReadOnly = false,
     ))
 
@@ -766,7 +612,6 @@ private var initialized = false
             tagLastUsedMsByTagId = tagsState.tagLastUsedMsByTagId,
             tagParentsByChild = tagsState.tagParentsByChild,
             nowMs = source.nowMs,
-            timeMachineTargetMs = source.timeMachineTargetMs,
             isReadOnly = source.isReadOnly,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TimelineUiState(
@@ -777,7 +622,6 @@ private var initialized = false
         tagLastUsedMsByTagId = emptyMap(),
         tagParentsByChild = emptyMap(),
         nowMs = _state.value.nowMs,
-        timeMachineTargetMs = null,
         isReadOnly = false,
     ))
 
@@ -785,12 +629,10 @@ private var initialized = false
         SinceWhenHostState(
             tags = tagsCapsule.tags(),
             nowMs = source.nowMs,
-            timeMachineTargetMs = source.timeMachineTargetMs,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SinceWhenHostState(
         tags = emptyList(),
         nowMs = _state.value.nowMs,
-        timeMachineTargetMs = null,
     ))
 
     private val alertsHostState: StateFlow<AlertsHostState> = state.map { source ->
@@ -813,10 +655,6 @@ private var initialized = false
         isReadOnly = false,
     ))
 
-    private val auditLogFeatureState: StateFlow<AuditLogUiState> = state.map { source ->
-        AuditLogUiState(isReadOnly = source.isReadOnly)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, AuditLogUiState(isReadOnly = false))
-
     // v423: FAIL-FAST data integrity gate (blocks the app if DB is inconsistent).
     private val _integrityBlock = MutableStateFlow<DataIntegrityGate.GateResult?>(null)
     val integrityBlock: StateFlow<DataIntegrityGate.GateResult?> = _integrityBlock
@@ -837,15 +675,6 @@ private var initialized = false
                     closedSessionsSnapshot = closedSessions,
                     tagSessionsSnapshot = tagSessions,
                     snapshot = runtime,
-                )
-            },
-            loadImportedSnapshot = { tasks, tags, closedSessions, tagSessions, runtime ->
-                engine.loadImportedSnapshot(
-                    tasks = tasks,
-                    tags = tags,
-                    importedClosedSessionRecords = closedSessions,
-                    importedTaggedSessionRecords = tagSessions,
-                    runtimeSnapshot = runtime,
                 )
             },
             exportRuntimeSnapshot = engine::exportRuntimeSnapshot,
@@ -908,7 +737,6 @@ private var initialized = false
             },
             setPersistenceFailureReport = { report -> _persistenceFailureReport.value = report },
             onSnapshotReloaded = { context -> notifyCapsuleRuntimeChanged(context, CapsuleRuntimeChange.SNAPSHOT_RELOAD) },
-            onPostImport = { context -> notifyCapsuleRuntimeChanged(context, CapsuleRuntimeChange.POST_IMPORT) },
             showPersistenceFailureToast = { ctx ->
                 Toast.makeText(ctx, ctx.getString(R.string.session_write_failed), Toast.LENGTH_LONG).show()
             },
@@ -922,7 +750,6 @@ private var initialized = false
             setInitialized = { initialized = it },
             integrityBlock = { _integrityBlock.value },
             setIntegrityBlock = { _integrityBlock.value = it },
-            setImportVerificationReport = { report -> _importVerificationReport.value = report },
             resetToFreshInstallState = { nowMs ->
                 sinceWhenCapsule.replaceLifePeriods(emptyList())
                 tagsCapsule.replaceTags(emptyList())
@@ -969,159 +796,7 @@ private var initialized = false
         }
     }
 
-    private fun isTimeMachineActive(): Boolean = _timeMachine.value != null
-
-    private fun blockWriteIfNeeded(): Boolean {
-        if (!isTimeMachineActive()) return false
-        appContext?.let { ctx ->
-            Toast.makeText(ctx, ctx.getString(R.string.time_machine_write_blocked), Toast.LENGTH_SHORT).show()
-        }
-        return true
-    }
-
-    private fun buildTimeMachineUiState(
-        snapshot: SnapshotStore.Snapshot,
-        targetMs: Long
-    ): UiState {
-        val tagsProjection = tagsCapsule.showTimeMachineSnapshotTags(snapshot)
-        val sessionsProjection = sessionOwnerCapsule.showTimeMachineSnapshot(
-            snapshot = snapshot,
-            tags = tagsProjection.tags,
-            activeTagStartByTagId = tagsProjection.activeTagStartByTagId,
-        )
-
-        return UiState(
-            appUsageMs = snapshot.appUsageMs,
-            appUsageRunningSinceMs = null,
-            installAtMs = snapshot.installAtMs,
-            nowMs = targetMs,
-            timeMachineTargetMs = targetMs,
-            isReadOnly = true,
-            homeLoadState = homeLoadStateFor(sessionsProjection.runningSessions),
-        )
-    }
-
-    fun enterTimeMachine(targetMs: Long) {
-        val ctx = appContext ?: return
-        val liveNowMs = _state.value.nowMs
-        if (targetMs > liveNowMs) {
-            Toast.makeText(ctx, ctx.getString(R.string.time_machine_target_in_future), Toast.LENGTH_SHORT).show()
-            return
-        }
-        val snapshot = SnapshotStore.loadAsOf(ctx, targetMs)
-        if (snapshot == null) {
-            Toast.makeText(ctx, ctx.getString(R.string.time_machine_no_snapshot), Toast.LENGTH_SHORT).show()
-            return
-        }
-        _timeMachine.value = TimeMachineState(
-            targetMs = targetMs,
-            uiState = buildTimeMachineUiState(snapshot = snapshot, targetMs = targetMs)
-        )
-        sinceWhenCapsule.showTimeMachineLifePeriods(snapshot.lifePeriods)
-        alertsCapsule.showTimeMachineRules(snapshot.timeFenceRules)
-        quickEventsCapsule.showTimeMachineSnapshot(snapshot.toQuickEventsSnapshot())
-        chainsCapsule.showTimeMachineSnapshot(snapshot.toChainsSnapshot())
-        tagsCapsule.showTimeMachineTagParentsByChild(snapshot.tagParents.groupBy({ it.childId }, { it.parentId }).mapValues { it.value.toSet() })
-        notifyCapsuleRuntimeChanged(ctx, CapsuleRuntimeChange.TIME_MACHINE_CHANGED)
-    }
-
-    fun exitTimeMachine() {
-        if (_timeMachine.value == null) return
-        _timeMachine.value = null
-        sinceWhenCapsule.clearTimeMachineLifePeriods()
-        alertsCapsule.clearTimeMachineRules()
-        quickEventsCapsule.clearTimeMachineSnapshot()
-        chainsCapsule.clearTimeMachineSnapshot()
-        tagsCapsule.clearTimeMachineTags()
-        tagsCapsule.clearTimeMachineTagParentsByChild()
-        sessionOwnerCapsule.clearTimeMachineRuntimeState()
-        notifyCapsuleRuntimeChanged(appContext, CapsuleRuntimeChange.TIME_MACHINE_CHANGED)
-    }
-
-    private fun SnapshotStore.Snapshot.toChainsSnapshot(): ChainsSnapshot {
-        return ChainsSnapshot(
-            chains = chains,
-            activeChainRun = activeChainRun,
-        )
-    }
-
-    private fun SnapshotStore.Snapshot.toQuickEventsSnapshot(): QuickEventsSnapshot {
-        return QuickEventsSnapshot(
-            templates = quickEventTemplates,
-            entries = quickEventEntries,
-            fieldDefinitions = quickEventFieldDefinitions,
-            fieldValues = quickEventFieldValues,
-            macros = quickEventMacros,
-            macroActions = quickEventMacroActions,
-        )
-    }
-
-    fun buildPeriodTagTotals(period: TimeMachinePeriodSelection): List<TimeMachineTagTotalRow> {
-        val liveState = _state.value
-        val runtime = sessionOwnerCapsule.runtimeStateValue()
-        val sessions = (runtime.chronologySessions + runtime.runningSessions).distinctBy { it.id }
-        return computeTimeMachineTagTotals(
-            sessions = sessions,
-            tags = tagsCapsule.uiState.value.tags,
-            period = period,
-            nowMs = liveState.nowMs
-        )
-    }
-
-    fun buildCompareWithTodayRows(): List<TimeMachineTagComparisonRow> {
-        val targetMs = _timeMachine.value?.targetMs ?: return emptyList()
-        val liveState = _state.value
-        val zoneId = ZoneId.systemDefault()
-        val selectedDayPeriod = dayPeriodFor(targetMs, zoneId)
-        val todayPeriod = dayPeriodFor(liveState.nowMs, zoneId)
-
-        val selectedTotals = buildPeriodTagTotals(selectedDayPeriod)
-            .associateBy({ it.tagId }, { it.totalMs })
-        val todayTotals = buildPeriodTagTotals(todayPeriod)
-            .associateBy({ it.tagId }, { it.totalMs })
-        val tagNamesById = tagsCapsule.uiState.value.tags.associate { it.id to it.name }
-
-        return (selectedTotals.keys + todayTotals.keys)
-            .map { tagId ->
-                TimeMachineTagComparisonRow(
-                    tagId = tagId,
-                    tagName = tagNamesById[tagId].orEmpty().ifBlank { "#$tagId" },
-                    selectedDayTotalMs = selectedTotals[tagId] ?: 0L,
-                    todayTotalMs = todayTotals[tagId] ?: 0L
-                )
-            }
-            .filter { it.selectedDayTotalMs > 0L || it.todayTotalMs > 0L }
-            .sortedWith(
-                compareByDescending<TimeMachineTagComparisonRow> {
-                    maxOf(it.selectedDayTotalMs, it.todayTotalMs)
-                }.thenBy { it.tagName.lowercase() }
-            )
-    }
-
-    fun currentTimeMachineDayLabel(): String? {
-        val targetMs = _timeMachine.value?.targetMs ?: return null
-        return Instant.ofEpochMilli(targetMs)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-            .toString()
-    }
-
-    private fun dayPeriodFor(targetMs: Long, zoneId: ZoneId): TimeMachinePeriodSelection {
-        val start = Instant.ofEpochMilli(targetMs)
-            .atZone(zoneId)
-            .toLocalDate()
-            .atStartOfDay(zoneId)
-            .toInstant()
-            .toEpochMilli()
-        val end = Instant.ofEpochMilli(start)
-            .atZone(zoneId)
-            .toLocalDate()
-            .plusDays(1)
-            .atStartOfDay(zoneId)
-            .toInstant()
-            .toEpochMilli()
-        return TimeMachinePeriodSelection(startMs = start, endMs = end)
-    }
+    private fun blockWriteIfNeeded(): Boolean = false
 
     fun onAppForeground(context: Context, nowMs: Long = System.currentTimeMillis()) {
         if (appForegroundStartMs != null) return
@@ -1148,21 +823,6 @@ private var initialized = false
         return snapshotCoordinator.loadStartupHomeFromSessionTables(context)
     }
 
-    // v423: Recovery actions exposed to the UI when integrity gate blocks the app.
-    fun tryRecoverFromPreImportBackup(context: Context): Boolean {
-        if (appContext == null) appContext = context.applicationContext
-        return recoveryCoordinator.tryRecoverFromPreImportBackup(context).also { recovered ->
-            if (recovered) notifyCapsuleRuntimeChanged(context, CapsuleRuntimeChange.RECOVERY_RESTORE)
-        }
-    }
-
-    fun tryRecoverFromUserFolder(context: Context): Boolean {
-        if (appContext == null) appContext = context.applicationContext
-        return recoveryCoordinator.tryRecoverFromUserFolder(context).also { recovered ->
-            if (recovered) notifyCapsuleRuntimeChanged(context, CapsuleRuntimeChange.RECOVERY_RESTORE)
-        }
-    }
-
     fun clearIntegrityBlock() {
         recoveryCoordinator.clearIntegrityBlock()
     }
@@ -1186,16 +846,6 @@ fun reloadFromSnapshot(context: Context) {
         return runCatching { SnapshotSqlite.hasSnapshot(context) }.getOrDefault(false)
     }
 
-    fun inspectBackupFolder(context: Context): BackupFolderInspection {
-        bindContext(context)
-        return importExportCapsule.inspectBackupFolder(context)
-    }
-
-    fun setVaultAutoRestoreEnabled(context: Context, enabled: Boolean) {
-        bindContext(context)
-        UiPrefsStore.setVaultAutoRestoreEnabled(context, enabled)
-    }
-
     private fun persist() = snapshotCoordinator.persist()
 
     private fun persistOrThrow(showFailureUi: Boolean) = snapshotCoordinator.persistOrThrow(showFailureUi)
@@ -1206,76 +856,9 @@ fun reloadFromSnapshot(context: Context) {
 
     private fun rememberCurrentStateAsPersisted() = snapshotCoordinator.rememberCurrentStateAsPersisted()
 
-    private fun computeBackupSignature(): String {
-        return snapshotCoordinator.computeBackupSignature()
-    }
     private fun scheduleAutoBackup() = snapshotCoordinator.scheduleAutoBackup()
     private fun scheduleSessionsRefresh(context: Context, nowMs: Long) {
         snapshotCoordinator.scheduleSessionsRefresh(context, nowMs)
-    }
-
-    /**
-     * Called from UI after the user picks a folder (OpenDocumentTree).
-     * Persists the permission and creates/uses the "MultiTimer data" subfolder.
-     */
-    fun setBackupRootFolder(context: Context, treeUri: Uri) {
-        if (blockWriteIfNeeded()) return
-        // Capsule-specific VM owns SAF permission/persist logic.
-        importExportCapsule.setBackupRootFolder(context, treeUri)
-    }
-
-    fun exportBackup(context: Context) {
-        // Capsule-specific VM owns export.
-        importExportCapsule.exportBackup(context)
-    }
-
-    private fun buildManualExportZipName(nowMs: Long): String = snapshotCoordinator.buildManualExportZipName(nowMs)
-
-    fun importBackup(context: Context) {
-        if (blockWriteIfNeeded()) return
-        // Capsule-specific VM owns import logic.
-        importExportCapsule.importBackup(context, viewModelScope)
-    }
-
-fun importDatabaseFromUri(context: Context, uri: android.net.Uri) {
-    if (blockWriteIfNeeded()) return
-    importExportCapsule.importDatabaseFromUri(context, uri, viewModelScope)
-}
-
-fun restoreLastPreImportBackup(context: Context) {
-    if (blockWriteIfNeeded()) return
-    importExportCapsule.restoreLastPreImportBackup(context, viewModelScope)
-}
-
-
-
-    /**
-     * Same as importBackup(), but runs in the caller coroutine (so UI can await it).
-     */
-    suspend fun importBackupBlocking(context: Context): Boolean {
-        if (blockWriteIfNeeded()) return false
-        // Capsule-specific VM owns import logic.
-        return importExportCapsule.importBackupBlocking(context)
-    }
-
-    private fun activateImportedSnapshotFromStore(context: Context, snap: SnapshotStore.Snapshot): String? {
-        if (appContext == null) appContext = context.applicationContext
-        snapshotCoordinator.applyImportedSnapshotFromStore(context, snap)
-        return snapshotCoordinator.verifyCurrentPersistedSnapshotActivated(context)
-    }
-
-    private fun applyImportedSnapshotFromStore(context: Context, snap: SnapshotStore.Snapshot) {
-        activateImportedSnapshotFromStore(context, snap)?.let { failure ->
-            throw IllegalStateException(failure)
-        }
-    }
-
-    fun verifyImportedSnapshotApplied(expected: SnapshotStore.Snapshot): String? {
-        return snapshotCoordinator.verifyImportedSnapshotApplied(expected)
-    }
-
-    private fun verifyCurrentPersistedSnapshotActivated(context: Context): String? {
-        return snapshotCoordinator.verifyCurrentPersistedSnapshotActivated(context)
     }
 
     private fun computeActiveTagStartByTagId(): Map<Long, Long> {

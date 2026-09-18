@@ -7,7 +7,7 @@ import org.json.JSONObject
 /**
  * Centralized lightweight invariant logging to detect NOW/Chronology desync early.
  *
- * Keep it cheap and always-on for debug builds; for release builds it still writes to AuditLog (small).
+ * Keep it cheap and always-on so runtime desynchronization remains visible in Logcat.
  */
 @OptIn(com.example.multitimetracker.util.CapsuleWriteApi::class)
 object SyncInvariants {
@@ -20,14 +20,5 @@ object SyncInvariants {
         payload: JSONObject? = null
     ) {
         Log.i(TAG, "$action: $summary")
-        AuditLogSqlite.insert(
-            context = context,
-            isSystem = true,
-            action = action,
-            entityType = "sync",
-            entityId = null,
-            summary = summary,
-            payload = payload
-        )
     }
 }

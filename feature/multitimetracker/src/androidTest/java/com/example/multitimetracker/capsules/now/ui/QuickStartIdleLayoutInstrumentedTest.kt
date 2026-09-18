@@ -196,7 +196,6 @@ class QuickStartIdleLayoutInstrumentedTest {
             tagLastUsedMsByTagId = emptyMap(),
             tagParentsByChild = emptyMap(),
             nowMs = 1_000_000L,
-            timeMachineTargetMs = null,
             isReadOnly = false,
             homeLoadState = loadState,
         )
@@ -220,8 +219,5 @@ class QuickStartIdleLayoutInstrumentedTest {
     ) : NowCapsuleAccess {
         override fun uiStateFlow(): StateFlow<NowUiState> = state
         override fun addTag(name: String) = Unit
-        override fun exportBackup(context: Context) = Unit
-        override fun importDbFromUri(context: Context, uri: Uri) = Unit
-        override fun setBackupRootFolder(context: Context, uri: Uri) = Unit
     }
 }

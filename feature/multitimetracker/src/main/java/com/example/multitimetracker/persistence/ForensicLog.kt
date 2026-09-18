@@ -1,8 +1,6 @@
 package com.example.multitimetracker.persistence
 
 import android.content.Context
-import com.example.multitimetracker.export.BackupFolderStore
-import com.example.multitimetracker.export.VaultFolders
 import org.json.JSONObject
 import java.io.File
 import java.time.Instant
@@ -38,17 +36,6 @@ object ForensicLog {
 
         runCatching {
             File(context.filesDir, LOG_FILE).appendText(line, Charsets.UTF_8)
-        }
-        runCatching {
-            if (BackupFolderStore.getTreeUri(context) == null) return@runCatching
-            val logs = VaultFolders.ensureRoot(context).logs
-            val doc = logs.findFile(LOG_FILE)?.takeIf { it.isFile }
-                ?: logs.createFile("application/jsonl", LOG_FILE)
-                ?: return@runCatching
-            context.contentResolver.openOutputStream(doc.uri, "wa")?.use { out ->
-                out.write(line.toByteArray(Charsets.UTF_8))
-                out.flush()
-            }
         }
     }
 }

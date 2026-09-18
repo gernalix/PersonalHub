@@ -32,13 +32,11 @@ class QuickEventsCapsuleViewModel(
 ) : ViewModel(), CapsuleRuntimeParticipant {
     override val capsuleId: String = "quickevents"
     private val liveSnapshot = MutableStateFlow(QuickEventsSnapshot.EMPTY)
-    private val timeMachineSnapshot = MutableStateFlow<QuickEventsSnapshot?>(null)
     val uiState: StateFlow<QuickEventsUiState> = combine(
         access.hostStateFlow(),
         liveSnapshot,
-        timeMachineSnapshot,
-    ) { host, live, projected ->
-        buildUiState(host = host, snapshot = projected ?: live)
+    ) { host, live ->
+        buildUiState(host = host, snapshot = live)
     }.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
@@ -53,14 +51,6 @@ class QuickEventsCapsuleViewModel(
 
     fun replaceSnapshot(snapshot: QuickEventsSnapshot) {
         liveSnapshot.value = snapshot
-    }
-
-    fun showTimeMachineSnapshot(snapshot: QuickEventsSnapshot) {
-        timeMachineSnapshot.value = snapshot
-    }
-
-    fun clearTimeMachineSnapshot() {
-        timeMachineSnapshot.value = null
     }
 
     fun createTemplate(
@@ -523,7 +513,6 @@ class QuickEventsCapsuleViewModel(
             quickEventMacroActions = snapshot.macroActions,
             tagLastUsedMsByTagId = host.tagLastUsedMsByTagId,
             nowMs = host.nowMs,
-            timeMachineTargetMs = host.timeMachineTargetMs,
             isReadOnly = host.isReadOnly,
         )
     }

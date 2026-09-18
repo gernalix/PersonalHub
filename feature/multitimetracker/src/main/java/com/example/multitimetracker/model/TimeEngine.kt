@@ -104,7 +104,7 @@ class TimeEngine {
     /**
      * Undo a previous start (PLAY) without creating any ClosedSessionRecord/TaggedSessionRecord.
      *
-     * This is used by audit-log undo to revert a START event.
+     * This is used by legacy rollback handling to revert a START event.
      */
     fun cancelTaskStart(
         tasks: List<Task>,
@@ -959,6 +959,5 @@ fun exportRuntimeSnapshot(): RuntimeSnapshot {
         }
     }
 }
-
 
 

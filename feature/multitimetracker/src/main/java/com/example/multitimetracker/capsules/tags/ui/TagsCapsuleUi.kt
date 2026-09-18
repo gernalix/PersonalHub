@@ -113,7 +113,7 @@ fun TagsCapsuleUi(
     showSeconds: Boolean,
     hideHoursIfZero: Boolean
 ) {
-    val effectiveTime = remember(state.nowMs, state.timeMachineTargetMs) { state.effectiveTimeContext() }
+    val effectiveTime = remember(state.nowMs) { state.effectiveTimeContext() }
     val listState = rememberLazyListState()
 
     var showAdd by remember { mutableStateOf(false) }

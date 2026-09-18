@@ -24,6 +24,7 @@ import com.supercontacts.app.hub.PeopleHubAdapter
 import com.wordpulse.app.hub.WordSessionHubAdapter
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.runBlocking
 
 class PersonalHubApplication : Application(), Configuration.Provider {
     override val workManagerConfiguration: Configuration
@@ -94,6 +95,9 @@ private object PostFirstFrameStartup {
                 Choreographer.getInstance().postFrameCallback {
                     Choreographer.getInstance().postFrameCallback {
                         executor.execute {
+                            runStep("profile runtime restore", "PH.bg.profileRuntime") {
+                                runBlocking { ProfileRuntimeCoordinator.restoreActiveProfile(app) }
+                            }
                             runStep("legacy Timer tag/session repair", "PH.bg.timerRepair") {
                                 TimerStartupApi.repairLegacyTagSessionsAfterHostDatabaseRecovery(app)
                             }

@@ -9,7 +9,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Import/Export integrity stats.
+ * Persistence integrity stats.
  *
  * Strategy:
  * - Keep a single-row table (id=1) with deterministic counters derived from the DB + snapshot JSON.
@@ -222,5 +222,4 @@ object IntegrityStatsSqlite {
         )
     }
 }
-
 

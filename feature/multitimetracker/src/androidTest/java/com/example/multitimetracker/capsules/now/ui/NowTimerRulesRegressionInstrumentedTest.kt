@@ -372,7 +372,6 @@ class NowTimerRulesRegressionInstrumentedTest {
             tagLastUsedMsByTagId = runningMinStartByTagId,
             tagParentsByChild = emptyMap(),
             nowMs = nowMs,
-            timeMachineTargetMs = if (readOnly) nowMs - 100_000L else null,
             isReadOnly = readOnly,
             homeLoadState = HomeLoadState.ReadyWithData,
         )
@@ -416,8 +415,5 @@ class NowTimerRulesRegressionInstrumentedTest {
     ) : NowCapsuleAccess {
         override fun uiStateFlow(): StateFlow<NowUiState> = state
         override fun addTag(name: String) = Unit
-        override fun exportBackup(context: Context) = Unit
-        override fun importDbFromUri(context: Context, uri: Uri) = Unit
-        override fun setBackupRootFolder(context: Context, uri: Uri) = Unit
     }
 }

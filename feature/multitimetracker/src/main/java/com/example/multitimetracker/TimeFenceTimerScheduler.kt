@@ -9,6 +9,7 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.AlarmManagerCompat
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 
 object TimeFenceTimerScheduler {
     fun canScheduleExactAlarms(context: Context): Boolean {
@@ -130,14 +131,15 @@ object TimeFenceTimerScheduler {
         requestCode: Int,
         data: Uri,
     ): PendingIntent {
+        val profileId = DatabaseProfiles.activeProfileId(context)
         val intent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
-            this.data = data
+            this.data = data.buildUpon().appendQueryParameter("profile_id", profileId).build()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         return PendingIntent.getActivity(
             context,
-            requestCode,
+            requestCode xor profileId.hashCode(),
             intent,
             immutableFlags(PendingIntent.FLAG_UPDATE_CURRENT)
         )
@@ -148,16 +150,18 @@ object TimeFenceTimerScheduler {
         sessionId: Long,
         legacyIdentity: Boolean,
     ): PendingIntent {
+        val profileId = DatabaseProfiles.activeProfileId(context)
         val intent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
             action = TimeFenceTimerReceiver.ACTION_FIRE_TIMED_SESSION
             putExtra(TimeFenceTimerReceiver.EXTRA_SESSION_ID, sessionId)
             if (!legacyIdentity) {
-                data = Uri.parse("mtt://timed-session/$sessionId")
+                putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, profileId)
+                data = Uri.parse("mtt://timed-session/$profileId/$sessionId")
             }
         }
         return PendingIntent.getBroadcast(
             context,
-            sessionId.toInt(),
+            if (legacyIdentity) sessionId.toInt() else sessionId.toInt() xor profileId.hashCode(),
             intent,
             immutableFlags(PendingIntent.FLAG_UPDATE_CURRENT)
         )
@@ -170,14 +174,17 @@ object TimeFenceTimerScheduler {
         expectedSessionStartAtMs: Long,
         legacyIdentity: Boolean,
     ): PendingIntent {
+        val profileId = DatabaseProfiles.activeProfileId(context)
         val intent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
             action = LEGACY_ACTION_FIRE_TIMER
             if (!legacyIdentity) {
-                data = Uri.parse("mtt://time-fence/$ruleId/$sessionId/$expectedSessionStartAtMs")
+                putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, profileId)
+                data = Uri.parse("mtt://time-fence/$profileId/$ruleId/$sessionId/$expectedSessionStartAtMs")
             }
         }
 
-        val requestCode = (ruleId xor sessionId xor expectedSessionStartAtMs).hashCode()
+        val legacyRequestCode = (ruleId xor sessionId xor expectedSessionStartAtMs).hashCode()
+        val requestCode = if (legacyIdentity) legacyRequestCode else legacyRequestCode xor profileId.hashCode()
         return PendingIntent.getBroadcast(
             context,
             requestCode,
@@ -193,16 +200,18 @@ object TimeFenceTimerScheduler {
         title: String,
         message: String,
     ): PendingIntent {
+        val profileId = DatabaseProfiles.activeProfileId(context)
         val intent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
             action = TimeFenceTimerReceiver.ACTION_RANDOM_ALERT
-            data = Uri.parse("mtt://random-alert/$identity/$fireAtMs")
+            data = Uri.parse("mtt://random-alert/$profileId/$identity/$fireAtMs")
+            putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, profileId)
             putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TITLE, title)
             putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TEXT, message)
             putExtra(TimeFenceTimerReceiver.EXTRA_NOTIFICATION_ID, (identity.hashCode() xor fireAtMs.hashCode()))
         }
         return PendingIntent.getBroadcast(
             context,
-            identity.hashCode() xor fireAtMs.hashCode(),
+            identity.hashCode() xor fireAtMs.hashCode() xor profileId.hashCode(),
             intent,
             immutableFlags(PendingIntent.FLAG_UPDATE_CURRENT)
         )

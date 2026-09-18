@@ -343,7 +343,6 @@ class QuickStartTagLauncherInstrumentedTest {
             tagLastUsedMsByTagId = runningMinStartByTagId,
             tagParentsByChild = emptyMap(),
             nowMs = nowMs,
-            timeMachineTargetMs = null,
             isReadOnly = false,
             homeLoadState = if (runningSessions.isEmpty()) {
                 HomeLoadState.ReadyEmpty
@@ -384,8 +383,5 @@ class QuickStartTagLauncherInstrumentedTest {
     ) : NowCapsuleAccess {
         override fun uiStateFlow(): StateFlow<NowUiState> = state
         override fun addTag(name: String) = Unit
-        override fun exportBackup(context: Context) = Unit
-        override fun importDbFromUri(context: Context, uri: Uri) = Unit
-        override fun setBackupRootFolder(context: Context, uri: Uri) = Unit
     }
 }

@@ -365,9 +365,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
-                        val tables = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('room_master_table','android_metadata','hub_generation','hub_sync_pending','hub_sync_known','hub_activity_undo_context','hub_git_pending','hub_git_events','hub_git_edit_context','hub_git_applied_patches','hub_git_history_index','hub_git_history_field_stats')").use { c ->
-                            buildList { while (c.moveToNext()) add(c.getString(0)) }
-                        }
+                        val tables = SyncJournal.tables(db)
                         SyncJournal.install(db)
                         val appVersion = runCatching {
                             androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
