@@ -72,6 +72,33 @@ Cross-module relations are deduplicated by unordered entity pair. The same two r
 An exact Context signature is based on context type, normalized title and the unordered set of member bindings plus roles. Repeated Contexts with the same signature are retained as source provenance but marked duplicate; they must not produce repeated Datasette links. Distinct Contexts that happen to connect the same pair still produce one visible relation with multiple provenance records.
 
 
+## Temporal associations
+
+Timestamp-based relationships are a separate evidence layer, not a replacement for native foreign keys or explicit Contexts.
+
+The local and remote presentation must expose the same temporal policy:
+
+- completed Places visits are intervals derived from matching CHECK_IN/CHECK_OUT events;
+- completed Timer sessions are intervals;
+- Soldi transactions and substance intakes are timestamped points;
+- People participates only through timestamped contact events/initiatives, never by inferring that the contact record itself was physically present;
+- WordPulse uses derived activity bursts, not raw long-lived session intervals: consecutive entries from the same session with gaps <=5 minutes are grouped, and singleton bursts are ignored;
+- intervals longer than 24 hours are excluded;
+- interval/interval requires >=50% overlap of the shorter interval; >=80% is high only when durations differ <=4x;
+- point/interval requires the point inside an interval <=12 hours; <=3-hour containers are high, longer containers are medium;
+- point/point requires <=5 minutes distance; <=60 seconds is high.
+
+Only different modules from the same source installation are compared. `confidence` means temporal match strength, not semantic certainty.
+
+The visible inferred graph is `hub_temporal_relations`. Every endpoint column is a real FK to its presentation record, so Datasette can render native links/backlinks. Explicit relations win: if the same endpoint pair is already connected by a native FK or `hub_entity_relations`, the temporal candidate is suppressed from visible backlinks and retained only as evidence. For Context links, the visible explicit relation receives aggregate temporal support fields instead of a duplicate row.
+
+The embedded mobile row page should therefore show two distinct sections:
+
+- **Related across PersonalHub** — authoritative FK/Context relationships;
+- **Temporal associations** — inferred timing relationships, high first and medium collapsed by default.
+
+A user can expand the evidence fields (overlap, time distance and source interval/point) when needed. No temporal inference may create, mutate or persist a canonical relationship in `personalhub.db`.
+
 ## Mobile presentation
 
 The initial shell currently embeds Datasette's normal HTML UI in a WebView, so before the mobile presentation layer is installed it is intentionally close to opening the same Datasette page in a mobile browser, minus browser chrome. The production target is more optimized than that baseline while preserving Datasette semantics.
