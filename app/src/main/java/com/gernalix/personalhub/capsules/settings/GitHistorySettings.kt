@@ -45,6 +45,9 @@ import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryStats
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitMilestone
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitRevision
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitStateDiff
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitSemanticDiff
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitPatchPreview
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitRevertPreview
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import java.text.DateFormat
@@ -74,12 +77,15 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var compareBefore by remember { mutableStateOf("") }
     var compareAfter by remember { mutableStateOf("") }
     var diff by remember { mutableStateOf<List<GitStateDiff>>(emptyList()) }
+    var semanticDiff by remember { mutableStateOf<GitSemanticDiff?>(null) }
     var proposalRef by remember { mutableStateOf("") }
     var patchId by remember { mutableStateOf("") }
     var proposalBranchName by remember { mutableStateOf("") }
     var proposalPrTitle by remember { mutableStateOf("") }
     var proposalPrBody by remember { mutableStateOf("") }
     var proposalPrUrl by remember { mutableStateOf<String?>(null) }
+    var patchPreview by remember { mutableStateOf<GitPatchPreview?>(null) }
+    var revertPreview by remember { mutableStateOf<GitRevertPreview?>(null) }
     var restore by remember { mutableStateOf<GitRevision?>(null) }
     var detail by remember { mutableStateOf<GitHistoryDetail?>(null) }
     var bulkFromDate by remember { mutableStateOf(LocalDate.now().minusDays(1).toString()) }
@@ -434,10 +440,35 @@ fun GitHistorySettings(onBack: () -> Unit) {
                             }
                         },
                     ) { Text(stringResource(R.string.git_history_revert_edit)) }
+                    TextButton(
+                        enabled = !busy,
+                        onClick = {
+                            scope.launch {
+                                busy = true
+                                val result = withContext(Dispatchers.IO) {
+                                    runCatching { GitHistory.previewRevert(context, item.id) }
+                                }
+                                busy = false
+                                result.onSuccess { revertPreview = it }.onFailure { error = true }
+                            }
+                        },
+                    ) { Text(stringResource(R.string.git_history_preview_revert)) }
                 } else {
                     Text(stringResource(R.string.git_history_reverted))
                 }
             }
+        }
+
+        revertPreview?.let { preview ->
+            Text(
+                stringResource(
+                    R.string.git_history_revert_preview_summary,
+                    preview.eventCount,
+                    preview.tables.joinToString(", "),
+                    preview.operations.joinToString(", "),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         HorizontalDivider()
@@ -489,6 +520,28 @@ fun GitHistorySettings(onBack: () -> Unit) {
         ) { Text(stringResource(R.string.git_history_compare_action)) }
         diff.filter { it.changed }.forEach { item ->
             Text(item.table + ": " + item.beforeRows + " → " + item.afterRows)
+        }
+        OutlinedButton(
+            enabled = !busy && compareBefore.isNotBlank() && compareAfter.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { GitHistory.semanticCompare(context, compareBefore, compareAfter) }
+                    }
+                    busy = false
+                    result.onSuccess { semanticDiff = it }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_semantic_compare)) }
+        semanticDiff?.events?.take(100)?.forEach { item ->
+            Text(
+                item.table + " · " + item.operation + " · " + item.changedColumns,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        semanticDiff?.events?.takeIf { it.size > 100 }?.let {
+            Text(stringResource(R.string.git_history_semantic_more, it.size - 100))
         }
 
         HorizontalDivider()
@@ -600,14 +653,62 @@ fun GitHistorySettings(onBack: () -> Unit) {
                     busy = true
                     val result = withContext(Dispatchers.IO) {
                         runCatching {
+                            GitDataSync.previewPatchFromRevision(context, proposalRef, patchId)
+                        }
+                    }
+                    busy = false
+                    result.onSuccess { patchPreview = it }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_preview_patch)) }
+        patchPreview?.let { preview ->
+            Text(
+                stringResource(
+                    R.string.git_history_patch_preview_summary,
+                    preview.operationCount,
+                    preview.inserts,
+                    preview.updates,
+                    preview.deletes,
+                    preview.tables.joinToString(", "),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        OutlinedButton(
+            enabled = !busy && proposalRef.isNotBlank() && patchId.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
                             GitDataSync.applyPatchFromRevision(context, proposalRef, patchId)
                         }
                     }
                     busy = false
-                    result.onSuccess { refresh() }.onFailure { error = true }
+                    result.onSuccess {
+                        patchPreview = null
+                        refresh()
+                    }.onFailure { error = true }
                 }
             },
         ) { Text(stringResource(R.string.git_history_cherry_pick)) }
+        OutlinedButton(
+            enabled = !busy && proposalRef.startsWith("data/"),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { GitHistory.discardProposalBranch(context, proposalRef) }
+                    }
+                    busy = false
+                    result.onSuccess {
+                        proposalRef = ""
+                        proposalPrUrl = null
+                        patchPreview = null
+                    }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_discard_proposal)) }
 
         OutlinedButton(
             enabled = !busy,
