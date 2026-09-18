@@ -90,6 +90,8 @@ private fun DatabaseProfilesSettings(onBack: () -> Unit) {
     var newName by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    var renamingId by remember { mutableStateOf<String?>(null) }
+    var renameName by rememberSaveable { mutableStateOf("") }
 
     fun create(mode: DatabaseProfileInitMode) {
         if (newName.isBlank()) return
@@ -122,8 +124,15 @@ private fun DatabaseProfilesSettings(onBack: () -> Unit) {
                         Text(stringResource(R.string.database_profile_active))
                     }
                 }
-                if (profile.id != activeId) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        enabled = !busy,
+                        onClick = {
+                            renamingId = profile.id
+                            renameName = profile.name
+                        },
+                    ) { Text(stringResource(R.string.database_profile_rename)) }
+                    if (profile.id != activeId) {
                         TextButton(
                             enabled = !busy,
                             onClick = {
@@ -174,6 +183,40 @@ private fun DatabaseProfilesSettings(onBack: () -> Unit) {
         }
         if (busy) CircularProgressIndicator()
         if (failed) Text(stringResource(R.string.database_profile_error), color = MaterialTheme.colorScheme.error)
+    }
+
+    val renameId = renamingId
+    if (renameId != null) {
+        AlertDialog(
+            onDismissRequest = { renamingId = null },
+            title = { Text(stringResource(R.string.database_profile_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = renameName,
+                    onValueChange = { renameName = it },
+                    label = { Text(stringResource(R.string.database_profile_name)) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = renameName.isNotBlank(),
+                    onClick = {
+                        runCatching { DatabaseProfiles.rename(context, renameId, renameName) }
+                            .onSuccess {
+                                profiles = DatabaseProfiles.list(context)
+                                renamingId = null
+                            }
+                            .onFailure { failed = true }
+                    },
+                ) { Text(stringResource(R.string.database_profile_rename)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { renamingId = null }) {
+                    Text(stringResource(R.string.settings_back))
+                }
+            },
+        )
     }
 }
 
