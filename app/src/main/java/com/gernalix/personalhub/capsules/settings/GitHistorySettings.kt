@@ -391,6 +391,23 @@ fun GitHistorySettings(onBack: () -> Unit) {
             )
             Text(
                 stringResource(
+                    R.string.git_history_stats_tables,
+                    value.byTable.take(8).joinToString { it.key + "=" + it.count },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                stringResource(R.string.git_history_stats_year, value.thisYearCount),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            value.averageFieldValueLifetimeHours?.let { hours ->
+                Text(
+                    stringResource(R.string.git_history_stats_value_lifetime, hours),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Text(
+                stringResource(
                     R.string.git_history_stats_revised,
                     value.mostRevisedEntities.take(5).joinToString { it.key + "=" + it.count },
                 ),
