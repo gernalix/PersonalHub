@@ -87,6 +87,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var patchPreview by remember { mutableStateOf<GitPatchPreview?>(null) }
     var revertPreview by remember { mutableStateOf<GitRevertPreview?>(null) }
     var restore by remember { mutableStateOf<GitRevision?>(null) }
+    var restoreRef by remember { mutableStateOf("") }
     var detail by remember { mutableStateOf<GitHistoryDetail?>(null) }
     var bulkFromDate by remember { mutableStateOf(LocalDate.now().minusDays(1).toString()) }
     var bulkConfirm by remember { mutableStateOf(false) }
@@ -488,6 +489,26 @@ fun GitHistorySettings(onBack: () -> Unit) {
                 }
             }
         }
+        OutlinedTextField(
+            restoreRef,
+            { restoreRef = it },
+            label = { Text(stringResource(R.string.git_history_restore_ref)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedButton(
+            enabled = !busy && restoreRef.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { GitHistory.resolveRevision(context, restoreRef) }
+                    }
+                    busy = false
+                    result.onSuccess { restore = it }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_restore_ref_action)) }
 
         HorizontalDivider()
         Text(stringResource(R.string.git_history_compare), style = MaterialTheme.typography.titleMedium)
