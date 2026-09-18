@@ -2,7 +2,10 @@
 
 Branch: `feature/salute-canonical-domain`
 
-Codex roadmap prompt: `PROMPT_ID=418763`
+Codex roadmap phases:
+
+- `PROMPT_ID=418763` — canonical Room schema/migration + patch/history foundation
+- `PROMPT_ID=724615` — canonical UI + Hub/Temporal + Obsidian/Datasette integration
 
 ## Already completed on this branch
 
@@ -20,19 +23,27 @@ Codex roadmap prompt: `PROMPT_ID=418763`
 
 ## Deliberately deferred to local Codex
 
-These steps must use the local Gradle/Room/AVD toolchain and should not be guessed through remote file editing:
+These steps must use the local Gradle/Room/AVD toolchain and are intentionally split into two failure domains:
+
+### Phase 418763 — schema/history
 
 1. rebase this branch after the global epoch timestamp task;
 2. allocate the next free Room schema version;
-3. add entities/DAO/views and the production migration;
+3. add health entities/DAO/views and the production migration;
 4. run Android consumer preflight before public API/schema changes;
 5. export/validate the Room schema;
-6. replace the external `salute.db` repository/cache implementation with canonical DAO queries;
-7. wire Hub adapters and temporal provider;
-8. extend the actual Obsidian exporter/projection seam found in the post-rebase code;
-9. add synthetic ChatGPT patch/history/revert fixtures;
-10. run host gates and Pixel_8a AVD QA;
-11. migrate private legacy health data outside the public source tree.
+6. add synthetic ChatGPT patch/history/revert fixtures;
+7. validate sample grouping, turnaround and AI snapshot persistence;
+8. migrate private legacy health data outside the public source tree when locally available.
+
+### Phase 724615 — integration/UI
+
+1. replace the external `salute.db` repository/cache implementation with canonical DAO queries;
+2. wire Hub adapters and temporal provider;
+3. extend the actual Obsidian exporter/projection seam found in the post-schema code;
+4. ensure Datasette snapshot/replica sees health tables/views;
+5. implement the thin read-only Android UI from the SVG;
+6. run host gates and Pixel_8a AVD QA.
 
 ## Merge policy
 
