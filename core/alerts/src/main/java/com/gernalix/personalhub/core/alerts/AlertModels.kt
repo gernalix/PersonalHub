@@ -59,6 +59,7 @@ data class AlertFire(
     val trigger: AlertTrigger,
     val entityId: String?,
     val tagIds: Set<String>,
+    val tagNames: Set<String> = emptySet(),
     val title: String,
     val message: String,
     val firedAtMs: Long,
