@@ -5,8 +5,9 @@ object AlertMatching {
         mode: AlertMatchMode,
         requiredIds: Set<String>,
         actualIds: Set<String>,
+        emptyAnyMatches: Boolean = false,
     ): Boolean {
-        if (requiredIds.isEmpty()) return false
+        if (requiredIds.isEmpty()) return mode == AlertMatchMode.ANY && emptyAnyMatches
         return when (mode) {
             AlertMatchMode.ALL -> requiredIds.all(actualIds::contains)
             AlertMatchMode.ANY -> requiredIds.any(actualIds::contains)
