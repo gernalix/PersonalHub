@@ -316,6 +316,15 @@ private fun GitDataSyncSettings(
         ) {
             Text(stringResource(R.string.git_data_sync_pull_now))
         }
+        if (status.pendingPatchIds.isNotEmpty()) {
+            Text(
+                stringResource(
+                    R.string.git_data_sync_pending_patches,
+                    status.pendingPatchIds.joinToString(", "),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
 
         HorizontalDivider()
         Text(stringResource(R.string.git_data_sync_restore_title), style = MaterialTheme.typography.titleMedium)
