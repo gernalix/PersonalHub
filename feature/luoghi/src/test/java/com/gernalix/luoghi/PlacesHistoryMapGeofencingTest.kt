@@ -61,15 +61,15 @@ class PlacesHistoryMapGeofencingTest {
     }
 
     @Test
-    fun overlappingNearbyPlacesAreAlwaysAmbiguousEvenWhenOneIsMuchNearer() {
+    fun overlappingNearbyPlacesPreferClearlySeparatedNearestCandidate() {
         val near = place("near", "Near", 0.0, 0.0, radiusM = 2_000.0)
         val far = place("far", "Far", 0.0, 0.015, radiusM = 2_000.0)
         val decision = CheckInPolicy.choosePlace(
             places = listOf(near, far),
             location = LocationSample(0.0, 0.0, accuracyM = 4.0),
         )
-        assertTrue(decision is CheckInMatchDecision.Ambiguous)
-        assertEquals(listOf("near", "far"), (decision as CheckInMatchDecision.Ambiguous).candidates.map { it.place.uuid })
+        assertTrue(decision is CheckInMatchDecision.Matched)
+        assertEquals("near", (decision as CheckInMatchDecision.Matched).candidate.place.uuid)
     }
 
     @Test
@@ -318,14 +318,15 @@ class PlacesHistoryMapGeofencingTest {
         val dao = db.placeDao()
         val repository = com.gernalix.luoghi.data.PlaceRepository(context)
         dao.upsertPlace(place("near", "Near", 0.0, 0.0, radiusM = 100.0))
-        dao.upsertPlace(place("far", "Far", 0.0, 0.0005, radiusM = 100.0))
+        dao.upsertPlace(place("far", "Far", 0.0, 0.00005, radiusM = 100.0))
 
         val attempt = repository.beginCheckInAttempt()
+        val attemptLocation = LocationSample(0.0, 0.0, accuracyM = 4.0)
         val candidates = CheckInPolicy.choosePlace(
             dao.listPlaces(),
-            LocationSample(0.0, 0.0, accuracyM = 4.0),
+            attemptLocation,
         ) as CheckInMatchDecision.Ambiguous
-        repository.updateCheckInAttemptLocation(attempt.id, LocationSample(0.0, 0.0, accuracyM = 4.0))
+        repository.updateCheckInAttemptLocation(attempt.id, attemptLocation)
         repository.replaceCheckInAttemptCandidates(
             attempt.id,
             candidates.candidates.mapIndexed { index, candidate ->
@@ -334,7 +335,7 @@ class PlacesHistoryMapGeofencingTest {
                     placeId = candidate.place.uuid,
                     placeNameSnapshot = candidate.place.nickname,
                     distanceM = candidate.distanceM,
-                    thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
+                    thresholdM = CheckInPolicy.matchThresholdM(candidate.place, attemptLocation),
                     rank = index + 1,
                     result = "AMBIGUOUS",
                 )
@@ -374,7 +375,7 @@ class PlacesHistoryMapGeofencingTest {
         assertEquals(listOf(diagnostic), filteredDiagnosticAttempts(listOf(diagnostic), "ambiguous", "far"))
         val report = diagnosticReport(diagnostic)
         assertTrue(report.contains("Far distanceM="))
-        assertTrue(report.contains("thresholdM=100.0"))
+        assertTrue(report.contains("thresholdM=104.0"))
         assertTrue(report.contains("rank=2"))
         assertTrue(report.contains("result=AMBIGUOUS"))
         assertEquals(PlaceDeleteResult.Deleted, repository.deletePlace("far"))
@@ -423,6 +424,9 @@ class PlacesHistoryMapGeofencingTest {
         assertEquals(1, repository.recoverInterruptedCheckInAttempts())
         assertEquals(0, repository.recoverInterruptedCheckInAttempts())
         assertEquals(1, dao.countCheckInAttemptsByOutcome(CheckInAttemptOutcomes.INTERRUPTED))
+        val recovered = requireNotNull(dao.checkInAttempt(pending.id))
+        assertEquals("NO_MATCH_INTERRUPTED", recovered.stage)
+        assertEquals("NO_MATCH", recovered.errorCode)
         assertEquals(0, dao.listEvents().size)
     }
 
