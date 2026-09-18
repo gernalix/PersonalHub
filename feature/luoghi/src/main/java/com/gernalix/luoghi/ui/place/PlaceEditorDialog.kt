@@ -46,9 +46,9 @@ fun PlaceEditorDialog(
     onNicknameChange: (String) -> Unit,
     onRadiusChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
-    onTagsChange: (String) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
+    onTagsChange: (String) -> Unit = {},
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -93,7 +93,7 @@ private fun PlaceEditor(
     onNicknameChange: (String) -> Unit,
     onRadiusChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
-    onTagsChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit = {},
 ) {
     Column {
         OutlinedTextField(
