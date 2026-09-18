@@ -147,7 +147,6 @@ internal object GitDataFormat {
             listOf("-wal", "-shm", "-journal").forEach { File(source.path + it).delete() }
         }
     }
-
     fun acknowledge(context: Context, bundle: GitExportBundle, revision: String) {
         DatabaseGate.access {
             val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
@@ -297,8 +296,7 @@ internal object GitDataFormat {
         db: SQLiteDatabase,
         table: String,
         objectFiles: MutableMap<String, ByteArray>,
-    ): TableSnapshot {
-        requireSafeIdentifier(table)
+    ): TableSnapshot {        requireSafeIdentifier(table)
         val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) add(
@@ -447,8 +445,7 @@ internal object GitDataFormat {
     }
 
     fun requireSafeIdentifier(value: String) {
-        require(value.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) {
-            "Unsafe database identifier"
+        require(value.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) {            "Unsafe database identifier"
         }
     }
 
@@ -460,17 +457,89 @@ internal object GitDataFormat {
         }.getOrDefault(0L)
 }
 
+data class GitPatchPreview(
+    val patchId: String,
+    val author: String,
+    val operationCount: Int,
+    val inserts: Int,
+    val updates: Int,
+    val deletes: Int,
+    val tables: List<String>,
+)
+
 internal object GitPatchEngine {
     fun apply(context: Context, patchBytes: ByteArray) {
-        val patch = JSONObject(String(patchBytes, Charsets.UTF_8))
-        require(patch.getInt("format_version") == 1) { "Unsupported patch format" }
-        require(patch.getInt("schema_version") == PersonalHubDatabase.SCHEMA_VERSION) {
-            "Patch targets a different database schema"
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        applyToDatabase(db, patchBytes)
+    }
+
+    /**
+     * Applies a patch to a disposable coherent database copy. This is the PH "what-if branch"
+     * preview: optimistic preconditions, SQLite constraints and FK closure are exercised without
+     * touching the live database. The returned summary can be reviewed before cherry-pick.
+     */
+    fun preview(context: Context, patchBytes: ByteArray): GitPatchPreview {
+        val patch = validatePatch(patchBytes)
+        val stage = DatabaseVault.backupCurrent(context)
+        try {
+            val temporary = PersonalHubDatabase.openTemporary(context, stage.absolutePath)
+            try {
+                applyToDatabase(temporary.openHelper.writableDatabase, patchBytes)
+            } finally {
+                temporary.close()
+            }
+            SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                db.rawQuery("PRAGMA quick_check", null).use {
+                    require(it.moveToFirst() && it.getString(0) == "ok") {
+                        "Patch preview failed SQLite integrity check"
+                    }
+                }
+                db.rawQuery("PRAGMA foreign_key_check", null).use {
+                    require(!it.moveToFirst()) { "Patch preview breaks database relationships" }
+                }
+            }
+            val operations = patch.getJSONArray("operations")
+            var inserts = 0
+            var updates = 0
+            var deletes = 0
+            val tables = linkedSetOf<String>()
+            for (i in 0 until operations.length()) {
+                val operation = operations.getJSONObject(i)
+                tables += operation.getString("table")
+                when (operation.getString("op")) {
+                    "insert" -> inserts++
+                    "update" -> updates++
+                    "delete" -> deletes++
+                }
+            }
+            return GitPatchPreview(
+                patchId = patch.optString("patch_id").ifBlank { "remote-patch" },
+                author = patch.optString("author").ifBlank { "chatgpt" },
+                operationCount = operations.length(),
+                inserts = inserts,
+                updates = updates,
+                deletes = deletes,
+                tables = tables.sorted(),
+            )
+        } finally {
+            stage.delete()
+            listOf("-wal", "-shm", "-journal").forEach { File(stage.path + it).delete() }
         }
+    }
+
+    private fun validatePatch(patchBytes: ByteArray): JSONObject =
+        JSONObject(String(patchBytes, Charsets.UTF_8)).also { patch ->
+            require(patch.getInt("format_version") == 1) { "Unsupported patch format" }
+            require(patch.getInt("schema_version") == PersonalHubDatabase.SCHEMA_VERSION) {
+                "Patch targets a different database schema"
+            }
+        }
+
+    private fun applyToDatabase(db: SupportSQLiteDatabase, patchBytes: ByteArray) {
+        val patch = validatePatch(patchBytes)
         val operations = patch.getJSONArray("operations")
         val patchId = patch.optString("patch_id").ifBlank { "remote-patch" }
         val author = patch.optString("author").ifBlank { "chatgpt" }
-        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
         db.beginTransaction()
         try {
             GitDataTracking.setEditContext(
@@ -597,8 +666,7 @@ internal object GitPatchEngine {
             Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(index)
             Cursor.FIELD_TYPE_STRING -> cursor.getString(index)
             Cursor.FIELD_TYPE_BLOB -> JSONObject().put(
-                "\$base64",
-                Base64.encodeToString(cursor.getBlob(index), Base64.NO_WRAP),
+                "\$base64",                Base64.encodeToString(cursor.getBlob(index), Base64.NO_WRAP),
             )
             else -> error("Unsupported SQLite value")
         }
@@ -747,8 +815,7 @@ internal object GitStateRestorer {
                     )
                 }
                 db.setTransactionSuccessful()
-            } finally {
-                db.endTransaction()
+            } finally {                db.endTransaction()
             }
             db.execSQL("PRAGMA foreign_keys=ON")
             db.rawQuery("PRAGMA foreign_key_check", null).use {
