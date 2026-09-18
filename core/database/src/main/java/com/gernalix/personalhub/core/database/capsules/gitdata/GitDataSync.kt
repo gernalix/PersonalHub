@@ -202,6 +202,13 @@ object GitDataSync {
     fun restoreRevision(context: Context, revision: String) = operations.withLock {
         val app = context.applicationContext
         val config = requireConfiguration(app)
+        // A radical restore must never strand the current local state outside Git.
+        if (hasPendingHistory(app)) {
+            syncNow(app)
+            require(!hasPendingHistory(app)) {
+                "Current PersonalHub state is not safely pushed; restore aborted"
+            }
+        }
         GitDataSettings.setRuntimeState(app, "restoring")
         try {
             val transport = transport(app, config)
@@ -235,6 +242,11 @@ object GitDataSync {
         GitDataSettings.stateManifestFile(app).delete()
         installTracking(app, enqueueAll = true)
         checkForChanges(app)
+    }
+
+    private fun hasPendingHistory(context: Context): Boolean = DatabaseGate.access {
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        GitDataTracking.pending(db).isNotEmpty() || GitDataTracking.events(db).isNotEmpty()
     }
 
     private fun pullControl(
