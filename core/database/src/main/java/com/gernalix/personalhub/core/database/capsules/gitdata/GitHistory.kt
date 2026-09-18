@@ -31,6 +31,20 @@ data class GitStateDiff(
     val changed: Boolean,
 )
 
+data class GitSemanticDiff(
+    val from: GitRevision,
+    val to: GitRevision,
+    val events: List<GitHistoryItem>,
+)
+
+data class GitRevertPreview(
+    val eventId: String,
+    val groupId: String?,
+    val eventCount: Int,
+    val tables: List<String>,
+    val operations: List<String>,
+)
+
 data class GitMilestone(val name: String, val sha: String)
 
 data class GitHistoryStats(
@@ -147,12 +161,54 @@ object GitHistory {
             val a = leftTables[table]
             val b = rightTables[table]
             GitStateDiff(
-                table = table,
-                beforeRows = a?.optLong("rows", 0L) ?: 0L,
+                table = table,                beforeRows = a?.optLong("rows", 0L) ?: 0L,
                 afterRows = b?.optLong("rows", 0L) ?: 0L,
                 changed = fingerprint(a) != fingerprint(b),
             )
         }
+    }
+
+    /**
+     * Semantic revision diff: materialized compare() says which tables changed; this says which
+     * logical row/field edits happened, using the rebuildable local history index.
+     */
+    fun semanticCompare(
+        context: Context,
+        before: String,
+        after: String,
+        limit: Int = 5000,
+    ): GitSemanticDiff {
+        val left = remote(context).revision(before)
+        val right = remote(context).revision(after)
+        val from = if (left.committedAt <= right.committedAt) left else right
+        val to = if (left.committedAt <= right.committedAt) right else left
+        return GitSemanticDiff(
+            from = from,
+            to = to,
+            events = eventsBetween(context, from.committedAt, to.committedAt, limit = limit),
+        )
+    }
+
+    fun previewRevert(context: Context, eventId: String): GitRevertPreview = DatabaseGate.access {
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        GitHistoryStore.install(db)
+        val selected = GitHistoryStore.find(db, eventId)
+            ?: error("History event is not indexed on this device")
+        val items = selected.groupId
+            ?.let { GitHistoryStore.byGroup(db, it) }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf(selected)
+        GitRevertPreview(
+            eventId = eventId,
+            groupId = selected.groupId,
+            eventCount = items.size,
+            tables = items.map { it.table }.distinct().sorted(),
+            operations = items
+                .groupingBy { it.operation.uppercase() }
+                .eachCount()
+                .toSortedMap()
+                .map { (operation, count) -> "$operation:$count" },
+        )
     }
 
     fun revertEvent(context: Context, eventId: String) {
@@ -297,8 +353,7 @@ object GitHistory {
                 transport(app).readFileOrNull(path + ".sig.json", head.commitSha)?.let { signature ->
                     require(GitDataSigner.verify(bytes, signature)) {
                         "Git history signature verification failed: $path"
-                    }
-                }
+                    }                }
                 String(bytes, Charsets.UTF_8).lineSequence()
                     .filter { it.isNotBlank() }
                     .forEach { line ->
@@ -344,6 +399,9 @@ object GitHistory {
         title: String,
         body: String,
     ): String = remote(context).createPullRequest(branch, title, body)
+
+    fun discardProposalBranch(context: Context, branch: String) =
+        remote(context).deleteProposalBranch(branch)
 
     private fun loadEvent(context: Context, item: GitHistoryItem): JSONObject {
         val git = transport(context)
@@ -447,8 +505,7 @@ object GitHistory {
         context: Context,
         item: GitHistoryItem,
         source: JSONObject,
-    ): ContentValues =
-        ContentValues().also { values ->
+    ): ContentValues =        ContentValues().also { values ->
             source.keys().forEach { column ->
                 putResolved(context, item, values, column, source.get(column))
             }
@@ -576,6 +633,19 @@ private class GitHistoryRemote(
         )
     }
 
+    fun revision(ref: String): GitRevision {
+        require(ref.matches(Regex("[A-Za-z0-9._/-]+"))) { "Invalid Git revision" }
+        val item = json("GET", api + "/commits/" + encode(ref))
+        val commit = item.getJSONObject("commit")
+        val author = commit.optJSONObject("author")
+        return GitRevision(
+            sha = item.getString("sha"),
+            message = commit.optString("message").lineSequence().firstOrNull().orEmpty(),
+            committedAt = author?.optString("date")?.takeIf { it.isNotBlank() }
+                ?.let { Instant.parse(it).toEpochMilli() } ?: 0L,
+        )
+    }
+
     fun revisions(limit: Int): List<GitRevision> {
         require(limit in 1..100)
         val values = JSONArray(
@@ -597,8 +667,7 @@ private class GitHistoryRemote(
                         sha = item.getString("sha"),
                         message = commit.optString("message").lineSequence().firstOrNull().orEmpty(),
                         committedAt = author?.optString("date")?.takeIf { it.isNotBlank() }
-                            ?.let { Instant.parse(it).toEpochMilli() } ?: 0L,
-                    ),
+                            ?.let { Instant.parse(it).toEpochMilli() } ?: 0L,                    ),
                 )
             }
         }
@@ -676,6 +745,12 @@ private class GitHistoryRemote(
                 .put("body", body),
         )
         return result.getString("html_url")
+    }
+
+    fun deleteProposalBranch(branch: String) {
+        require(branch.startsWith("data/")) { "Only data proposal branches can be discarded here" }
+        require(branch.matches(Regex("data/[A-Za-z0-9._/-]+"))) { "Invalid proposal branch" }
+        request("DELETE", api + "/git/refs/heads/" + encode(branch))
     }
 
     private fun json(method: String, url: String, body: JSONObject? = null): JSONObject =
