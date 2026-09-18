@@ -2,13 +2,22 @@
 
 See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch/migration and restore architecture.
 
-PersonalHub contains People, Timer, Places, Substances and WordPulse. The application package is `com.gernalix.personalhub`.
+PersonalHub contains People, Timer, Places, Substances, WordPulse, Soldi and Salute. The application package is `com.gernalix.personalhub`.
 
 ## Database capsule
 
 `:core:database` owns the single canonical data file `personalhub.db`. `PersonalHubDatabase` is the only Room schema owner and assembles the sync journal plus the deliberately exported Room entities and DAOs from `:contracts:database`. Entity/DAO packages remain stable for source and schema compatibility, while their source ownership is no longer hidden inside generic core. Feature database names are type aliases to this owner, not independent Room builders. The timer compatibility adapter borrows the same Room connection; it does not create, version or close another canonical database.
 
 `:contracts:database` is a compile-time boundary only: it contains stable Room entities, DAOs and narrow cross-module query contracts, but no database builder, singleton, repository, UI or feature workflow. Feature implementations depend on this contract and on `:core:database`; `:core:database` depends only on the contract and never on a feature implementation. Soldi workflow/Git code belongs to `:feature:soldi`, and People photo staging belongs to `:feature:supercontacts`. Places protects referenced rows through `PlaceReferenceReader` rather than accessing the Soldi DAO. The root `checkArchitectureBoundaries` task rejects feature-to-feature Gradle dependencies, feature persistence source placed back in generic core and app imports of feature-private data/repository/implementation packages.
+
+
+## Salute external read-only capsule
+
+Salute is deliberately different from the writable feature capsules. `:feature:salute` consumes the private `gernalix/salute` repository and its canonical `salute.db` as an **external read-only artifact**. It does not add health tables to `personalhub.db`, does not use Room for health data, and has no create/edit/delete workflow.
+
+The existing encrypted GitHub credential and transport boundary in `:core:database` is reused through the narrow `GitReadOnlyArtifactClient`. The feature never receives the raw GitHub token and never invokes `GitDataSync` bidirectional state/history semantics for health data. Downloaded health bytes are staged in `noBackupFilesDir`, validated as SQLite, checked for FK/integrity and the supported consumer contract, then atomically replace the last known-good cache. Validation or network failure leaves the prior cache untouched.
+
+`personalhub.db` remains the sole PersonalHub-owned writable database. The cached `salute.db` is reproducible external source material and is excluded from PersonalHub import/export, Git History, Datasette sync, Activity undo and Android backup. UI reads stable producer views such as `v_health_timeline`, `v_health_measurement_history`, `v_health_journal_detail` and `v_test_turnaround`. See `docs/HEALTH_MODULE.md`.
 
 ## Hub Context Graph foundation
 
