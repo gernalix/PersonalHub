@@ -9,6 +9,8 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.Signature
+import java.security.KeyFactory
+import java.security.spec.X509EncodedKeySpec
 import java.security.spec.ECGenParameterSpec
 
 /**
@@ -43,6 +45,24 @@ internal object GitDataSigner {
             .toString(2)
             .toByteArray(Charsets.UTF_8)
     }
+
+    fun verify(bytes: ByteArray, signatureDocument: ByteArray): Boolean = runCatching {
+        val document = JSONObject(String(signatureDocument, Charsets.UTF_8))
+        require(document.getInt("format_version") == 1)
+        require(document.getString("algorithm") == "SHA256withECDSA")
+        require(document.getString("payload_sha256") == GitDataFormat.sha256(bytes))
+        val publicBytes = Base64.decode(
+            document.getString("public_key_spki_base64"),
+            Base64.DEFAULT,
+        )
+        val publicKey = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(publicBytes))
+        val signature = Base64.decode(document.getString("signature_base64"), Base64.DEFAULT)
+        Signature.getInstance("SHA256withECDSA").run {
+            initVerify(publicKey)
+            update(bytes)
+            verify(signature)
+        }
+    }.getOrDefault(false)
 
     private fun keyPair(): Pair<PrivateKey, PublicKey> {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
