@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local lease for serialized PersonalHub implementation, QA and release work."""
+"""Local lease for serialized PersonalHub integration, shared QA and release work."""
 
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ def status(path: Path, ttl_seconds: int) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Serialize PersonalHub Codex tasks with a local lease.")
+    parser = argparse.ArgumentParser(description="Serialize PersonalHub canonical integration, shared QA and release with a local lease.")
     parser.add_argument("command", choices=("acquire", "release", "status"))
     parser.add_argument("--prompt-id", help="Current roadmap PROMPT_ID.")
     parser.add_argument("--lock-path", type=Path, default=DEFAULT_LOCK_PATH)
