@@ -217,4 +217,11 @@
     <string name="git_history_day_filter">Giorno (AAAA-MM-GG, opzionale)</string>
     <string name="git_history_stats_sources">Origini: %1$s</string>
     <string name="git_history_stats_revised">Più revisionati: %1$s</string>
+    <string name="git_history_preview_revert">Anteprima gruppo di modifiche coinvolto</string>
+    <string name="git_history_revert_preview_summary">%1$d eventi di modifica · tabelle: %2$s · operazioni: %3$s</string>
+    <string name="git_history_semantic_compare">Diff semantico record/campi</string>
+    <string name="git_history_semantic_more">Altre %1$d modifiche semantiche non mostrate</string>
+    <string name="git_history_preview_patch">Anteprima patch in sandbox</string>
+    <string name="git_history_patch_preview_summary">%1$d operazioni · +%2$d / ~%3$d / -%4$d · tabelle: %5$s</string>
+    <string name="git_history_discard_proposal">Elimina branch proposta</string>
 </resources>
