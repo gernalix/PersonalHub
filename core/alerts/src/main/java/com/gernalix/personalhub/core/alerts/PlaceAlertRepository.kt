@@ -15,6 +15,8 @@ class PlaceAlertRepository(
 
     fun observeRules(): Flow<List<AlertRuleEntity>> = dao.observeRules(AlertDomain.PLACE.name)
 
+    suspend fun listRules(): List<AlertRuleEntity> = dao.listRules(AlertDomain.PLACE.name)
+
     suspend fun create(draft: PlaceAlertDraft): String {
         validate(draft)
         val now = System.currentTimeMillis()
