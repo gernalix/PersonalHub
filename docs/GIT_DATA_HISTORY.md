@@ -66,7 +66,7 @@ Automatic push pauses when a batch is unusually destructive: at least 100 delete
 
 Git is transport/history, not the database merge engine. PersonalHub never delegates database semantics to a raw Git merge.
 
-Granular import uses hash-verified declarative patches with patch id, schema compatibility, author and optimistic expect preconditions. Patches run transactionally, cannot modify operational tables or primary keys, and finish with FK validation. One patch can be cherry-picked from a branch, tag or commit without merging that Git tree.
+Granular import uses hash-verified declarative patches with patch id, schema compatibility, author and optimistic expect preconditions. Patches run transactionally, cannot modify operational tables or primary keys, and finish with FK validation. One patch can be cherry-picked from a branch, tag or commit without merging that Git tree. Before applying it, PH can run the patch against a coherent disposable database copy and report insert/update/delete counts and affected tables; the production database is untouched. Proposal branches under `data/` can be discarded explicitly after review.
 
 History can revert one logical edit. Events sharing group_id are reversed together in reverse order, preserving dependency direction. The revert is itself a new immutable event.
 
@@ -74,7 +74,7 @@ General import reconstructs the selected Git revision into a staging SQLite data
 
 ## Schema upgrades
 
-One-shot schema transforms are declarative rather than permanent handwritten Kotlin where possible. Packaged and remote migration documents are hash-verified, resolved as a continuous unambiguous chain and applied only to staging databases.
+One-shot schema transforms are declarative rather than permanent handwritten Kotlin where possible. Packaged and remote migration documents are hash-verified, resolved as a continuous unambiguous chain and applied only to staging databases. During startup, PH first uses the packaged migration graph; when the APK already understands the target Room schema but no packaged path exists, an enabled/configured Git Data repository may supply the missing declarative chain. PH migrates a detached copy, validates it, then atomically replaces the canonical file; Git OFF never creates a network dependency.
 
 The installed APK remains the compatibility boundary: a remote migration cannot make an old Room model understand an arbitrary future schema. minimum_app_version and target_schema_version therefore fail closed.
 
@@ -82,7 +82,7 @@ The installed APK remains the compatibility boundary: a remote migration cannot 
 
 When Git data sync is enabled, the Home Activity/Registro destination uses global Git History as the user-facing audit/history source.
 
-The platform supports recent edits, filters by author/table/row, record and field blame, statistics, complete PH revision history, semantic revision diff, granular logical-edit revert, complete revision restore, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing, and patch cherry-pick from proposal refs.
+The platform supports recent edits, filters by author/table/row, record and field blame, statistics, complete PH revision history, table-level and semantic row/field revision diff, granular logical-edit revert with an affected-group preview, complete revision restore, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing, proposal sandbox preview/discard, and patch cherry-pick from proposal refs.
 
 hub_git_history_index is a disposable local projection for fast UI queries. Full before/after payloads remain in immutable Git history.
 
@@ -96,7 +96,7 @@ Existing pre-Git snapshot_history rows are preserved automatically. They must no
 
 The history API can create data proposal branches, create pull requests and cherry-pick a declared patch. This supports ChatGPT/Codex-assisted review while keeping SQLite semantics authoritative.
 
-A future isolated experiment workspace must isolate its database from the production SQLite file; simply redirecting live auto-sync to a different Git branch is not considered safe isolation.
+A data proposal is never tested by redirecting the live database to another branch. PH's what-if workflow applies the declared proposal patch to a disposable coherent SQLite copy, validates constraints/integrity, and only then allows an explicit cherry-pick into the live database. This gives branch-style experimentation without creating a second writable production database.
 
 ## Storage and performance
 
