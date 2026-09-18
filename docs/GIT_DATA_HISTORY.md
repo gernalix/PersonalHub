@@ -52,7 +52,7 @@ Materialized tables use deterministic JSONL shards:
 - up to 50,000 rows: 32 shards
 - larger tables: 128 shards
 
-Rows are ordered by primary key and assigned deterministically from a key hash. A normal edit therefore uploads only affected shards. Manifest v2 records shard hashes and row counts; restore remains compatible with the original v1 single-file table representation.
+Rows are ordered by primary key and assigned deterministically from a key hash. When shard count is unchanged and semantic events identify the touched rows, PH determines affected shards from before/after primary keys, scans only the table primary keys, and materializes full rows only for those shards. Unchanged shards are neither regenerated nor uploaded. A shard-threshold transition, missing semantic event (for technical state), unsupported PK type, or missing cache safely falls back to the full deterministic table exporter. Manifest v2 records shard hashes and row counts; restore remains compatible with the original v1 single-file table representation.
 
 ## History signing
 
@@ -82,7 +82,7 @@ The installed APK remains the compatibility boundary: a remote migration cannot 
 
 When Git data sync is enabled, the Home Activity/Registro destination uses global Git History as the user-facing audit/history source.
 
-The platform supports recent edits, filters by author/table/row/operation (including deleted rows), record and field blame, statistics, complete PH revision history, table-level and semantic row/field revision diff, granular logical-edit revert with an affected-group preview and sandbox FK/staleness check, complete revision restore by any commit/tag/branch ref or date, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing for data regressions, proposal sandbox preview/discard, and patch cherry-pick from proposal refs.
+The platform supports recent edits, filters by author/table/row/operation (including deleted rows), record and field blame, statistics, complete PH revision history, table-level and semantic row/field revision diff, granular logical-edit revert with an affected-group preview and sandbox FK/staleness check, complete revision restore by any commit/tag/branch ref or date, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing for data regressions, proposal sandbox preview/discard, and patch cherry-pick from proposal refs. Semantic revision diff compares the two materialized state trees and only downloads shards whose hashes differ; it deliberately does not infer revision membership from event timestamps, so offline edits pushed later are handled correctly. Primary-key schema changes fail over to delete/insert semantics rather than guessing row identity.
 
 hub_git_history_index is a disposable local projection for fast UI queries. Full before/after payloads remain in immutable Git history.
 
@@ -102,7 +102,7 @@ A data proposal is never tested by redirecting the live database to another bran
 
 Do not commit repeated personalhub.db binaries on every change. A Git commit tree plus `state/manifest.json` is itself the logical checkpoint: unchanged shards/objects keep the same blob identity, so an old complete PH state is addressable without storing another SQLite file. Long-term storage should be dominated by compressed small history events, changed current-state shards and genuinely new content-addressed BLOBs. Content-addressed objects are not garbage-collected merely because the current state stopped referencing them; historical revisions may still require them.
 
-Normal startup never replays Git history. Current UI reads SQLite. History queries use rebuildable local projections, including cached field-lifetime aggregates, rather than rescanning Git. Full reconstruction, old-state reads and repository scans happen only on demand.
+Normal startup never replays Git history. Current UI reads SQLite. History queries use rebuildable local projections, including cached field-lifetime aggregates, rather than rescanning Git. The top-level temporal search can merge indexed Git edits into the same date window as Places, Timer, Soldi, Substances, WordPulse and People without network access. Full reconstruction, old-state reads, semantic revision comparisons and repository scans happen only on demand.
 
 ## Failure model
 
