@@ -577,6 +577,7 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
                             },
                             entityId = ev.sessionId.toString(),
                             tagIds = ev.sessionTagIds.mapTo(linkedSetOf()) { it.toString() },
+                            tagNames = ev.sessionTagIds.mapNotNullTo(linkedSetOf()) { tagNameById[it] },
                             title = title,
                             message = r.message,
                             firedAtMs = nowMs,
