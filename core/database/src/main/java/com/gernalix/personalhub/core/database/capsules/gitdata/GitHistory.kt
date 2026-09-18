@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.util.Base64
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.gernalix.personalhub.core.database.DatabaseGate
+import com.gernalix.personalhub.core.database.DatabaseVault
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
 import org.json.JSONArray
@@ -43,6 +44,8 @@ data class GitRevertPreview(
     val eventCount: Int,
     val tables: List<String>,
     val operations: List<String>,
+    val safe: Boolean,
+    val blockingReason: String?,
 )
 
 data class GitMilestone(val name: String, val sha: String)
@@ -192,16 +195,50 @@ object GitHistory {
         )
     }
 
-    fun previewRevert(context: Context, eventId: String): GitRevertPreview = DatabaseGate.access {
-        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
-        GitHistoryStore.install(db)
-        val selected = GitHistoryStore.find(db, eventId)
+    fun previewRevert(context: Context, eventId: String): GitRevertPreview {
+        val app = context.applicationContext
+        val live = PersonalHubDatabase.get(app).openHelper.writableDatabase
+        GitHistoryStore.install(live)
+        val selected = GitHistoryStore.find(live, eventId)
             ?: error("History event is not indexed on this device")
         val items = selected.groupId
-            ?.let { GitHistoryStore.byGroup(db, it) }
+            ?.let { GitHistoryStore.byGroup(live, it) }
             ?.takeIf { it.isNotEmpty() }
             ?: listOf(selected)
-        GitRevertPreview(
+        val payloads = items.associateWith { loadEvent(app, it) }
+        val stage = DatabaseVault.backupCurrent(app)
+        val failure = try {
+            val temporary = PersonalHubDatabase.openTemporary(app, stage.absolutePath)
+            try {
+                val db = temporary.openHelper.writableDatabase
+                runCatching {
+                    db.beginTransaction()
+                    try {
+                        items.sortedWith(
+                            compareByDescending<GitHistoryItem> { it.occurredAt }
+                                .thenByDescending { it.id },
+                        ).forEach { item ->
+                            applyInverse(app, db, item, requireNotNull(payloads[item]))
+                        }
+                        db.query("PRAGMA foreign_key_check").use {
+                            require(!it.moveToFirst()) {
+                                "Revert would break database relationships"
+                            }
+                        }
+                    } finally {
+                        db.endTransaction()
+                    }
+                }.exceptionOrNull()
+            } finally {
+                temporary.close()
+            }
+        } finally {
+            stage.delete()
+            listOf("-wal", "-shm", "-journal").forEach {
+                java.io.File(stage.path + it).delete()
+            }
+        }
+        return GitRevertPreview(
             eventId = eventId,
             groupId = selected.groupId,
             eventCount = items.size,
@@ -211,6 +248,8 @@ object GitHistory {
                 .eachCount()
                 .toSortedMap()
                 .map { (operation, count) -> "$operation:$count" },
+            safe = failure == null,
+            blockingReason = failure?.message ?: failure?.javaClass?.simpleName,
         )
     }
 
