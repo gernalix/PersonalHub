@@ -77,36 +77,41 @@ fun GitHistorySettings(onBack: () -> Unit) {
         scope.launch {
             busy = true
             error = false
-            val result = withContext(Dispatchers.IO) {
+            val localResult = withContext(Dispatchers.IO) {
                 runCatching {
-                    val configured = GitDataSettings.configuration(context)
-                    val local = GitHistory.recent(
+                    GitHistory.recent(
                         context,
                         limit = 200,
                         author = author,
                         table = table.trim().ifBlank { null },
                         rowKey = rowKey.trim().ifBlank { null },
-                    )
-                    val localStats = GitHistory.stats(context)
-                    val remoteRevisions = if (configured.enabled && configured.configured) {
-                        GitHistory.revisions(context, 50)
-                    } else emptyList()
-                    val remoteMilestones = if (configured.enabled && configured.configured) {
-                        GitHistory.milestones(context)
-                    } else emptyList()
-                    arrayOf(local, localStats, remoteRevisions, remoteMilestones)
+                    ) to GitHistory.stats(context)
                 }
             }
-            busy = false
-            result.onSuccess { values ->
-                @Suppress("UNCHECKED_CAST")
-                history = values[0] as List<GitHistoryItem>
-                stats = values[1] as GitHistoryStats
-                @Suppress("UNCHECKED_CAST")
-                revisions = values[2] as List<GitRevision>
-                @Suppress("UNCHECKED_CAST")
-                milestones = values[3] as List<GitMilestone>
+            localResult.onSuccess { (local, localStats) ->
+                history = local
+                stats = localStats
             }.onFailure { error = true }
+
+            val configured = runCatching { GitDataSettings.configuration(context) }.getOrNull()
+            if (configured?.enabled == true && configured.configured) {
+                val remoteResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        GitHistory.revisions(context, 50) to GitHistory.milestones(context)
+                    }
+                }
+                remoteResult.onSuccess { (remoteRevisions, remoteMilestones) ->
+                    revisions = remoteRevisions
+                    milestones = remoteMilestones
+                }.onFailure {
+                    // Local audit/history remains usable while GitHub is offline.
+                    error = true
+                }
+            } else {
+                revisions = emptyList()
+                milestones = emptyList()
+            }
+            busy = false
         }
     }
 
@@ -224,9 +229,13 @@ fun GitHistorySettings(onBack: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     DateFormat.getDateTimeInstance().format(Date(item.occurredAt)) +
-                        " · " + item.author + " · " + item.table + " · " + item.operation,
+                        " · " + item.author + " · " + item.source +
+                        " · " + item.table + " · " + item.operation,
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                item.reason?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
                 if (item.changedColumns.isNotBlank()) {
                     Text(item.changedColumns, style = MaterialTheme.typography.bodySmall)
                 }
