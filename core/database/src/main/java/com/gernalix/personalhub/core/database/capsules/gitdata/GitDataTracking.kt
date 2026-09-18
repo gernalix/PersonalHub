@@ -7,6 +7,8 @@ data class GitEditEvent(
     val id: String,
     val occurredAt: Long,
     val author: String,
+    val source: String,
+    val reason: String?,
     val groupId: String?,
     val table: String,
     val operation: String,
@@ -59,10 +61,12 @@ object GitDataTracking {
             "INSERT OR IGNORE INTO $TABLE(table_name,revision) VALUES ('$table',0); " +
             "UPDATE $TABLE SET revision=revision+1 WHERE table_name='$table'; " +
             "INSERT INTO $EVENTS_TABLE(" +
-            "id,occurred_at,author,group_id,table_name,operation,row_key,columns,before_payload,after_payload" +
+            "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,columns,before_payload,after_payload" +
             ") VALUES(" +
             "${randomIdSql()},${nowMsSql()}," +
             "COALESCE((SELECT actor FROM $CONTEXT_TABLE WHERE id=1),'user')," +
+            "COALESCE((SELECT source FROM $CONTEXT_TABLE WHERE id=1),'ui')," +
+            "(SELECT reason FROM $CONTEXT_TABLE WHERE id=1)," +
             "(SELECT group_id FROM $CONTEXT_TABLE WHERE id=1)," +
             "'$table','$op',$key,'$columnCsv',$before,$after" +
             "); END"
@@ -77,15 +81,19 @@ object GitDataTracking {
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `$EVENTS_TABLE` (" +
                 "`id` TEXT NOT NULL, `occurred_at` INTEGER NOT NULL, " +
-                "`author` TEXT NOT NULL, `group_id` TEXT, " +
+                "`author` TEXT NOT NULL, `source` TEXT NOT NULL DEFAULT 'ui', `reason` TEXT, `group_id` TEXT, " +
                 "`table_name` TEXT NOT NULL, `operation` TEXT NOT NULL, " +
                 "`row_key` TEXT NOT NULL, `columns` TEXT NOT NULL, " +
                 "`before_payload` TEXT, `after_payload` TEXT, PRIMARY KEY(`id`))",
         )
+        ensureColumn(db, EVENTS_TABLE, "source", "TEXT NOT NULL DEFAULT 'ui'")
+        ensureColumn(db, EVENTS_TABLE, "reason", "TEXT")
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `$CONTEXT_TABLE` (" +
-                "`id` INTEGER NOT NULL PRIMARY KEY, `actor` TEXT NOT NULL, `group_id` TEXT)",
+                "`id` INTEGER NOT NULL PRIMARY KEY, `actor` TEXT NOT NULL, `source` TEXT NOT NULL DEFAULT 'ui', `reason` TEXT, `group_id` TEXT)",
         )
+        ensureColumn(db, CONTEXT_TABLE, "source", "TEXT NOT NULL DEFAULT 'ui'")
+        ensureColumn(db, CONTEXT_TABLE, "reason", "TEXT")
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `$APPLIED_PATCHES_TABLE` (" +
                 "`id` TEXT NOT NULL PRIMARY KEY, `applied_at` INTEGER NOT NULL)",
@@ -101,6 +109,12 @@ object GitDataTracking {
             }
         }
         if (enqueueAll) enqueueAll(db)
+    }
+
+    private fun ensureColumn(db: SupportSQLiteDatabase, table: String, column: String, definition: String) {
+        if (column !in columns(db, table)) {
+            db.execSQL("ALTER TABLE `$table` ADD COLUMN `$column` $definition")
+        }
     }
 
     fun uninstall(db: SupportSQLiteDatabase) {
@@ -134,7 +148,7 @@ object GitDataTracking {
 
     fun events(db: SupportSQLiteDatabase): List<GitEditEvent> =
         db.query(
-            "SELECT id,occurred_at,author,group_id,table_name,operation,row_key,columns," +
+            "SELECT id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,columns," +
                 "before_payload,after_payload FROM $EVENTS_TABLE ORDER BY occurred_at,id",
         ).use { cursor ->
             buildList {
@@ -144,13 +158,15 @@ object GitDataTracking {
                             id = cursor.getString(0),
                             occurredAt = cursor.getLong(1),
                             author = cursor.getString(2),
-                            groupId = if (cursor.isNull(3)) null else cursor.getString(3),
-                            table = cursor.getString(4),
-                            operation = cursor.getString(5),
-                            rowKey = cursor.getString(6),
-                            columns = cursor.getString(7),
-                            beforePayload = if (cursor.isNull(8)) null else cursor.getString(8),
-                            afterPayload = if (cursor.isNull(9)) null else cursor.getString(9),
+                            source = cursor.getString(3),
+                            reason = if (cursor.isNull(4)) null else cursor.getString(4),
+                            groupId = if (cursor.isNull(5)) null else cursor.getString(5),
+                            table = cursor.getString(6),
+                            operation = cursor.getString(7),
+                            rowKey = cursor.getString(8),
+                            columns = cursor.getString(9),
+                            beforePayload = if (cursor.isNull(10)) null else cursor.getString(10),
+                            afterPayload = if (cursor.isNull(11)) null else cursor.getString(11),
                         ),
                     )
                 }
@@ -170,11 +186,18 @@ object GitDataTracking {
         }
     }
 
-    fun setEditContext(db: SupportSQLiteDatabase, author: String, groupId: String?) {
-        require(author.matches(Regex("[A-Za-z0-9._-]{1,64}"))) { "Invalid edit author" }
+    fun setEditContext(
+        db: SupportSQLiteDatabase,
+        author: String,
+        source: String,
+        reason: String? = null,
+        groupId: String? = null,
+    ) {
+        require(author.matches(Regex("[A-Za-z0-9._:-]{1,96}"))) { "Invalid edit author" }
+        require(source.matches(Regex("[A-Za-z0-9._-]{1,64}"))) { "Invalid edit source" }
         db.execSQL(
-            "INSERT OR REPLACE INTO $CONTEXT_TABLE(id,actor,group_id) VALUES(1,?,?)",
-            arrayOf(author, groupId),
+            "INSERT OR REPLACE INTO $CONTEXT_TABLE(id,actor,source,reason,group_id) VALUES(1,?,?,?,?)",
+            arrayOf(author, source, reason, groupId),
         )
     }
 
