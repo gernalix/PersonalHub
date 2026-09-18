@@ -135,7 +135,8 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     val schema = org.json.JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/3.json").bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
                                     for (i in 0 until schema.length()) {
                                         val entity = schema.getJSONObject(i)
-                                        val indices = entity.optJSONArray("indices") ?: continue                                        for (j in 0 until indices.length()) db.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
+                                        val indices = entity.optJSONArray("indices") ?: continue
+                                        for (j in 0 until indices.length()) db.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
                                     }
                                 }
                             },
@@ -284,7 +285,8 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     db.execSQL("""
                                         CREATE TABLE IF NOT EXISTS `check_in_attempt_candidates` (
                                             `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                                            `attempt_id` TEXT NOT NULL,                                            `place_id` TEXT NOT NULL,
+                                            `attempt_id` TEXT NOT NULL,
+                                            `place_id` TEXT NOT NULL,
                                             `distance_m` REAL NOT NULL,
                                             `threshold_m` REAL NOT NULL,
                                             `rank` INTEGER NOT NULL,
