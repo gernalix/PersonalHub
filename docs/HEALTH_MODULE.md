@@ -93,12 +93,16 @@ PersonalHub should depend only on stable consumer surfaces, not on arbitrary int
 
 Required metadata:
 - `metadata.schema_version`
-- add/maintain a distinct `consumer_contract_version`; PH contract v1 requires value `1`
+- add/maintain a distinct `consumer_contract_version`; PH currently requires contract v2 (`2`)
 
 Required views:
 - `v_all_health_data`
 - `v_medical_journal`
-- `v_health_timeline` (recommended stable PH-facing projection)
+- `v_health_timeline` (stable PH-facing projection)
+- `v_test_turnaround`
+- `v_health_measurement_history`
+- `v_health_journal_detail`
+- `v_health_snapshot_evidence`
 
 ### `v_all_health_data`
 
@@ -156,6 +160,34 @@ source_id       INTEGER  -- stable id within the source table/view domain
 
 For laboratory data, the Timeline UI may group multiple rows sharing the same clinical date/session into one visual card, but the underlying view should remain lossless enough to open every measurement.
 
+
+## Blood-test turnaround
+
+For blood tests the producer records two separate timestamps:
+
+- sample collection: `test_events.event_epoch_ms`;
+- result receipt by ChatGPT: `measurements.received_epoch_ms`.
+
+The second timestamp is a proxy for when the user became aware of the result through Min Sundhedsplatform. It is not silently relabeled as the hospital's official publication timestamp.
+
+A turnaround is valid only when the collection timestamp has `event_time_precision = 'datetime'`. If only the day is known, PersonalHub must show no turnaround rather than compute one from technical midnight.
+
+Consumer view `v_test_turnaround`:
+
+```text
+data_prelievo
+data_ms
+categoria
+esame
+ricevuto_ms
+delta_ms
+delta
+```
+
+`delta` is already formatted as whole days and hours, e.g. `1g 7h`. The Esami screen may calculate aggregate statistics from `delta_ms`; the first implementation shows the arithmetic mean across rows with a known delta.
+
+Timeline and measurement detail show `tempo_referto` when present.
+
 ## Read-only query layer
 
 `:feature:salute` should own a small repository around Android's read-only SQLite API, not Room:
@@ -163,10 +195,10 @@ For laboratory data, the Timeline UI may group multiple rows sharing the same cl
 ```text
 HealthRepository
   timeline(...)
-  measurements(...)
   measurementHistory(...)
-  journal(...)
-  journalEntry(...)
+  journalDetail(...)
+  journalEvidence(...)
+  turnaroundSummary(...)
   syncStatus()
   refresh()
 ```
@@ -325,7 +357,7 @@ Unsupported newer contract:
 4. It never pushes to the health repository.
 5. It caches the file under app-private no-backup storage.
 6. Invalid/incompatible downloads never replace the last known-good cache.
-7. `v_health_timeline` is sorted by `data_ms DESC`.
+7. `v_health_timeline` is sorted by `data_ms DESC` and displays blood-test turnaround when available.
 8. Journal detail visually separates clinician note, AI snapshot, evidence and Danish original.
 9. Measurement detail can show longitudinal history of the same analyte.
 10. PersonalHub architecture-boundary tests remain green and `personalhub.db` remains the sole writable PH database.
