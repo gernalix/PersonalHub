@@ -702,7 +702,8 @@ fun GitHistorySettings(onBack: () -> Unit) {
             val hidden = (result.changes.size - 100).coerceAtLeast(0)
             if (hidden > 0) {
                 Text(stringResource(R.string.git_history_semantic_more, hidden))
-            } else if (result.truncated) {
+            }
+            if (result.truncated) {
                 Text(stringResource(R.string.git_history_semantic_truncated))
             }
         }
