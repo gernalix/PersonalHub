@@ -54,7 +54,7 @@ Foreign-key navigation must work as a peer-to-peer graph, not as a hierarchy wit
 
 Known direct relationships stored as ordinary columns are projected as real SQLite foreign keys even when Room cannot safely declare the cross-feature constraint directly.
 
-Relationships created through PersonalHub Context use the Context graph as their source of truth. The read-only presentation materializes every resolvable pair of Context members into the symmetric derived table `hub_entity_relations`. For each pair it creates both directions, source → target and target → source, and stores native foreign keys to the concrete presentation rows.
+Relationships created through PersonalHub Context use the Context graph as their source of truth. The read-only presentation materializes every resolvable unordered pair of Context members into the symmetric derived table `hub_entity_relations`. Each pair is stored exactly once with native foreign keys to both concrete presentation rows; Datasette can reach the same edge from either endpoint through its normal FK/backlink navigation.
 
 Therefore any supported record can be the starting point: a Place can lead to a Timer session, Soldi transaction or Substance; a transaction can lead back to the Place or onward to another Context member; a Substance can lead to related sessions, resources, people or other entities. People are one peer among the others, not a hub.
 
