@@ -677,7 +677,16 @@ class LuoghiHomeViewModel(
     }
 
     fun newPlace() {
-        val pendingAttemptId = mutableState.value.checkIn.pendingAttemptId
+        val pendingCheckIn = mutableState.value.checkIn
+        val pendingAttemptId = pendingCheckIn.pendingAttemptId
+        val cancellationDiagnostic = when {
+            pendingCheckIn.ambiguousCandidates.isNotEmpty() ->
+                Triple("AMBIGUOUS_USER_CANCELLED", "AMBIGUOUS_MATCH", "User cancelled ambiguous place selection")
+            pendingCheckIn.message == CheckInMessage.UNKNOWN_PLACE ->
+                Triple("NO_MATCH_USER_CANCELLED", "NO_MATCH", "User cancelled new-place check-in")
+            else ->
+                Triple("USER_CANCELLED", "USER_CANCELLED", "User cancelled pending check-in")
+        }
         container.addressAutocomplete.resetSession()
         addressSearchJob?.cancel()
         addressLatestGate.invalidate()
@@ -700,9 +709,9 @@ class LuoghiHomeViewModel(
                 container.checkIns.finishAttempt(
                     attemptId = pendingAttemptId,
                     outcome = CheckInAttemptOutcomes.USER_CANCELLED,
-                    stage = "USER_CANCELLED",
-                    errorCode = "USER_CANCELLED",
-                    errorMessage = "User cancelled pending check-in",
+                    stage = cancellationDiagnostic.first,
+                    errorCode = cancellationDiagnostic.second,
+                    errorMessage = cancellationDiagnostic.third,
                 )
             }
         }
@@ -1138,7 +1147,13 @@ class LuoghiHomeViewModel(
                 is CheckInMatchDecision.Matched -> {
                     container.checkIns.replaceAttemptCandidates(
                         attempt.id,
-                        attemptCandidateRows(attempt.id, decision.candidate, listOf(decision.candidate), "MATCHED"),
+                        attemptCandidateRows(
+                            attempt.id,
+                            decision.candidate,
+                            listOf(decision.candidate),
+                            "MATCHED",
+                            location,
+                        ),
                     )
                     val result = container.checkIns.manualCheckIn(decision.candidate.place.uuid, location = location)
                     if (result is HistoryMutationResult.Failure) {
@@ -1176,12 +1191,18 @@ class LuoghiHomeViewModel(
                 is CheckInMatchDecision.Ambiguous -> {
                     container.checkIns.replaceAttemptCandidates(
                         attempt.id,
-                        attemptCandidateRows(attempt.id, null, decision.candidates, "AMBIGUOUS"),
+                        attemptCandidateRows(
+                            attempt.id,
+                            null,
+                            decision.candidates,
+                            "AMBIGUOUS",
+                            location,
+                        ),
                     )
-                    container.checkIns.finishAttempt(
+                    container.checkIns.markAttemptStage(
                         attemptId = attempt.id,
-                        outcome = CheckInAttemptOutcomes.AMBIGUOUS,
-                        stage = "AMBIGUOUS",
+                        stage = "AMBIGUOUS_SELECTION_PENDING",
+                        outcome = CheckInAttemptOutcomes.IN_PROGRESS,
                         errorCode = "AMBIGUOUS_MATCH",
                         errorMessage = "Multiple places matched the current location",
                     )
@@ -1309,6 +1330,7 @@ private fun attemptCandidateRows(
     selected: CheckInCandidate?,
     candidates: List<CheckInCandidate>,
     result: String,
+    location: LocationSample,
 ): List<CheckInAttemptCandidateEntity> =
     candidates.mapIndexed { index, candidate ->
         CheckInAttemptCandidateEntity(
@@ -1316,7 +1338,7 @@ private fun attemptCandidateRows(
             placeId = candidate.place.uuid,
             placeNameSnapshot = candidate.place.nickname.takeIf { it.isNotBlank() } ?: candidate.place.address,
             distanceM = candidate.distanceM,
-            thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
+            thresholdM = CheckInPolicy.matchThresholdM(candidate.place, location),
             rank = index + 1,
             result = if (candidate.place.uuid == selected?.place?.uuid) "MATCHED" else result,
         )
