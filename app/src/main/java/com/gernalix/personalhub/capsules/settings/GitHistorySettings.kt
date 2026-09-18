@@ -64,6 +64,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var author by remember { mutableStateOf<String?>(null) }
     var table by remember { mutableStateOf("") }
     var rowKey by remember { mutableStateOf("") }
+    var columnFilter by remember { mutableStateOf("") }
     var history by remember { mutableStateOf<List<GitHistoryItem>>(emptyList()) }
     var stats by remember { mutableStateOf<GitHistoryStats?>(null) }
     var revisions by remember { mutableStateOf<List<GitRevision>>(emptyList()) }
@@ -89,13 +90,33 @@ fun GitHistorySettings(onBack: () -> Unit) {
             error = false
             val localResult = withContext(Dispatchers.IO) {
                 runCatching {
-                    GitHistory.recent(
-                        context,
-                        limit = 200,
-                        author = author,
-                        table = table.trim().ifBlank { null },
-                        rowKey = rowKey.trim().ifBlank { null },
-                    ) to GitHistory.stats(context)
+                    val normalizedTable = table.trim()
+                    val normalizedRow = rowKey.trim()
+                    val normalizedColumn = columnFilter.trim()
+                    val localHistory = if (
+                        normalizedTable.isNotBlank() &&
+                        normalizedRow.isNotBlank() &&
+                        normalizedColumn.isNotBlank()
+                    ) {
+                        GitHistory.blame(
+                            context,
+                            table = normalizedTable,
+                            rowKey = normalizedRow,
+                            column = normalizedColumn,
+                            limit = 200,
+                        ).let { rows ->
+                            author?.let { selected -> rows.filter { it.author == selected } } ?: rows
+                        }
+                    } else {
+                        GitHistory.recent(
+                            context,
+                            limit = 200,
+                            author = author,
+                            table = normalizedTable.ifBlank { null },
+                            rowKey = normalizedRow.ifBlank { null },
+                        )
+                    }
+                    localHistory to GitHistory.stats(context)
                 }
             }
             localResult.onSuccess { (local, localStats) ->
@@ -289,6 +310,13 @@ fun GitHistorySettings(onBack: () -> Unit) {
             rowKey,
             { rowKey = it },
             label = { Text(stringResource(R.string.git_history_row_filter)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            columnFilter,
+            { columnFilter = it },
+            label = { Text(stringResource(R.string.git_history_column_filter)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
