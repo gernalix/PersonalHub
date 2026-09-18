@@ -37,7 +37,12 @@ object AlertNotificationDispatcher {
     ): Boolean {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
         ensureChannel(context, manager)
-        val contentIntent = contentPendingIntent(context, notificationId, message)
+        val contentIntent = contentPendingIntent(
+            context = context,
+            notificationId = notificationId,
+            message = message,
+            fallbackIntent = launchAppIntent(context),
+        )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -57,31 +62,50 @@ object AlertNotificationDispatcher {
         }.getOrDefault(false)
     }
 
-    private fun contentPendingIntent(context: Context, notificationId: Int, message: String): PendingIntent {
-        val link = AlertLinkPolicy.linkOnlyUriOrNull(message)
-        val intent = if (link != null) {
-            Intent(Intent.ACTION_VIEW, link).apply {
-                addCategory(Intent.CATEGORY_BROWSABLE)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                val workflowy = link.scheme.equals("workflowy", ignoreCase = true) ||
-                    (link.scheme.equals("https", ignoreCase = true) &&
-                        link.host.equals("workflowy.com", ignoreCase = true))
-                if (workflowy && isPackageInstalled(context, WORKFLOWY_PACKAGE)) {
-                    setPackage(WORKFLOWY_PACKAGE)
-                }
-            }
-        } else {
-            context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            } ?: Intent(Intent.ACTION_MAIN).setPackage(context.packageName)
-        }
+    /**
+     * Shared tap policy used by Timer and Places notifications.
+     *
+     * If [message] is exactly one supported link, the PendingIntent opens that URI directly.
+     * Otherwise [fallbackIntent] is used.
+     */
+    fun contentPendingIntent(
+        context: Context,
+        notificationId: Int,
+        message: String,
+        fallbackIntent: Intent? = null,
+    ): PendingIntent {
+        val chosen = directLinkIntentOrNull(context, message)
+            ?: fallbackIntent
+            ?: launchAppIntent(context)
+
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        return PendingIntent.getActivity(context, notificationId, intent, flags)
+        return PendingIntent.getActivity(context, notificationId, chosen, flags)
     }
 
-    private fun isPackageInstalled(context: Context, packageName: String): Boolean =
-        runCatching { context.packageManager.getPackageInfo(packageName, 0) }.isSuccess
+    fun directLinkIntentOrNull(context: Context, message: String): Intent? {
+        val link = AlertLinkPolicy.linkOnlyUriOrNull(message) ?: return null
+        val base = Intent(Intent.ACTION_VIEW, link).apply {
+            addCategory(Intent.CATEGORY_BROWSABLE)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+
+        val workflowyLink = link.scheme.equals("workflowy", ignoreCase = true) ||
+            (link.scheme.equals("https", ignoreCase = true) &&
+                link.host.equals("workflowy.com", ignoreCase = true))
+        if (workflowyLink) {
+            val workflowyIntent = Intent(base).setPackage(WORKFLOWY_PACKAGE)
+            if (workflowyIntent.resolveActivity(context.packageManager) != null) {
+                return workflowyIntent
+            }
+        }
+        return base.takeIf { it.resolveActivity(context.packageManager) != null }
+    }
+
+    private fun launchAppIntent(context: Context): Intent =
+        context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        } ?: Intent(Intent.ACTION_MAIN).setPackage(context.packageName)
 
     private const val WORKFLOWY_PACKAGE = "com.workflowy.android"
 
