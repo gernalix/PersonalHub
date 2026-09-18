@@ -38,6 +38,12 @@ data class GitHistoryStats(
     val byTable: List<GitHistoryCount>,
 )
 
+data class GitHistoryDetail(
+    val item: GitHistoryItem,
+    val before: String?,
+    val after: String?,
+)
+
 /**
  * User-facing history primitives: global Time Machine, blame, archaeology, granular revert,
  * milestones and semantic revision diffs. Git is the durable history; SQLite holds only an index.
@@ -65,6 +71,19 @@ object GitHistory {
         recent(context, limit, table = table, rowKey = rowKey).filter { item ->
             column == null || item.changedColumns.split(',').contains(column)
         }
+
+    fun detail(context: Context, eventId: String): GitHistoryDetail {
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        GitHistoryStore.install(db)
+        val item = GitHistoryStore.find(db, eventId)
+            ?: error("History event is not indexed on this device")
+        val event = loadEvent(context.applicationContext, item)
+        return GitHistoryDetail(
+            item = item,
+            before = event.optJSONObject("before")?.toString(2),
+            after = event.optJSONObject("after")?.toString(2),
+        )
+    }
 
     fun stats(context: Context): GitHistoryStats = DatabaseGate.access {
         val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
