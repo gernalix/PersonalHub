@@ -65,6 +65,13 @@ The bridge is derived presentation data only. It must never create new canonical
 The normal Datasette row page must retain native forward foreign-key links and reverse related-row navigation. The PH mobile row template may aggregate those same FK-backed relationships into a **Related across PersonalHub** section grouped by module/entity kind for readability, but every displayed relationship must still resolve to a real Datasette row and remain queryable through Datasette SQL/API/filtering.
 
 
+### Duplicate suppression
+
+Cross-module relations are deduplicated by unordered entity pair. The same two records appear once in **Related across PersonalHub** even if multiple Contexts support that relationship. Original Context IDs remain available as provenance.
+
+An exact Context signature is based on context type, normalized title and the unordered set of member bindings plus roles. Repeated Contexts with the same signature are retained as source provenance but marked duplicate; they must not produce repeated Datasette links. Distinct Contexts that happen to connect the same pair still produce one visible relation with multiple provenance records.
+
+
 ## Mobile presentation
 
 The initial shell currently embeds Datasette's normal HTML UI in a WebView, so before the mobile presentation layer is installed it is intentionally close to opening the same Datasette page in a mobile browser, minus browser chrome. The production target is more optimized than that baseline while preserving Datasette semantics.
