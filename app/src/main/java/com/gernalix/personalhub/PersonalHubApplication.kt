@@ -13,6 +13,7 @@ import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.core.database.DatabaseVault
 import com.gernalix.personalhub.core.database.HubAutoExport
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.ResourceHubAdapter
 import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
@@ -104,6 +105,9 @@ private object PostFirstFrameStartup {
                             }
                             runStep("Datasette sync", "PH.bg.datasetteSync") {
                                 DatasetteSync.start(app)
+                            }
+                            runStep("Git data sync", "PH.bg.gitDataSync") {
+                                GitDataSync.start(app)
                             }
                             runStep("Workflowy days sync", "PH.bg.workflowySync") {
                                 WorkflowyDaysSync.ensureScheduled(app)
