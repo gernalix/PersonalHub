@@ -10,6 +10,8 @@ import com.example.multitimetracker.model.TimedTagNotificationType
 import com.example.multitimetracker.model.TimeFenceMatchMode
 import com.example.multitimetracker.model.TimeFenceRule
 import com.example.multitimetracker.model.TimeFenceTrigger
+import com.gernalix.personalhub.core.alerts.AlertMatchMode
+import com.gernalix.personalhub.core.alerts.AlertMatching
 
 internal data class LegacyTimerAlertKey(
     val ruleId: Long,
@@ -51,10 +53,15 @@ internal fun matchTimeFenceRuleForEvent(
 ): TimeFenceRuntimeMatch? {
     if (!isLiveTimeFenceRule(rule)) return null
     if (rule.trigger != event.trigger) return null
-    val matchesTags = when (rule.matchMode) {
-        TimeFenceMatchMode.AND -> rule.tagIds.all { event.sessionTagIds.contains(it) }
-        TimeFenceMatchMode.OR -> rule.tagIds.isEmpty() || rule.tagIds.any { event.sessionTagIds.contains(it) }
-    }
+    val matchesTags = AlertMatching.tags(
+        mode = when (rule.matchMode) {
+            TimeFenceMatchMode.AND -> AlertMatchMode.ALL
+            TimeFenceMatchMode.OR -> AlertMatchMode.ANY
+        },
+        requiredIds = rule.tagIds.mapTo(linkedSetOf()) { it.toString() },
+        actualIds = event.sessionTagIds.mapTo(linkedSetOf()) { it.toString() },
+        emptyAnyMatches = true,
+    )
     if (!matchesTags) return null
     val lastFired = rule.lastFiredAtMs ?: 0L
     if (rule.cooldownMs > 0L && (nowMs - lastFired) < rule.cooldownMs) return null
