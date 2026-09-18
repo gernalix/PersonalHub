@@ -58,6 +58,11 @@ internal object GitDataFormat {
                 val cached = GitDataSettings.readCachedStateManifest(context)
                 val cachedSchema = cached?.optInt("schema_version", -1) ?: -1
                 val cachedEntries = cachedEntries(cached)
+                val cachedObjects = cached?.optJSONArray("objects")?.let { array ->
+                    buildSet {
+                        for (i in 0 until array.length()) add(array.getString(i))
+                    }
+                }.orEmpty()
                 val cachedTables = cachedEntries.keys
                 val full = cachedSchema != PersonalHubDatabase.SCHEMA_VERSION ||
                     cachedTables != allTables.toSet()
@@ -97,8 +102,6 @@ internal object GitDataFormat {
                             entries.toSortedMap().values.forEach(::put)
                         },
                     )
-                val manifestBytes = manifest.toString(2).toByteArray(Charsets.UTF_8)
-                files[GIT_STATE_MANIFEST] = manifestBytes
                 if (full) {
                     files["state/schema.json"] = context.assets.open(
                         "com.gernalix.personalhub.core.database.PersonalHubDatabase/" +
@@ -119,6 +122,17 @@ internal object GitDataFormat {
                     files[path + ".sig.json"] = GitDataSigner.signatureDocument(bytes)
                 }
                 val historyPath = history?.first.orEmpty()
+                val objectPaths = files.keys.filter { it.startsWith("objects/sha256/") }
+                val batchObjects = objectPaths.map { path ->
+                    path.substringAfterLast('/').removeSuffix(".bin")
+                }.toSet()
+                objectPaths.forEach { path ->
+                    val hash = path.substringAfterLast('/').removeSuffix(".bin")
+                    if (hash in cachedObjects) files.remove(path)
+                }
+                val allObjects = (cachedObjects + batchObjects).sorted()
+                manifest.put("objects", JSONArray(allObjects))
+                files[GIT_STATE_MANIFEST] = manifest.toString(2).toByteArray(Charsets.UTF_8)
                 val meta = events.map { event ->
                     GitHistoryCommitMeta(
                         id = event.id,
