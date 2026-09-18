@@ -12,6 +12,9 @@ interface AlertDao {
     @Query("SELECT * FROM alert_rules WHERE domain = :domain ORDER BY created_at DESC, id ASC")
     fun observeRules(domain: String): Flow<List<AlertRuleEntity>>
 
+    @Query("SELECT * FROM alert_rules WHERE domain = :domain ORDER BY created_at DESC, id ASC")
+    suspend fun listRules(domain: String): List<AlertRuleEntity>
+
     @Query("SELECT * FROM alert_rules WHERE domain = :domain AND enabled = 1 AND deleted_at IS NULL ORDER BY created_at ASC, id ASC")
     suspend fun activeRules(domain: String): List<AlertRuleEntity>
 
