@@ -47,6 +47,7 @@ import com.gernalix.personalhub.capsules.settings.GitHistorySettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
+import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
 import com.gernalix.personalhub.core.hubcontext.HubContextComposerScreen
 
 class MainActivity : ComponentActivity() {
