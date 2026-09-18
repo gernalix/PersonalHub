@@ -13,7 +13,7 @@ PersonalHub contains People, Timer, Places, Substances, WordPulse, Soldi and Sal
 
 ## Shared alerts and Places tags
 
-`:core:alerts` owns the cross-module alert evaluator, safe link-only notification tap policy and the optional Tasker broadcast bridge. Timer and Places both adapt their events into this evaluator, but they keep independent tag namespaces: a Timer tag ID is never a Places tag ID even when the numeric values happen to match. Timer keeps its existing snapshot rule representation for compatibility; Places stores its native alert rules in the canonical database.
+`:core:alerts` owns the cross-module alert evaluator, safe link-only notification tap policy and the optional Tasker broadcast bridge. See `docs/ALERTS.md` for the runtime and integration contract. Timer and Places both adapt their events into this evaluator, but they keep independent tag namespaces: a Timer tag ID is never a Places tag ID even when the numeric values happen to match. Timer keeps its existing snapshot rule representation for compatibility; Places stores its native alert rules in the canonical database.
 
 Places tags are first-class canonical rows in `place_tags` with a many-to-many `place_tag_cross_ref` relation to places. Places alerts can target either one concrete place UUID or a Places-tag query with ALL/ANY matching, and can fire on manual check-in, manual check-out or both. The Places alert engine is invoked only after an explicit check-in/out write succeeds; it never requests location updates and is separate from Android's platform geofence subsystem.
 
