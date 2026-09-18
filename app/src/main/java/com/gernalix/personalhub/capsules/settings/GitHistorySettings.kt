@@ -74,6 +74,10 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var diff by remember { mutableStateOf<List<GitStateDiff>>(emptyList()) }
     var proposalRef by remember { mutableStateOf("") }
     var patchId by remember { mutableStateOf("") }
+    var proposalBranchName by remember { mutableStateOf("") }
+    var proposalPrTitle by remember { mutableStateOf("") }
+    var proposalPrBody by remember { mutableStateOf("") }
+    var proposalPrUrl by remember { mutableStateOf<String?>(null) }
     var restore by remember { mutableStateOf<GitRevision?>(null) }
     var detail by remember { mutableStateOf<GitHistoryDetail?>(null) }
     var bulkFromDate by remember { mutableStateOf(LocalDate.now().minusDays(1).toString()) }
@@ -448,6 +452,65 @@ fun GitHistorySettings(onBack: () -> Unit) {
 
         HorizontalDivider()
         Text(stringResource(R.string.git_history_proposal), style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            proposalBranchName,
+            { proposalBranchName = it },
+            label = { Text(stringResource(R.string.git_history_proposal_branch_name)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedButton(
+            enabled = !busy && proposalBranchName.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { GitHistory.createProposalBranch(context, proposalBranchName) }
+                    }
+                    busy = false
+                    result.onSuccess {
+                        proposalRef = it
+                        proposalBranchName = ""
+                    }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_create_proposal_branch)) }
+        OutlinedTextField(
+            proposalPrTitle,
+            { proposalPrTitle = it },
+            label = { Text(stringResource(R.string.git_history_proposal_pr_title)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            proposalPrBody,
+            { proposalPrBody = it },
+            label = { Text(stringResource(R.string.git_history_proposal_pr_body)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedButton(
+            enabled = !busy && proposalRef.isNotBlank() && proposalPrTitle.isNotBlank(),
+            onClick = {
+                scope.launch {
+                    busy = true
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            GitHistory.createProposalPullRequest(
+                                context,
+                                proposalRef,
+                                proposalPrTitle,
+                                proposalPrBody,
+                            )
+                        }
+                    }
+                    busy = false
+                    result.onSuccess { proposalPrUrl = it }.onFailure { error = true }
+                }
+            },
+        ) { Text(stringResource(R.string.git_history_create_pr)) }
+        proposalPrUrl?.let {
+            Text(stringResource(R.string.git_history_pr_created, it), style = MaterialTheme.typography.bodySmall)
+        }
         OutlinedTextField(
             proposalRef,
             { proposalRef = it },
