@@ -7,10 +7,11 @@ import androidx.room.Index
 import com.gernalix.luoghi.data.PlaceTagEntity
 
 /**
- * Canonical cross-module alert rule.
+ * Canonical alert-rule persistence for domains stored in personalhub.db.
  *
- * Tag targets stay domain-specific: Places references PlaceTagEntity while Timer keeps its
- * independent Timer tag identifiers. Equal numeric IDs across the two domains are never equivalent.
+ * Places uses this table today. Timer keeps its existing snapshot persistence for compatibility and
+ * adapts those rules to the shared evaluator; Timer tags and Places tags therefore remain completely
+ * separate namespaces.
  */
 @Entity(
     tableName = "alert_rules",
