@@ -47,9 +47,31 @@ Remote mode already uses the relational `personalhub_read` projection for this p
 
 Local and remote acceptance therefore includes forward FK links, reverse/backlink navigation and readable labels for the same canonical relationships. Technical IDs remain available in row detail/API/SQL but should not replace human labels in normal table browsing.
 
+
+## Cross-module entity hubs
+
+Foreign-key navigation must work as a graph, not only as isolated one-hop links.
+
+Known direct relationships that are stored as ordinary columns (for example finance transaction → person/place, prescription → doctor/finance transaction, intake → prescription) are projected as real SQLite foreign keys even when Room cannot declare the cross-feature constraint directly.
+
+Relationships created through PersonalHub Context use the Context graph as their source of truth. The read-only presentation must materialize those memberships into typed relational bridge rows with real foreign keys to the concrete presentation tables. A person page such as Carlo must therefore expose a **Related across PersonalHub** section grouped by module, using Datasette-native links/backlinks for every resolved target:
+
+- Soldi: transactions and recurring entries associated with the person;
+- Places: places linked through Context;
+- Substances: substances/intakes/prescriptions linked through Context or explicit references;
+- Timer: sessions linked through Context;
+- WordPulse: sessions linked through Context;
+- People: other people linked through the same Contexts when applicable.
+
+The bridge is derived presentation data only. It must never create new canonical associations, infer relationships from names, or write back to `personalhub.db`. Unresolved/deleted bindings remain explicit and must not silently point to a different record.
+
+The normal Datasette row page must retain its native related-row navigation. The PH mobile row template may additionally aggregate those same FK-backed relationships into module sections/cards for one-tap cross-module exploration; the links themselves must still resolve to actual Datasette rows rather than client-side synthetic objects.
+
 ## Mobile presentation
 
-The Data Explorer should keep Datasette itself responsible for table, row, filter, facet, pagination, SQL and foreign-key rendering. PersonalHub adds a thin mobile presentation layer rather than recreating those components natively.
+The initial shell currently embeds Datasette's normal HTML UI in a WebView, so before the mobile presentation layer is installed it is intentionally close to opening the same Datasette page in a mobile browser, minus browser chrome. The production target is more optimized than that baseline while preserving Datasette semantics.
+
+The Data Explorer should keep Datasette itself responsible for table, row, filter, facet, pagination, SQL and foreign-key rendering. PersonalHub adds a thin mobile presentation layer rather than recreating those components natively. On narrow screens the preferred default is a readable card/list representation with an explicit switch to the dense table when useful; foreign-key values are rendered as prominent tappable labels/chips, and row detail groups incoming/outgoing relationships by PersonalHub module.
 
 Inside PH, both local and remote Datasette pages should receive the same bundled mobile stylesheet/layout treatment: no browser chrome, PH navigation around the WebView, system light/dark compatibility, readable typography and spacing, touch-friendly controls, sticky table headers where practical, horizontal table scrolling instead of squeezed columns, and visually clear foreign-key links. Filters, facets, pagination, row pages and the SQL editor must remain functionally identical to Datasette.
 
