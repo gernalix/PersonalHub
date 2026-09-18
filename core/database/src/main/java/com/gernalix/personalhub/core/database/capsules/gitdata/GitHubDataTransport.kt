@@ -20,6 +20,18 @@ internal class GitHubDataTransport(
         val treeSha: String,
     )
 
+    fun validatePrivateWritable() {
+        val repo = json("GET", api)
+        require(repo.optBoolean("private", false)) {
+            "PersonalHub data repository must be private"
+        }
+        repo.optJSONObject("permissions")?.let { permissions ->
+            require(permissions.optBoolean("push", true)) {
+                "GitHub credential does not have push access to this repository"
+            }
+        }
+    }
+
     fun remoteHead(): RemoteHead {
         val repo = json("GET", api)
         val branch = repo.getString("default_branch")
