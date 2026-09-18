@@ -342,7 +342,13 @@ object GitHistory {
     ): String = remote(context).createPullRequest(branch, title, body)
 
     private fun loadEvent(context: Context, item: GitHistoryItem): JSONObject {
-        val bytes = transport(context).readFile(item.historyPath, item.commitSha)
+        val git = transport(context)
+        val bytes = git.readFile(item.historyPath, item.commitSha)
+        git.readFileOrNull(item.historyPath + ".sig.json", item.commitSha)?.let { signature ->
+            require(GitDataSigner.verify(bytes, signature)) {
+                "Git history signature verification failed: " + item.historyPath
+            }
+        }
         return String(bytes, Charsets.UTF_8).lineSequence()
             .filter { it.isNotBlank() }
             .map(::JSONObject)
