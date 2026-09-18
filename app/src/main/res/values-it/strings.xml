@@ -226,4 +226,6 @@
     <string name="git_history_discard_proposal">Elimina branch proposta</string>
     <string name="git_history_restore_ref">Commit / tag / branch più vecchio</string>
     <string name="git_history_restore_ref_action">Carica revisione da ripristinare</string>
+    <string name="git_history_revert_preview_safe">Controllo sandbox superato: questo ripristino è attualmente applicabile.</string>
+    <string name="git_history_revert_preview_blocked">Il controllo sandbox ha bloccato il ripristino: %1$s</string>
 </resources>
