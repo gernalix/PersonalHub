@@ -235,4 +235,10 @@
     <string name="git_history_stats_value_lifetime">Durata media del valore di un campo: %1$d ore</string>
     <string name="git_history_restore_date">Vai alla data (AAAA-MM-GG)</string>
     <string name="git_history_restore_date_action">Carica stato a fine giornata</string>
+    <string name="git_history_all_operations">Tutte le operazioni</string>
+    <string name="git_history_bisect_title">Restringi una regressione dati</string>
+    <string name="git_history_bisect_description">Scegli sopra una tabella e una data sicuramente funzionante / non funzionante per elencare gli edit semantici che possono aver introdotto il cambiamento.</string>
+    <string name="git_history_known_good">Data sicuramente funzionante (AAAA-MM-GG)</string>
+    <string name="git_history_known_bad">Data sicuramente non funzionante (AAAA-MM-GG)</string>
+    <string name="git_history_bisect_action">Trova edit sospetti</string>
 </resources>
