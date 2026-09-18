@@ -186,7 +186,16 @@ for kotlin in source_files.get("app", []):
 
 
 ANDROID_ATTR = "{http://schemas.android.com/apk/res/android}"
-PUBLIC_SHORTCUT_ALIAS = re.compile(r"^com\.gernalix\.personalhub\.shortcut\.[A-Za-z]+ShortcutActivity$")
+SHORTCUT_ALIAS_PREFIX = "com.gernalix.personalhub.shortcut."
+PUBLIC_SHORTCUT_ALIASES = {
+    "luoghi": f"{SHORTCUT_ALIAS_PREFIX}PlacesShortcutActivity",
+    "multitimetracker": f"{SHORTCUT_ALIAS_PREFIX}TimerShortcutActivity",
+    "salute": f"{SHORTCUT_ALIAS_PREFIX}SaluteShortcutActivity",
+    "soldi": f"{SHORTCUT_ALIAS_PREFIX}SoldiShortcutActivity",
+    "sostanze": f"{SHORTCUT_ALIAS_PREFIX}SubstancesShortcutActivity",
+    "supercontacts": f"{SHORTCUT_ALIAS_PREFIX}PeopleShortcutActivity",
+    "wordpulse": f"{SHORTCUT_ALIAS_PREFIX}WordPulseShortcutActivity",
+}
 
 
 def manifest_class_references(manifest: Path) -> list[str]:
@@ -206,6 +215,12 @@ def manifest_class_references(manifest: Path) -> list[str]:
 # providers, receivers, services and public shortcut alias in its own manifest.
 app_manifest = ROOT / "app/src/main/AndroidManifest.xml"
 for referenced in manifest_class_references(app_manifest):
+    if referenced.startswith(SHORTCUT_ALIAS_PREFIX):
+        errors.append(
+            f"{app_manifest.relative_to(ROOT)} declares feature shortcut alias {referenced}; "
+            "move it to the owning feature manifest"
+        )
+        continue
     referenced_owner = resolve_import_owner(referenced)
     if referenced_owner and referenced_owner.startswith("feature:"):
         errors.append(
@@ -213,15 +228,21 @@ for referenced in manifest_class_references(app_manifest):
             "move it to the owning feature manifest"
         )
 
+seen_shortcut_aliases: dict[str, list[str]] = defaultdict(list)
 for feature_dir in sorted((ROOT / "feature").glob("*")):
     if not feature_dir.is_dir():
         continue
     owner = f"feature:{feature_dir.name}"
     manifest = feature_dir / "src/main/AndroidManifest.xml"
+    expected_alias = PUBLIC_SHORTCUT_ALIASES.get(feature_dir.name)
     for referenced in manifest_class_references(manifest):
-        # Stable public aliases deliberately live in the host package but are owned
-        # by the feature manifest that declares them.
-        if PUBLIC_SHORTCUT_ALIAS.fullmatch(referenced):
+        if referenced.startswith(SHORTCUT_ALIAS_PREFIX):
+            if referenced != expected_alias:
+                errors.append(
+                    f"{manifest.relative_to(ROOT)} declares shortcut alias not owned by this feature: {referenced}"
+                )
+            else:
+                seen_shortcut_aliases[referenced].append(feature_dir.name)
             continue
         referenced_owner = resolve_import_owner(referenced)
         if referenced_owner and referenced_owner != owner and (
@@ -230,6 +251,13 @@ for feature_dir in sorted((ROOT / "feature").glob("*")):
             errors.append(
                 f"{manifest.relative_to(ROOT)} declares component owned by {referenced_owner}: {referenced}"
             )
+
+for feature_name, alias in PUBLIC_SHORTCUT_ALIASES.items():
+    owners = seen_shortcut_aliases.get(alias, [])
+    if owners != [feature_name]:
+        errors.append(
+            f"shortcut alias ownership mismatch for {alias}: expected feature:{feature_name}, found {owners or 'none'}"
+        )
 
 
 if errors:
