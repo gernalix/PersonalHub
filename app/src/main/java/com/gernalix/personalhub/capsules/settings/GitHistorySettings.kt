@@ -39,6 +39,7 @@ import com.gernalix.personalhub.DatabaseRestartActivity
 import com.gernalix.personalhub.R
 import com.gernalix.personalhub.core.database.ImportRolledBack
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryDetail
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryStats
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitMilestone
@@ -72,6 +73,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var proposalRef by remember { mutableStateOf("") }
     var patchId by remember { mutableStateOf("") }
     var restore by remember { mutableStateOf<GitRevision?>(null) }
+    var detail by remember { mutableStateOf<GitHistoryDetail?>(null) }
 
     fun refresh() {
         scope.launch {
@@ -116,6 +118,32 @@ fun GitHistorySettings(onBack: () -> Unit) {
     }
 
     LaunchedEffect(author) { refresh() }
+
+    detail?.let { value ->
+        AlertDialog(
+            onDismissRequest = { detail = null },
+            title = {
+                Text(value.item.table + " · " + value.item.operation + " · " + value.item.author)
+            },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(stringResource(R.string.git_history_diff_columns, value.item.changedColumns))
+                    Text(stringResource(R.string.git_history_before), style = MaterialTheme.typography.titleSmall)
+                    Text(value.before ?: "∅", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.git_history_after), style = MaterialTheme.typography.titleSmall)
+                    Text(value.after ?: "∅", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { detail = null }) {
+                    Text(stringResource(R.string.home_autoexport_close))
+                }
+            },
+        )
+    }
 
     if (restore != null) {
         AlertDialog(
@@ -239,6 +267,19 @@ fun GitHistorySettings(onBack: () -> Unit) {
                 if (item.changedColumns.isNotBlank()) {
                     Text(item.changedColumns, style = MaterialTheme.typography.bodySmall)
                 }
+                TextButton(
+                    enabled = !busy,
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching { GitHistory.detail(context, item.id) }
+                            }
+                            busy = false
+                            result.onSuccess { detail = it }.onFailure { error = true }
+                        }
+                    },
+                ) { Text(stringResource(R.string.git_history_view_diff)) }
                 if (item.revertedBy == null) {
                     TextButton(
                         enabled = !busy,
