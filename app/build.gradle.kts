@@ -183,6 +183,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation("androidx.webkit:webkit:1.17.0")
     implementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
