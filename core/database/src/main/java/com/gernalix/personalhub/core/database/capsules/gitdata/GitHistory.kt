@@ -196,6 +196,58 @@ object GitHistory {
         }
     }
 
+    fun revertAuthorRange(
+        context: Context,
+        author: String,
+        fromMs: Long,
+        toMs: Long = System.currentTimeMillis(),
+    ): Int {
+        require(author.matches(Regex("[A-Za-z0-9._:-]{1,96}")))
+        require(fromMs <= toMs)
+        val app = context.applicationContext
+        val db = PersonalHubDatabase.get(app).openHelper.writableDatabase
+        GitHistoryStore.install(db)
+        val selected = GitHistoryStore.between(db, fromMs, toMs, limit = 5000)
+            .filter { it.author == author && it.revertedBy == null }
+        if (selected.isEmpty()) return 0
+
+        val expanded = linkedMapOf<String, GitHistoryItem>()
+        selected.forEach { item ->
+            val logical = item.groupId?.let { GitHistoryStore.byGroup(db, it) }.orEmpty()
+            (logical.ifEmpty { listOf(item) }).forEach { member ->
+                if (member.revertedBy == null) expanded[member.id] = member
+            }
+        }
+        val items = expanded.values.sortedWith(
+            compareByDescending<GitHistoryItem> { it.occurredAt }.thenByDescending { it.id },
+        )
+        val payloads = items.associateWith { loadEvent(app, it) }
+        val revertGroup = "bulk-revert:" + author + ":" + UUID.randomUUID().toString()
+
+        db.beginTransaction()
+        try {
+            GitDataTracking.setEditContext(
+                db = db,
+                author = "user",
+                source = "history_bulk_revert",
+                reason = "Bulk revert of " + author + " edits since " + fromMs,
+                groupId = revertGroup,
+            )
+            items.forEach { item ->
+                applyInverse(app, db, item, requireNotNull(payloads[item]))
+            }
+            db.query("PRAGMA foreign_key_check").use {
+                require(!it.moveToFirst()) { "Bulk revert would break database relationships" }
+            }
+            items.forEach { GitHistoryStore.markReverted(db, it.id, revertGroup) }
+            db.setTransactionSuccessful()
+        } finally {
+            GitDataTracking.clearEditContext(db)
+            db.endTransaction()
+        }
+        return items.size
+    }
+
     /**
      * Returns history events in a time window. This powers "what happened that day?" and
      * data-debugging/bisect workflows without scanning Git on every query.
