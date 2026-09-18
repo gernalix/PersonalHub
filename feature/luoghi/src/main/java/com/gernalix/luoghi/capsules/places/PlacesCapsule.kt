@@ -22,6 +22,7 @@ class PlacesCapsule(private val repository: PlaceRepository) {
     val tags = repository.placeTags
 
     suspend fun tagsForPlace(placeUuid: String) = repository.tagsForPlace(placeUuid)
+    suspend fun listTags() = repository.listPlaceTags()
 
     suspend fun save(mutation: PlaceMutation): String {
         val uuid = repository.savePlace(
