@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 import com.gernalix.personalhub.capsules.settings.HubSettings
+import com.gernalix.personalhub.capsules.settings.GitHistorySettings
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
 import com.gernalix.personalhub.core.hubcontext.HubContextComposerScreen
 
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun PersonalHubApp() {
+    val context = LocalContext.current
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var topDestination by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = topDestination != null) { topDestination = null }
@@ -74,14 +77,20 @@ fun PersonalHubApp() {
         return
     }
     if (topDestination == "activity") {
-        HubActivityRegisterScreen(onBack = { topDestination = null })
+        val gitHistoryEnabled = runCatching {
+            GitDataSettings.configuration(context).enabled
+        }.getOrDefault(false)
+        if (gitHistoryEnabled) {
+            GitHistorySettings(onBack = { topDestination = null })
+        } else {
+            HubActivityRegisterScreen(onBack = { topDestination = null })
+        }
         return
     }
     if (showSettings) {
         HubSettings(onBack = { showSettings = false })
         return
     }
-    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
