@@ -100,9 +100,9 @@ A data proposal is never tested by redirecting the live database to another bran
 
 ## Storage and performance
 
-Do not commit repeated personalhub.db binaries on every change. Long-term storage should be dominated by compressed small history events, changed current-state shards and genuinely new content-addressed BLOBs.
+Do not commit repeated personalhub.db binaries on every change. A Git commit tree plus `state/manifest.json` is itself the logical checkpoint: unchanged shards/objects keep the same blob identity, so an old complete PH state is addressable without storing another SQLite file. Long-term storage should be dominated by compressed small history events, changed current-state shards and genuinely new content-addressed BLOBs. Content-addressed objects are not garbage-collected merely because the current state stopped referencing them; historical revisions may still require them.
 
-Normal startup never replays Git history. Current UI reads SQLite. History queries use the local index. Full reconstruction, old-state reads and repository scans happen only on demand.
+Normal startup never replays Git history. Current UI reads SQLite. History queries use rebuildable local projections, including cached field-lifetime aggregates, rather than rescanning Git. Full reconstruction, old-state reads and repository scans happen only on demand.
 
 ## Failure model
 
