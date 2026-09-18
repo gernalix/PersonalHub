@@ -128,26 +128,25 @@ object GitHistoryStore {
     }
 
     fun find(db: SupportSQLiteDatabase, id: String): GitHistoryItem? =
-        recent(db, limit = 1).takeIf { false }?.firstOrNull()
-            ?: db.query(
-                "SELECT id,occurred_at,author,group_id,table_name,operation,row_key,changed_columns," +
-                    "history_path,commit_sha,reverted_by FROM " + TABLE + " WHERE id=? LIMIT 1",
-                arrayOf(id),
-            ).use { cursor ->
-                if (!cursor.moveToFirst()) null else GitHistoryItem(
-                    id = cursor.getString(0),
-                    occurredAt = cursor.getLong(1),
-                    author = cursor.getString(2),
-                    groupId = if (cursor.isNull(3)) null else cursor.getString(3),
-                    table = cursor.getString(4),
-                    operation = cursor.getString(5),
-                    rowKey = cursor.getString(6),
-                    changedColumns = cursor.getString(7),
-                    historyPath = cursor.getString(8),
-                    commitSha = cursor.getString(9),
-                    revertedBy = if (cursor.isNull(10)) null else cursor.getString(10),
-                )
-            }
+        db.query(
+            "SELECT id,occurred_at,author,group_id,table_name,operation,row_key,changed_columns," +
+                "history_path,commit_sha,reverted_by FROM " + TABLE + " WHERE id=? LIMIT 1",
+            arrayOf(id),
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) null else GitHistoryItem(
+                id = cursor.getString(0),
+                occurredAt = cursor.getLong(1),
+                author = cursor.getString(2),
+                groupId = if (cursor.isNull(3)) null else cursor.getString(3),
+                table = cursor.getString(4),
+                operation = cursor.getString(5),
+                rowKey = cursor.getString(6),
+                changedColumns = cursor.getString(7),
+                historyPath = cursor.getString(8),
+                commitSha = cursor.getString(9),
+                revertedBy = if (cursor.isNull(10)) null else cursor.getString(10),
+            )
+        }
 
     fun markReverted(db: SupportSQLiteDatabase, id: String, revertedBy: String) {
         db.execSQL(
