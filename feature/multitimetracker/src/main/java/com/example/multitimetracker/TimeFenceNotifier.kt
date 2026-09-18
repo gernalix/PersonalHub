@@ -16,6 +16,7 @@ import android.os.VibratorManager
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import com.example.multitimetracker.model.TimedTagNotificationType
+import com.gernalix.personalhub.core.alerts.AlertNotificationDispatcher
 
 object TimeFenceNotifier {
 
@@ -151,7 +152,13 @@ object TimeFenceNotifier {
         }
         val piFlags = PendingIntent.FLAG_UPDATE_CURRENT or
             (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
-        val contentPi = PendingIntent.getActivity(context, notificationId, fullIntent, piFlags)
+        val fullScreenPi = PendingIntent.getActivity(context, notificationId, fullIntent, piFlags)
+        val contentPi = AlertNotificationDispatcher.contentPendingIntent(
+            context = context,
+            notificationId = notificationId,
+            message = message,
+            fallbackIntent = fullIntent,
+        )
         val acknowledgeIntent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
             action = TimeFenceTimerReceiver.ACTION_ACK_TIMED_SESSION
             putExtra(TimeFenceTimerReceiver.EXTRA_NOTIFICATION_ID, notificationId)
@@ -169,7 +176,7 @@ object TimeFenceNotifier {
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(contentPi)
-            .setFullScreenIntent(contentPi, canShowFullScreen)
+            .setFullScreenIntent(fullScreenPi, canShowFullScreen)
             .setAutoCancel(true)
             .addAction(0, context.getString(R.string.ok), acknowledgePi)
             .build()
