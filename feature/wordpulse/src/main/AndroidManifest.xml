@@ -1,10 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
-    <queries><package android:name="com.google.android.apps.healthdata" /></queries>
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
     <application>
-        <activity android:name=".PermissionsRationaleActivity" android:exported="true">
-            <intent-filter><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" /></intent-filter>
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.WordPulse"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+
+        <activity-alias
+            android:name="com.gernalix.personalhub.shortcut.WordPulseShortcutActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:host="module" android:path="/wordpulse" android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
+            android:name=".PermissionsRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
         <activity-alias
             android:name=".ViewPermissionUsageActivity"
             android:exported="true"

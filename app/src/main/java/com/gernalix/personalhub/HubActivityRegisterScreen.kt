@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
+import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.database.HubActivityEntity
@@ -372,7 +373,7 @@ private suspend fun openActivityTarget(context: android.content.Context, item: A
         return
     }
     moduleFor(item.activity.moduleId)?.let { module ->
-        context.startActivity(Intent().setClassName(context.packageName, module.activityClassName))
+        context.startActivity(LauncherShortcutsCapsule.moduleIntent(context, module))
     }
 }
 

@@ -7,19 +7,17 @@ import org.junit.Test
 
 class HubModuleTest {
     @Test
-    fun hubContainsExactlyTheSevenFeatureApps() {
+    fun hubContainsExactlyTheSevenFeatureAliases() {
         assertEquals(7, HubModule.entries.size)
-        assertTrue(HubModule.entries.any { it.shortcutPath == "soldi" })
-        assertTrue(HubModule.entries.any { it.shortcutPath == "salute" })
-        val activityNames = HubModule.entries.map { it.activityClassName }
-
-        assertTrue("com.supercontacts.app.MainActivity" in activityNames)
-        assertTrue("com.example.multitimetracker.MainActivity" in activityNames)
-        assertTrue("com.gernalix.luoghi.MainActivity" in activityNames)
-        assertTrue("com.gernalix.sostanze.MainActivity" in activityNames)
-        assertTrue("com.wordpulse.app.MainActivity" in activityNames)
-        assertTrue("com.gernalix.personalhub.salute.SaluteActivity" in activityNames)
-        assertEquals(activityNames.toSet().size, activityNames.size)
+        assertEquals(
+            setOf("people", "timer", "places", "substances", "wordpulse", "soldi", "salute"),
+            HubModule.entries.map { it.shortcutPath }.toSet(),
+        )
+        assertTrue(
+            HubModule.entries.all {
+                it.shortcutActivityAliasName.startsWith("com.gernalix.personalhub.shortcut.")
+            },
+        )
     }
 
     @Test
@@ -27,7 +25,7 @@ class HubModuleTest {
         val aliases = HubModule.entries.map { it.shortcutActivityAliasName }
         assertEquals(7, aliases.size)
         assertEquals(aliases.size, aliases.toSet().size)
-        assertTrue(aliases.all { it.startsWith("com.gernalix.personalhub.shortcut.") })
+        assertTrue(aliases.none { it == "com.gernalix.personalhub.MainActivity" })
     }
 
     @Test
@@ -36,11 +34,5 @@ class HubModuleTest {
         assertEquals(7, pinnedIds.size)
         assertEquals(pinnedIds.size, pinnedIds.toSet().size)
         assertTrue(HubModule.entries.all { it.shortcutIconRes != 0 })
-    }
-
-    @Test
-    fun directShortcutAliasesDoNotRouteThroughPersonalHubHome() {
-        assertTrue(HubModule.entries.none { it.shortcutActivityAliasName == "com.gernalix.personalhub.MainActivity" })
-        assertTrue(HubModule.entries.none { it.activityClassName == "com.gernalix.personalhub.MainActivity" })
     }
 }

@@ -2,23 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Host/core networking only. Feature permissions are declared by their owning manifests. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
-    <uses-feature
-        android:name="android.hardware.telephony"
-        android:required="false" />
 
     <application
         android:name=".PersonalHubApplication"
@@ -50,18 +36,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-        <provider
-            android:name="com.gernalix.luoghi.provider.PlacesProvider"
-            android:authorities="${applicationId}.luoghi.places"
-            android:exported="false"
-            android:grantUriPermissions="false" />
-
-        <provider
-            android:name="com.example.multitimetracker.api.MttPublicSessionsProvider"
-            android:authorities="${applicationId}.mtt.sessions"
-            android:exported="false"
-            android:grantUriPermissions="false" />
 
         <activity
             android:name=".HubDeepLinkActivity"
@@ -108,7 +82,11 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <activity android:name=".DatabaseRestartActivity" android:process=":restart" android:exported="false" android:taskAffinity="com.gernalix.personalhub.restart" />
+        <activity
+            android:name=".DatabaseRestartActivity"
+            android:process=":restart"
+            android:exported="false"
+            android:taskAffinity="com.gernalix.personalhub.restart" />
 
         <activity
             android:name=".DatabaseActivity"
@@ -123,274 +101,5 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name="com.supercontacts.app.MainActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.SuperContacts"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name="com.example.multitimetracker.MainActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.MultiTimeTracker"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name="com.example.multitimetracker.TimeFenceFullScreenActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:noHistory="true"
-            android:showWhenLocked="true"
-            android:theme="@style/Theme.MultiTimeTracker"
-            android:turnScreenOn="true" />
-
-        <activity
-            android:name="com.example.multitimetracker.widget.QuickSessionWidgetClickActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:noHistory="true"
-            android:taskAffinity=""
-            android:theme="@style/Theme.MultiTimeTracker.Transparent" />
-
-        <activity
-            android:name="com.example.multitimetracker.widget.QuickEventWidgetClickActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:noHistory="true"
-            android:taskAffinity=""
-            android:theme="@style/Theme.MultiTimeTracker.Transparent" />
-
-        <activity
-            android:name="com.example.multitimetracker.widget.QuickEventWidgetConfigureActivity"
-            android:exported="true"
-            android:theme="@style/Theme.MultiTimeTracker" />
-
-        <activity
-            android:name="com.gernalix.sostanze.widget.SubstancesWidgetClickActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:noHistory="true"
-            android:taskAffinity=""
-            android:theme="@style/Theme.MultiTimeTracker.Transparent" />
-
-        <activity
-            android:name="com.gernalix.sostanze.widget.SubstancesWidgetConfigureActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Sostanze" />
-
-        <activity
-            android:name="com.gernalix.luoghi.MainActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.Luoghi" />
-
-        <activity
-            android:name="com.gernalix.luoghi.MapViewerActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Luoghi" />
-
-        <activity
-            android:name="com.gernalix.sostanze.MainActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.Sostanze"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name="com.wordpulse.app.MainActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.WordPulse"
-            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
-
-        <activity android:name="com.gernalix.personalhub.soldi.SoldiActivity" android:exported="false" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize" />
-        <activity-alias android:name=".shortcut.SoldiShortcutActivity" android:exported="true" android:icon="@drawable/ic_shortcut_soldi" android:label="@string/module_soldi" android:targetActivity="com.gernalix.personalhub.soldi.SoldiActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:host="module" android:path="/soldi" android:scheme="personalhub" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".shortcut.SaluteShortcutActivity"
-            android:exported="true"
-            android:icon="@drawable/ic_shortcut_salute"
-            android:label="@string/module_salute"
-            android:targetActivity="com.gernalix.personalhub.salute.SaluteActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:host="module" android:path="/salute" android:scheme="personalhub" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".shortcut.PeopleShortcutActivity"
-            android:exported="true"
-            android:icon="@drawable/ic_shortcut_people"
-            android:label="@string/module_people"
-            android:targetActivity="com.supercontacts.app.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data
-                    android:host="module"
-                    android:path="/people"
-                    android:scheme="personalhub" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".shortcut.TimerShortcutActivity"
-            android:exported="true"
-            android:icon="@drawable/ic_shortcut_timer"
-            android:label="@string/module_timer"
-            android:targetActivity="com.example.multitimetracker.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data
-                    android:host="module"
-                    android:path="/timer"
-                    android:scheme="personalhub" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".shortcut.PlacesShortcutActivity"
-            android:exported="true"
-            android:icon="@drawable/ic_shortcut_places"
-            android:label="@string/module_places"
-            android:targetActivity="com.gernalix.luoghi.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data
-                    android:host="module"
-                    android:path="/places"
-                    android:scheme="personalhub" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".shortcut.SubstancesShortcutActivity"
-            android:exported="true"
-            android:icon="@drawable/ic_shortcut_substances"
-            android:label="@string/module_substances"
-            android:targetActivity="com.gernalix.sostanze.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data
-                    android:host="module"
-                    android:path="/substances"
-                    android:scheme="personalhub" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".shortcut.WordPulseShortcutActivity"
-            android:exported="true"
-            android:icon="@drawable/ic_shortcut_wordpulse"
-            android:label="@string/module_wordpulse"
-            android:targetActivity="com.wordpulse.app.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data
-                    android:host="module"
-                    android:path="/wordpulse"
-                    android:scheme="personalhub" />
-            </intent-filter>
-        </activity-alias>
-
-        <receiver
-            android:name="com.example.multitimetracker.widget.QuickSessionWidgetProvider"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/quick_task_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.example.multitimetracker.widget.QuickEventWidgetProvider"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/quick_event_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.gernalix.sostanze.widget.SubstancesWidgetProvider"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/substances_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.example.multitimetracker.TimeFenceTimerReceiver"
-            android:exported="false" />
-
-        <receiver
-            android:name="com.example.multitimetracker.TimeFenceRestoreReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.gernalix.luoghi.capsules.geofence.PlaceGeofenceReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.gernalix.luoghi.action.GEOFENCE_TRANSITION" />
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.gernalix.sostanze.notifications.SostanzeNotificationReceiver"
-            android:exported="false" />
-
-        <receiver
-            android:name="com.gernalix.sostanze.notifications.SostanzeNotificationRestoreReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.TIME_SET" />
-                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.supercontacts.app.CallStateReceiver"
-            android:exported="true"
-            android:permission="android.permission.READ_PHONE_STATE">
-            <intent-filter>
-                <action android:name="android.intent.action.PHONE_STATE" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name="com.supercontacts.app.CallOverlayDebugReceiver"
-            android:enabled="@bool/debug_call_overlay_receiver_enabled"
-            android:exported="false" />
     </application>
 </manifest>
