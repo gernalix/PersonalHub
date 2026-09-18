@@ -55,6 +55,8 @@ data class GitHistoryStats(
     val byTable: List<GitHistoryCount>,
     val bySource: List<GitHistoryCount>,
     val mostRevisedEntities: List<GitHistoryCount>,
+    val thisYearCount: Long,
+    val averageFieldValueLifetimeHours: Long?,
 )
 
 data class GitHistoryDetail(
@@ -107,11 +109,20 @@ object GitHistory {
     fun stats(context: Context): GitHistoryStats = DatabaseGate.access {
         val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
         GitHistoryStore.install(db)
+        val startOfYear = java.time.LocalDate.now()
+            .withDayOfYear(1)
+            .atStartOfDay(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
         GitHistoryStats(
             byAuthor = GitHistoryStore.countsByAuthor(db),
             byTable = GitHistoryStore.countsByTable(db),
             bySource = GitHistoryStore.countsBySource(db),
             mostRevisedEntities = GitHistoryStore.countsByEntity(db),
+            thisYearCount = GitHistoryStore.countSince(db, startOfYear),
+            averageFieldValueLifetimeHours = GitHistoryStore
+                .averageFieldValueLifetimeMs(db)
+                ?.div(60L * 60L * 1000L),
         )
     }
 
