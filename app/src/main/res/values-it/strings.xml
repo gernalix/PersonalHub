@@ -207,4 +207,10 @@
     <string name="git_history_bulk_revert_title">Annullare le modifiche di questo autore?</string>
     <string name="git_history_bulk_revert_confirm">Tutte le modifiche non già annullate di %1$s dal %2$s in poi verranno invertite atomicamente quando possibile. Nessuna cronologia Git verrà eliminata.</string>
     <string name="git_history_bulk_revert_action">Annulla modifiche</string>
+    <string name="git_history_proposal_branch_name">Nome nuovo branch proposta</string>
+    <string name="git_history_create_proposal_branch">Crea branch sicuro di proposta dati</string>
+    <string name="git_history_proposal_pr_title">Titolo pull request</string>
+    <string name="git_history_proposal_pr_body">Note pull request</string>
+    <string name="git_history_create_pr">Crea pull request dati</string>
+    <string name="git_history_pr_created">Pull request creata: %1$s</string>
 </resources>
