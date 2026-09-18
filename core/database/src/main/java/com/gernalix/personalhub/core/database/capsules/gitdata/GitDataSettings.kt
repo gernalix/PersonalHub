@@ -49,6 +49,7 @@ data class GitDataStatus(
     val lastPushedGeneration: Long,
     val lastRemoteRevision: String?,
     val lastError: String?,
+    val pendingPatchIds: List<String>,
 )
 
 object GitDataSettings {
@@ -188,6 +189,9 @@ object GitDataSettings {
             lastPushedGeneration = prefs.getLong("last_pushed_generation", -1L),
             lastRemoteRevision = prefs.getString("last_remote_revision", null),
             lastError = prefs.getString("last_error", null),
+            pendingPatchIds = prefs.getStringSet("pending_patch_ids", emptySet())
+                .orEmpty()
+                .sorted(),
         )
     }
 
@@ -227,6 +231,12 @@ object GitDataSettings {
             .apply()
     }
 
+    internal fun recordPendingPatches(context: Context, ids: Collection<String>) {
+        statusPrefs(context).edit()
+            .putStringSet("pending_patch_ids", ids.toSortedSet())
+            .apply()
+    }
+
     @Synchronized
     internal fun appliedPatchIds(context: Context): Set<String> {
         val array = read(context).optJSONArray("applied_patches") ?: return emptySet()
@@ -244,5 +254,11 @@ object GitDataSettings {
         existing.sorted().forEach(array::put)
         value.put("applied_patches", array)
         write(context, value)
+        val pending = statusPrefs(context)
+            .getStringSet("pending_patch_ids", emptySet())
+            .orEmpty()
+            .toMutableSet()
+        pending.remove(patchId)
+        statusPrefs(context).edit().putStringSet("pending_patch_ids", pending).apply()
     }
 }
