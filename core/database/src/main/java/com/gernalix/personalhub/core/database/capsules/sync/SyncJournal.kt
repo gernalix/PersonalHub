@@ -11,7 +11,7 @@ data class HubSyncKnown(val table_name: String, val row_key: String)
 
 /** Transactional, coalescing journal shared by every DAO and the timer compatibility adapter. */
 object SyncJournal {
-    val excluded = setOf("room_master_table", "android_metadata", "hub_generation", "hub_sync_pending", "hub_sync_known", "sync_queue", "sync_shadow", "sync_meta", "hub_activity_undo_context", "hub_git_pending")
+    val excluded = setOf("room_master_table", "android_metadata", "hub_generation", "hub_sync_pending", "hub_sync_known", "sync_queue", "sync_shadow", "sync_meta", "hub_activity_undo_context", "hub_git_pending", "hub_git_events", "hub_git_edit_context", "hub_git_applied_patches")
 
     fun create(db: SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `hub_sync_pending` (`table_name` TEXT NOT NULL, `row_key` TEXT NOT NULL, `revision` INTEGER NOT NULL, PRIMARY KEY(`table_name`, `row_key`))")
