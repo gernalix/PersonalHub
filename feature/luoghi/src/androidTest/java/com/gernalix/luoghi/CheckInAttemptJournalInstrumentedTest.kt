@@ -94,7 +94,7 @@ class CheckInAttemptJournalInstrumentedTest {
                     placeId = candidate.place.uuid,
                     placeNameSnapshot = candidate.place.nickname,
                     distanceM = candidate.distanceM,
-                    thresholdM = CheckInPolicy.effectiveRadiusM(candidate.place),
+                    thresholdM = CheckInPolicy.matchThresholdM(candidate.place, location),
                     rank = index + 1,
                     result = "AMBIGUOUS",
                 )
