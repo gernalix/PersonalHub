@@ -24,6 +24,8 @@ internal data class GitExportBundle(
     val files: Map<String, ByteArray>,
     val manifest: JSONObject,
     val pending: List<Pair<String, Long>>,
+    val events: List<GitEditEvent>,
+    val eventMeta: List<GitHistoryCommitMeta>,
     val generation: Long,
 )
 
@@ -36,11 +38,16 @@ internal object GitDataFormat {
 
     fun exportPending(context: Context): GitExportBundle? {
         var pending: List<Pair<String, Long>> = emptyList()
+        var events: List<GitEditEvent> = emptyList()
         var snapshot: File? = null
         DatabaseGate.access {
             val live = PersonalHubDatabase.get(context).openHelper.writableDatabase
+            GitHistoryStore.install(live)
             pending = GitDataTracking.pending(live)
-            if (pending.isEmpty() && GitDataSettings.readCachedStateManifest(context) != null) return@access
+            events = GitDataTracking.events(live)
+            if (pending.isEmpty() && events.isEmpty() &&
+                GitDataSettings.readCachedStateManifest(context) != null
+            ) return@access
             snapshot = DatabaseVault.backupCurrent(context)
         }
         val source = snapshot ?: return null
@@ -100,7 +107,17 @@ internal object GitDataFormat {
                 files[
                     "changes/${System.currentTimeMillis()}-g$generation.json"
                 ] = change.toString(2).toByteArray(Charsets.UTF_8)
-                return GitExportBundle(files, manifest, pending, generation)
+                val history = encodeHistory(events, files)
+                history?.let { files[it.first] = it.second }
+                val historyPath = history?.first.orEmpty()
+                val meta = events.map { event ->
+                    GitHistoryCommitMeta(
+                        id = event.id,
+                        historyPath = historyPath,
+                        changedColumns = changedColumns(event),
+                    )
+                }
+                return GitExportBundle(files, manifest, pending, events, meta, generation)
             }
         } finally {
             source.delete()
@@ -108,12 +125,113 @@ internal object GitDataFormat {
         }
     }
 
-    fun acknowledge(context: Context, bundle: GitExportBundle) {
+    fun acknowledge(context: Context, bundle: GitExportBundle, revision: String) {
         DatabaseGate.access {
             val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
-            GitDataTracking.acknowledge(db, bundle.pending)
+            GitHistoryStore.install(db)
+            db.beginTransaction()
+            try {
+                GitHistoryStore.indexCommitted(db, bundle.events, bundle.eventMeta, revision)
+                GitDataTracking.acknowledge(db, bundle.pending, bundle.events.map { it.id })
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
         }
         GitDataSettings.writeCachedStateManifest(context, bundle.manifest)
+    }
+
+    private fun encodeHistory(
+        events: List<GitEditEvent>,
+        files: MutableMap<String, ByteArray>,
+    ): Pair<String, ByteArray>? {
+        if (events.isEmpty()) return null
+        val first = events.minOf { it.occurredAt }
+        val instant = java.time.Instant.ofEpochMilli(first).atZone(java.time.ZoneOffset.UTC)
+        val digest = sha256(events.joinToString("|") { it.id }.toByteArray(Charsets.UTF_8)).take(16)
+        val path = "history/%04d/%02d/%02d/%d-%s.jsonl".format(
+            instant.year,
+            instant.monthValue,
+            instant.dayOfMonth,
+            first,
+            digest,
+        )
+        val output = StringBuilder()
+        events.forEach { event ->
+            val columns = event.columns.split(',').filter { it.isNotBlank() }
+            val before = historyPayload(event.beforePayload, columns, files)
+            val after = historyPayload(event.afterPayload, columns, files)
+            output.append(
+                JSONObject()
+                    .put("format_version", 1)
+                    .put("event_id", event.id)
+                    .put("timestamp_ms", event.occurredAt)
+                    .put("author", event.author)
+                    .put("group_id", event.groupId ?: JSONObject.NULL)
+                    .put("table", event.table)
+                    .put("operation", event.operation.lowercase())
+                    .put("row_key", event.rowKey)
+                    .put("changed_columns", JSONArray(changedColumns(event).split(',').filter { it.isNotBlank() }))
+                    .put("before", before ?: JSONObject.NULL)
+                    .put("after", after ?: JSONObject.NULL)
+                    .toString(),
+            ).append('\n')
+        }
+        return path to output.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    private fun changedColumns(event: GitEditEvent): String {
+        val columns = event.columns.split(',').filter { it.isNotBlank() }
+        val before = decodedPayload(event.beforePayload, columns)
+        val after = decodedPayload(event.afterPayload, columns)
+        if (before == null || after == null) return columns.joinToString(",")
+        return columns.filter { column -> !rawEquals(before[column], after[column]) }.joinToString(",")
+    }
+
+    private fun decodedPayload(payload: String?, columns: List<String>): Map<String, Any?>? {
+        if (payload == null) return null
+        val values = SyncJournal.keyValues(payload)
+        require(values.size == columns.size) { "Git history payload shape mismatch" }
+        return columns.indices.associate { columns[it] to values[it] }
+    }
+
+    private fun historyPayload(
+        payload: String?,
+        columns: List<String>,
+        files: MutableMap<String, ByteArray>,
+    ): JSONObject? {
+        val decoded = decodedPayload(payload, columns) ?: return null
+        return JSONObject().also { target ->
+            decoded.forEach { (column, value) ->
+                target.put(column, historyValue(value, files))
+            }
+        }
+    }
+
+    private fun historyValue(value: Any?, files: MutableMap<String, ByteArray>): Any =
+        when (value) {
+            null -> JSONObject.NULL
+            is ByteArray -> {
+                val hash = sha256(value)
+                val path = "objects/sha256/" + hash.take(2) + "/" + hash + ".bin"
+                files.putIfAbsent(path, value)
+                JSONObject()
+                    .put("\$object", hash)
+                    .put("path", path)
+                    .put("size", value.size)
+            }
+            is Number, is String, is Boolean -> value
+            else -> value.toString()
+        }
+
+    private fun rawEquals(left: Any?, right: Any?): Boolean {
+        if (left is ByteArray && right is ByteArray) return left.contentEquals(right)
+        if (left is Number && right is Number) {
+            return runCatching {
+                BigDecimal(left.toString()).compareTo(BigDecimal(right.toString())) == 0
+            }.getOrDefault(left.toDouble() == right.toDouble())
+        }
+        return left == right
     }
 
     private fun cachedEntries(manifest: JSONObject?): Map<String, JSONObject> {
