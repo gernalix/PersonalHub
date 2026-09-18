@@ -219,6 +219,11 @@ object GitHistory {
             db.execSQL("DELETE FROM " + GitHistoryStore.TABLE)
             files.forEach { path ->
                 val bytes = transport(app).readFile(path, head.commitSha)
+                transport(app).readFileOrNull(path + ".sig.json", head.commitSha)?.let { signature ->
+                    require(GitDataSigner.verify(bytes, signature)) {
+                        "Git history signature verification failed: $path"
+                    }
+                }
                 String(bytes, Charsets.UTF_8).lineSequence()
                     .filter { it.isNotBlank() }
                     .forEach { line ->
