@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Salute workflow: ChatGPT to PersonalHub</title>
+  <desc id="desc">Architecture diagram showing MinSP input, ChatGPT normalization and analysis, semantic Git patching, PersonalHub database, Git History, Datasette, Obsidian and the thin Android Salute UI.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#37474F"/>
+    </marker>
+    <style>
+      .bg { fill: #FAFAFA; }
+      .lane { fill: #FFFFFF; stroke: #CFD8DC; stroke-width: 2; rx: 18; }
+      .box { fill: #FFFFFF; stroke: #455A64; stroke-width: 2.5; rx: 16; }
+      .source { fill: #E3F2FD; stroke: #1565C0; }
+      .ai { fill: #F3E5F5; stroke: #7B1FA2; }
+      .git { fill: #FFF8E1; stroke: #F9A825; }
+      .db { fill: #E8F5E9; stroke: #2E7D32; }
+      .consumer { fill: #ECEFF1; stroke: #546E7A; }
+      .label { font: 700 28px sans-serif; fill: #263238; }
+      .body { font: 400 21px sans-serif; fill: #37474F; }
+      .small { font: 400 18px sans-serif; fill: #546E7A; }
+      .arrow { stroke: #37474F; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+      .dash { stroke-dasharray: 10 10; }
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1600" height="980"/>
+  <text x="70" y="70" class="label" font-size="36">Salute — workflow ChatGPT → PersonalHub</text>
+  <text x="70" y="110" class="small">Source of truth finale: personalhub.db · Android read-only · Git/History/Datasette/Obsidian condivisi</text>
+
+  <rect class="lane" x="50" y="145" width="1500" height="210"/>
+  <text x="80" y="185" class="small">INGESTIONE</text>
+
+  <rect class="box source" x="90" y="215" width="330" height="100"/>
+  <text x="255" y="255" text-anchor="middle" class="label">MinSP / MyChart</text>
+  <text x="255" y="287" text-anchor="middle" class="body">screenshot · testo · metadati</text>
+
+  <rect class="box source" x="510" y="215" width="330" height="100"/>
+  <text x="675" y="255" text-anchor="middle" class="label">Chat</text>
+  <text x="675" y="287" text-anchor="middle" class="body">timestamp ricezione / notifica</text>
+
+  <rect class="box ai" x="930" y="195" width="540" height="140"/>
+  <text x="1200" y="235" text-anchor="middle" class="label">ChatGPT ingestion</text>
+  <text x="1200" y="270" text-anchor="middle" class="body">traduzione · dedup · sample grouping</text>
+  <text x="1200" y="300" text-anchor="middle" class="body">analisi longitudinale · commenti AI · cross-links</text>
+
+  <path class="arrow" d="M420 265 H510"/>
+  <path class="arrow" d="M840 265 H930"/>
+
+  <rect class="lane" x="50" y="385" width="1500" height="245"/>
+  <text x="80" y="425" class="small">SCRITTURA CANONICA E HISTORY</text>
+
+  <rect class="box git" x="110" y="465" width="370" height="120"/>
+  <text x="295" y="505" text-anchor="middle" class="label">Patch semantica PH</text>
+  <text x="295" y="540" text-anchor="middle" class="body">author=chatgpt · group_id=import</text>
+  <text x="295" y="568" text-anchor="middle" class="small">preconditions + provenance</text>
+
+  <rect class="box git" x="610" y="465" width="330" height="120"/>
+  <text x="775" y="505" text-anchor="middle" class="label">GitPatchEngine</text>
+  <text x="775" y="540" text-anchor="middle" class="body">transazione atomica</text>
+  <text x="775" y="568" text-anchor="middle" class="small">no raw SQLite merge</text>
+
+  <rect class="box db" x="1070" y="445" width="390" height="160"/>
+  <text x="1265" y="490" text-anchor="middle" class="label">personalhub.db</text>
+  <text x="1265" y="528" text-anchor="middle" class="body">health_* + People + Places</text>
+  <text x="1265" y="558" text-anchor="middle" class="body">Substances + Soldi + Hub Context</text>
+  <text x="1265" y="587" text-anchor="middle" class="small">unico DB runtime scrivibile di PH</text>
+
+  <path class="arrow" d="M1200 335 V390 H295 V465"/>
+  <path class="arrow" d="M480 525 H610"/>
+  <path class="arrow" d="M940 525 H1070"/>
+
+  <rect class="lane" x="50" y="660" width="1500" height="255"/>
+  <text x="80" y="700" class="small">PROIEZIONI E CONSUMER</text>
+
+  <rect class="box consumer" x="85" y="750" width="270" height="110"/>
+  <text x="220" y="790" text-anchor="middle" class="label">Git History</text>
+  <text x="220" y="824" text-anchor="middle" class="body">diff · blame · revert</text>
+  <text x="220" y="851" text-anchor="middle" class="small">Time Machine / restore</text>
+
+  <rect class="box consumer" x="410" y="750" width="270" height="110"/>
+  <text x="545" y="790" text-anchor="middle" class="label">Datasette</text>
+  <text x="545" y="824" text-anchor="middle" class="body">SQL · FK · views</text>
+  <text x="545" y="851" text-anchor="middle" class="small">esplorazione ad hoc</text>
+
+  <rect class="box consumer" x="735" y="750" width="270" height="110"/>
+  <text x="870" y="790" text-anchor="middle" class="label">Obsidian</text>
+  <text x="870" y="824" text-anchor="middle" class="body">Markdown deterministico</text>
+  <text x="870" y="851" text-anchor="middle" class="small">Bases · link · backlink</text>
+
+  <rect class="box consumer" x="1060" y="750" width="270" height="110"/>
+  <text x="1195" y="790" text-anchor="middle" class="label">Salute Android</text>
+  <text x="1195" y="824" text-anchor="middle" class="body">UI minimale read-only</text>
+  <text x="1195" y="851" text-anchor="middle" class="small">Recenti · Esami · Campioni · Diario</text>
+
+  <rect class="box consumer" x="1380" y="750" width="135" height="110"/>
+  <text x="1447" y="790" text-anchor="middle" class="label" font-size="24">Hub</text>
+  <text x="1447" y="822" text-anchor="middle" class="body" font-size="18">temporal</text>
+  <text x="1447" y="848" text-anchor="middle" class="small" font-size="16">context</text>
+
+  <path class="arrow" d="M1265 605 V690 H220 V750"/>
+  <path class="arrow" d="M1265 605 V705 H545 V750"/>
+  <path class="arrow" d="M1265 605 V720 H870 V750"/>
+  <path class="arrow" d="M1265 605 V735 H1195 V750"/>
+  <path class="arrow" d="M1265 605 V745 H1447 V750"/>
+
+  <text x="80" y="950" class="small">Obsidian e Datasette sono consumer rigenerabili; nessuna modifica manuale lì sostituisce la source of truth PH.</text>
+</svg>
