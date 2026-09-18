@@ -32,10 +32,20 @@ data class GitStateDiff(
     val changed: Boolean,
 )
 
+data class GitSemanticChange(
+    val table: String,
+    val operation: String,
+    val rowKey: String,
+    val changedColumns: List<String>,
+    val before: String?,
+    val after: String?,
+)
+
 data class GitSemanticDiff(
     val from: GitRevision,
     val to: GitRevision,
-    val events: List<GitHistoryItem>,
+    val changes: List<GitSemanticChange>,
+    val truncated: Boolean,
 )
 
 data class GitRevertPreview(
@@ -181,7 +191,8 @@ object GitHistory {
             val a = leftTables[table]
             val b = rightTables[table]
             GitStateDiff(
-                table = table,                beforeRows = a?.optLong("rows", 0L) ?: 0L,
+                table = table,
+                beforeRows = a?.optLong("rows", 0L) ?: 0L,
                 afterRows = b?.optLong("rows", 0L) ?: 0L,
                 changed = fingerprint(a) != fingerprint(b),
             )
@@ -189,8 +200,9 @@ object GitHistory {
     }
 
     /**
-     * Semantic revision diff: materialized compare() says which tables changed; this says which
-     * logical row/field edits happened, using the rebuildable local history index.
+     * True semantic state diff. It compares the two materialized Git states, not event timestamps,
+     * so edits created offline and pushed much later are attributed to the correct revision delta.
+     * Only shards whose hashes differ are downloaded.
      */
     fun semanticCompare(
         context: Context,
@@ -198,15 +210,93 @@ object GitHistory {
         after: String,
         limit: Int = 5000,
     ): GitSemanticDiff {
-        val left = remote(context).revision(before)
-        val right = remote(context).revision(after)
-        val from = if (left.committedAt <= right.committedAt) left else right
-        val to = if (left.committedAt <= right.committedAt) right else left
-        return GitSemanticDiff(
-            from = from,
-            to = to,
-            events = eventsBetween(context, from.committedAt, to.committedAt, limit = limit),
+        require(limit in 1..20_000)
+        val historyRemote = remote(context)
+        val leftResolved = historyRemote.revision(before)
+        val rightResolved = historyRemote.revision(after)
+        val from = if (leftResolved.committedAt <= rightResolved.committedAt) {
+            leftResolved
+        } else {
+            rightResolved
+        }
+        val to = if (leftResolved.committedAt <= rightResolved.committedAt) {
+            rightResolved
+        } else {
+            leftResolved
+        }
+        val git = transport(context)
+        val leftManifest = JSONObject(
+            String(git.readFile(GIT_STATE_MANIFEST, from.sha), Charsets.UTF_8),
         )
+        val rightManifest = JSONObject(
+            String(git.readFile(GIT_STATE_MANIFEST, to.sha), Charsets.UTF_8),
+        )
+        val leftTables = manifestTables(leftManifest)
+        val rightTables = manifestTables(rightManifest)
+        val leftKeys = primaryKeysAtRevision(git, from.sha)
+        val rightKeys = primaryKeysAtRevision(git, to.sha)
+
+        val changes = mutableListOf<GitSemanticChange>()
+        var truncated = false
+        tableLoop@ for (table in (leftTables.keys + rightTables.keys).sorted()) {
+            val leftEntry = leftTables[table]
+            val rightEntry = rightTables[table]
+            if (fingerprint(leftEntry) == fingerprint(rightEntry)) continue
+
+            val leftChunks = tableChunks(leftEntry)
+            val rightChunks = tableChunks(rightEntry)
+            val leftHashes = leftChunks.associate { it.first to it.second }
+            val rightHashes = rightChunks.associate { it.first to it.second }
+            val changedPaths = (leftHashes.keys + rightHashes.keys)
+                .filter { leftHashes[it] != rightHashes[it] }
+                .toSet()
+            val primary = rightKeys[table] ?: leftKeys[table].orEmpty()
+            val beforeRows = loadSemanticRows(
+                git = git,
+                ref = from.sha,
+                chunks = leftChunks.filter { it.first in changedPaths },
+                primary = primary,
+            )
+            val afterRows = loadSemanticRows(
+                git = git,
+                ref = to.sha,
+                chunks = rightChunks.filter { it.first in changedPaths },
+                primary = primary,
+            )
+            for (rowKey in (beforeRows.keys + afterRows.keys).sorted()) {
+                val leftRow = beforeRows[rowKey]
+                val rightRow = afterRows[rowKey]
+                if (jsonRowsEqual(leftRow, rightRow)) continue
+                val operation = when {
+                    leftRow == null -> "INSERT"
+                    rightRow == null -> "DELETE"
+                    else -> "UPDATE"
+                }
+                val changedColumns = when {
+                    leftRow == null -> jsonKeys(rightRow)
+                    rightRow == null -> jsonKeys(leftRow)
+                    else -> (jsonKeys(leftRow) + jsonKeys(rightRow))
+                        .distinct()
+                        .sorted()
+                        .filter { column ->
+                            !jsonValuesEqual(leftRow.opt(column), rightRow.opt(column))
+                        }
+                }
+                changes += GitSemanticChange(
+                    table = table,
+                    operation = operation,
+                    rowKey = rowKey,
+                    changedColumns = changedColumns,
+                    before = leftRow?.toString(),
+                    after = rightRow?.toString(),
+                )
+                if (changes.size >= limit) {
+                    truncated = true
+                    break@tableLoop
+                }
+            }
+        }
+        return GitSemanticDiff(from, to, changes, truncated)
     }
 
     fun previewRevert(context: Context, eventId: String): GitRevertPreview {
@@ -623,6 +713,95 @@ object GitHistory {
         if (left is Number && right is Number) return left.toString().toBigDecimal()
             .compareTo(right.toString().toBigDecimal()) == 0
         return left == right
+    }
+
+    private fun primaryKeysAtRevision(
+        git: GitHubDataTransport,
+        ref: String,
+    ): Map<String, List<String>> {
+        val bytes = git.readFileOrNull("state/schema.json", ref) ?: return emptyMap()
+        val database = JSONObject(String(bytes, Charsets.UTF_8)).getJSONObject("database")
+        val entities = database.getJSONArray("entities")
+        return buildMap {
+            for (i in 0 until entities.length()) {
+                val entity = entities.getJSONObject(i)
+                val columns = entity.getJSONObject("primaryKey").getJSONArray("columnNames")
+                put(
+                    entity.getString("tableName"),
+                    buildList {
+                        for (j in 0 until columns.length()) add(columns.getString(j))
+                    },
+                )
+            }
+        }
+    }
+
+    private fun tableChunks(entry: JSONObject?): List<Pair<String, String>> {
+        if (entry == null) return emptyList()
+        val shards = entry.optJSONArray("shards")
+        if (shards == null) {
+            val path = entry.optString("path")
+            return if (path.isBlank()) emptyList() else listOf(path to entry.optString("sha256"))
+        }
+        return buildList {
+            for (i in 0 until shards.length()) {
+                val shard = shards.getJSONObject(i)
+                add(shard.getString("path") to shard.getString("sha256"))
+            }
+        }
+    }
+
+    private fun loadSemanticRows(
+        git: GitHubDataTransport,
+        ref: String,
+        chunks: List<Pair<String, String>>,
+        primary: List<String>,
+    ): Map<String, JSONObject> = buildMap {
+        for ((path, expectedHash) in chunks) {
+            val bytes = git.readFile(path, ref)
+            require(GitDataFormat.sha256(bytes) == expectedHash) {
+                "State shard hash mismatch during semantic diff: $path"
+            }
+            String(bytes, Charsets.UTF_8).lineSequence()
+                .filter { it.isNotBlank() }
+                .forEach { line ->
+                    val row = JSONObject(line)
+                    val key = if (primary.isEmpty()) {
+                        GitDataFormat.sha256(line.toByteArray(Charsets.UTF_8))
+                    } else {
+                        JSONObject().apply {
+                            primary.forEach { column ->
+                                put(column, row.opt(column) ?: JSONObject.NULL)
+                            }
+                        }.toString()
+                    }
+                    put(key, row)
+                }
+        }
+    }
+
+    private fun jsonKeys(row: JSONObject?): List<String> {
+        if (row == null) return emptyList()
+        return row.keys().asSequence().toList().sorted()
+    }
+
+    private fun jsonRowsEqual(left: JSONObject?, right: JSONObject?): Boolean {
+        if (left == null || right == null) return left == null && right == null
+        val keys = (jsonKeys(left) + jsonKeys(right)).distinct()
+        return keys.all { jsonValuesEqual(left.opt(it), right.opt(it)) }
+    }
+
+    private fun jsonValuesEqual(left: Any?, right: Any?): Boolean {
+        if (left == null || left === JSONObject.NULL) {
+            return right == null || right === JSONObject.NULL
+        }
+        if (right == null || right === JSONObject.NULL) return false
+        if (left is Number && right is Number) {
+            return runCatching {
+                left.toString().toBigDecimal().compareTo(right.toString().toBigDecimal()) == 0
+            }.getOrDefault(left.toDouble() == right.toDouble())
+        }
+        return left.toString() == right.toString()
     }
 
     private fun manifestTables(manifest: JSONObject): Map<String, JSONObject> {
