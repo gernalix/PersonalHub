@@ -366,6 +366,7 @@ private fun LuoghiNavigation(
                 rules = state.placeAlertRules,
                 tagTargets = state.placeAlertTagTargets,
                 onCreate = vm::createPlaceAlert,
+                onUpdate = vm::updatePlaceAlert,
                 onDelete = vm::deletePlaceAlert,
                 onSetEnabled = vm::setPlaceAlertEnabled,
                 onDismiss = { alertPlaceId = null },
