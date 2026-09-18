@@ -241,4 +241,5 @@
     <string name="git_history_known_good">Data sicuramente funzionante (AAAA-MM-GG)</string>
     <string name="git_history_known_bad">Data sicuramente non funzionante (AAAA-MM-GG)</string>
     <string name="git_history_bisect_action">Trova edit sospetti</string>
+    <string name="git_history_semantic_truncated">Il diff ha raggiunto il limite di sicurezza; restringi le revisioni o analizza le singole tabelle per le modifiche restanti.</string>
 </resources>
