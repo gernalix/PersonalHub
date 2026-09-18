@@ -16,5 +16,5 @@ dependencies {
     implementation(project(":contracts:database"))
     implementation(project(":core:database"))
     implementation(libs.androidx.core.ktx)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.android)\n    testImplementation(libs.junit)
 }
