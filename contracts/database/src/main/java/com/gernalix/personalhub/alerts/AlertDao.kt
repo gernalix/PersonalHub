@@ -36,18 +36,9 @@ interface AlertDao {
     @Query("SELECT * FROM alert_place_tag_targets WHERE rule_id IN (:ruleIds)")
     suspend fun placeTagTargets(ruleIds: List<String>): List<AlertPlaceTagTargetEntity>
 
-    @Query("SELECT * FROM alert_timer_tag_targets WHERE rule_id IN (:ruleIds)")
-    suspend fun timerTagTargets(ruleIds: List<String>): List<AlertTimerTagTargetEntity>
-
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertPlaceTagTargets(targets: List<AlertPlaceTagTargetEntity>)
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertTimerTagTargets(targets: List<AlertTimerTagTargetEntity>)
-
     @Query("DELETE FROM alert_place_tag_targets WHERE rule_id = :ruleId")
     suspend fun clearPlaceTagTargets(ruleId: String)
-
-    @Query("DELETE FROM alert_timer_tag_targets WHERE rule_id = :ruleId")
-    suspend fun clearTimerTagTargets(ruleId: String)
 }
