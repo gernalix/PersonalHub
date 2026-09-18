@@ -21,6 +21,8 @@ import com.example.multitimetracker.model.TimeFenceMatchMode
 import com.example.multitimetracker.model.TimeFenceRule
 import com.example.multitimetracker.model.TimeFenceScope
 import com.example.multitimetracker.model.TimeFenceTrigger
+import com.gernalix.personalhub.core.alerts.AlertLinkPolicy
+import com.gernalix.personalhub.core.alerts.AlertNotificationDispatcher
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
@@ -174,6 +176,13 @@ class AlertsCapsuleViewModel(
 
     private fun showInAppPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long): Boolean {
         showNotificationOverride?.let { return it(ruleId, title, message) }
+        val context = getContext()
+        if (context != null && AlertLinkPolicy.linkOnlyUriOrNull(message) != null) {
+            val notificationId = ("timer-alert:" + ruleId + ":" + sessionId).hashCode() and Int.MAX_VALUE
+            if (AlertNotificationDispatcher.postNotification(context, notificationId, title, message)) {
+                return true
+            }
+        }
         showTimerAlertPrompt(ruleId, sessionId, title, message, firedAtMs)
         return true
     }
