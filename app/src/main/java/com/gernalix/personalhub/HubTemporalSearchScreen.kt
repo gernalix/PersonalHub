@@ -22,6 +22,9 @@ import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
 import com.gernalix.personalhub.core.hubcontext.*
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -110,6 +113,26 @@ internal fun buildTemporalEntries(
 internal fun groupedTemporalEntries(entries: List<TemporalEntry>): List<Pair<String, List<TemporalEntry>>> =
     entries.groupBy { it.sectionTitle }.toSortedMap().map { it.key to it.value }
 
+internal fun buildGitHistoryTemporalEntries(
+    events: List<GitHistoryItem>,
+    sectionTitle: String,
+): List<TemporalEntry> = events.map { event ->
+    TemporalEntry(
+        id = "git-history:" + event.id,
+        sectionKey = "git_history",
+        sectionTitle = sectionTitle,
+        title = event.author + " · " + event.operation.lowercase() + " · " + event.table,
+        subtitle = listOfNotNull(
+            formatHubDateTime(event.occurredAt),
+            event.changedColumns.takeIf { it.isNotBlank() },
+            event.reason?.takeIf { it.isNotBlank() },
+        ).joinToString(" · "),
+        startMs = event.occurredAt,
+        refs = emptyList(),
+        selectable = false,
+    )
+}
+
 private fun encodeRef(ref: HubEntityRef) = "${ref.moduleId}\u001F${ref.entityKind}\u001F${ref.canonicalId}"
 
 private fun decodeRef(value: String): HubEntityRef? {
@@ -189,6 +212,7 @@ fun HubTemporalSearchScreen(
     }
     var records by rememberSaveable(saver = TemporalRecordStateSaver) { mutableStateOf(emptyList<HubTemporalRecord>()) }
     var boundedPeople by rememberSaveable(saver = HubSummaryStateSaver) { mutableStateOf(emptyList<HubEntitySummary>()) }
+    var gitHistoryEvents by remember { mutableStateOf(emptyList<GitHistoryItem>()) }
     var cursors by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
     var error by remember { mutableStateOf<String?>(null) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -198,13 +222,23 @@ fun HubTemporalSearchScreen(
     var savedEpisodes by remember { mutableStateOf<List<SavedEpisodeEntry>>(emptyList()) }
     var editingEpisodeContextId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val entries = remember(records, boundedPeople, resources) {
-        buildTemporalEntries(
-            records,
-            boundedPeople,
-            wordPulseAvailableLabel = { resources.getString(R.string.temporal_wordpulse_fatigue_available, it) },
-            wordPulseUnavailableLabel = resources.getString(R.string.temporal_wordpulse_fatigue_unavailable),
-            peopleTitle = resources.getString(R.string.temporal_people),
+    val entries = remember(records, boundedPeople, gitHistoryEvents, resources) {
+        (
+            buildTemporalEntries(
+                records,
+                boundedPeople,
+                wordPulseAvailableLabel = { resources.getString(R.string.temporal_wordpulse_fatigue_available, it) },
+                wordPulseUnavailableLabel = resources.getString(R.string.temporal_wordpulse_fatigue_unavailable),
+                peopleTitle = resources.getString(R.string.temporal_people),
+            ) + buildGitHistoryTemporalEntries(
+                gitHistoryEvents,
+                resources.getString(R.string.temporal_git_history),
+            )
+        ).sortedWith(
+            compareBy<TemporalEntry> { it.sectionTitle }
+                .thenByDescending { it.startMs }
+                .thenBy { it.title.lowercase() }
+                .thenBy { it.id },
         )
     }
 
@@ -239,6 +273,7 @@ fun HubTemporalSearchScreen(
     fun invalidateTemporalResults() {
         records = emptyList()
         boundedPeople = emptyList()
+        gitHistoryEvents = emptyList()
         cursors = emptyMap()
         selectedRefs = emptyList()
         saving = false
@@ -294,6 +329,23 @@ fun HubTemporalSearchScreen(
             linkedPeople
         }
         if (!append) {
+            gitHistoryEvents = withContext(Dispatchers.IO) {
+                val gitEnabled = runCatching {
+                    GitDataSettings.configuration(context).enabled
+                }.getOrDefault(false)
+                if (gitEnabled) {
+                    runCatching {
+                        GitHistory.eventsBetween(
+                            context = context,
+                            fromMs = from,
+                            toMs = to,
+                            limit = 1000,
+                        )
+                    }.getOrDefault(emptyList())
+                } else {
+                    emptyList()
+                }
+            }
             saving = false
             selectedRefs = emptyList()
         }
