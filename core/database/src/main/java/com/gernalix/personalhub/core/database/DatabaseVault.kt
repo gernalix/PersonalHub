@@ -2,6 +2,7 @@ package com.gernalix.personalhub.core.database
 
 import com.gernalix.personalhub.core.database.capsules.sync.*
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
@@ -148,6 +149,7 @@ object DatabaseVault {
                 backup.delete()
             }
     }
+
     /** Run before any feature/database initialization. An interrupted replacement restores the last good DB. */
     fun recoverInterruptedImport(context: Context) {
         val marker = marker(context)
@@ -297,8 +299,13 @@ object DatabaseVault {
                         "hub_sync_${table}_$op" -> {
                             require(db.version >= 3 && table !in SyncJournal.excluded)
                             val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columns ->
-                                buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }                            }
+                                buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }
+                            }
                             SyncJournal.trigger(table, keys, op, legacy = db.version == 3)
+                        }
+                        "hub_git_dirty_${table}_$op" -> {
+                            require(table != GitDataTracking.TABLE && table !in SyncJournal.excluded)
+                            GitDataTracking.trigger(table, op)
                         }
                         else -> error("Unexpected database trigger: $name")
                     }
@@ -446,6 +453,7 @@ object DatabaseVault {
             throw error
         } finally { stage.delete() }
     }
+
     /** Returns only after verified replacement; caller must restart the process before allowing further edits. */
     fun importDatabase(context: Context, uri: Uri) = GitDataSync.pauseSync { DatasetteSync.pauseUploads { operations.withLock {
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
@@ -601,7 +609,8 @@ object DatabaseVault {
                 source.inputStream().use { it.copyTo(requireNotNull(out)) }
             }
         }
-        override fun readTo(source: ExportFile, target: File) {            val file = source as DocumentExportFile
+        override fun readTo(source: ExportFile, target: File) {
+            val file = source as DocumentExportFile
             resolver.openInputStream(file.uri).use { input ->
                 FileOutputStream(target).use { out ->
                     requireNotNull(input).copyTo(out)
