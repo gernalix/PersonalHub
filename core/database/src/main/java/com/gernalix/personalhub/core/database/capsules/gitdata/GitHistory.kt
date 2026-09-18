@@ -188,13 +188,15 @@ object GitHistory {
                         }.joinToString(",")
                         db.execSQL(
                             "INSERT OR REPLACE INTO " + GitHistoryStore.TABLE + "(" +
-                                "id,occurred_at,author,group_id,table_name,operation,row_key," +
+                                "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key," +
                                 "changed_columns,history_path,commit_sha,reverted_by" +
-                                ") VALUES(?,?,?,?,?,?,?,?,?,?,NULL)",
+                                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL)",
                             arrayOf(
                                 event.getString("event_id"),
                                 event.getLong("timestamp_ms"),
                                 event.optString("author", "unknown"),
+                                event.optString("source", "unknown"),
+                                event.optString("reason").takeIf { it.isNotBlank() && it != "null" },
                                 event.optString("group_id").takeIf { it.isNotBlank() && it != "null" },
                                 event.getString("table"),
                                 event.getString("operation").uppercase(),
