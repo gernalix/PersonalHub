@@ -230,4 +230,5 @@
     <string name="git_history_revert_preview_safe">Sandbox check passed: this revert is currently applicable.</string>
     <string name="git_history_revert_preview_blocked">Sandbox check blocked the revert: %1$s</string>
     <string name="git_data_sync_pending_patches">Verified patches awaiting review in History: %1$s</string>
+    <string name="temporal_git_history">Data edits</string>
 </resources>
