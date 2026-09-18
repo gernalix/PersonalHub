@@ -13,8 +13,8 @@ data class PlaceMutation(
     val lon: Double?,
     val radiusM: Double?,
     val notes: String?,
-    val tagNames: Set<String> = emptySet(),
     val sourceApp: String = "Luoghi",
+    val tagNames: Set<String> = emptySet(),
 )
 
 class PlacesCapsule(private val repository: PlaceRepository) {
