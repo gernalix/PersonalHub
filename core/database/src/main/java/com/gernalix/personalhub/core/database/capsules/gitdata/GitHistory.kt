@@ -143,7 +143,13 @@ object GitHistory {
         val group = "revert:" + eventId + ":" + UUID.randomUUID().toString()
         db.beginTransaction()
         try {
-            GitDataTracking.setEditContext(db, "user", group)
+            GitDataTracking.setEditContext(
+                db = db,
+                author = "user",
+                source = "history_revert",
+                reason = "Revert history event $eventId",
+                groupId = group,
+            )
             applyInverse(app, db, item, event)
             db.query("PRAGMA foreign_key_check").use {
                 require(!it.moveToFirst()) { "Revert would break database relationships" }
