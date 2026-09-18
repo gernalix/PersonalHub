@@ -78,6 +78,37 @@ object GitHistory {
     fun revisions(context: Context, limit: Int = 100): List<GitRevision> =
         remote(context).revisions(limit)
 
+    /**
+     * Timer compatibility bridge while its former local Time Machine is retired.
+     * Reads the canonical snapshot row from the newest Git state committed at/before targetMs.
+     */
+    fun readTimerSnapshotAsOf(context: Context, targetMs: Long): String? {
+        val revision = remote(context).revisionAtOrBefore(targetMs) ?: return null
+        val transport = transport(context)
+        val manifest = JSONObject(
+            String(transport.readFile(GIT_STATE_MANIFEST, revision.sha), Charsets.UTF_8),
+        )
+        val table = manifestTables(manifest)["snapshot"] ?: return null
+        val shards = table.optJSONArray("shards")
+        if (shards == null) {
+            val bytes = transport.readFile(table.getString("path"), revision.sha)
+            return snapshotJsonFromRows(bytes)
+        }
+        for (i in 0 until shards.length()) {
+            val shard = shards.getJSONObject(i)
+            val bytes = transport.readFile(shard.getString("path"), revision.sha)
+            snapshotJsonFromRows(bytes)?.let { return it }
+        }
+        return null
+    }
+
+    private fun snapshotJsonFromRows(bytes: ByteArray): String? =
+        String(bytes, Charsets.UTF_8).lineSequence()
+            .filter { it.isNotBlank() }
+            .map(::JSONObject)
+            .firstOrNull { it.optLong("id", -1L) == 1L }
+            ?.optString("json")
+
     fun milestones(context: Context): List<GitMilestone> = remote(context).milestones()
 
     fun createMilestone(context: Context, name: String): GitMilestone =
@@ -385,6 +416,30 @@ private class GitHistoryRemote(
     private val token: String,
 ) {
     private val api = "https://api.github.com/repos/" + repository.owner + "/" + repository.name
+
+    fun revisionAtOrBefore(targetMs: Long): GitRevision? {
+        val until = encode(Instant.ofEpochMilli(targetMs).toString())
+        val values = JSONArray(
+            String(
+                request(
+                    "GET",
+                    api + "/commits?path=" + encode("state/manifest.json") +
+                        "&until=" + until + "&per_page=1",
+                ),
+                Charsets.UTF_8,
+            ),
+        )
+        if (values.length() == 0) return null
+        val item = values.getJSONObject(0)
+        val commit = item.getJSONObject("commit")
+        val author = commit.optJSONObject("author")
+        return GitRevision(
+            sha = item.getString("sha"),
+            message = commit.optString("message").lineSequence().firstOrNull().orEmpty(),
+            committedAt = author?.optString("date")?.takeIf { it.isNotBlank() }
+                ?.let { Instant.parse(it).toEpochMilli() } ?: 0L,
+        )
+    }
 
     fun revisions(limit: Int): List<GitRevision> {
         require(limit in 1..100)
