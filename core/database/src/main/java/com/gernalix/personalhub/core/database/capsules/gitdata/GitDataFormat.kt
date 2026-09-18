@@ -63,7 +63,7 @@ internal object GitDataFormat {
                     cachedTables != allTables.toSet()
 
                 val changed = if (full) allTables.toSet() else pending.map { it.first }.toSet()
-                if (changed.isEmpty()) return null
+                if (changed.isEmpty() && events.isEmpty()) return null
 
                 val files = linkedMapOf<String, ByteArray>()
                 val entries = if (full) linkedMapOf() else cachedEntries.toMutableMap()
