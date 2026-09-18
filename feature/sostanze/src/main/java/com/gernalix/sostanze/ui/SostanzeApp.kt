@@ -75,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.sostanze.R
 import com.gernalix.sostanze.data.SubstanceEntity
 import com.gernalix.sostanze.data.SubstanceTypes
@@ -171,6 +172,11 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                 TopAppBar(
                     title = { Text(stringResource(R.string.app_name)) },
                     actions = {
+                        TextButton(
+                            onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "substances")) },
+                        ) {
+                            Text("Data")
+                        }
                         TextButton(onClick = { exportFolderLauncher.launch(null) }) {
                             Text(stringResource(R.string.export_action))
                         }
