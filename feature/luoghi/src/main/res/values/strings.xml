@@ -305,6 +305,8 @@
     <string name="place_alert_every_time">Every time</string>
     <string name="place_alert_once">Next time only</string>
     <string name="place_alert_add">Add alert</string>
+    <string name="place_alert_update">Save changes</string>
+    <string name="place_alert_edit">Edit</string>
     <string name="place_alert_existing">Existing Places alerts</string>
     <string name="place_alert_specific_place">Specific place</string>
 </resources>
