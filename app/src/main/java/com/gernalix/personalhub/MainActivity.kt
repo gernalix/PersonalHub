@@ -106,6 +106,11 @@ fun PersonalHubApp() {
                 item { HomeUtilityButton(R.string.home_context, R.string.home_context_help) { topDestination = "composer" } }
                 item { HomeUtilityButton(R.string.home_search, R.string.home_search_help) { topDestination = "search" } }
                 item { HomeUtilityButton(R.string.home_activity_register, R.string.home_activity_help) { topDestination = "activity" } }
+                item {
+                    HomeUtilityButton(R.string.home_data_explorer, R.string.home_data_explorer_help) {
+                        context.startActivity(Intent(context, DataExplorerActivity::class.java))
+                    }
+                }
                 item { OutlinedButton(onClick = { showSettings = true }) { Text(stringResource(R.string.settings_title)) } }
             }
             HomeAutoExportStatusIndicator()
