@@ -406,13 +406,15 @@ internal object GitDataFormat {
         shardCount: Int,
     ): Set<Int>? {
         val result = linkedSetOf<Int>()
-        events.forEach { event ->
-            listOf(event.beforePayload, event.afterPayload).forEach { payload ->
-                val row = decodedPayload(payload, columns) ?: return@forEach
-                val key = primary.joinToString("|") { column ->
-                    shardKeyValue(row[column]) ?: return null
+        for (event in events) {
+            for (payload in listOf(event.beforePayload, event.afterPayload)) {
+                val row = decodedPayload(payload, columns) ?: continue
+                val parts = mutableListOf<String>()
+                for (column in primary) {
+                    val part = shardKeyValue(row[column]) ?: return null
+                    parts += part
                 }
-                result += shardForKey(key, shardCount)
+                result += shardForKey(parts.joinToString("|"), shardCount)
             }
         }
         return result.takeIf { it.isNotEmpty() }
@@ -435,20 +437,36 @@ internal object GitDataFormat {
         val selectPrimary = primary.joinToString(",") { "`$it`" }
         db.rawQuery("SELECT $selectPrimary FROM `$table` ORDER BY $order", null).use { cursor ->
             while (cursor.moveToNext()) {
-                val keyValues = Array<Any?>(primary.size) { index ->
-                    sqliteScalar(cursor, index) ?: return exportTableShards(
+                val keyValues = mutableListOf<Any>()
+                var unsupportedPrimary = false
+                for (index in primary.indices) {
+                    val value = sqliteScalar(cursor, index)
+                    if (value == null) {
+                        unsupportedPrimary = true
+                        break
+                    }
+                    keyValues += value
+                }
+                if (unsupportedPrimary) {
+                    return exportTableShards(
                         db = db,
                         table = table,
                         objectFiles = objectFiles,
                     )
                 }
-                val key = keyValues.joinToString("|") { value ->
-                    shardKeyValue(value) ?: return exportTableShards(
-                        db = db,
-                        table = table,
-                        objectFiles = objectFiles,
-                    )
+                val keyParts = mutableListOf<String>()
+                for (value in keyValues) {
+                    val part = shardKeyValue(value)
+                    if (part == null) {
+                        return exportTableShards(
+                            db = db,
+                            table = table,
+                            objectFiles = objectFiles,
+                        )
+                    }
+                    keyParts += part
                 }
+                val key = keyParts.joinToString("|")
                 val shard = shardForKey(key, shardCount)
                 if (shard !in selected) continue
                 val where = primary.joinToString(" AND ") { "`$it`=?" }
