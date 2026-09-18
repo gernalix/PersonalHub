@@ -159,7 +159,32 @@ object GitHistoryStore {
         }
 
     fun byGroup(db: SupportSQLiteDatabase, groupId: String): List<GitHistoryItem> =
-        recent(db, limit = 1000).filter { it.groupId == groupId }.sortedByDescending { it.occurredAt }
+        db.query(
+            "SELECT id,occurred_at,author,source,reason,group_id,table_name,operation,row_key," +
+                "changed_columns,history_path,commit_sha,reverted_by FROM " + TABLE +
+                " WHERE group_id=? ORDER BY occurred_at DESC,id DESC",
+            arrayOf(groupId),
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(
+                    GitHistoryItem(
+                        id = cursor.getString(0),
+                        occurredAt = cursor.getLong(1),
+                        author = cursor.getString(2),
+                        source = cursor.getString(3),
+                        reason = if (cursor.isNull(4)) null else cursor.getString(4),
+                        groupId = if (cursor.isNull(5)) null else cursor.getString(5),
+                        table = cursor.getString(6),
+                        operation = cursor.getString(7),
+                        rowKey = cursor.getString(8),
+                        changedColumns = cursor.getString(9),
+                        historyPath = cursor.getString(10),
+                        commitSha = cursor.getString(11),
+                        revertedBy = if (cursor.isNull(12)) null else cursor.getString(12),
+                    ),
+                )
+            }
+        }
 
     fun between(
         db: SupportSQLiteDatabase,
