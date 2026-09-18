@@ -215,4 +215,6 @@
     <string name="git_history_pr_created">Pull request creata: %1$s</string>
     <string name="git_history_column_filter">Campo / colonna per blame (opzionale)</string>
     <string name="git_history_day_filter">Giorno (AAAA-MM-GG, opzionale)</string>
+    <string name="git_history_stats_sources">Origini: %1$s</string>
+    <string name="git_history_stats_revised">Più revisionati: %1$s</string>
 </resources>
