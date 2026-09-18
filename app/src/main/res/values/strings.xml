@@ -216,7 +216,9 @@
     <string name="git_history_day_filter">Day (YYYY-MM-DD, optional)</string>
     <string name="git_history_stats_sources">Sources: %1$s</string>
     <string name="git_history_stats_revised">Most revised: %1$s</string>
-    <string name="module_salute">Salute</string>\n    <string name="module_salute_subtitle">Timeline, esami e diario clinico</string>\n    <string name="git_history_preview_revert">Preview affected edit group</string>
+    <string name="module_salute">Salute</string>
+    <string name="module_salute_subtitle">Timeline, esami e diario clinico</string>
+    <string name="git_history_preview_revert">Preview affected edit group</string>
     <string name="git_history_revert_preview_summary">%1$d edit events · tables: %2$s · operations: %3$s</string>
     <string name="git_history_semantic_compare">Semantic row/field diff</string>
     <string name="git_history_semantic_more">%1$d more semantic edits not shown</string>
