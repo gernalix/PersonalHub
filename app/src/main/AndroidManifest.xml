@@ -216,6 +216,19 @@
         </activity-alias>
 
         <activity-alias
+            android:name=".shortcut.SaluteShortcutActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_salute"
+            android:label="@string/module_salute"
+            android:targetActivity="com.gernalix.personalhub.salute.SaluteActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:host="module" android:path="/salute" android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
             android:name=".shortcut.PeopleShortcutActivity"
             android:exported="true"
             android:icon="@drawable/ic_shortcut_people"
