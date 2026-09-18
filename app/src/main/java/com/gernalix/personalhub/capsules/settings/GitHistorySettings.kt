@@ -65,6 +65,7 @@ fun GitHistorySettings(onBack: () -> Unit) {
     var table by remember { mutableStateOf("") }
     var rowKey by remember { mutableStateOf("") }
     var columnFilter by remember { mutableStateOf("") }
+    var dayFilter by remember { mutableStateOf("") }
     var history by remember { mutableStateOf<List<GitHistoryItem>>(emptyList()) }
     var stats by remember { mutableStateOf<GitHistoryStats?>(null) }
     var revisions by remember { mutableStateOf<List<GitRevision>>(emptyList()) }
@@ -93,7 +94,25 @@ fun GitHistorySettings(onBack: () -> Unit) {
                     val normalizedTable = table.trim()
                     val normalizedRow = rowKey.trim()
                     val normalizedColumn = columnFilter.trim()
-                    val localHistory = if (
+                    val normalizedDay = dayFilter.trim()
+                    val localHistory = if (normalizedDay.isNotBlank()) {
+                        val day = LocalDate.parse(normalizedDay)
+                        val from = day.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        val to = day.plusDays(1).atStartOfDay(ZoneId.systemDefault())
+                            .toInstant().toEpochMilli() - 1L
+                        GitHistory.eventsBetween(
+                            context,
+                            fromMs = from,
+                            toMs = to,
+                            table = normalizedTable.ifBlank { null },
+                            limit = 1000,
+                        ).filter { item ->
+                            (author == null || item.author == author) &&
+                                (normalizedRow.isBlank() || item.rowKey == normalizedRow) &&
+                                (normalizedColumn.isBlank() ||
+                                    item.changedColumns.split(',').contains(normalizedColumn))
+                        }
+                    } else if (
                         normalizedTable.isNotBlank() &&
                         normalizedRow.isNotBlank() &&
                         normalizedColumn.isNotBlank()
@@ -317,6 +336,13 @@ fun GitHistorySettings(onBack: () -> Unit) {
             columnFilter,
             { columnFilter = it },
             label = { Text(stringResource(R.string.git_history_column_filter)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            dayFilter,
+            { dayFilter = it },
+            label = { Text(stringResource(R.string.git_history_day_filter)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
