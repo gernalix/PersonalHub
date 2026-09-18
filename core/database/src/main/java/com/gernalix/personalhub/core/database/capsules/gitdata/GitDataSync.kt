@@ -123,7 +123,13 @@ object GitDataSync {
             }
             val revision = transport.pushFiles(
                 files = files,
-                message = "PersonalHub data generation ${bundle.generation}",
+                message = buildString {
+                    val authors = bundle.events.map { it.author }.distinct().sorted()
+                    append("PersonalHub data generation ").append(bundle.generation)
+                    append("\n\nPH-Events: ").append(bundle.events.size)
+                    append("\nPH-Authors: ").append(authors.takeIf { it.isNotEmpty() }?.joinToString(",") ?: "state-only")
+                    append("\nPH-Schema: ").append(PersonalHubDatabase.SCHEMA_VERSION)
+                },
                 expectedHead = head,
             )
             GitDataFormat.acknowledge(app, bundle, revision)
