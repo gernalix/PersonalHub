@@ -2,6 +2,8 @@
 
 Status: implementation contract for branch `feature/salute-canonical-domain`.
 
+See also [ChatGPT health patch contract](CHATGPT_PATCH_CONTRACT.md).
+
 ## Architectural decision
 
 Salute is a first-class PersonalHub domain inside the canonical `personalhub.db`.
@@ -33,7 +35,7 @@ Consequences:
 ## Entity overview
 
 ```text
-health_import_batches
+health_import_batches ── health_source_metadata
         │
         ├──────────────┐
         ▼              ▼
