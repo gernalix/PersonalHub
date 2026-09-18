@@ -375,6 +375,20 @@ fun GitHistorySettings(onBack: () -> Unit) {
                     value.byAuthor.joinToString { it.key + "=" + it.count },
                 ),
             )
+            Text(
+                stringResource(
+                    R.string.git_history_stats_sources,
+                    value.bySource.joinToString { it.key + "=" + it.count },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                stringResource(
+                    R.string.git_history_stats_revised,
+                    value.mostRevisedEntities.take(5).joinToString { it.key + "=" + it.count },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         HorizontalDivider()
