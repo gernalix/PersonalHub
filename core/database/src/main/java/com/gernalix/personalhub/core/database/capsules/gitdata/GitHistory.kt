@@ -36,6 +36,8 @@ data class GitMilestone(val name: String, val sha: String)
 data class GitHistoryStats(
     val byAuthor: List<GitHistoryCount>,
     val byTable: List<GitHistoryCount>,
+    val bySource: List<GitHistoryCount>,
+    val mostRevisedEntities: List<GitHistoryCount>,
 )
 
 data class GitHistoryDetail(
@@ -91,6 +93,8 @@ object GitHistory {
         GitHistoryStats(
             byAuthor = GitHistoryStore.countsByAuthor(db),
             byTable = GitHistoryStore.countsByTable(db),
+            bySource = GitHistoryStore.countsBySource(db),
+            mostRevisedEntities = GitHistoryStore.countsByEntity(db),
         )
     }
 
