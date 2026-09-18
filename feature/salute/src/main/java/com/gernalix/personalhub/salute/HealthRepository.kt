@@ -89,6 +89,7 @@ sealed interface HealthLoadResult {
 }
 
 class HealthRepository(context: Context) {
+    // External read-only cache; never part of personalhub.db.
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val cacheDir = File(app.noBackupFilesDir, "salute")
