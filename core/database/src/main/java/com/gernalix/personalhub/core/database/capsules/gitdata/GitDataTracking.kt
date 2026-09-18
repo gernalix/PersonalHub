@@ -202,6 +202,17 @@ object GitDataTracking {
     fun setEditContext(
         db: SupportSQLiteDatabase,
         author: String,
+        groupId: String?,
+    ) = setEditContext(
+        db = db,
+        author = author,
+        source = "ui",
+        groupId = groupId,
+    )
+
+    fun setEditContext(
+        db: SupportSQLiteDatabase,
+        author: String,
         source: String,
         reason: String? = null,
         groupId: String? = null,
