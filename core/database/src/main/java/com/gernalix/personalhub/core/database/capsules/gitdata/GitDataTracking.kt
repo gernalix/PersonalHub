@@ -139,8 +139,16 @@ object GitDataTracking {
                 db.execSQL("DROP TRIGGER IF EXISTS `hub_git_dirty_${table}_$op`")
             }
         }
-        db.execSQL("DELETE FROM $CONTEXT_TABLE")
+        if (tableExists(db, CONTEXT_TABLE)) {
+            db.execSQL("DELETE FROM $CONTEXT_TABLE")
+        }
     }
+
+    private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
+        db.query(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            arrayOf(table),
+        ).use { it.moveToFirst() }
 
     fun enqueueAll(db: SupportSQLiteDatabase) {
         tables(db).forEach { table ->
@@ -234,11 +242,7 @@ object GitDataTracking {
 
     fun ensureAutomaticEditContext(db: SupportSQLiteDatabase) {
         if (!active) return
-        val installed = db.query(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
-            arrayOf(CONTEXT_TABLE),
-        ).use { it.moveToFirst() }
-        if (!installed) return
+        if (!tableExists(db, CONTEXT_TABLE)) return
         val alreadySet = db.query(
             "SELECT 1 FROM $CONTEXT_TABLE WHERE id=1 LIMIT 1",
         ).use { it.moveToFirst() }
