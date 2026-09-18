@@ -19,15 +19,31 @@ object AlertNotificationDispatcher {
         fire: AlertFire,
         emitTaskerBroadcast: Boolean = false,
     ): Boolean {
+        val posted = postNotification(
+            context = context,
+            notificationId = notificationId,
+            title = fire.title,
+            message = fire.message,
+        )
+        if (posted && emitTaskerBroadcast) AlertTaskerBridge.emit(context, fire)
+        return posted
+    }
+
+    fun postNotification(
+        context: Context,
+        notificationId: Int,
+        title: String,
+        message: String,
+    ): Boolean {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
         ensureChannel(context, manager)
-        val contentIntent = contentPendingIntent(context, notificationId, fire.message)
+        val contentIntent = contentPendingIntent(context, notificationId, message)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(fire.title)
-            .setContentText(fire.message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(fire.message))
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -36,7 +52,6 @@ object AlertNotificationDispatcher {
             .build()
 
         manager.notify(notificationId, notification)
-        if (emitTaskerBroadcast) AlertTaskerBridge.emit(context, fire)
         return true
     }
 
