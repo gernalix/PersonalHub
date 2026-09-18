@@ -1,6 +1,7 @@
 package com.gernalix.personalhub.core.database
 
 import com.gernalix.personalhub.core.database.capsules.sync.*
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
@@ -147,7 +148,6 @@ object DatabaseVault {
                 backup.delete()
             }
     }
-
     /** Run before any feature/database initialization. An interrupted replacement restores the last good DB. */
     fun recoverInterruptedImport(context: Context) {
         val marker = marker(context)
@@ -297,8 +297,7 @@ object DatabaseVault {
                         "hub_sync_${table}_$op" -> {
                             require(db.version >= 3 && table !in SyncJournal.excluded)
                             val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columns ->
-                                buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }
-                            }
+                                buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }                            }
                             SyncJournal.trigger(table, keys, op, legacy = db.version == 3)
                         }
                         else -> error("Unexpected database trigger: $name")
@@ -447,9 +446,8 @@ object DatabaseVault {
             throw error
         } finally { stage.delete() }
     }
-
     /** Returns only after verified replacement; caller must restart the process before allowing further edits. */
-    fun importDatabase(context: Context, uri: Uri) = DatasetteSync.pauseUploads { operations.withLock {
+    fun importDatabase(context: Context, uri: Uri) = GitDataSync.pauseSync { DatasetteSync.pauseUploads { operations.withLock {
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
         target.parentFile!!.mkdirs()
         val stage = File(target.parentFile, "personalhub-import-${UUID.randomUUID()}.db")
@@ -491,6 +489,7 @@ object DatabaseVault {
                     validate(context, target)
                     preferences(context).edit().putLong("exported_generation", -1).remove("error").commit()
                     HubAutoExport.request(context)
+                    GitDataSync.onDatabaseReplaced(context)
                     retireSeparateDatabases(context)
                     check(marker(context).delete())
                     syncDirectory(context.filesDir)
@@ -504,7 +503,12 @@ object DatabaseVault {
                 }
             }
         } finally { stage.delete(); sidecars(stage) }
-    } }
+    } } }
+
+    fun importDatabaseFile(context: Context, file: File) {
+        require(file.isFile) { "Database import source is missing" }
+        importDatabase(context, Uri.fromFile(file))
+    }
 
     private fun retireSeparateDatabases(context: Context) {
         val names = listOf("luoghi.db", "multitimer.db", "mtt_remote_sync.db", "sostanze.db", "super_contacts.db", "wordpulse.db", "personalhub_migration_map.db")
@@ -597,8 +601,7 @@ object DatabaseVault {
                 source.inputStream().use { it.copyTo(requireNotNull(out)) }
             }
         }
-        override fun readTo(source: ExportFile, target: File) {
-            val file = source as DocumentExportFile
+        override fun readTo(source: ExportFile, target: File) {            val file = source as DocumentExportFile
             resolver.openInputStream(file.uri).use { input ->
                 FileOutputStream(target).use { out ->
                     requireNotNull(input).copyTo(out)
