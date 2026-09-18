@@ -406,10 +406,12 @@ object GitHistory {
             db.execSQL("DELETE FROM " + GitHistoryStore.TABLE)
             files.forEach { path ->
                 val bytes = transport(app).readFile(path, head.commitSha)
-                transport(app).readFileOrNull(path + ".sig.json", head.commitSha)?.let { signature ->
-                    require(GitDataSigner.verify(bytes, signature)) {
-                        "Git history signature verification failed: $path"
-                    }                }
+                val signature = requireNotNull(
+                    transport(app).readFileOrNull(path + ".sig.json", head.commitSha),
+                ) { "Git history signature is missing: $path" }
+                require(GitDataSigner.verify(bytes, signature)) {
+                    "Git history signature verification failed: $path"
+                }
                 String(bytes, Charsets.UTF_8).lineSequence()
                     .filter { it.isNotBlank() }
                     .forEach { line ->
@@ -463,10 +465,11 @@ object GitHistory {
     private fun loadEvent(context: Context, item: GitHistoryItem): JSONObject {
         val git = transport(context)
         val bytes = git.readFile(item.historyPath, item.commitSha)
-        git.readFileOrNull(item.historyPath + ".sig.json", item.commitSha)?.let { signature ->
-            require(GitDataSigner.verify(bytes, signature)) {
-                "Git history signature verification failed: " + item.historyPath
-            }
+        val signature = requireNotNull(
+            git.readFileOrNull(item.historyPath + ".sig.json", item.commitSha),
+        ) { "Git history signature is missing: " + item.historyPath }
+        require(GitDataSigner.verify(bytes, signature)) {
+            "Git history signature verification failed: " + item.historyPath
         }
         return String(bytes, Charsets.UTF_8).lineSequence()
             .filter { it.isNotBlank() }
