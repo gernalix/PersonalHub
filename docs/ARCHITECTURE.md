@@ -89,3 +89,12 @@ Verification for this change: debug v13 and the isolated QA variant built succes
 ## Finance accounts and exchange (684213)
 
 Application v14 / Room 5 adds required account references, derived per-currency balances, reconciliation and canonical product UUID/FK preservation. See [FINANCE_EXCHANGE.md](FINANCE_EXCHANGE.md) for the accounting rules, localized date/time pickers, local suggestions, dedicated finance-only Git exchange and conservative conflict rules. The earlier v13 editor-offset description is superseded by readable local date/time pickers; persistence remains UTC.
+
+
+## Hybrid Datasette data explorer
+
+PersonalHub keeps `personalhub.db` as the sole writable source of truth while exposing a shared read-only Data Explorer. Local exploration creates a coherent, validated snapshot under app cache and serves only that detached file to an embedded Datasette Lite runtime through a synthetic HTTPS WebView origin. The live Room database and WAL are never exposed. Local WebView requests outside that origin are blocked, so offline mode cannot silently fall back to network-hosted runtime assets.
+
+Remote exploration reuses only the encrypted Datasette HTTPS base address and targets the read-only `personalhub_read` presentation database by default. It never injects or reveals the Android `personalhub-sync` bearer token, which remains scoped to the technical envelope. Human browsing and read-only SQL use server-side interactive authentication. Arbitrary Datasette writes remain prohibited; any future explorer mutation must enter a PersonalHub-owned mutation API so domain validation, sync journaling, Activity capture and undo remain authoritative.
+
+See `docs/DATA_EXPLORER.md` for the runtime boundary and offline packaging contract.
