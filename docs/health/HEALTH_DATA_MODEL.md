@@ -74,6 +74,28 @@ One logical user→ChatGPT→PH import. It is the preferred semantic Git `group_
 
 Recommended unique constraint: non-null `source_hash`.
 
+## 1b. `health_source_metadata`
+
+Lossless storage for source metadata that is present in MinSP/MyChart but does not justify a permanent first-class column yet.
+
+| column | type | rule |
+|---|---|---|
+| `owner_kind` | TEXT | `import`, `event`, `sample`, `measurement`, `journal` |
+| `owner_id` | TEXT | canonical id of the source object |
+| `key` | TEXT | stable normalized metadata key |
+| `value` | TEXT NOT NULL | source value; preserve meaning exactly |
+| `source_label` | TEXT | original Danish/UI label when useful |
+
+Primary key: `(owner_kind, owner_id, key)`.
+
+Rules:
+
+- capture **all available source metadata** that is not already represented by a stable structured field;
+- do not duplicate first-class values into this table merely for convenience;
+- do not invent missing metadata;
+- promote a repeatedly useful key to a real column only through an explicit schema migration;
+- this table is provenance/source data, not a dumping ground for AI interpretation.
+
 ## 2. `health_events`
 
 Common event spine for temporal and cross-module integration.
