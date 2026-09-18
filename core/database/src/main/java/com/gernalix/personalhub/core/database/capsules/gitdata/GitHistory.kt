@@ -250,18 +250,22 @@ object GitHistory {
             val changedPaths = (leftHashes.keys + rightHashes.keys)
                 .filter { leftHashes[it] != rightHashes[it] }
                 .toSet()
-            val primary = rightKeys[table] ?: leftKeys[table].orEmpty()
+            val leftPrimary = leftKeys[table].orEmpty()
+            val rightPrimary = rightKeys[table].orEmpty()
+            val samePrimary = leftPrimary == rightPrimary
             val beforeRows = loadSemanticRows(
                 git = git,
                 ref = from.sha,
                 chunks = leftChunks.filter { it.first in changedPaths },
-                primary = primary,
+                primary = leftPrimary,
+                keyPrefix = if (samePrimary) "" else "before:",
             )
             val afterRows = loadSemanticRows(
                 git = git,
                 ref = to.sha,
                 chunks = rightChunks.filter { it.first in changedPaths },
-                primary = primary,
+                primary = rightPrimary,
+                keyPrefix = if (samePrimary) "" else "after:",
             )
             for (rowKey in (beforeRows.keys + afterRows.keys).sorted()) {
                 val leftRow = beforeRows[rowKey]
@@ -756,6 +760,7 @@ object GitHistory {
         ref: String,
         chunks: List<Pair<String, String>>,
         primary: List<String>,
+        keyPrefix: String = "",
     ): Map<String, JSONObject> = buildMap {
         for ((path, expectedHash) in chunks) {
             val bytes = git.readFile(path, ref)
@@ -766,7 +771,7 @@ object GitHistory {
                 .filter { it.isNotBlank() }
                 .forEach { line ->
                     val row = JSONObject(line)
-                    val key = if (primary.isEmpty()) {
+                    val key = keyPrefix + if (primary.isEmpty()) {
                         GitDataFormat.sha256(line.toByteArray(Charsets.UTF_8))
                     } else {
                         JSONObject().apply {
