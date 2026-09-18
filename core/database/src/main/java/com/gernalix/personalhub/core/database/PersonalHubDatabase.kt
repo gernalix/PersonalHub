@@ -53,7 +53,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.luoghi.data.PlaceTagCrossRef::class,
     com.gernalix.personalhub.alerts.AlertRuleEntity::class,
     com.gernalix.personalhub.alerts.AlertPlaceTagTargetEntity::class,
-    com.gernalix.personalhub.alerts.AlertTimerTagTargetEntity::class,
     com.gernalix.sostanze.data.SubstanceEntity::class,
     com.gernalix.sostanze.data.IntakeEventEntity::class,
     com.gernalix.sostanze.data.StockAdjustmentEntity::class,
@@ -425,16 +424,6 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_place_tag_targets_rule_id` ON `alert_place_tag_targets` (`rule_id`)")
                                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_place_tag_targets_place_tag_id` ON `alert_place_tag_targets` (`place_tag_id`)")
 
-                                    db.execSQL("""
-                                        CREATE TABLE IF NOT EXISTS `alert_timer_tag_targets` (
-                                            `rule_id` TEXT NOT NULL,
-                                            `timer_tag_id` INTEGER NOT NULL,
-                                            PRIMARY KEY(`rule_id`, `timer_tag_id`),
-                                            FOREIGN KEY(`rule_id`) REFERENCES `alert_rules`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
-                                        )
-                                    """.trimIndent())
-                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_timer_tag_targets_rule_id` ON `alert_timer_tag_targets` (`rule_id`)")
-                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_timer_tag_targets_timer_tag_id` ON `alert_timer_tag_targets` (`timer_tag_id`)")
 
                                     db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                                 }
