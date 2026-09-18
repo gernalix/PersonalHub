@@ -35,6 +35,9 @@ object DatabaseVault {
     private var transferHooks: TransferHooks = noTransferHooks
     private var exportPublisherFactory: (Context, Uri) -> ExportPublisher = { context, uri -> DocumentFileExportPublisher(context, uri) }
     private var directorySyncForTests: ((File) -> Unit)? = null
+    private fun rootPreferences(context: Context) =
+        context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
+
     internal fun preferences(context: Context) = context.getSharedPreferences(
         "personalhub_transfer" + DatabaseProfiles.preferenceSuffix(context),
         Context.MODE_PRIVATE,
@@ -48,7 +51,7 @@ object DatabaseVault {
     internal fun setDirectorySyncForTests(sync: ((File) -> Unit)?) {
         directorySyncForTests = sync
     }
-    fun folder(context: Context): String? = preferences(context).getString("tree_uri", null)
+    fun folder(context: Context): String? = rootPreferences(context).getString("tree_uri", null)
     fun error(context: Context): String? = preferences(context).getString("error", null)
     fun lastExport(context: Context): Long = preferences(context).getLong("exported_at", 0)
     fun exportedGeneration(context: Context): Long = preferences(context).getLong("exported_generation", -1)
@@ -165,6 +168,7 @@ object DatabaseVault {
         syncCopy(backup, recovery)
         sidecars(target)
         atomicMove(recovery, target)
+        DatabaseProfiles.rollbackPendingSwitch(context)
         check(marker.delete())
         syncDirectory(context.filesDir)
         preferences(context).edit().putString("error", "Interrupted import was rolled back").commit()
@@ -365,8 +369,8 @@ object DatabaseVault {
     fun configureFolder(context: Context, uri: Uri) {
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         require(DocumentFile.fromTreeUri(context, uri)?.canWrite() == true) { "Export folder is not writable" }
+        check(rootPreferences(context).edit().putString("tree_uri", uri.toString()).commit())
         preferences(context).edit()
-            .putString("tree_uri", uri.toString())
             .putLong("exported_generation", -1)
             .remove(CANONICAL_DOCUMENT_URI)
             .remove(BACKUP_DOCUMENT_URI)
@@ -655,6 +659,7 @@ object DatabaseVault {
                             sidecars(target)
                             atomicMove(stage, target)
                             validate(context, target)
+                            DatabaseProfiles.markPendingTargetActive(context)
                             check(marker(context).delete())
                             syncDirectory(context.filesDir)
                             cleanupOrphanedPreImportBackups(context)
