@@ -8,6 +8,7 @@ See also:
 - [ChatGPT health patch contract](health/CHATGPT_PATCH_CONTRACT.md)
 - [ChatGPT → PH workflow](health/chatgpt-to-ph-workflow.svg)
 - [Minimal Android UI](health/android-minimal-ui.svg)
+- [Obsidian projection](health/OBSIDIAN_PROJECTION.md)
 
 ## Decision
 
