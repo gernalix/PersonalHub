@@ -115,6 +115,9 @@ object GitHistory {
     fun revisions(context: Context, limit: Int = 100): List<GitRevision> =
         remote(context).revisions(limit)
 
+    fun resolveRevision(context: Context, ref: String): GitRevision =
+        remote(context).revision(ref.trim())
+
     /**
      * Timer compatibility bridge while its former local Time Machine is retired.
      * Reads the canonical snapshot row from the newest Git state committed at/before targetMs.
