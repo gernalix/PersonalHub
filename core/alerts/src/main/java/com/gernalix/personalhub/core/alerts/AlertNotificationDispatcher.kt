@@ -131,10 +131,11 @@ object AlertNotificationDispatcher {
  */
 object AlertTaskerBridge {
     const val ACTION_ALERT_FIRED = "com.gernalix.personalhub.ALERT_FIRED"
+    private const val TASKER_PACKAGE = "net.dinglisch.android.taskerm"
 
     fun emit(context: Context, fire: AlertFire) {
         context.sendBroadcast(
-            Intent(ACTION_ALERT_FIRED).apply {
+            Intent(ACTION_ALERT_FIRED).setPackage(TASKER_PACKAGE).apply {
                 putExtra("rule_id", fire.ruleId)
                 putExtra("domain", fire.domain.name)
                 putExtra("trigger", fire.trigger.name)
