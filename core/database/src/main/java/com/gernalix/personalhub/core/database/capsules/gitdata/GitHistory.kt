@@ -136,10 +136,16 @@ object GitHistory {
         val app = context.applicationContext
         val db = PersonalHubDatabase.get(app).openHelper.writableDatabase
         GitHistoryStore.install(db)
-        val item = GitHistoryStore.find(db, eventId)
+        val selected = GitHistoryStore.find(db, eventId)
             ?: error("History event is not indexed on this device")
-        require(item.revertedBy == null) { "History event was already reverted" }
-        val event = loadEvent(app, item)
+        val items = selected.groupId
+            ?.let { GitHistoryStore.byGroup(db, it) }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf(selected)
+        require(items.all { it.revertedBy == null }) {
+            "At least one part of this logical edit was already reverted"
+        }
+        val payloads = items.associateWith { loadEvent(app, it) }
         val group = "revert:" + eventId + ":" + UUID.randomUUID().toString()
         db.beginTransaction()
         try {
@@ -147,19 +153,54 @@ object GitHistory {
                 db = db,
                 author = "user",
                 source = "history_revert",
-                reason = "Revert history event $eventId",
+                reason = if (items.size == 1) {
+                    "Revert history event $eventId"
+                } else {
+                    "Revert logical edit " + requireNotNull(selected.groupId)
+                },
                 groupId = group,
             )
-            applyInverse(app, db, item, event)
+            // Undo multi-row logical edits in reverse order to preserve dependency direction.
+            items.sortedWith(
+                compareByDescending<GitHistoryItem> { it.occurredAt }.thenByDescending { it.id },
+            ).forEach { item ->
+                applyInverse(app, db, item, requireNotNull(payloads[item]))
+            }
             db.query("PRAGMA foreign_key_check").use {
                 require(!it.moveToFirst()) { "Revert would break database relationships" }
             }
-            GitHistoryStore.markReverted(db, eventId, group)
+            items.forEach { GitHistoryStore.markReverted(db, it.id, group) }
             db.setTransactionSuccessful()
         } finally {
             GitDataTracking.clearEditContext(db)
             db.endTransaction()
         }
+    }
+
+    /**
+     * Returns history events in a time window. This powers "what happened that day?" and
+     * data-debugging/bisect workflows without scanning Git on every query.
+     */
+    fun eventsBetween(
+        context: Context,
+        fromMs: Long,
+        toMs: Long,
+        table: String? = null,
+        limit: Int = 1000,
+    ): List<GitHistoryItem> = DatabaseGate.access {
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        GitHistoryStore.install(db)
+        GitHistoryStore.between(db, fromMs, toMs, table, limit)
+    }
+
+    fun suspectChanges(
+        context: Context,
+        table: String,
+        knownGoodMs: Long,
+        knownBadMs: Long,
+    ): List<GitHistoryItem> {
+        require(knownGoodMs <= knownBadMs)
+        return eventsBetween(context, knownGoodMs, knownBadMs, table, 5000)
     }
 
     /**
