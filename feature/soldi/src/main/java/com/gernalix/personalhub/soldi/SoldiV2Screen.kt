@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.personalhub.core.database.capsules.soldi.*
 import com.gernalix.personalhub.soldi.receipt.*
 import kotlinx.coroutines.CancellationException
@@ -386,6 +387,16 @@ internal fun SoldiV2Screen(
                         modifier = Modifier.clickable { showMore = false; receiptLauncher.launch("image/*") },
                     )
                     ListItem(headlineContent = { Text("Opzioni di visualizzazione") }, modifier = Modifier.clickable { showMore = false; showViewOptions = true })
+                    ListItem(
+                        headlineContent = { Text("Esplora dati") },
+                        supportingContent = { Text("Datasette · transazioni") },
+                        modifier = Modifier.clickable {
+                            showMore = false
+                            context.startActivity(
+                                DataExplorerContract.intent(context.packageName, "finance_transactions"),
+                            )
+                        },
+                    )
                     ListItem(headlineContent = { Text("Nuovo trasferimento") }, modifier = Modifier.clickable { showMore = false; editor = SoldiEditor.Transfer(defaultTransfer(accounts)) })
                 }
             },
