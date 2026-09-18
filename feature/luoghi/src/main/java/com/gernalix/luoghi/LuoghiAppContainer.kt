@@ -19,17 +19,21 @@ import com.gernalix.luoghi.capsules.stats.StatsCapsule
 import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.luoghi.backup.RestoreCoordinator
+import com.gernalix.personalhub.core.alerts.PlaceAlertEngine
+import com.gernalix.personalhub.core.alerts.PlaceAlertRepository
 
 class LuoghiAppContainer(context: Context) {
     private val appContext = context.applicationContext
     private val database = LuoghiDatabase.get(appContext)
     private val dao = database.placeDao()
     private val placeRepository = PlaceRepository(appContext, database, dao)
+    private val placeAlertEngine = PlaceAlertEngine(appContext, database)
 
     val places = PlacesCapsule(placeRepository)
+    val alerts = PlaceAlertRepository(appContext, database)
     val aliases = AliasesCapsule(placeRepository)
     val links = LinksCapsule(placeRepository)
-    val checkIns = CheckInCapsule(placeRepository)
+    val checkIns = CheckInCapsule(placeRepository, placeAlertEngine)
     val geofences = PlaceGeofenceCapsule(appContext, placeRepository)
     val stats = StatsCapsule(placeRepository)
     val routeDistances by lazy {
