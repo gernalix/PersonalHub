@@ -233,16 +233,17 @@ private fun GitDataSyncSettings(
         }
     }
 
-    fun runOperation(block: suspend () -> Unit) {
+    fun runOperation(block: () -> Unit, onSuccess: () -> Unit = {}) {
         busy = true
         failed = false
         message = null
         scope.launch {
             val error = withContext(Dispatchers.IO) {
-                runCatching { block() }.exceptionOrNull()
+                runCatching(block).exceptionOrNull()
             }
             busy = false
             if (error == null) {
+                onSuccess()
                 message = R.string.git_data_sync_complete
             } else {
                 failed = true
@@ -274,12 +275,16 @@ private fun GitDataSyncSettings(
         Button(
             enabled = !busy,
             onClick = {
-                runOperation {
-                    GitDataSync.save(context, repository, token)
-                    if (enableAfterSave) GitDataSync.setEnabled(context, true)
-                    token = ""
-                    onConfigured()
-                }
+                runOperation(
+                    block = {
+                        GitDataSync.save(context, repository, token)
+                        if (enableAfterSave) GitDataSync.setEnabled(context, true)
+                    },
+                    onSuccess = {
+                        token = ""
+                        onConfigured()
+                    },
+                )
             },
         ) {
             Text(stringResource(R.string.git_data_sync_save))
