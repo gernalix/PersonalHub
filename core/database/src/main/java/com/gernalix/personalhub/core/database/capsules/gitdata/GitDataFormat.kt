@@ -114,7 +114,10 @@ internal object GitDataFormat {
                     "changes/${System.currentTimeMillis()}-g$generation.json"
                 ] = change.toString(2).toByteArray(Charsets.UTF_8)
                 val history = encodeHistory(events, files)
-                history?.let { files[it.first] = it.second }
+                history?.let { (path, bytes) ->
+                    files[path] = bytes
+                    files[path + ".sig.json"] = GitDataSigner.signatureDocument(bytes)
+                }
                 val historyPath = history?.first.orEmpty()
                 val meta = events.map { event ->
                     GitHistoryCommitMeta(
@@ -592,7 +595,7 @@ internal object GitStateRestorer {
         }
         val manifestBytes = transport.readFile(GIT_STATE_MANIFEST, revision)
         val manifest = JSONObject(String(manifestBytes, Charsets.UTF_8))
-        require(manifest.getInt("format_version") == 1) { "Unsupported state format" }
+        require(manifest.getInt("format_version") in setOf(1, 2)) { "Unsupported state format" }
         val schemaVersion = manifest.getInt("schema_version")
         require(schemaVersion in 1..PersonalHubDatabase.SCHEMA_VERSION) {
             "The selected revision uses a newer unsupported schema"
