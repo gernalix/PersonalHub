@@ -176,6 +176,8 @@ internal object GitDataFormat {
                     .put("event_id", event.id)
                     .put("timestamp_ms", event.occurredAt)
                     .put("author", event.author)
+                    .put("source", event.source)
+                    .put("reason", event.reason ?: JSONObject.NULL)
                     .put("group_id", event.groupId ?: JSONObject.NULL)
                     .put("table", event.table)
                     .put("operation", event.operation.lowercase())
