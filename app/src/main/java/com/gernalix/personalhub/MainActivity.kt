@@ -144,7 +144,7 @@ fun PersonalHubApp() {
                     module = module,
                     onClick = {
                         context.startActivity(
-                            Intent().setClassName(context.packageName, module.activityClassName),
+                            LauncherShortcutsCapsule.moduleIntent(context, module),
                         )
                     },
                 )
