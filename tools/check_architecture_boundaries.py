@@ -186,6 +186,7 @@ for kotlin in source_files.get("app", []):
 
 
 ANDROID_ATTR = "{http://schemas.android.com/apk/res/android}"
+PUBLIC_SHORTCUT_ALIAS = re.compile(r"^com\.gernalix\.personalhub\.shortcut\.[A-Za-z]+ShortcutActivity$")
 
 
 def manifest_class_references(manifest: Path) -> list[str]:
@@ -218,6 +219,10 @@ for feature_dir in sorted((ROOT / "feature").glob("*")):
     owner = f"feature:{feature_dir.name}"
     manifest = feature_dir / "src/main/AndroidManifest.xml"
     for referenced in manifest_class_references(manifest):
+        # Stable public aliases deliberately live in the host package but are owned
+        # by the feature manifest that declares them.
+        if PUBLIC_SHORTCUT_ALIAS.fullmatch(referenced):
+            continue
         referenced_owner = resolve_import_owner(referenced)
         if referenced_owner and referenced_owner != owner and (
             referenced_owner == "app" or referenced_owner.startswith("feature:")
