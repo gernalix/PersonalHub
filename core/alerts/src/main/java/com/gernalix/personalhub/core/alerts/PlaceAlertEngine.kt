@@ -13,7 +13,7 @@ class PlaceAlertEngine(
     context: Context,
     private val database: PersonalHubDatabase = PersonalHubDatabase.get(context.applicationContext),
     private val appContext: Context = context.applicationContext,
-    private val emitTaskerBroadcast: Boolean = false,
+    private val emitTaskerBroadcast: Boolean = true,
 ) {
     suspend fun onPlaceEvent(
         placeUuid: String,
