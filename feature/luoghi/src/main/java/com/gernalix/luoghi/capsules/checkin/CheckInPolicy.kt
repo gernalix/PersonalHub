@@ -59,7 +59,7 @@ object CheckInPolicy {
     fun effectiveRadiusM(place: PlaceEntity): Double =
         place.radiusM?.takeIf { it > 0.0 } ?: DEFAULT_RADIUS_M
 
-    fun matchThresholdM(place: PlaceEntity, location: LocationSample): Double =
+    internal fun matchThresholdM(place: PlaceEntity, location: LocationSample): Double =
         effectiveRadiusM(place) + accuracyAllowanceM(location)
 
     private fun accuracyAllowanceM(location: LocationSample): Double =
