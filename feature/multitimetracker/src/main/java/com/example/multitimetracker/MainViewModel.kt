@@ -923,15 +923,6 @@ private var initialized = false
             integrityBlock = { _integrityBlock.value },
             setIntegrityBlock = { _integrityBlock.value = it },
             setImportVerificationReport = { report -> _importVerificationReport.value = report },
-            showVaultActivationVerified = { ctx, vaultName ->
-                viewModelScope.launch(Dispatchers.Main.immediate) {
-                    Toast.makeText(
-                        ctx,
-                        ctx.getString(R.string.multidb_switched_verified_toast_fmt, vaultName),
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
-            },
             resetToFreshInstallState = { nowMs ->
                 sinceWhenCapsule.replaceLifePeriods(emptyList())
                 tagsCapsule.replaceTags(emptyList())
