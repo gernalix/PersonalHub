@@ -202,6 +202,13 @@ object GitDataSettings {
             .apply()
     }
 
+    internal fun recordAttention(context: Context, message: String) {
+        statusPrefs(context).edit()
+            .putString("runtime_state", "attention")
+            .putString("last_error", message)
+            .apply()
+    }
+
     internal fun markPushed(context: Context, generation: Long, revision: String) {
         statusPrefs(context).edit()
             .putString("runtime_state", "complete")
