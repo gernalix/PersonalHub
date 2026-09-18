@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.DatabaseVault
+import com.gernalix.personalhub.contracts.database.HubTimestamp
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -91,7 +92,7 @@ class DatabaseActivity : ComponentActivity() {
                     withContext(Dispatchers.IO) { DatabaseVault.exportNow(this@DatabaseActivity) }
                     message = exported
                 } }) { Text(stringResource(R.string.database_export)) }
-                if (lastExport > 0) Text(stringResource(R.string.database_last_export, java.text.DateFormat.getDateTimeInstance().format(java.util.Date(lastExport))))
+                if (lastExport > 0) Text(stringResource(R.string.database_last_export, HubTimestamp.format(lastExport)))
                 exportError?.let { Text(failed, color = MaterialTheme.colorScheme.error) }
                 message?.let { Text(it) }
                 if (busy) CircularProgressIndicator()
