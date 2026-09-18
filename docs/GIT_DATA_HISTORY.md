@@ -56,7 +56,7 @@ Rows are ordered by primary key and assigned deterministically from a key hash. 
 
 ## History signing
 
-Each immutable history batch is signed on-device with EC P-256 / SHA256withECDSA. The private key never leaves Android Keystore. A sibling signature document stores payload hash, public SPKI key and signature. This authenticates PH-produced history payloads independently of Git commit signing.
+Each immutable history batch is signed on-device with EC P-256 / SHA256withECDSA. The private key never leaves Android Keystore. A sibling signature document stores payload hash, public SPKI key and signature. Verification detects payload/signature mismatch and accidental tampering; because the public key travels with the repository, it is not by itself a remote identity trust anchor against an attacker able to rewrite both payload and signature metadata.
 
 ## Push safety
 
@@ -82,7 +82,7 @@ The installed APK remains the compatibility boundary: a remote migration cannot 
 
 When Git data sync is enabled, the Home Activity/Registro destination uses global Git History as the user-facing audit/history source.
 
-The platform supports recent edits, filters by author/table/row, record and field blame, statistics, complete PH revision history, table-level and semantic row/field revision diff, granular logical-edit revert with an affected-group preview and sandbox FK/staleness check, complete revision restore by any commit/tag/branch ref, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing, proposal sandbox preview/discard, and patch cherry-pick from proposal refs.
+The platform supports recent edits, filters by author/table/row/operation (including deleted rows), record and field blame, statistics, complete PH revision history, table-level and semantic row/field revision diff, granular logical-edit revert with an affected-group preview and sandbox FK/staleness check, complete revision restore by any commit/tag/branch ref or date, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing for data regressions, proposal sandbox preview/discard, and patch cherry-pick from proposal refs.
 
 hub_git_history_index is a disposable local projection for fast UI queries. Full before/after payloads remain in immutable Git history.
 
