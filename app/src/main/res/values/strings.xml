@@ -213,4 +213,5 @@
     <string name="git_history_create_pr">Create data pull request</string>
     <string name="git_history_pr_created">Pull request created: %1$s</string>
     <string name="git_history_column_filter">Field / column for blame (optional)</string>
+    <string name="git_history_day_filter">Day (YYYY-MM-DD, optional)</string>
 </resources>
