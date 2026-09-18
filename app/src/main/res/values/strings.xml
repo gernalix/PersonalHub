@@ -197,4 +197,8 @@
     <string name="git_history_error">History operation failed. No unverified database replacement was accepted.</string>
     <string name="git_data_sync_attention">Automatic push paused: an unusually large/destructive batch needs review.</string>
     <string name="git_data_sync_force_push">Force push reviewed batch</string>
+    <string name="git_history_view_diff">View before / after</string>
+    <string name="git_history_diff_columns">Changed columns: %1$s</string>
+    <string name="git_history_before">Before</string>
+    <string name="git_history_after">After</string>
 </resources>
