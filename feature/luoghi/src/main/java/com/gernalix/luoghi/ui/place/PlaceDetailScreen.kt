@@ -62,8 +62,8 @@ fun PlaceDetailScreen(
     onHistory: () -> Unit,
     onCheckInNow: () -> Unit,
     onAddManualVisit: () -> Unit,
-    onAlerts: () -> Unit,
     onGeofenceSettings: () -> Unit,
+    onAlerts: () -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
     val place = item.place
