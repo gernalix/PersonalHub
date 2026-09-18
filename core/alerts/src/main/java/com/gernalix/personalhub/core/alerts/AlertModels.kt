@@ -16,6 +16,32 @@ enum class AlertMatchMode { ALL, ANY }
 
 enum class AlertScope { ALWAYS, ONE_TIME }
 
+/**
+ * Domain-neutral alert rule used by the shared evaluator.
+ *
+ * Tag identifiers are meaningful only inside [domain]. Timer and Places therefore remain separate
+ * namespaces even when their numeric IDs happen to be equal.
+ */
+data class AlertRuleSpec(
+    val domain: AlertDomain,
+    val trigger: AlertTrigger,
+    val targetKind: AlertTargetKind,
+    val entityId: String? = null,
+    val requiredTagIds: Set<String> = emptySet(),
+    val matchMode: AlertMatchMode = AlertMatchMode.ALL,
+    val enabled: Boolean = true,
+    val cooldownMs: Long = 0L,
+    val lastFiredAtMs: Long? = null,
+    val emptyTagQueryMatches: Boolean = false,
+)
+
+data class AlertEventSpec(
+    val domain: AlertDomain,
+    val trigger: AlertTrigger,
+    val entityId: String? = null,
+    val tagIds: Set<String> = emptySet(),
+)
+
 data class PlaceAlertDraft(
     val message: String,
     val trigger: AlertTrigger,
