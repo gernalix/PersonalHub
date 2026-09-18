@@ -47,6 +47,14 @@ object GitDataSync {
     fun save(context: Context, repositoryUrl: String, token: String) = operations.withLock {
         val app = context.applicationContext
         val previous = runCatching { GitDataSettings.configuration(app) }.getOrNull()
+        val repository = requireNotNull(GitRepository.parse(repositoryUrl.trim().trimEnd('/'))) {
+            "Use an HTTPS GitHub repository URL"
+        }
+        val effectiveToken = token.ifBlank {
+            runCatching { GitDataSettings.token(app) }.getOrDefault("")
+        }
+        require(effectiveToken.isNotBlank()) { "A GitHub access token is required" }
+        GitHubDataTransport(repository, effectiveToken).validatePrivateWritable()
         GitDataSettings.save(app, repositoryUrl, token)
         val current = GitDataSettings.configuration(app)
         val repositoryChanged = previous?.repositoryUrl != current.repositoryUrl
