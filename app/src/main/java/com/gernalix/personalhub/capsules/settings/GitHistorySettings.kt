@@ -470,6 +470,22 @@ fun GitHistorySettings(onBack: () -> Unit) {
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )
+            Text(
+                if (preview.safe) {
+                    stringResource(R.string.git_history_revert_preview_safe)
+                } else {
+                    stringResource(
+                        R.string.git_history_revert_preview_blocked,
+                        preview.blockingReason ?: "unknown",
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (preview.safe) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
         }
 
         HorizontalDivider()
