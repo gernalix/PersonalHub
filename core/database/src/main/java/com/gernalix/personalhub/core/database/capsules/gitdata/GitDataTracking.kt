@@ -229,6 +229,32 @@ object GitDataTracking {
         db.execSQL("DELETE FROM $CONTEXT_TABLE WHERE id=1")
     }
 
+    fun ensureAutomaticEditContext(db: SupportSQLiteDatabase) {
+        val installed = db.query(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            arrayOf(CONTEXT_TABLE),
+        ).use { it.moveToFirst() }
+        if (!installed) return
+        val alreadySet = db.query(
+            "SELECT 1 FROM $CONTEXT_TABLE WHERE id=1 LIMIT 1",
+        ).use { it.moveToFirst() }
+        if (alreadySet) return
+        setEditContext(
+            db = db,
+            author = "user",
+            source = "ui",
+            groupId = "txn:" + java.util.UUID.randomUUID().toString(),
+        )
+    }
+
+    fun clearEditContextIfInstalled(db: SupportSQLiteDatabase) {
+        val installed = db.query(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            arrayOf(CONTEXT_TABLE),
+        ).use { it.moveToFirst() }
+        if (installed) clearEditContext(db)
+    }
+
     fun isPatchApplied(db: SupportSQLiteDatabase, patchId: String): Boolean =
         db.query(
             "SELECT 1 FROM $APPLIED_PATCHES_TABLE WHERE id=? LIMIT 1",
