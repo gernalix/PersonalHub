@@ -109,3 +109,14 @@ PersonalHub keeps `personalhub.db` as the sole writable source of truth while ex
 Remote exploration reuses only the encrypted Datasette HTTPS base address and targets the read-only `personalhub_read` presentation database by default. It never injects or reveals the Android `personalhub-sync` bearer token, which remains scoped to the technical envelope. Human browsing and read-only SQL use server-side interactive authentication. Arbitrary Datasette writes remain prohibited; any future explorer mutation must enter a PersonalHub-owned mutation API so domain validation, sync journaling, Activity capture and undo remain authoritative.
 
 See `docs/DATA_EXPLORER.md` for the runtime boundary and offline packaging contract.
+
+
+## Salute canonical domain
+
+Salute is a first-class domain of the canonical `personalhub.db` and a deliberately thin read-only Android feature. The user-facing app does not provide health CRUD; trusted ChatGPT-assisted ingestion arrives through the existing semantic Git patch path, so health mutations participate in the same transaction, Git History, Time Machine, revert, Datasette and backup semantics as the other PH domains.
+
+The previous design that treated `gernalix/salute/salute.db` as a separately downloaded runtime database is transitional and must be retired when the canonical health schema lands. PersonalHub must not maintain a second health database, second Git history engine or second sync state machine.
+
+Health events link to canonical People and Places records; documented prescriptions/renewals update the existing Substances domain rather than creating duplicate drug entities, and medication purchases remain canonical Soldi transactions. Hub Context provides semantic cross-module links and the global temporal layer indexes health events by epoch-ms.
+
+Obsidian is the preferred human-reading projection for Health but remains a deterministic, disposable export of `personalhub.db`. Datasette remains the ad-hoc relational/query interface. The Android Salute UI is intentionally minimal. See `docs/HEALTH_MODULE.md` and `docs/health/HEALTH_DATA_MODEL.md`.

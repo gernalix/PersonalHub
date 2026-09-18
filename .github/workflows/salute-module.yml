@@ -2,9 +2,14 @@ name: Salute module
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/salute-canonical-domain]
     paths:
       - 'feature/salute/**'
+      - 'contracts/database/src/main/java/**/Health*.kt'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/PersonalHubDatabase.kt'
+      - 'core/hub-context/**'
+      - 'docs/HEALTH_MODULE.md'
+      - 'docs/health/**'
       - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitReadOnlyArtifactClient.kt'
       - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitHubDataTransport.kt'
       - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataSettings.kt'
@@ -17,6 +22,11 @@ on:
   pull_request:
     paths:
       - 'feature/salute/**'
+      - 'contracts/database/src/main/java/**/Health*.kt'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/PersonalHubDatabase.kt'
+      - 'core/hub-context/**'
+      - 'docs/HEALTH_MODULE.md'
+      - 'docs/health/**'
       - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitReadOnlyArtifactClient.kt'
       - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitHubDataTransport.kt'
       - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataSettings.kt'
@@ -50,6 +60,8 @@ jobs:
           chmod +x ./gradlew
           ./gradlew --no-daemon --console=plain \
             :feature:salute:testDebugUnitTest \
+            :core:database:testDebugUnitTest \
+            :core:hub-context:testDebugUnitTest \
             :app:testDebugUnitTest \
             :app:compileDebugKotlin \
             checkArchitectureBoundaries

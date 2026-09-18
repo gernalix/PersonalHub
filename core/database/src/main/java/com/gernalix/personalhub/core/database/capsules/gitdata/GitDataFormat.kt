@@ -357,7 +357,7 @@ internal object GitDataFormat {
                 totalRows = totalRows,
                 shardCount = shardCount,
                 selected = affected,
-                previousShards = previousShards,
+                previousShards = requireNotNull(previousShards),
                 objectFiles = objectFiles,
             )
         }
