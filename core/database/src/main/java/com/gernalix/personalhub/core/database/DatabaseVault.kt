@@ -3,6 +3,8 @@ package com.gernalix.personalhub.core.database
 import com.gernalix.personalhub.core.database.capsules.sync.*
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryStore
 import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
@@ -501,7 +503,10 @@ object DatabaseVault {
             validate(context, stage)
             // Room upgrades accepted v2 exports without changing the source file.
             val importedVersion = SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
-            if (importedVersion < PersonalHubDatabase.SCHEMA_VERSION) {
+            val gitHistoryEnabled = runCatching {
+                GitDataSettings.configuration(context).enabled
+            }.getOrDefault(false)
+            if (importedVersion < PersonalHubDatabase.SCHEMA_VERSION || gitHistoryEnabled) {
                 PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
                     try { temporary.openHelper.writableDatabase } finally { temporary.close() }
                 }
@@ -521,6 +526,40 @@ object DatabaseVault {
                             imported.execSQL("DELETE FROM hub_sync_known")
                             imported.execSQL("INSERT OR IGNORE INTO hub_sync_known SELECT table_name,row_key FROM previous.hub_sync_known")
                             imported.execSQL("INSERT OR IGNORE INTO hub_sync_known SELECT table_name,row_key FROM previous.hub_sync_pending")
+
+                            // Git metadata belongs to this installation, never to the imported
+                            // payload. Clear any imported projection first.
+                            listOf(
+                                GitDataTracking.TABLE,
+                                GitDataTracking.EVENTS_TABLE,
+                                GitDataTracking.CONTEXT_TABLE,
+                                GitDataTracking.APPLIED_PATCHES_TABLE,
+                                GitHistoryStore.TABLE,
+                                GitHistoryStore.FIELD_STATS_TABLE,
+                            ).forEach { table ->
+                                if (rawTableExists(imported, "main", table)) {
+                                    imported.execSQL("DELETE FROM `$table`")
+                                }
+                            }
+                            if (gitHistoryEnabled) {
+                                val preservedTables = listOf(
+                                    GitDataTracking.TABLE,
+                                    GitDataTracking.EVENTS_TABLE,
+                                    GitDataTracking.APPLIED_PATCHES_TABLE,
+                                    GitHistoryStore.TABLE,
+                                    GitHistoryStore.FIELD_STATS_TABLE,
+                                )
+                                preservedTables.forEach { table ->
+                                    require(rawTableExists(imported, "main", table)) {
+                                        "Git operational table is missing from import staging: $table"
+                                    }
+                                    if (rawTableExists(imported, "previous", table)) {
+                                        imported.execSQL(
+                                            "INSERT OR REPLACE INTO `$table` SELECT * FROM previous.`$table`",
+                                        )
+                                    }
+                                }
+                            }
                             imported.setTransactionSuccessful()
                         } finally { imported.endTransaction() }
                         imported.execSQL("DETACH DATABASE previous")
@@ -553,6 +592,18 @@ object DatabaseVault {
     fun importDatabaseFile(context: Context, file: File) {
         require(file.isFile) { "Database import source is missing" }
         importDatabase(context, Uri.fromFile(file))
+    }
+
+    private fun rawTableExists(
+        db: SQLiteDatabase,
+        schema: String,
+        table: String,
+    ): Boolean {
+        require(schema == "main" || schema == "previous")
+        return db.rawQuery(
+            "SELECT 1 FROM $schema.sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            arrayOf(table),
+        ).use { it.moveToFirst() }
     }
 
     private fun retireSeparateDatabases(context: Context) {
