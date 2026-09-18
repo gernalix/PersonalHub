@@ -5,20 +5,24 @@ on:
     branches: [main]
     paths:
       - 'feature/salute/**'
-      - 'core/database/**'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitReadOnlyArtifactClient.kt'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitHubDataTransport.kt'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataSettings.kt'
       - 'app/src/main/java/com/gernalix/personalhub/capsules/shortcuts/LauncherShortcutsCapsule.kt'
       - 'app/src/main/AndroidManifest.xml'
-      - 'app/src/main/res/**'
+      - 'app/src/main/res/drawable/ic_shortcut_salute.xml'
       - 'app/build.gradle.kts'
       - 'settings.gradle.kts'
       - '.github/workflows/salute-module.yml'
   pull_request:
     paths:
       - 'feature/salute/**'
-      - 'core/database/**'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitReadOnlyArtifactClient.kt'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitHubDataTransport.kt'
+      - 'core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataSettings.kt'
       - 'app/src/main/java/com/gernalix/personalhub/capsules/shortcuts/LauncherShortcutsCapsule.kt'
       - 'app/src/main/AndroidManifest.xml'
-      - 'app/src/main/res/**'
+      - 'app/src/main/res/drawable/ic_shortcut_salute.xml'
       - 'app/build.gradle.kts'
       - 'settings.gradle.kts'
       - '.github/workflows/salute-module.yml'
@@ -28,7 +32,7 @@ permissions:
 
 concurrency:
   group: personalhub-salute-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   test:
