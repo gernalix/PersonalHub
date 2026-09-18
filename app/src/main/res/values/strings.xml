@@ -223,4 +223,6 @@
     <string name="git_history_preview_patch">Preview patch in sandbox</string>
     <string name="git_history_patch_preview_summary">%1$d operations · +%2$d / ~%3$d / -%4$d · tables: %5$s</string>
     <string name="git_history_discard_proposal">Discard proposal branch</string>
+    <string name="git_history_restore_ref">Older commit / tag / branch</string>
+    <string name="git_history_restore_ref_action">Load revision for restore</string>
 </resources>
