@@ -1,1 +1,48 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application>
+        <provider
+            android:name=".provider.PlacesProvider"
+            android:authorities="${applicationId}.luoghi.places"
+            android:exported="false"
+            android:grantUriPermissions="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Luoghi" />
+
+        <activity-alias
+            android:name="com.gernalix.personalhub.shortcut.PlacesShortcutActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:host="module" android:path="/places" android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
+            android:name=".MapViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Luoghi" />
+
+        <receiver
+            android:name=".capsules.geofence.PlaceGeofenceReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.gernalix.luoghi.action.GEOFENCE_TRANSITION" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
