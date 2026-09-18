@@ -251,6 +251,51 @@ object GitHistoryStore {
     fun countsBySource(db: SupportSQLiteDatabase, limit: Int = 20): List<GitHistoryCount> =
         counts(db, "source", limit)
 
+    fun countSince(db: SupportSQLiteDatabase, fromMs: Long): Long =
+        db.query(
+            "SELECT COUNT(*) FROM " + TABLE + " WHERE occurred_at>=?",
+            arrayOf(fromMs),
+        ).use { cursor ->
+            require(cursor.moveToFirst())
+            cursor.getLong(0)
+        }
+
+    /**
+     * Average lifetime of a field value, measured as the interval between successive edits to the
+     * same table/row/column. Streams the index ordered by entity, so memory stays bounded.
+     */
+    fun averageFieldValueLifetimeMs(db: SupportSQLiteDatabase): Long? =
+        db.query(
+            "SELECT table_name,row_key,changed_columns,occurred_at FROM " + TABLE +
+                " ORDER BY table_name,row_key,occurred_at,id",
+        ).use { cursor ->
+            var currentEntity: String? = null
+            val lastByColumn = mutableMapOf<String, Long>()
+            var total = 0.0
+            var count = 0L
+            while (cursor.moveToNext()) {
+                val entity = cursor.getString(0) + "\u001F" + cursor.getString(1)
+                if (entity != currentEntity) {
+                    currentEntity = entity
+                    lastByColumn.clear()
+                }
+                val occurredAt = cursor.getLong(3)
+                cursor.getString(2)
+                    .split(',')
+                    .filter { it.isNotBlank() }
+                    .forEach { column ->
+                        lastByColumn[column]?.let { previous ->
+                            if (occurredAt >= previous) {
+                                total += (occurredAt - previous).toDouble()
+                                count++
+                            }
+                        }
+                        lastByColumn[column] = occurredAt
+                    }
+            }
+            if (count == 0L) null else (total / count.toDouble()).toLong()
+        }
+
     fun countsByEntity(db: SupportSQLiteDatabase, limit: Int = 20): List<GitHistoryCount> =
         db.query(
             "SELECT table_name || ':' || row_key,COUNT(*) FROM " + TABLE +
