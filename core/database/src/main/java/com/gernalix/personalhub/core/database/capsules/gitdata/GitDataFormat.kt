@@ -1,0 +1,543 @@
+package com.gernalix.personalhub.core.database.capsules.gitdata
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.util.Base64
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.gernalix.personalhub.core.database.DatabaseGate
+import com.gernalix.personalhub.core.database.DatabaseVault
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.math.BigDecimal
+import java.security.MessageDigest
+import java.util.UUID
+
+internal const val GIT_STATE_MANIFEST = "state/manifest.json"
+internal const val GIT_CONTROL_MANIFEST = "control/manifest.json"
+
+internal data class GitExportBundle(
+    val files: Map<String, ByteArray>,
+    val manifest: JSONObject,
+    val pending: List<Pair<String, Long>>,
+    val generation: Long,
+)
+
+internal object GitDataFormat {
+    private val excludedTables = SyncJournal.excluded + GitDataTracking.TABLE
+
+    fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+
+    fun exportPending(context: Context): GitExportBundle? {
+        var pending: List<Pair<String, Long>> = emptyList()
+        var snapshot: File? = null
+        DatabaseGate.access {
+            val live = PersonalHubDatabase.get(context).openHelper.writableDatabase
+            pending = GitDataTracking.pending(live)
+            if (pending.isEmpty() && GitDataSettings.readCachedStateManifest(context) != null) return@access
+            snapshot = DatabaseVault.backupCurrent(context)
+        }
+        val source = snapshot ?: return null
+        try {
+            SQLiteDatabase.openDatabase(source.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                val generation = generation(db)
+                val allTables = tableNames(db)
+                val cached = GitDataSettings.readCachedStateManifest(context)
+                val cachedSchema = cached?.optInt("schema_version", -1) ?: -1
+                val cachedEntries = cachedEntries(cached)
+                val cachedTables = cachedEntries.keys
+                val full = cachedSchema != PersonalHubDatabase.SCHEMA_VERSION ||
+                    cachedTables != allTables.toSet()
+
+                val changed = if (full) allTables.toSet() else pending.map { it.first }.toSet()
+                if (changed.isEmpty()) return null
+
+                val files = linkedMapOf<String, ByteArray>()
+                val entries = if (full) linkedMapOf() else cachedEntries.toMutableMap()
+                for (table in changed.sorted()) {
+                    require(table in allTables) { "Unknown Git sync table: $table" }
+                    val bytes = exportTable(db, table)
+                    val path = tablePath(table)
+                    files[path] = bytes
+                    entries[table] = JSONObject()
+                        .put("name", table)
+                        .put("path", path)
+                        .put("sha256", sha256(bytes))
+                        .put("rows", rowCount(bytes))
+                }
+
+                val manifest = JSONObject()
+                    .put("format_version", 1)
+                    .put("schema_version", PersonalHubDatabase.SCHEMA_VERSION)
+                    .put("app_version", appVersion(context))
+                    .put("generation", generation)
+                    .put("created_at_ms", System.currentTimeMillis())
+                    .put(
+                        "tables",
+                        JSONArray().apply {
+                            entries.toSortedMap().values.forEach(::put)
+                        },
+                    )
+                val manifestBytes = manifest.toString(2).toByteArray(Charsets.UTF_8)
+                files[GIT_STATE_MANIFEST] = manifestBytes
+                if (full) {
+                    files["state/schema.json"] = context.assets.open(
+                        "com.gernalix.personalhub.core.database.PersonalHubDatabase/" +
+                            "${PersonalHubDatabase.SCHEMA_VERSION}.json",
+                    ).use { it.readBytes() }
+                }
+                val change = JSONObject()
+                    .put("format_version", 1)
+                    .put("generation", generation)
+                    .put("created_at_ms", System.currentTimeMillis())
+                    .put("tables", JSONArray(changed.sorted()))
+                files[
+                    "changes/${System.currentTimeMillis()}-g$generation.json"
+                ] = change.toString(2).toByteArray(Charsets.UTF_8)
+                return GitExportBundle(files, manifest, pending, generation)
+            }
+        } finally {
+            source.delete()
+            listOf("-wal", "-shm", "-journal").forEach { File(source.path + it).delete() }
+        }
+    }
+
+    fun acknowledge(context: Context, bundle: GitExportBundle) {
+        DatabaseGate.access {
+            val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+            GitDataTracking.acknowledge(db, bundle.pending)
+        }
+        GitDataSettings.writeCachedStateManifest(context, bundle.manifest)
+    }
+
+    private fun cachedEntries(manifest: JSONObject?): Map<String, JSONObject> {
+        val array = manifest?.optJSONArray("tables") ?: return emptyMap()
+        return buildMap {
+            for (i in 0 until array.length()) {
+                val item = array.getJSONObject(i)
+                put(item.getString("name"), item)
+            }
+        }
+    }
+
+    private fun tableNames(db: SQLiteDatabase): List<String> =
+        db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+            null,
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    val table = cursor.getString(0)
+                    if (table !in excludedTables) add(table)
+                }
+            }
+        }
+
+    private fun generation(db: SQLiteDatabase): Long =
+        db.rawQuery("SELECT generation FROM hub_generation WHERE id=1", null).use {
+            require(it.moveToFirst()) { "Missing database generation" }
+            it.getLong(0)
+        }
+
+    private fun exportTable(db: SQLiteDatabase, table: String): ByteArray {
+        requireSafeIdentifier(table)
+        val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(
+                    Triple(cursor.getString(1), cursor.getInt(5), cursor.getInt(0)),
+                )
+            }
+        }
+        require(columns.isNotEmpty()) { "Missing table: $table" }
+        val primary = columns.filter { it.second > 0 }.sortedBy { it.second }.map { it.first }
+        val order = if (primary.isNotEmpty()) {
+            primary.joinToString(",") { "`$it`" }
+        } else {
+            "rowid"
+        }
+        val output = StringBuilder()
+        db.rawQuery("SELECT * FROM `$table` ORDER BY $order", null).use { cursor ->
+            while (cursor.moveToNext()) {
+                val row = JSONObject()
+                for (index in 0 until cursor.columnCount) {
+                    row.put(cursor.getColumnName(index), encodeCursorValue(cursor, index))
+                }
+                output.append(row.toString()).append('\n')
+            }
+        }
+        return output.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    private fun rowCount(bytes: ByteArray): Int {
+        if (bytes.isEmpty()) return 0
+        var count = 0
+        bytes.forEach { if (it == '\n'.code.toByte()) count++ }
+        return count
+    }
+
+    private fun encodeCursorValue(cursor: Cursor, index: Int): Any =
+        when (cursor.getType(index)) {
+            Cursor.FIELD_TYPE_NULL -> JSONObject.NULL
+            Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(index)
+            Cursor.FIELD_TYPE_FLOAT -> {
+                val value = cursor.getDouble(index)
+                if (value.isFinite()) value
+                else JSONObject().put("\$real", value.toString())
+            }
+            Cursor.FIELD_TYPE_STRING -> cursor.getString(index)
+            Cursor.FIELD_TYPE_BLOB -> JSONObject().put(
+                "\$base64",
+                Base64.encodeToString(cursor.getBlob(index), Base64.NO_WRAP),
+            )
+            else -> error("Unsupported SQLite value")
+        }
+
+    fun decodeJsonValue(value: Any?): Any? =
+        when (value) {
+            null, JSONObject.NULL -> null
+            is JSONObject -> when {
+                value.has("\$base64") ->
+                    Base64.decode(value.getString("\$base64"), Base64.DEFAULT)
+                value.has("\$real") -> when (value.getString("\$real")) {
+                    "NaN" -> Double.NaN
+                    "Infinity" -> Double.POSITIVE_INFINITY
+                    "-Infinity" -> Double.NEGATIVE_INFINITY
+                    else -> error("Invalid encoded real")
+                }
+                else -> error("Unsupported encoded SQLite value")
+            }
+            is Boolean -> if (value) 1L else 0L
+            is Number, is String -> value
+            else -> error("Unsupported JSON value")
+        }
+
+    fun putValue(values: ContentValues, column: String, value: Any?) {
+        when (val decoded = decodeJsonValue(value)) {
+            null -> values.putNull(column)
+            is ByteArray -> values.put(column, decoded)
+            is String -> values.put(column, decoded)
+            is Int -> values.put(column, decoded)
+            is Long -> values.put(column, decoded)
+            is Float -> values.put(column, decoded)
+            is Double -> values.put(column, decoded)
+            is Number -> values.put(column, decoded.toString())
+            else -> error("Unsupported SQLite value for $column")
+        }
+    }
+
+    fun jsonValueEquals(expected: Any?, actual: Any?): Boolean {
+        val left = decodeJsonValue(expected)
+        val right = decodeJsonValue(actual)
+        if (left is ByteArray && right is ByteArray) return left.contentEquals(right)
+        if (left is Number && right is Number) {
+            return runCatching {
+                BigDecimal(left.toString()).compareTo(BigDecimal(right.toString())) == 0
+            }.getOrDefault(left.toDouble() == right.toDouble())
+        }
+        return left == right
+    }
+
+    private fun tablePath(table: String): String {
+        requireSafeIdentifier(table)
+        return "state/tables/$table.jsonl"
+    }
+
+    fun requireSafeIdentifier(value: String) {
+        require(value.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) {
+            "Unsafe database identifier"
+        }
+    }
+
+    private fun appVersion(context: Context): Long =
+        runCatching {
+            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                context.packageManager.getPackageInfo(context.packageName, 0),
+            )
+        }.getOrDefault(0L)
+}
+
+internal object GitPatchEngine {
+    fun apply(context: Context, patchBytes: ByteArray) {
+        val patch = JSONObject(String(patchBytes, Charsets.UTF_8))
+        require(patch.getInt("format_version") == 1) { "Unsupported patch format" }
+        require(patch.getInt("schema_version") == PersonalHubDatabase.SCHEMA_VERSION) {
+            "Patch targets a different database schema"
+        }
+        val operations = patch.getJSONArray("operations")
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            for (i in 0 until operations.length()) applyOperation(db, operations.getJSONObject(i))
+            db.query("PRAGMA foreign_key_check").use {
+                require(!it.moveToFirst()) { "Patch would break database relationships" }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    private fun applyOperation(db: SupportSQLiteDatabase, operation: JSONObject) {
+        val table = operation.getString("table")
+        GitDataFormat.requireSafeIdentifier(table)
+        require(table !in SyncJournal.excluded && table != GitDataTracking.TABLE) {
+            "Patch cannot modify operational table"
+        }
+        val columns = db.query("PRAGMA table_info(`$table`)").use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(
+                    Triple(cursor.getString(1), cursor.getInt(5), cursor.getInt(0)),
+                )
+            }
+        }
+        require(columns.isNotEmpty()) { "Unknown patch table: $table" }
+        val allowed = columns.map { it.first }.toSet()
+        val primary = columns.filter { it.second > 0 }.sortedBy { it.second }.map { it.first }
+        require(primary.isNotEmpty()) { "Patch table has no primary key" }
+
+        val key = operation.getJSONObject("key")
+        require(key.keys().asSequence().toSet() == primary.toSet()) {
+            "Patch key does not match primary key"
+        }
+        val whereArgs = primary.map { GitDataFormat.decodeJsonValue(key.get(it)) }.toTypedArray()
+        val where = primary.joinToString(" AND ") { "`$it`=?" }
+        val current = readRow(db, table, allowed, where, whereArgs)
+        val op = operation.getString("op")
+
+        val expected = operation.optJSONObject("expect")
+        if (expected != null) {
+            require(current != null) { "Patch precondition row is missing" }
+            expected.keys().forEach { column ->
+                require(column in allowed) { "Unknown patch column: $column" }
+                require(GitDataFormat.jsonValueEquals(expected.get(column), current.get(column))) {
+                    "Patch precondition failed for $table.$column"
+                }
+            }
+        }
+
+        when (op) {
+            "insert" -> {
+                require(current == null) { "Patch insert row already exists" }
+                val values = values(operation.getJSONObject("values"), allowed)
+                primary.forEach { column ->
+                    if (!values.containsKey(column)) {
+                        GitDataFormat.putValue(values, column, key.get(column))
+                    }
+                }
+                require(db.insert(table, SQLiteDatabase.CONFLICT_ABORT, values) != -1L) {
+                    "Patch insert failed"
+                }
+            }
+            "update" -> {
+                require(current != null) { "Patch update row is missing" }
+                val payload = operation.getJSONObject("values")
+                primary.forEach { require(!payload.has(it)) { "Patch cannot change a primary key" } }
+                val values = values(payload, allowed)
+                require(values.size() > 0) { "Patch update has no values" }
+                require(db.update(table, SQLiteDatabase.CONFLICT_ABORT, values, where, whereArgs) == 1) {
+                    "Patch update matched an unexpected number of rows"
+                }
+            }
+            "delete" -> {
+                require(current != null) { "Patch delete row is missing" }
+                require(db.delete(table, where, whereArgs) == 1) {
+                    "Patch delete matched an unexpected number of rows"
+                }
+            }
+            else -> error("Unsupported patch operation: $op")
+        }
+    }
+
+    private fun values(source: JSONObject, allowed: Set<String>): ContentValues =
+        ContentValues().also { values ->
+            source.keys().forEach { column ->
+                require(column in allowed) { "Unknown patch column: $column" }
+                GitDataFormat.putValue(values, column, source.get(column))
+            }
+        }
+
+    private fun readRow(
+        db: SupportSQLiteDatabase,
+        table: String,
+        columns: Set<String>,
+        where: String,
+        args: Array<Any?>,
+    ): JSONObject? {
+        val ordered = columns.sorted()
+        return db.query(
+            "SELECT ${ordered.joinToString(",") { "`$it`" }} FROM `$table` WHERE $where LIMIT 2",
+            args,
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val row = JSONObject()
+            for (i in ordered.indices) row.put(ordered[i], encodeSupportValue(cursor, i))
+            require(!cursor.moveToNext()) { "Patch key is not unique" }
+            row
+        }
+    }
+
+    private fun encodeSupportValue(cursor: Cursor, index: Int): Any =
+        when (cursor.getType(index)) {
+            Cursor.FIELD_TYPE_NULL -> JSONObject.NULL
+            Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(index)
+            Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(index)
+            Cursor.FIELD_TYPE_STRING -> cursor.getString(index)
+            Cursor.FIELD_TYPE_BLOB -> JSONObject().put(
+                "\$base64",
+                Base64.encodeToString(cursor.getBlob(index), Base64.NO_WRAP),
+            )
+            else -> error("Unsupported SQLite value")
+        }
+}
+
+internal object GitStateRestorer {
+    fun restore(
+        context: Context,
+        transport: GitHubDataTransport,
+        revision: String,
+    ) {
+        require(revision.matches(Regex("[A-Fa-f0-9]{7,40}|[A-Za-z0-9._/-]+"))) {
+            "Invalid Git revision"
+        }
+        val manifestBytes = transport.readFile(GIT_STATE_MANIFEST, revision)
+        val manifest = JSONObject(String(manifestBytes, Charsets.UTF_8))
+        require(manifest.getInt("format_version") == 1) { "Unsupported state format" }
+        val schemaVersion = manifest.getInt("schema_version")
+        require(schemaVersion in 1..PersonalHubDatabase.SCHEMA_VERSION) {
+            "The selected revision uses a newer unsupported schema"
+        }
+        val stage = File(context.cacheDir, "personalhub-git-restore-${UUID.randomUUID()}.db")
+        try {
+            createDatabaseForSchema(context, stage, schemaVersion)
+            populate(context, transport, revision, manifest, stage)
+            if (schemaVersion < PersonalHubDatabase.SCHEMA_VERSION) {
+                PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
+                    try {
+                        temporary.openHelper.writableDatabase
+                    } finally {
+                        temporary.close()
+                    }
+                }
+            }
+            DatabaseVault.validate(context, stage)
+            DatabaseVault.importDatabaseFile(context, stage)
+        } finally {
+            stage.delete()
+            listOf("-wal", "-shm", "-journal").forEach { File(stage.path + it).delete() }
+        }
+    }
+
+    private fun createDatabaseForSchema(context: Context, target: File, version: Int) {
+        if (target.exists()) target.delete()
+        val schema = JSONObject(
+            context.assets.open(
+                "com.gernalix.personalhub.core.database.PersonalHubDatabase/$version.json",
+            ).bufferedReader().use { it.readText() },
+        ).getJSONObject("database")
+        SQLiteDatabase.openOrCreateDatabase(target, null).use { db ->
+            db.execSQL("PRAGMA foreign_keys=OFF")
+            val entities = schema.getJSONArray("entities")
+            for (i in 0 until entities.length()) {
+                val entity = entities.getJSONObject(i)
+                val table = entity.getString("tableName")
+                db.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
+            }
+            for (i in 0 until entities.length()) {
+                val entity = entities.getJSONObject(i)
+                val table = entity.getString("tableName")
+                val indices = entity.optJSONArray("indices") ?: JSONArray()
+                for (j in 0 until indices.length()) {
+                    db.execSQL(
+                        indices.getJSONObject(j).getString("createSql")
+                            .replace("\${TABLE_NAME}", table),
+                    )
+                }
+            }
+            val views = schema.optJSONArray("views") ?: JSONArray()
+            for (i in 0 until views.length()) {
+                db.execSQL(views.getJSONObject(i).getString("createSql"))
+            }
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS room_master_table " +
+                    "(id INTEGER PRIMARY KEY,identity_hash TEXT)",
+            )
+            db.execSQL(
+                "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42,?)",
+                arrayOf(schema.getString("identityHash")),
+            )
+            db.version = version
+            runCatching {
+                db.execSQL("INSERT OR IGNORE INTO hub_generation(id,generation) VALUES(1,0)")
+            }
+        }
+    }
+
+    private fun populate(
+        context: Context,
+        transport: GitHubDataTransport,
+        revision: String,
+        manifest: JSONObject,
+        target: File,
+    ) {
+        val generation = manifest.getLong("generation")
+        val tables = manifest.getJSONArray("tables")
+        SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.execSQL("PRAGMA foreign_keys=OFF")
+            db.beginTransaction()
+            try {
+                for (i in 0 until tables.length()) {
+                    val entry = tables.getJSONObject(i)
+                    val table = entry.getString("name")
+                    GitDataFormat.requireSafeIdentifier(table)
+                    val bytes = transport.readFile(entry.getString("path"), revision)
+                    require(GitDataFormat.sha256(bytes) == entry.getString("sha256")) {
+                        "State file hash mismatch: $table"
+                    }
+                    importTable(db, table, bytes)
+                }
+                runCatching {
+                    db.execSQL(
+                        "INSERT OR REPLACE INTO hub_generation(id,generation) VALUES(1,?)",
+                        arrayOf(generation),
+                    )
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+            db.execSQL("PRAGMA foreign_keys=ON")
+            db.rawQuery("PRAGMA foreign_key_check", null).use {
+                require(!it.moveToFirst()) { "Restored state has invalid relationships" }
+            }
+            db.rawQuery("PRAGMA quick_check", null).use {
+                require(it.moveToFirst() && it.getString(0) == "ok") {
+                    "Restored database failed integrity check"
+                }
+            }
+        }
+    }
+
+    private fun importTable(db: SQLiteDatabase, table: String, bytes: ByteArray) {
+        val allowed = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
+            buildSet {
+                while (cursor.moveToNext()) add(cursor.getString(1))
+            }
+        }
+        require(allowed.isNotEmpty()) { "State references a table absent from its schema: $table" }
+        String(bytes, Charsets.UTF_8).lineSequence().filter { it.isNotBlank() }.forEach { line ->
+            val row = JSONObject(line)
+            val values = ContentValues()
+            row.keys().forEach { column ->
+                require(column in allowed) { "State contains unknown column: $table.$column" }
+                GitDataFormat.putValue(values, column, row.get(column))
+            }
+            db.insertOrThrow(table, null, values)
+        }
+    }
+}
