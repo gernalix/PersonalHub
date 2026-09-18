@@ -236,4 +236,10 @@
     <string name="git_history_stats_value_lifetime">Average field-value lifetime: %1$d hours</string>
     <string name="git_history_restore_date">Jump to date (YYYY-MM-DD)</string>
     <string name="git_history_restore_date_action">Load state at end of date</string>
+    <string name="git_history_all_operations">All ops</string>
+    <string name="git_history_bisect_title">Narrow a data regression</string>
+    <string name="git_history_bisect_description">Choose a table above and a known-good / known-bad date to list every semantic edit that could have introduced the change.</string>
+    <string name="git_history_known_good">Known good date (YYYY-MM-DD)</string>
+    <string name="git_history_known_bad">Known bad date (YYYY-MM-DD)</string>
+    <string name="git_history_bisect_action">Find suspect edits</string>
 </resources>
