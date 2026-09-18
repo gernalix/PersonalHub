@@ -26,6 +26,17 @@ object GitDataTracking {
 
     val operationalTables = setOf(TABLE, EVENTS_TABLE, CONTEXT_TABLE, APPLIED_PATCHES_TABLE)
 
+    // Current-state restore still includes these tables, but their churn is implementation detail,
+    // not a semantic user edit. In particular, Timer snapshot JSON would make history enormous.
+    private val semanticEventExcluded = setOf(
+        "snapshot",
+        "snapshot_history",
+        "snapshot_payloads",
+        "audit_events",
+        "integrity_stats",
+        "ui_prefs_mirror",
+    )
+
     fun tables(db: SupportSQLiteDatabase): List<String> =
         SyncJournal.tables(db).filterNot { it in operationalTables }
 
@@ -57,9 +68,11 @@ object GitDataTracking {
         val before = if (op == "INSERT") "NULL" else encodedPayload(columns, "OLD.")
         val after = if (op == "DELETE") "NULL" else encodedPayload(columns, "NEW.")
         val columnCsv = columns.joinToString(",").replace("'", "''")
-        return "CREATE TRIGGER `hub_git_dirty_${table}_$op` AFTER $op ON `$table` BEGIN " +
+        val dirty = "CREATE TRIGGER `hub_git_dirty_${table}_$op` AFTER $op ON `$table` BEGIN " +
             "INSERT OR IGNORE INTO $TABLE(table_name,revision) VALUES ('$table',0); " +
-            "UPDATE $TABLE SET revision=revision+1 WHERE table_name='$table'; " +
+            "UPDATE $TABLE SET revision=revision+1 WHERE table_name='$table'; "
+        if (table in semanticEventExcluded) return dirty + "END"
+        return dirty +
             "INSERT INTO $EVENTS_TABLE(" +
             "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,columns,before_payload,after_payload" +
             ") VALUES(" +
