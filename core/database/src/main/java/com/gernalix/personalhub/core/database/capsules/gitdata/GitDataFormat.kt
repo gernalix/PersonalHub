@@ -401,6 +401,8 @@ internal object GitStateRestorer {
         context: Context,
         transport: GitHubDataTransport,
         revision: String,
+        control: JSONObject?,
+        controlRef: String,
     ) {
         require(revision.matches(Regex("[A-Fa-f0-9]{7,40}|[A-Za-z0-9._/-]+"))) {
             "Invalid Git revision"
@@ -417,11 +419,28 @@ internal object GitStateRestorer {
             createDatabaseForSchema(context, stage, schemaVersion)
             populate(context, transport, revision, manifest, stage)
             if (schemaVersion < PersonalHubDatabase.SCHEMA_VERSION) {
-                PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
-                    try {
-                        temporary.openHelper.writableDatabase
-                    } finally {
-                        temporary.close()
+                if (GitRemoteMigrationEngine.canMigrate(
+                        control,
+                        schemaVersion,
+                        PersonalHubDatabase.SCHEMA_VERSION,
+                    )
+                ) {
+                    GitRemoteMigrationEngine.migrate(
+                        context = context,
+                        transport = transport,
+                        ref = controlRef,
+                        control = requireNotNull(control),
+                        file = stage,
+                        from = schemaVersion,
+                        to = PersonalHubDatabase.SCHEMA_VERSION,
+                    )
+                } else {
+                    PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
+                        try {
+                            temporary.openHelper.writableDatabase
+                        } finally {
+                            temporary.close()
+                        }
                     }
                 }
             }
