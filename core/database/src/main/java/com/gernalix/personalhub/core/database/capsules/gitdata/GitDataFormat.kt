@@ -103,6 +103,10 @@ internal object GitDataFormat {
                     .put("generation", generation)
                     .put("created_at_ms", System.currentTimeMillis())
                     .put(
+                        "applied_patches",
+                        JSONArray(GitDataSettings.appliedPatchIds(context).sorted()),
+                    )
+                    .put(
                         "tables",
                         JSONArray().apply {
                             entries.toSortedMap().values.forEach(::put)
