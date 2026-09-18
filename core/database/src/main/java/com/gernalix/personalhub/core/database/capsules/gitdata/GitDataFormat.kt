@@ -457,7 +457,13 @@ internal object GitPatchEngine {
         val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
         db.beginTransaction()
         try {
-            GitDataTracking.setEditContext(db, author, patchId)
+            GitDataTracking.setEditContext(
+                db = db,
+                author = author,
+                source = "remote_patch",
+                reason = patch.optString("reason").takeIf { it.isNotBlank() },
+                groupId = patchId,
+            )
             for (i in 0 until operations.length()) applyOperation(db, operations.getJSONObject(i))
             db.query("PRAGMA foreign_key_check").use {
                 require(!it.moveToFirst()) { "Patch would break database relationships" }
