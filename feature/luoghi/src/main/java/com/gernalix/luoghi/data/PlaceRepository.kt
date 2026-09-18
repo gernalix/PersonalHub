@@ -155,13 +155,24 @@ class PlaceRepository(
     suspend fun recoverInterruptedCheckInAttempts(): Int {
         val stale = dao.inProgressCheckInAttempts()
         stale.forEach { attempt ->
+            val priorErrorCode = attempt.errorCode?.takeIf { it.isNotBlank() }
+            val interruptedStage = when {
+                attempt.stage.startsWith("AMBIGUOUS") -> "AMBIGUOUS_INTERRUPTED"
+                attempt.stage.startsWith("NO_MATCH") -> "NO_MATCH_INTERRUPTED"
+                else -> "RECOVERY"
+            }
+            val interruptedMessage = when (priorErrorCode) {
+                "AMBIGUOUS_MATCH" -> "Ambiguous check-in interrupted before place selection"
+                "NO_MATCH" -> "No-match check-in interrupted before completion"
+                else -> "Attempt interrupted before completion"
+            }
             dao.upsertCheckInAttempt(
                 attempt.copy(
                     finishedAt = attempt.finishedAt ?: System.currentTimeMillis(),
-                    stage = "RECOVERY",
+                    stage = interruptedStage,
                     outcome = CheckInAttemptOutcomes.INTERRUPTED,
-                    errorCode = "PROCESS_INTERRUPTED",
-                    errorMessage = "Attempt interrupted before completion",
+                    errorCode = priorErrorCode ?: "PROCESS_INTERRUPTED",
+                    errorMessage = interruptedMessage,
                 )
             )
         }
