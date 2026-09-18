@@ -23,6 +23,9 @@ import com.example.multitimetracker.model.TimeFenceScope
 import com.example.multitimetracker.model.TimeFenceTrigger
 import com.gernalix.personalhub.core.alerts.AlertLinkPolicy
 import com.gernalix.personalhub.core.alerts.AlertNotificationDispatcher
+import com.gernalix.personalhub.core.alerts.AlertDomain
+import com.gernalix.personalhub.core.alerts.AlertFire
+import com.gernalix.personalhub.core.alerts.AlertTaskerBridge
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
@@ -562,6 +565,24 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
                 val title = match.title
 
                 if (!showInAppPrompt(r.id, ev.sessionId, title, r.message, nowMs)) continue
+                getContext()?.let { context ->
+                    AlertTaskerBridge.emit(
+                        context,
+                        AlertFire(
+                            ruleId = r.id.toString(),
+                            domain = AlertDomain.TIMER,
+                            trigger = when (ev.trigger) {
+                                TimeFenceTrigger.ON_START -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_START
+                                TimeFenceTrigger.ON_STOP -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_STOP
+                            },
+                            entityId = ev.sessionId.toString(),
+                            tagIds = ev.sessionTagIds.mapTo(linkedSetOf()) { it.toString() },
+                            title = title,
+                            message = r.message,
+                            firedAtMs = nowMs,
+                        ),
+                    )
+                }
                 logSystemEvent(
                     "ALERT_FIRED",
                     "TIME_FENCE_RULE",
