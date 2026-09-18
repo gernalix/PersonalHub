@@ -115,6 +115,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".DataExplorerActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name="com.supercontacts.app.MainActivity"
             android:exported="false"
             android:launchMode="singleTop"
