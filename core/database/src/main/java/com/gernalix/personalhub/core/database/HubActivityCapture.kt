@@ -186,6 +186,23 @@ object HubActivityCapture {
         if (tableExists(db, "history_audit_log")) installPlacesBridge(db, appVersion)
     }
 
+    fun uninstall(db: SupportSQLiteDatabase) {
+        rowSpecs.forEach { spec ->
+            val base = "hub_activity_" + spec.table
+            listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
+                db.execSQL("DROP TRIGGER IF EXISTS `" + base + "_" + op + "`")
+            }
+        }
+        listOf(
+            "hub_activity_bridge_people",
+            "hub_activity_people_creation_label",
+            "hub_activity_bridge_timer",
+            "hub_activity_bridge_places",
+        ).forEach { trigger ->
+            db.execSQL("DROP TRIGGER IF EXISTS `" + trigger + "`")
+        }
+    }
+
     private fun installRowSpec(db: SupportSQLiteDatabase, spec: RowSpec, appVersion: Long) {
         val columns = columns(db, spec.table)
         if (columns.isEmpty()) return
