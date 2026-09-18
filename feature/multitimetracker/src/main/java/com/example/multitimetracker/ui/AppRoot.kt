@@ -121,6 +121,7 @@ import com.example.multitimetracker.ui.components.AlertPopupHost
 import com.example.multitimetracker.ui.components.DateTimePickerCommitMode
 import com.example.multitimetracker.ui.components.LocalOpenAppMenu
 import com.example.multitimetracker.ui.components.MttDateTimePickerDialog
+import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -142,6 +143,7 @@ private enum class DrawerDestination {
     IMPORT,
     EXPORT,
     STATISTICS,
+    DATA_EXPLORER,
     SETTINGS,
     INFO
 }
@@ -662,6 +664,7 @@ if (developerSurfaceEnabled && showDevReport) {
                 DrawerItemSpec(DrawerDestination.IMPORT, R.string.cd_import, Icons.Filled.CloudDownload),
                 DrawerItemSpec(DrawerDestination.EXPORT, R.string.cd_export, Icons.Filled.CloudUpload),
                 DrawerItemSpec(DrawerDestination.STATISTICS, R.string.statistics, Icons.Filled.Assessment),
+                DrawerItemSpec(DrawerDestination.DATA_EXPLORER, R.string.data_explorer, Icons.Filled.Storage),
                 DrawerItemSpec(DrawerDestination.SETTINGS, R.string.cd_settings, Icons.Filled.Settings),
                 DrawerItemSpec(DrawerDestination.INFO, R.string.drawer_info, Icons.Filled.Info)
             )
@@ -717,6 +720,8 @@ if (developerSurfaceEnabled && showDevReport) {
             DrawerDestination.IMPORT, DrawerDestination.EXPORT ->
                 com.gernalix.personalhub.core.database.DatabaseNavigation.open(context)
             DrawerDestination.STATISTICS -> showStatistics = true
+            DrawerDestination.DATA_EXPLORER ->
+                context.startActivity(DataExplorerContract.intent(context.packageName, "sessions"))
             DrawerDestination.SETTINGS -> showSettings = true
             DrawerDestination.INFO -> showInfo = true
         }
