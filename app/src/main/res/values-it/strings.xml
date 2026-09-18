@@ -229,4 +229,5 @@
     <string name="git_history_revert_preview_safe">Controllo sandbox superato: questo ripristino è attualmente applicabile.</string>
     <string name="git_history_revert_preview_blocked">Il controllo sandbox ha bloccato il ripristino: %1$s</string>
     <string name="git_data_sync_pending_patches">Patch verificate in attesa di revisione in Cronologia: %1$s</string>
+    <string name="temporal_git_history">Modifiche dati</string>
 </resources>
