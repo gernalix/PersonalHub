@@ -304,8 +304,18 @@ object DatabaseVault {
                             SyncJournal.trigger(table, keys, op, legacy = db.version == 3)
                         }
                         "hub_git_dirty_${table}_$op" -> {
-                            require(table != GitDataTracking.TABLE && table !in SyncJournal.excluded)
-                            GitDataTracking.trigger(table, op)
+                            require(table !in GitDataTracking.operationalTables && table !in SyncJournal.excluded)
+                            val columns = GitDataTracking.columns(db, table)
+                            val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columnsCursor ->
+                                buildList {
+                                    while (columnsCursor.moveToNext()) {
+                                        if (columnsCursor.getInt(5) > 0) {
+                                            add(columnsCursor.getInt(5) to columnsCursor.getString(1))
+                                        }
+                                    }
+                                }.sortedBy { it.first }.map { it.second }
+                            }
+                            GitDataTracking.trigger(table, columns, keys, op)
                         }
                         else -> error("Unexpected database trigger: $name")
                     }
