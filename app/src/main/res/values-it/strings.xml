@@ -233,4 +233,6 @@
     <string name="git_history_stats_tables">Tabelle: %1$s</string>
     <string name="git_history_stats_year">Modifiche quest’anno: %1$d</string>
     <string name="git_history_stats_value_lifetime">Durata media del valore di un campo: %1$d ore</string>
+    <string name="git_history_restore_date">Vai alla data (AAAA-MM-GG)</string>
+    <string name="git_history_restore_date_action">Carica stato a fine giornata</string>
 </resources>
