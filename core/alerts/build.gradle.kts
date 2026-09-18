@@ -17,4 +17,6 @@ dependencies {
     implementation(project(":core:database"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)\n    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
