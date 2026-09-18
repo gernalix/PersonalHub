@@ -1,5 +1,6 @@
 package com.gernalix.personalhub
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -219,6 +220,7 @@ class DataExplorerActivity : ComponentActivity() {
         return "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/assets/datasette-lite/index.html?url=${Uri.encode(databaseUrl)}"
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     @Composable
     private fun ExplorerWebView(
         url: String,
