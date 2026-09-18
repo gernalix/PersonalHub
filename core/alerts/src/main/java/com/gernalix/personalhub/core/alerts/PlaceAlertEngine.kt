@@ -29,7 +29,8 @@ class PlaceAlertEngine(
         if (rules.isEmpty()) return 0
 
         val place = database.placeDao().getPlace(placeUuid) ?: return 0
-        val actualTagIds = database.placeDao().tagIdsForPlace(placeUuid).mapTo(linkedSetOf()) { it.toString() }
+        val actualTags = database.placeDao().tagsForPlace(placeUuid)
+        val actualTagIds = actualTags.mapTo(linkedSetOf()) { it.id.toString() }
         val tagTargets = alertDao.placeTagTargets(rules.map { it.id })
             .groupBy { it.ruleId }
             .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.placeTagId.toString() } }
@@ -64,6 +65,7 @@ class PlaceAlertEngine(
                 trigger = eventTrigger,
                 entityId = placeUuid,
                 tagIds = actualTagIds,
+                tagNames = actualTags.mapTo(linkedSetOf()) { it.name },
                 title = place.nickname.takeIf { it.isNotBlank() } ?: "Places",
                 message = rule.message,
                 firedAtMs = firedAtMs,
