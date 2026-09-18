@@ -23,3 +23,17 @@ The technical `personalhub.personalhub_entities` envelope remains separate from 
 ## Writes
 
 Arbitrary Datasette SQL writes are intentionally unsupported. Any future mutation exposed from a Datasette view must call a PersonalHub-owned mutation API so validation, sync journaling, Activity logging and undo remain intact.
+
+
+## Module entry points
+
+Feature modules open the explorer through `DataExplorerContract` in `:contracts:database`; they do not depend on `DataExplorerActivity` or WebView code. The default contextual tables are:
+
+- People → `contacts`
+- Timer → `sessions`
+- Places → `places`
+- Substances → `substances`
+- WordPulse → `word_entries`
+- Soldi → `finance_transactions`
+
+Datasette Lite receives the table as a fragment route after the local snapshot is loaded. Remote mode appends the same validated table name below `personalhub_read`.
