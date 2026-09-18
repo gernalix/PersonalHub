@@ -115,7 +115,7 @@ object GitDataSync {
                 message = "PersonalHub data generation ${bundle.generation}",
                 expectedHead = head,
             )
-            GitDataFormat.acknowledge(app, bundle)
+            GitDataFormat.acknowledge(app, bundle, revision)
             GitDataSettings.markPushed(app, bundle.generation, revision)
         } catch (error: Throwable) {
             GitDataSettings.recordError(app, error)
@@ -260,6 +260,7 @@ object GitDataSync {
     private fun installTracking(context: Context, enqueueAll: Boolean) {
         DatabaseGate.access {
             val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+            GitHistoryStore.install(db)
             GitDataTracking.install(db, enqueueAll)
         }
     }
