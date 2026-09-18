@@ -335,7 +335,11 @@ object GitDataSync {
         transport: GitHubDataTransport,
         ref: String,
     ): JSONObject? {
-        val bytes = transport.readFileOrNull(GIT_CONTROL_MANIFEST, ref) ?: return null
+        val bytes = transport.readFileOrNull(GIT_CONTROL_MANIFEST, ref)
+        if (bytes == null) {
+            GitDataSettings.recordPendingPatches(context, emptyList())
+            return null
+        }
         val control = JSONObject(String(bytes, Charsets.UTF_8))
         validateControl(control)
         val appVersion = appVersion(context)
@@ -350,6 +354,7 @@ object GitDataSync {
         }
 
         val applied = GitDataSettings.appliedPatchIds(context)
+        val pending = mutableListOf<String>()
         val patches = control.optJSONArray("patches") ?: JSONArray()
         for (i in 0 until patches.length()) {
             val spec = patches.getJSONObject(i)
@@ -365,9 +370,12 @@ object GitDataSync {
             }
             val document = JSONObject(String(patchBytes, Charsets.UTF_8))
             require(document.getString("patch_id") == id) { "Patch id mismatch" }
-            GitPatchEngine.apply(context, patchBytes)
-            GitDataSettings.markPatchApplied(context, id)
+            require(document.getInt("schema_version") == PersonalHubDatabase.SCHEMA_VERSION) {
+                "Patch targets a different database schema"
+            }
+            pending += id
         }
+        GitDataSettings.recordPendingPatches(context, pending)
         return control
     }
 
@@ -378,7 +386,8 @@ object GitDataSync {
             val item = migrations.getJSONObject(i)
             require(item.getInt("from") < item.getInt("to")) { "Invalid migration edge" }
             require(item.getString("sha256").matches(Regex("[A-Fa-f0-9]{64}"))) {
-                "Invalid migration hash"            }
+                "Invalid migration hash"
+            }
             require(item.getString("path").startsWith("migrations/")) {
                 "Migration must live under migrations/"
             }
