@@ -127,7 +127,8 @@ object AlertNotificationDispatcher {
 }
 
 /**
- * Optional Tasker bridge. It is not part of matching or persistence and is disabled by default.
+ * Optional Tasker bridge. PH has no Tasker dependency: the explicit broadcast is inert unless the
+ * user has Tasker installed and creates a profile for ACTION_ALERT_FIRED.
  */
 object AlertTaskerBridge {
     const val ACTION_ALERT_FIRED = "com.gernalix.personalhub.ALERT_FIRED"
