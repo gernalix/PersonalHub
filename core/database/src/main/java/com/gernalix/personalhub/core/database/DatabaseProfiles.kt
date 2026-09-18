@@ -26,6 +26,8 @@ object DatabaseProfiles {
     private const val PREFS = "personalhub_profiles"
     private const val KEY_ACTIVE = "active_profile"
     private const val KEY_PROFILES = "profiles_json"
+    private const val KEY_PENDING_FROM = "pending_switch_from"
+    private const val KEY_PENDING_TO = "pending_switch_to"
     private const val PROFILE_DIR = "database-profiles"
 
     private fun prefs(context: Context) =
@@ -153,13 +155,54 @@ object DatabaseProfiles {
             ?: error("Unknown profile")
         val targetFile = databaseFile(context, target.id)
         require(targetFile.isFile) { "Profile database is missing" }
-        DatabaseVault.switchProfileDatabase(
-            context = context,
-            currentProfileFile = databaseFile(context, currentId),
-            targetProfileFile = targetFile,
+        check(
+            prefs(context).edit()
+                .putString(KEY_PENDING_FROM, currentId)
+                .putString(KEY_PENDING_TO, target.id)
+                .commit(),
         )
-        check(prefs(context).edit().putString(KEY_ACTIVE, target.id).commit())
-        return true
+        try {
+            DatabaseVault.switchProfileDatabase(
+                context = context,
+                currentProfileFile = databaseFile(context, currentId),
+                targetProfileFile = targetFile,
+            )
+            clearPendingSwitch(context)
+            return true
+        } catch (error: Throwable) {
+            rollbackPendingSwitch(context)
+            throw error
+        }
+    }
+
+    /**
+     * Called only after the target DB is mounted and validated, while the import marker still
+     * exists. If the process dies before that marker is retired, startup recovery restores the
+     * previous DB and rollbackPendingSwitch() restores the previous active profile id as well.
+     */
+    @Synchronized
+    internal fun markPendingTargetActive(context: Context) {
+        val target = prefs(context).getString(KEY_PENDING_TO, null) ?: return
+        check(prefs(context).edit().putString(KEY_ACTIVE, target).commit())
+    }
+
+    @Synchronized
+    internal fun rollbackPendingSwitch(context: Context) {
+        val prefs = prefs(context)
+        val from = prefs.getString(KEY_PENDING_FROM, null)
+        val edit = prefs.edit()
+        if (!from.isNullOrBlank()) edit.putString(KEY_ACTIVE, from)
+        check(edit.remove(KEY_PENDING_FROM).remove(KEY_PENDING_TO).commit())
+    }
+
+    @Synchronized
+    private fun clearPendingSwitch(context: Context) {
+        check(
+            prefs(context).edit()
+                .remove(KEY_PENDING_FROM)
+                .remove(KEY_PENDING_TO)
+                .commit(),
+        )
     }
 
     @Synchronized
