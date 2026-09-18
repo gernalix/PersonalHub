@@ -46,10 +46,17 @@ object DatabaseGate {
     ) {
         val currentDepth = transactionDepth.get() ?: 0
         val currentMutatingDepth = mutatingTransactionDepth.get() ?: 0
+        var bookkeepingError: Throwable? = null
         if (currentDepth == 1 && currentMutatingDepth > 0) {
-            beforeOutermostMutatingEnd?.invoke()
+            try {
+                beforeOutermostMutatingEnd?.invoke()
+            } catch (error: Throwable) {
+                bookkeepingError = error
+            }
         }
-        try { block() } finally {
+        try {
+            block()
+        } finally {
             val depth = currentDepth - 1
             transactionDepth.set(depth.coerceAtLeast(0))
             if (currentMutatingDepth > 0) {
@@ -58,6 +65,7 @@ object DatabaseGate {
             lock.unlock()
             if (depth <= 0 && currentMutatingDepth > 0) afterMutation()
         }
+        bookkeepingError?.let { throw it }
     }
     fun <T> mutate(block: () -> T): T {
         return try { access(block) } finally { if ((transactionDepth.get() ?: 0) == 0) afterMutation() }
