@@ -45,6 +45,7 @@ fun PlaceAlertsDialog(
     rules: List<AlertRuleEntity>,
     tagTargets: Map<String, Set<Long>>,
     onCreate: (PlaceAlertDraft) -> Unit,
+    onUpdate: (String, PlaceAlertDraft) -> Unit,
     onDelete: (String) -> Unit,
     onSetEnabled: (String, Boolean) -> Unit,
     onDismiss: () -> Unit,
@@ -55,8 +56,34 @@ fun PlaceAlertsDialog(
     var selectedTagIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var matchMode by remember { mutableStateOf(AlertMatchMode.ALL) }
     var scope by remember { mutableStateOf(AlertScope.ALWAYS) }
+    var editingRuleId by remember { mutableStateOf<String?>(null) }
 
-    val visibleRules = rules.filter { it.deletedAt == null }
+    fun clearEditor() {
+        message = ""
+        trigger = AlertTrigger.PLACE_CHECK_IN
+        targetKind = AlertTargetKind.ENTITY
+        selectedTagIds = emptySet()
+        matchMode = AlertMatchMode.ALL
+        scope = AlertScope.ALWAYS
+        editingRuleId = null
+    }
+
+    fun edit(rule: AlertRuleEntity) {
+        message = rule.message
+        trigger = runCatching { AlertTrigger.valueOf(rule.trigger) }.getOrDefault(AlertTrigger.PLACE_CHECK_IN)
+        targetKind = runCatching { AlertTargetKind.valueOf(rule.targetKind) }.getOrDefault(AlertTargetKind.ENTITY)
+        selectedTagIds = tagTargets[rule.id].orEmpty()
+        matchMode = runCatching { AlertMatchMode.valueOf(rule.matchMode) }.getOrDefault(AlertMatchMode.ALL)
+        scope = runCatching { AlertScope.valueOf(rule.scope) }.getOrDefault(AlertScope.ALWAYS)
+        editingRuleId = rule.id
+    }
+
+    val visibleRules = rules.filter { rule ->
+        rule.deletedAt == null && (
+            rule.targetKind == AlertTargetKind.TAGS.name ||
+                (rule.targetKind == AlertTargetKind.ENTITY.name && rule.entityId == placeId)
+            )
+    }
     val canSave = message.trim().isNotEmpty() &&
         (targetKind == AlertTargetKind.ENTITY || selectedTagIds.isNotEmpty())
 
@@ -167,11 +194,11 @@ fun PlaceAlertsDialog(
                     )
                 }
 
-                TextButton(
-                    enabled = canSave,
-                    onClick = {
-                        onCreate(
-                            PlaceAlertDraft(
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        enabled = canSave,
+                        onClick = {
+                            val draft = PlaceAlertDraft(
                                 message = message,
                                 trigger = trigger,
                                 targetKind = targetKind,
@@ -180,11 +207,26 @@ fun PlaceAlertsDialog(
                                 matchMode = matchMode,
                                 scope = scope,
                             )
+                            val editingId = editingRuleId
+                            if (editingId == null) {
+                                onCreate(draft)
+                            } else {
+                                onUpdate(editingId, draft)
+                            }
+                            clearEditor()
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (editingRuleId == null) R.string.place_alert_add else R.string.place_alert_update
+                            )
                         )
-                        message = ""
-                    },
-                ) {
-                    Text(stringResource(R.string.place_alert_add))
+                    }
+                    if (editingRuleId != null) {
+                        TextButton(onClick = ::clearEditor) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
                 }
 
                 if (visibleRules.isNotEmpty()) {
@@ -194,6 +236,7 @@ fun PlaceAlertsDialog(
                             rule = rule,
                             tags = tags,
                             tagIds = tagTargets[rule.id].orEmpty(),
+                            onEdit = { edit(rule) },
                             onDelete = { onDelete(rule.id) },
                             onSetEnabled = { onSetEnabled(rule.id, it) },
                         )
@@ -212,6 +255,7 @@ private fun PlaceAlertRuleCard(
     rule: AlertRuleEntity,
     tags: List<PlaceTagEntity>,
     tagIds: Set<Long>,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSetEnabled: (Boolean) -> Unit,
 ) {
@@ -220,6 +264,12 @@ private fun PlaceAlertRuleCard(
         stringResource(R.string.place_alert_specific_place)
     } else {
         tagNames.joinToString(", ").ifBlank { stringResource(R.string.place_tags) }
+    }
+    val triggerLabel = when (runCatching { AlertTrigger.valueOf(rule.trigger) }.getOrNull()) {
+        AlertTrigger.PLACE_CHECK_IN -> stringResource(R.string.checkin_button)
+        AlertTrigger.PLACE_CHECK_OUT -> stringResource(R.string.checkout_button)
+        AlertTrigger.PLACE_BOTH -> stringResource(R.string.place_alert_both)
+        else -> rule.trigger
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -235,14 +285,17 @@ private fun PlaceAlertRuleCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(rule.message, style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "${rule.trigger} · $target",
+                        "$triggerLabel · $target",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Switch(checked = rule.enabled, onCheckedChange = onSetEnabled)
             }
-            TextButton(onClick = onDelete) { Text(stringResource(R.string.delete)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onEdit) { Text(stringResource(R.string.place_alert_edit)) }
+                TextButton(onClick = onDelete) { Text(stringResource(R.string.delete)) }
+            }
         }
     }
 }
