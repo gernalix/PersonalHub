@@ -198,4 +198,8 @@
     <string name="git_history_error">Operazione sulla cronologia non riuscita. Nessuna sostituzione del database non verificata è stata accettata.</string>
     <string name="git_data_sync_attention">Push automatico in pausa: un batch insolitamente grande o distruttivo richiede revisione.</string>
     <string name="git_data_sync_force_push">Forza push del batch verificato</string>
+    <string name="git_history_view_diff">Vedi prima / dopo</string>
+    <string name="git_history_diff_columns">Colonne modificate: %1$s</string>
+    <string name="git_history_before">Prima</string>
+    <string name="git_history_after">Dopo</string>
 </resources>
