@@ -142,6 +142,7 @@ object AlertTaskerBridge {
                 putExtra("trigger", fire.trigger.name)
                 putExtra("entity_id", fire.entityId)
                 putExtra("tag_ids", fire.tagIds.toTypedArray())
+                putExtra("tags", fire.tagNames.toTypedArray())
                 putExtra("title", fire.title)
                 putExtra("message", fire.message)
                 putExtra("fired_at_ms", fire.firedAtMs)
