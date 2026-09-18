@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import androidx.sqlite.db.*
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import java.util.concurrent.locks.ReentrantLock
@@ -39,14 +40,23 @@ object DatabaseGate {
         transactionDepth.set((transactionDepth.get() ?: 0) + 1)
         if (mutating) mutatingTransactionDepth.set((mutatingTransactionDepth.get() ?: 0) + 1)
     }
-    fun end(block: () -> Unit) {
+    fun end(
+        beforeOutermostMutatingEnd: (() -> Unit)? = null,
+        block: () -> Unit,
+    ) {
+        val currentDepth = transactionDepth.get() ?: 0
+        val currentMutatingDepth = mutatingTransactionDepth.get() ?: 0
+        if (currentDepth == 1 && currentMutatingDepth > 0) {
+            beforeOutermostMutatingEnd?.invoke()
+        }
         try { block() } finally {
-            val depth = (transactionDepth.get() ?: 0) - 1
-            val mutatingDepth = mutatingTransactionDepth.get() ?: 0
+            val depth = currentDepth - 1
             transactionDepth.set(depth.coerceAtLeast(0))
-            if (mutatingDepth > 0) mutatingTransactionDepth.set(mutatingDepth - 1)
+            if (currentMutatingDepth > 0) {
+                mutatingTransactionDepth.set(currentMutatingDepth - 1)
+            }
             lock.unlock()
-            if (depth <= 0 && mutatingDepth > 0) afterMutation()
+            if (depth <= 0 && currentMutatingDepth > 0) afterMutation()
         }
     }
     fun <T> mutate(block: () -> T): T {
@@ -71,13 +81,23 @@ class GatedOpenHelperFactory : SupportSQLiteOpenHelper.Factory {
 }
 
 private class GatedDatabase(private val delegate: SupportSQLiteDatabase) : SupportSQLiteDatabase by delegate {
-    override fun beginTransaction() = DatabaseGate.begin { delegate.beginTransaction() }
-    override fun beginTransactionNonExclusive() = DatabaseGate.begin { delegate.beginTransactionNonExclusive() }
-    override fun beginTransactionWithListener(transactionListener: android.database.sqlite.SQLiteTransactionListener) = DatabaseGate.begin { delegate.beginTransactionWithListener(transactionListener) }
-    override fun beginTransactionWithListenerNonExclusive(transactionListener: android.database.sqlite.SQLiteTransactionListener) = DatabaseGate.begin { delegate.beginTransactionWithListenerNonExclusive(transactionListener) }
+    private fun beginMutating(block: () -> Unit) = DatabaseGate.begin {
+        block()
+        GitDataTracking.ensureAutomaticEditContext(delegate)
+    }
+
+    override fun beginTransaction() = beginMutating { delegate.beginTransaction() }
+    override fun beginTransactionNonExclusive() = beginMutating { delegate.beginTransactionNonExclusive() }
+    override fun beginTransactionWithListener(transactionListener: android.database.sqlite.SQLiteTransactionListener) =
+        beginMutating { delegate.beginTransactionWithListener(transactionListener) }
+    override fun beginTransactionWithListenerNonExclusive(transactionListener: android.database.sqlite.SQLiteTransactionListener) =
+        beginMutating { delegate.beginTransactionWithListenerNonExclusive(transactionListener) }
     override fun beginTransactionReadOnly() = DatabaseGate.begin(mutating = false) { delegate.beginTransactionReadOnly() }
-    override fun beginTransactionWithListenerReadOnly(transactionListener: android.database.sqlite.SQLiteTransactionListener) = DatabaseGate.begin(mutating = false) { delegate.beginTransactionWithListenerReadOnly(transactionListener) }
-    override fun endTransaction() = DatabaseGate.end { delegate.endTransaction() }
+    override fun beginTransactionWithListenerReadOnly(transactionListener: android.database.sqlite.SQLiteTransactionListener) =
+        DatabaseGate.begin(mutating = false) { delegate.beginTransactionWithListenerReadOnly(transactionListener) }
+    override fun endTransaction() = DatabaseGate.end(
+        beforeOutermostMutatingEnd = { GitDataTracking.clearEditContextIfInstalled(delegate) },
+    ) { delegate.endTransaction() }
     override fun execSQL(sql: String) = DatabaseGate.mutate { delegate.execSQL(sql) }
     override fun execSQL(sql: String, bindArgs: Array<out Any?>) = DatabaseGate.mutate { delegate.execSQL(sql, bindArgs) }
     override fun insert(table: String, conflictAlgorithm: Int, values: ContentValues) = DatabaseGate.mutate { delegate.insert(table, conflictAlgorithm, values) }
