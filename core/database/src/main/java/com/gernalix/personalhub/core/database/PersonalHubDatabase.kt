@@ -4,6 +4,7 @@ import android.content.Context
 import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.capsules.sync.*
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -355,7 +356,14 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                 context.packageManager.getPackageInfo(context.packageName, 0),
                             )
                         }.getOrDefault(0L)
-                        HubActivityCapture.install(db, appVersion)
+                        val gitHistoryEnabled = runCatching {
+                            GitDataSettings.configuration(context).enabled
+                        }.getOrDefault(false)
+                        if (gitHistoryEnabled) {
+                            HubActivityCapture.uninstall(db)
+                        } else {
+                            HubActivityCapture.install(db, appVersion)
+                        }
                         tables.forEach { table ->
                             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
                                 db.execSQL("CREATE TRIGGER IF NOT EXISTS `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END")
