@@ -421,7 +421,7 @@ class HealthRepository(context: Context) {
             ),
             "v_all_health_data" to setOf(
                 "data", "data_ms", "categoria", "esame", "risultato", "unita", "flag",
-                "campione", "tempo_referto_ms", "tempo_referto",
+                "campione", "tempo_referto",
             ),
             "v_test_turnaround" to setOf(
                 "data_prelievo", "data_ms", "categoria", "esame", "ricevuto_ms",
