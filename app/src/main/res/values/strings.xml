@@ -201,4 +201,9 @@
     <string name="git_history_diff_columns">Changed columns: %1$s</string>
     <string name="git_history_before">Before</string>
     <string name="git_history_after">After</string>
+    <string name="git_history_bulk_from_date">Revert from date (YYYY-MM-DD)</string>
+    <string name="git_history_bulk_revert_author">Revert %1$s edits since date…</string>
+    <string name="git_history_bulk_revert_title">Revert this author’s edits?</string>
+    <string name="git_history_bulk_revert_confirm">All non-reverted %1$s edits from %2$s onward will be reversed atomically when possible. Nothing in Git history will be deleted.</string>
+    <string name="git_history_bulk_revert_action">Revert edits</string>
 </resources>
