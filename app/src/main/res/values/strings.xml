@@ -234,4 +234,6 @@
     <string name="git_history_stats_tables">Tables: %1$s</string>
     <string name="git_history_stats_year">Edits this year: %1$d</string>
     <string name="git_history_stats_value_lifetime">Average field-value lifetime: %1$d hours</string>
+    <string name="git_history_restore_date">Jump to date (YYYY-MM-DD)</string>
+    <string name="git_history_restore_date_action">Load state at end of date</string>
 </resources>
