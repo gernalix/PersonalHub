@@ -16,8 +16,13 @@ import javax.crypto.spec.GCMParameterSpec
 
 data class DatasetteConfiguration(val baseUrl: String, val database: String, val table: String, val enabled: Boolean, val hasToken: Boolean)
 
+data class DatasetteExplorerConfiguration(val baseUrl: String, val database: String) {
+    val configured: Boolean get() = baseUrl.isNotBlank() && database.isNotBlank()
+}
+
 /** All connection values are runtime-only, AES-GCM encrypted with a non-exportable Android key. */
 object DatasetteSettings {
+    const val DEFAULT_EXPLORER_DATABASE = "personalhub_read"
     private const val ALIAS = "personalhub.datasette"
     private fun file(context: Context) = AtomicFile(File(context.noBackupFilesDir, "datasette.enc"))
     private fun key(): SecretKey {
@@ -61,6 +66,29 @@ object DatasetteSettings {
         value.put("url", base).put("database", database).put("table", table).put("token", token).put("full", true)
         write(context, value)
     }
+    @Synchronized fun explorerDatabase(context: Context): String =
+        read(context).optString("explorer_database").trim().ifBlank { DEFAULT_EXPLORER_DATABASE }
+
+    @Synchronized fun explorerConfiguration(context: Context): DatasetteExplorerConfiguration {
+        val value = read(context)
+        val base = value.optString("url").trim().trimEnd('/')
+        val database = value.optString("explorer_database").trim().ifBlank { DEFAULT_EXPLORER_DATABASE }
+        return if (validBaseUrl(base) && validName(database)) {
+            DatasetteExplorerConfiguration(base, database)
+        } else {
+            DatasetteExplorerConfiguration("", database)
+        }
+    }
+
+    @Synchronized fun explorerUrl(context: Context): String? =
+        explorerConfiguration(context).takeIf { it.configured }?.let { "${it.baseUrl}/${it.database}/" }
+
+    @Synchronized fun saveExplorerDatabase(context: Context, database: String) {
+        val normalized = database.trim().ifBlank { DEFAULT_EXPLORER_DATABASE }
+        require(validName(normalized)) { "Invalid explorer database" }
+        write(context, read(context).put("explorer_database", normalized))
+    }
+
     @Synchronized fun setEnabled(context: Context, enabled: Boolean) {
         val value = read(context)
         if (enabled) require(configuration(context).let { validBaseUrl(it.baseUrl) && validName(it.database) && validName(it.table) && it.hasToken })
