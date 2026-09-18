@@ -757,6 +757,13 @@ class LuoghiHomeViewModel(
         }
     }
 
+    fun updatePlaceAlert(ruleId: String, draft: PlaceAlertDraft) {
+        viewModelScope.launch {
+            container.alerts.update(ruleId, draft)
+            refreshPlaceAlertDataNow()
+        }
+    }
+
     fun deletePlaceAlert(ruleId: String) {
         viewModelScope.launch {
             container.alerts.delete(ruleId)
