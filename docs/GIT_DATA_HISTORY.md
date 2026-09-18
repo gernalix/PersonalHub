@@ -1,6 +1,6 @@
 # PersonalHub Git Data & History
 
-PersonalHub keeps SQLite as the only writable runtime source of truth. Git is an optional versioned history and transport layer. Git data sync is OFF by default and enabling it requires an HTTPS GitHub repository URL plus an access token. Credentials remain AES-GCM encrypted with Android Keystore and are not written to the database, exports, logs, saved state or BuildConfig.
+PersonalHub keeps SQLite as the only writable runtime source of truth. Git is an optional versioned history and transport layer. Git data sync is OFF by default and enabling it requires an HTTPS GitHub repository URL plus an access token. PH verifies that the selected repository is private and writable before storing the connection. Credentials remain AES-GCM encrypted with Android Keystore and are not written to the database, exports, logs, saved state or BuildConfig.
 
 Use a PRIVATE data repository, preferably separate from the PersonalHub source repository. Git history is deliberately durable: deleting a current value does not erase older committed versions.
 
@@ -16,7 +16,7 @@ Git and network operations never run on the interactive write path. Mutations sc
 
 ## Provenance
 
-History records provenance on the edit rather than adding a last-author column to every domain table. Each event records event id, timestamp, author, source, optional reason and group id, table and typed primary key, operation, changed columns, and complete typed before/after row state.
+History records provenance on the edit rather than adding a last-author column to every domain table. Each event records event id, timestamp, author, source, optional reason and group id, table and typed primary key, operation, changed columns, and complete typed before/after row state. The shared database gate automatically assigns one group id to all writes in the same outer SQLite transaction; explicit ChatGPT/Codex/revert contexts can override that provenance for their transaction.
 
 Typical authors are user, chatgpt, codex and system. Typical sources are ui, remote_patch, history_revert, migration, import and automation. Remote patches default to chatgpt unless they declare another author. Reverts are new edits and never rewrite old history.
 
@@ -82,7 +82,7 @@ The installed APK remains the compatibility boundary: a remote migration cannot 
 
 When Git data sync is enabled, the Home Activity/Registro destination uses global Git History as the user-facing audit/history source.
 
-The platform supports recent edits, filters by author/table/row, record and field blame, statistics, complete PH revision history, table-level and semantic row/field revision diff, granular logical-edit revert with an affected-group preview, complete revision restore, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing, proposal sandbox preview/discard, and patch cherry-pick from proposal refs.
+The platform supports recent edits, filters by author/table/row, record and field blame, statistics, complete PH revision history, table-level and semantic row/field revision diff, granular logical-edit revert with an affected-group preview and sandbox FK/staleness check, complete revision restore by any commit/tag/branch ref, Git-tag milestones, index rebuild, time-window queries, known-good/known-bad change narrowing, proposal sandbox preview/discard, and patch cherry-pick from proposal refs.
 
 hub_git_history_index is a disposable local projection for fast UI queries. Full before/after payloads remain in immutable Git history.
 
