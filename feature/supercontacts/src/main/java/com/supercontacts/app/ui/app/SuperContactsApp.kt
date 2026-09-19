@@ -225,6 +225,13 @@ fun SuperContactsApp(
     var activeCallOverlay by remember { mutableStateOf<CallOverlaySignal?>(null) }
     var activeCallContactId by remember { mutableStateOf<Long?>(null) }
     var showOverlayPermissionRequest by rememberSaveable { mutableStateOf(false) }
+    var restrictedSettingsPrimerCompleted by rememberSaveable { mutableStateOf(false) }
+    val restrictedSettingsPrimerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        restrictedSettingsPrimerCompleted = true
+        showOverlayPermissionRequest = !CallOverlayPermission.canDrawOverlays(context)
+    }
     val callPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { permissions ->
@@ -278,17 +285,40 @@ fun SuperContactsApp(
     }
 
     if (showOverlayPermissionRequest) {
+        val requiresRestrictedSettingsPrimer =
+            !restrictedSettingsPrimerCompleted &&
+                CallOverlayPermission.requiresRestrictedSettingsPrimer(context)
         AlertDialog(
             onDismissRequest = { showOverlayPermissionRequest = false },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showOverlayPermissionRequest = false
-                        context.startActivity(CallOverlayPermission.settingsIntent(context))
+                        if (requiresRestrictedSettingsPrimer) {
+                            restrictedSettingsPrimerLauncher.launch(
+                                CallOverlayPermission.appInfoIntent(context),
+                            )
+                        } else {
+                            context.startActivity(CallOverlayPermission.settingsIntent(context))
+                        }
                     },
-                    modifier = Modifier.testTag("call-overlay-permission-open-settings"),
+                    modifier = Modifier.testTag(
+                        if (requiresRestrictedSettingsPrimer) {
+                            "call-overlay-permission-open-app-info"
+                        } else {
+                            "call-overlay-permission-open-settings"
+                        },
+                    ),
                 ) {
-                    Text(stringResource(R.string.call_overlay_permission_open_settings))
+                    Text(
+                        stringResource(
+                            if (requiresRestrictedSettingsPrimer) {
+                                R.string.call_overlay_permission_open_app_info
+                            } else {
+                                R.string.call_overlay_permission_open_settings
+                            },
+                        ),
+                    )
                 }
             },
             dismissButton = {
@@ -296,8 +326,28 @@ fun SuperContactsApp(
                     Text(stringResource(R.string.cancel))
                 }
             },
-            title = { Text(stringResource(R.string.call_overlay_permission_title)) },
-            text = { Text(stringResource(R.string.call_overlay_permission_body)) },
+            title = {
+                Text(
+                    stringResource(
+                        if (requiresRestrictedSettingsPrimer) {
+                            R.string.call_overlay_permission_restricted_title
+                        } else {
+                            R.string.call_overlay_permission_title
+                        },
+                    ),
+                )
+            },
+            text = {
+                Text(
+                    stringResource(
+                        if (requiresRestrictedSettingsPrimer) {
+                            R.string.call_overlay_permission_restricted_body
+                        } else {
+                            R.string.call_overlay_permission_body
+                        },
+                    ),
+                )
+            },
         )
     }
 
