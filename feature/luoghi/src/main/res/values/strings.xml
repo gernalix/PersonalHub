@@ -1,10 +1,10 @@
 <resources>
-    <string name="app_name">Luoghi</string>
+    <string name="app_name">Places</string>
     <string name="backup_folder_not_configured">Export folder not configured</string>
     <string name="backup_folder_access_failed">Export folder access failed</string>
     <string name="backup_folder_missing_read">SAF read permission missing</string>
     <string name="backup_folder_missing_write">SAF write permission missing</string>
-    <string name="home_title">Luoghi</string>
+    <string name="home_title">Places</string>
     <string name="home_version_format">v%1$s</string>
     <string name="choose_saf_folder">Choose SAF folder</string>
     <string name="export_status_configured">Export: configured</string>
@@ -69,7 +69,7 @@
     <string name="cancel">Cancel</string>
     <string name="unnamed_place">(unnamed)</string>
     <string name="no_address">No address</string>
-    <string name="map_default_title">Luoghi map</string>
+    <string name="map_default_title">Places map</string>
     <string name="map_mode_format">Mode: %1$s - marker: %2$s</string>
     <string name="map_fallback_title">Map fallback</string>
     <string name="map_fallback_error">The map engine could not load.</string>
@@ -94,6 +94,9 @@
     <string name="checkin_diagnostics_no_place">no place</string>
     <string name="checkin_diagnostics_accuracy_format">accuracy %1$.0f m</string>
     <string name="checkin_diagnostics_copy">Copy diagnostic report</string>
+    <string name="checkin_diagnostics_open">Open check-in diagnostics</string>
+    <string name="checkin_diagnostics_outcome_filter">Outcome</string>
+    <string name="checkin_diagnostics_place_filter">Place</string>
     <string name="history">History</string>
     <string name="history_empty">No check-in history yet.</string>
     <string name="history_empty_place">No history for this place yet.</string>
