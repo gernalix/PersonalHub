@@ -1,5 +1,7 @@
 package com.wordpulse.app.data
 
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
+
 import androidx.room.withTransaction
 import com.wordpulse.app.domain.CaptureWordPolicy
 import com.wordpulse.app.domain.CorrectionMetrics
@@ -26,7 +28,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class WordRepository(
-    private val database: WordPulseDatabase,
+    private val database: PersonalHubDatabase,
     private val timeProvider: TimeProvider,
     private val idProvider: () -> String = { UUID.randomUUID().toString() },
 ) {
