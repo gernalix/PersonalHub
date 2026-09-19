@@ -11,8 +11,9 @@ import java.net.URL
 internal class GitHubDataTransport(
     private val repository: GitRepository,
     private val token: String,
+    apiBase: String = "https://api.github.com/repos",
 ) {
-    private val api = "https://api.github.com/repos/${repository.owner}/${repository.name}"
+    private val api = "${apiBase.trimEnd('/')}/${repository.owner}/${repository.name}"
 
     data class RemoteHead(
         val branch: String,
@@ -35,6 +36,10 @@ internal class GitHubDataTransport(
     fun remoteHead(): RemoteHead {
         val repo = json("GET", api)
         val branch = repo.getString("default_branch")
+        return remoteHead(branch)
+    }
+
+    private fun remoteHead(branch: String): RemoteHead {
         val ref = json("GET", "$api/git/ref/heads/${encodeSegment(branch)}")
         val commitSha = ref.getJSONObject("object").getString("sha")
         val commit = json("GET", "$api/git/commits/$commitSha")
@@ -69,7 +74,7 @@ internal class GitHubDataTransport(
         expectedHead: RemoteHead? = null,
     ): String {
         require(files.isNotEmpty())
-        val head = expectedHead ?: remoteHead()
+        val (branch, head) = expectedHead?.let { it.branch to it } ?: remoteHeadOrNull()
         val treeEntries = JSONArray()
         files.toSortedMap().forEach { (path, bytes) ->
             require(bytes.size <= 100 * 1024 * 1024) { "Git file exceeds GitHub blob limit: $path" }
@@ -88,28 +93,69 @@ internal class GitHubDataTransport(
                     .put("sha", blob.getString("sha")),
             )
         }
-        val tree = json(
-            "POST",
-            "$api/git/trees",
-            JSONObject()
-                .put("base_tree", head.treeSha)
-                .put("tree", treeEntries),
-        )
+        val treeBody = JSONObject().put("tree", treeEntries)
+        if (head != null) treeBody.put("base_tree", head.treeSha)
+        val tree = json("POST", "$api/git/trees", treeBody)
         val commit = json(
             "POST",
             "$api/git/commits",
             JSONObject()
                 .put("message", message)
                 .put("tree", tree.getString("sha"))
-                .put("parents", JSONArray().put(head.commitSha)),
+                .put("parents", head?.let { JSONArray().put(it.commitSha) } ?: JSONArray()),
         )
         val commitSha = commit.getString("sha")
-        json(
-            "PATCH",
-            "$api/git/refs/heads/${encodeSegment(head.branch)}",
-            JSONObject().put("sha", commitSha).put("force", false),
-        )
+        if (head == null) {
+            if (!createRef(branch, commitSha)) {
+                return pushFiles(files, message, remoteHead())
+            }
+        } else {
+            json(
+                "PATCH",
+                "$api/git/refs/heads/${encodeSegment(head.branch)}",
+                JSONObject().put("sha", commitSha).put("force", false),
+            )
+        }
         return commitSha
+    }
+
+    fun remoteHeadOrNull(): Pair<String, RemoteHead?> {
+        val repo = json("GET", api)
+        val branch = repo.getString("default_branch")
+        val head = requestOrNull(
+            method = "GET",
+            url = "$api/git/ref/heads/${encodeSegment(branch)}",
+            accept = "application/vnd.github+json",
+        )?.let { bytes ->
+            val ref = JSONObject(String(bytes, Charsets.UTF_8))
+            val commitSha = ref.getJSONObject("object").getString("sha")
+            val commit = json("GET", "$api/git/commits/$commitSha")
+            RemoteHead(branch, commitSha, commit.getJSONObject("tree").getString("sha"))
+        }
+        return branch to head
+    }
+
+    private fun createRef(branch: String, commitSha: String): Boolean {
+        val connection = connection(
+            "POST",
+            "$api/git/refs",
+            "application/vnd.github+json",
+            "application/json; charset=utf-8",
+        )
+        return try {
+            connection.doOutput = true
+            connection.outputStream.use {
+                val body = JSONObject().put("ref", "refs/heads/$branch").put("sha", commitSha)
+                it.write(body.toString().toByteArray(Charsets.UTF_8))
+            }
+            when (val code = connection.responseCode) {
+                in 200..299 -> true
+                HttpURLConnection.HTTP_CONFLICT, 422 -> false
+                else -> throw IllegalArgumentException(errorMessage(connection, code))
+            }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun json(method: String, url: String, body: JSONObject? = null): JSONObject =

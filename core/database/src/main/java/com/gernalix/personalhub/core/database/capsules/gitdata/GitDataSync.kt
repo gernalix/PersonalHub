@@ -108,11 +108,23 @@ object GitDataSync {
         GitDataSettings.setRuntimeState(app, "syncing")
         try {
             val transport = transport(app, config)
-            val head = transport.remoteHead()
-            val control = pullControl(app, transport, head.commitSha)
+            val (_, head) = transport.remoteHeadOrNull()
+            val control = head?.let { pullControl(app, transport, it.commitSha) }
             val bundle = GitDataFormat.exportPending(app)
             if (bundle == null) {
-                GitDataSettings.markPulled(app, head.commitSha)
+                val revision = if (head == null) {
+                    transport.pushFiles(
+                        files = mapOf(
+                            GIT_CONTROL_MANIFEST to emptyControlManifest(app)
+                                .toString(2)
+                                .toByteArray(Charsets.UTF_8),
+                        ),
+                        message = "Initialize PersonalHub data",
+                    )
+                } else {
+                    head.commitSha
+                }
+                GitDataSettings.markPulled(app, revision)
                 GitDataSettings.setRuntimeState(app, "complete")
                 return@withLock
             }
