@@ -297,5 +297,5 @@ class HubContextRepository(
         onBindingBatch?.invoke(distinctIds.size)
         return dao.bindings(distinctIds)
     }
-    private fun now() = Instant.now().toString()
+    private fun now() = System.currentTimeMillis()
 }

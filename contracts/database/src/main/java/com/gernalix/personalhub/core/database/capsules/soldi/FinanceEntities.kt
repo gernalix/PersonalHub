@@ -59,14 +59,14 @@ data class FinanceTransaction(
     val placeId: String?,
     val fromReceipt: Boolean = false,
     val notes: String,
-    val occurredAt: String,
-    val createdAt: String,
-    val updatedAt: String,
+    val occurredAt: Long,
+    val createdAt: Long,
+    val updatedAt: Long,
     @ColumnInfo(defaultValue = "NULL") val personId: Long? = null,
     @ColumnInfo(defaultValue = "NULL") val macroId: String? = null,
     @ColumnInfo(defaultValue = "NULL") val recurrenceId: String? = null,
     @ColumnInfo(defaultValue = "NULL") val occurrenceKey: String? = null,
-    @ColumnInfo(defaultValue = "NULL") val reminderAt: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val reminderAt: Long? = null,
     @ColumnInfo(defaultValue = "''") val category: String = "",
 )
 
@@ -99,7 +99,7 @@ data class FinanceTransfer(
     val quotedRate: String? = null,
     val feeAmount: String? = null,
     val feeCurrency: String? = null,
-    val createdAt: String = java.time.Instant.now().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 @Entity(
@@ -112,9 +112,9 @@ data class FinanceMacro(
     val title: String,
     val accountId: String,
     val currency: String,
-    val occurredAt: String,
+    val occurredAt: Long,
     val notes: String = "",
-    val createdAt: String = java.time.Instant.now().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 @Entity(
@@ -138,8 +138,8 @@ data class FinanceRecurrence(
     val endDate: String? = null,
     val reminderDaysBefore: Int? = null,
     val enabled: Boolean = true,
-    val createdAt: String = java.time.Instant.now().toString(),
-    val updatedAt: String = java.time.Instant.now().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
     val kind: String = "EXPENSE",
     val targetAccountId: String? = null,
     val targetAmount: String? = null,
@@ -176,7 +176,7 @@ data class FinanceRecurrenceOverride(
     val targetAmount: String? = null,
     val skipped: Boolean = false,
     val transactionId: Long? = null,
-    val createdAt: String = java.time.Instant.now().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 @Entity(
@@ -191,7 +191,7 @@ data class FinanceAttachment(
     val uri: String,
     val title: String = "",
     val mimeType: String? = null,
-    val createdAt: String = java.time.Instant.now().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 data class TransactionView(
@@ -211,7 +211,7 @@ data class FinanceAccount(
     val name: String,
     val currency: String,
     val openingBalance: String = "0",
-    val openedAt: String = "1970-01-01T00:00:00Z",
+    val openedAt: Long = 0L,
     val included: Boolean = true,
 )
 

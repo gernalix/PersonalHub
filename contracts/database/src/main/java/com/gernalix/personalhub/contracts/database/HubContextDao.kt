@@ -23,7 +23,7 @@ interface HubContextDao {
     suspend fun insertBinding(value: HubEntityBinding)
 
     @Query("UPDATE hub_entity_bindings SET lifecycle=:lifecycle, updated_at=:updatedAt WHERE id=:id")
-    suspend fun setLifecycle(id: String, lifecycle: String, updatedAt: String): Int
+    suspend fun setLifecycle(id: String, lifecycle: String, updatedAt: Long): Int
 
     @Query("SELECT count(*) FROM hub_context_members WHERE entity_id=:entityId")
     suspend fun membershipCount(entityId: String): Int
@@ -38,7 +38,7 @@ interface HubContextDao {
     suspend fun context(contextId: String): HubContext?
 
     @Query("UPDATE hub_contexts SET context_type_id=:typeId,title=:title,updated_at=:updatedAt WHERE id=:contextId")
-    suspend fun updateContext(contextId: String, typeId: String?, title: String?, updatedAt: String): Int
+    suspend fun updateContext(contextId: String, typeId: String?, title: String?, updatedAt: Long): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertMembers(values: List<HubContextMember>)

@@ -35,7 +35,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
     suspend fun reuseLatestTitle(draft: TransactionDraft, title: String): TransactionDraft = db.withTransaction {
         val previous = dao.transactionsWithTitle(title).maxWithOrNull(
-            compareBy<FinanceTransaction> { Instant.parse(it.occurredAt) }.thenBy { it.id },
+            compareBy<FinanceTransaction> { it.occurredAt }.thenBy { it.id },
         ) ?: return@withTransaction draft.copy(title = title)
         draft.copy(
             title = title,
@@ -87,12 +87,12 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
     suspend fun saveTransaction(draft: TransactionDraft): Long = db.withTransaction {
         val old = draft.id?.let { requireNotNull(dao.transaction(it)) }
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         val chainId = chain(draft.chain)
         store(draft.placeId, chainId)
         val account = draft.accountId?.let { requireNotNull(dao.account(it)) } ?: defaultAccount(draft.currency)
         require(account.currency == currency(draft.currency))
-        require(Instant.parse(utc(draft.occurredAt)) >= Instant.parse(account.openedAt))
+        require(epoch(draft.occurredAt) >= account.openedAt)
         val selectedProduct = draft.productId?.let { requireNotNull(dao.product(it)) }
         val value = FinanceTransaction(
             id = old?.id ?: 0,
@@ -106,14 +106,14 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             placeId = draft.placeId,
             fromReceipt = draft.fromReceipt,
             notes = draft.notes,
-            occurredAt = utc(draft.occurredAt),
+            occurredAt = epoch(draft.occurredAt),
             createdAt = old?.createdAt ?: now,
             updatedAt = now,
             personId = draft.personId,
             macroId = draft.macroId,
             recurrenceId = draft.recurrenceId,
             occurrenceKey = draft.occurrenceKey,
-            reminderAt = draft.reminderAt?.takeIf(String::isNotBlank)?.let(::utc),
+            reminderAt = draft.reminderAt?.takeIf(String::isNotBlank)?.let(::epoch),
             category = draft.category.trim(),
         )
         val id = if (old == null) dao.add(value) else {
@@ -173,7 +173,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             quotedRate = draft.quotedRate?.takeIf(String::isNotBlank)?.let(::decimal),
             feeAmount = draft.feeAmount?.takeIf(String::isNotBlank)?.let(::decimal),
             feeCurrency = draft.feeCurrency?.takeIf(String::isNotBlank)?.let(::currency),
-            createdAt = old?.createdAt ?: Instant.now().toString(),
+            createdAt = old?.createdAt ?: System.currentTimeMillis(),
         )
         if (old == null) dao.add(value) else dao.update(value)
         value
@@ -189,7 +189,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             title = value.merchant.ifBlank { "Receipt" },
             accountId = account.id,
             currency = receiptCurrency,
-            occurredAt = occurredAt,
+            occurredAt = epoch(occurredAt),
         )
         dao.add(macro)
         value.items.map { item ->
@@ -259,10 +259,10 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             name = value.name.trim(),
             currency = currency(value.currency),
             openingBalance = decimal(value.openingBalance),
-            openedAt = utc(value.openedAt),
+            openedAt = value.openedAt,
         )
         val rows = dao.allTransactions().filter { it.accountId == account.id }
-        require(rows.all { it.currency == account.currency && Instant.parse(it.occurredAt) >= Instant.parse(account.openedAt) })
+        require(rows.all { it.currency == account.currency && it.occurredAt >= account.openedAt })
         if (dao.account(account.id) == null) dao.add(account) else dao.update(account)
         account.id
     }
@@ -274,7 +274,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
     suspend fun reconcile(id: String, at: String, desired: String, title: String, notes: String): Long? = db.withTransaction {
         val account = requireNotNull(dao.account(id))
         val instant = Instant.parse(utc(at))
-        require(instant >= Instant.parse(account.openedAt))
+        require(instant.toEpochMilli() >= account.openedAt)
         val difference = BigDecimal(decimal(desired)) - balance(account, dao.allTransactions(), instant)
         if (difference.signum() == 0) null else saveTransaction(
             TransactionDraft(
@@ -326,7 +326,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             BigDecimal(decimal(requireNotNull(draft.targetAmount))).abs().also { require(it.signum() > 0) }.stripTrailingZeros().toPlainString()
         } else null
 
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         val old = draft.id?.let { dao.recurrence(it) }
         val value = FinanceRecurrence(
             id = old?.id ?: draft.id ?: java.util.UUID.randomUUID().toString(),
@@ -365,7 +365,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
     suspend fun setRecurrenceEnabled(id: String, enabled: Boolean) = db.withTransaction {
         val row = requireNotNull(dao.recurrence(id))
-        dao.update(row.copy(enabled = enabled, updatedAt = Instant.now().toString()))
+        dao.update(row.copy(enabled = enabled, updatedAt = System.currentTimeMillis()))
     }
 
     suspend fun deleteRecurrence(id: String) = db.withTransaction { dao.deleteRecurrence(id) }
@@ -391,11 +391,11 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             RecurrenceEditScope.THIS_AND_FOLLOWING -> {
                 val start = LocalDate.parse(row.startDate)
                 if (!occurrenceDate.isAfter(start)) {
-                    dao.update(row.copy(amount = normalized, targetAmount = normalizedTarget ?: row.targetAmount, startDate = occurrenceDate.toString(), updatedAt = Instant.now().toString()))
+                    dao.update(row.copy(amount = normalized, targetAmount = normalizedTarget ?: row.targetAmount, startDate = occurrenceDate.toString(), updatedAt = System.currentTimeMillis()))
                     id
                 } else {
                     val originalEnd = row.endDate
-                    dao.update(row.copy(endDate = occurrenceDate.minusDays(1).toString(), updatedAt = Instant.now().toString()))
+                    dao.update(row.copy(endDate = occurrenceDate.minusDays(1).toString(), updatedAt = System.currentTimeMillis()))
                     val newId = java.util.UUID.randomUUID().toString()
                     dao.add(
                         row.copy(
@@ -404,8 +404,8 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                             targetAmount = normalizedTarget ?: row.targetAmount,
                             startDate = occurrenceDate.toString(),
                             endDate = originalEnd,
-                            createdAt = Instant.now().toString(),
-                            updatedAt = Instant.now().toString(),
+                            createdAt = System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis(),
                         ),
                     )
                     dao.recurrenceTagIds(id).forEach { dao.add(FinanceRecurrenceTag(newId, it)) }
@@ -422,7 +422,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             if (rule.kind == "TRANSFER") add(requireNotNull(rule.targetAccountId))
         }
         val latestOpening = accountIds
-            .map { id -> Instant.parse(requireNotNull(dao.account(id)).openedAt) }
+            .map { id -> Instant.ofEpochMilli(requireNotNull(dao.account(id)).openedAt) }
             .maxOrNull()
             ?: return null
         if (latestOpening.atZone(zone).toLocalDate().isAfter(date)) return null
@@ -522,8 +522,8 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
     companion object {
         fun balance(account: FinanceAccount, rows: List<FinanceTransaction>, at: Instant = Instant.now()): BigDecimal {
-            if (at < Instant.parse(account.openedAt)) return BigDecimal.ZERO
-            return rows.filter { it.accountId == account.id && Instant.parse(it.occurredAt) <= at }
+            if (at.toEpochMilli() < account.openedAt) return BigDecimal.ZERO
+            return rows.filter { it.accountId == account.id && it.occurredAt <= at.toEpochMilli() }
                 .fold(BigDecimal(account.openingBalance)) { sum, row -> sum + BigDecimal(row.amount) }
         }
 
@@ -561,6 +561,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
         fun currency(input: String): String = input.trim().uppercase(java.util.Locale.ROOT).also { Currency.getInstance(it) }
         fun utc(input: String): String = Instant.parse(input.trim()).toString()
+        fun epoch(input: String): Long = Instant.parse(input.trim()).toEpochMilli()
 
         fun occurrenceDate(rule: FinanceRecurrence, month: YearMonth): LocalDate = if (rule.lastBusinessDay) {
             var date = month.atEndOfMonth()

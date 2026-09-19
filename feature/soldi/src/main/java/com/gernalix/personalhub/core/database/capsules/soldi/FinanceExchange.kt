@@ -13,12 +13,12 @@ class FinanceExchange(private val db: PersonalHubDatabase) {
     private val dao = db.financeDao()
     private val finance = FinanceCapsule(db)
     suspend fun export(): String = db.withTransaction {
-        val accounts = dao.allAccounts().map { a -> obj("id" to a.id,"name" to a.name,"currency" to a.currency,"openingBalance" to a.openingBalance,"openedAt" to a.openedAt) }
+        val accounts = dao.allAccounts().map { a -> obj("id" to a.id,"name" to a.name,"currency" to a.currency,"openingBalance" to a.openingBalance,"openedAt" to Instant.ofEpochMilli(a.openedAt).toString()) }
         val products = dao.allProducts().map { p -> obj("id" to p.uuid,"name" to p.name) }
         val transactions = dao.allTransactions().map { t -> obj("id" to t.uuid,"accountId" to t.accountId,"productId" to t.productId?.let { dao.product(it)!!.uuid },
             "title" to t.titleId?.let { dao.titleName(it) },"amount" to t.amount,"currency" to t.currency,"chain" to t.chainId?.let { dao.chainName(it) },
             "placeId" to t.placeId,"notes" to t.notes,"tags" to dao.tags(t.id).joinToString(","),"fromReceipt" to t.fromReceipt,
-            "occurredAt" to t.occurredAt,"createdAt" to t.createdAt,"updatedAt" to t.updatedAt) }
+            "occurredAt" to Instant.ofEpochMilli(t.occurredAt).toString(),"createdAt" to Instant.ofEpochMilli(t.createdAt).toString(),"updatedAt" to Instant.ofEpochMilli(t.updatedAt).toString()) }
         canonical(obj("version" to 1,"accounts" to JSONArray(accounts),"products" to JSONArray(products),"transactions" to JSONArray(transactions))) + "\n"
     }
     suspend fun import(text: String, bases: Map<String, String>): Map<String, String> = db.withTransaction {
@@ -37,7 +37,7 @@ class FinanceExchange(private val db: PersonalHubDatabase) {
         rows(input,"accounts").forEach { a ->
             keys(a,setOf("id","name","currency","openingBalance","openedAt")); uuid(a.getString("id"))
             val old = dao.account(a.getString("id"))
-            if(current["accounts/${a.getString("id")}"] != incoming["accounts/${a.getString("id")}"]) finance.saveAccount(FinanceAccount(a.getString("id"),a.getString("name"),a.getString("currency"),a.getString("openingBalance"),a.getString("openedAt"),old?.included ?: true))
+            if(current["accounts/${a.getString("id")}"] != incoming["accounts/${a.getString("id")}"]) finance.saveAccount(FinanceAccount(a.getString("id"),a.getString("name"),a.getString("currency"),a.getString("openingBalance"),FinanceCapsule.epoch(a.getString("openedAt")),old?.included ?: true))
         }
         rows(input,"products").forEach { p ->
             keys(p,setOf("id","name")); val id = p.getString("id"); uuid(id)
@@ -49,9 +49,9 @@ class FinanceExchange(private val db: PersonalHubDatabase) {
             keys(t,setOf("id","accountId","productId","title","amount","currency","chain","placeId","notes","tags","fromReceipt","occurredAt","createdAt","updatedAt"))
             val uuid = t.getString("id"); uuid(uuid)
             val old = dao.transactionByUuid(uuid)
-            val created = FinanceCapsule.utc(t.getString("createdAt")); val updated = FinanceCapsule.utc(t.getString("updatedAt"))
-            require(Instant.parse(updated) >= Instant.parse(created))
-            if (old != null) require(Instant.parse(updated) >= Instant.parse(old.updatedAt)) { "Stale finance record" }
+            val created = FinanceCapsule.epoch(t.getString("createdAt")); val updated = FinanceCapsule.epoch(t.getString("updatedAt"))
+            require(updated >= created)
+            if (old != null) require(updated >= old.updatedAt) { "Stale finance record" }
             if (current["transactions/$uuid"] != incoming["transactions/$uuid"]) {
                 val product = nullable(t,"productId")?.let { requireNotNull(dao.productByUuid(it)) }
                 val id = finance.saveTransaction(TransactionDraft(id = old?.id,title = nullable(t,"title") ?: product?.name.orEmpty(),

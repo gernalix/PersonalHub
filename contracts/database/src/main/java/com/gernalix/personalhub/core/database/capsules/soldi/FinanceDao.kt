@@ -70,10 +70,10 @@ interface FinanceDao {
         LEFT JOIN finance_chains c ON c.id=t.chainId
         LEFT JOIN places l ON l.uuid=t.placeId
         LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=t.personId AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
-        WHERE t.occurredAt >= :fromIso AND t.occurredAt < :toIso
+        WHERE t.occurredAt >= :fromMs AND t.occurredAt < :toMs
         ORDER BY t.occurredAt DESC,t.uuid DESC LIMIT :limit OFFSET :offset
     """)
-    suspend fun temporalTransactionViews(fromIso: String, toIso: String, limit: Int, offset: Int): List<TransactionView>
+    suspend fun temporalTransactionViews(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<TransactionView>
 
     @Query("SELECT name FROM finance_titles WHERE id=:id") suspend fun titleName(id: Long): String?
     @Query("SELECT name FROM finance_chains WHERE id=:id") suspend fun chainName(id: Long): String?

@@ -146,9 +146,9 @@ class SostanzeCampaignTest {
                     chainId = null,
                     placeId = null,
                     notes = "",
-                    occurredAt = "2026-09-0${index}T12:00:00Z",
-                    createdAt = "2026-09-0${index}T12:00:00Z",
-                    updatedAt = "2026-09-0${index}T12:00:00Z",
+                    occurredAt = java.time.Instant.parse("2026-09-0${index}T12:00:00Z").toEpochMilli(),
+                    createdAt = java.time.Instant.parse("2026-09-0${index}T12:00:00Z").toEpochMilli(),
+                    updatedAt = java.time.Instant.parse("2026-09-0${index}T12:00:00Z").toEpochMilli(),
                 )
             )
         }

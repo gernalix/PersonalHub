@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 
 private const val FINANCE_CURSOR_SEPARATOR = '\u001F'
-private data class FinanceTemporalRow(val occurredAt: String, val record: HubTemporalRecord)
+private data class FinanceTemporalRow(val occurredAt: Long, val record: HubTemporalRecord)
 
 class SoldiTransactionHubAdapter(private val context: Context) : HubEntityAdapter, HubTemporalProvider {
     override val moduleId = "soldi"
@@ -29,9 +29,7 @@ class SoldiTransactionHubAdapter(private val context: Context) : HubEntityAdapte
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val cursor = decodeFinanceCursor(query.cursor)
-        val fromIso = Instant.ofEpochMilli(query.fromMs).toString()
-        val toIso = Instant.ofEpochMilli(query.toMs).toString()
-        val args = mutableListOf<Any?>(fromIso, toIso)
+        val args = mutableListOf<Any?>(query.fromMs, query.toMs)
         val cursorClause = if (cursor != null) {
             args += cursor.first
             args += cursor.first
@@ -55,7 +53,7 @@ class SoldiTransactionHubAdapter(private val context: Context) : HubEntityAdapte
             buildList {
                 while (c.moveToNext()) {
                     val uuid = c.getString(0)
-                    val occurredAt = c.getString(1)
+                    val occurredAt = c.getLong(1)
                     val title = c.getString(2).orEmpty()
                     val notes = c.getString(3).orEmpty()
                     val amount = c.getString(4)
@@ -69,7 +67,7 @@ class SoldiTransactionHubAdapter(private val context: Context) : HubEntityAdapte
                                 entityKind,
                                 uuid,
                                 HubTemporalKind.POINT,
-                                Instant.parse(occurredAt).toEpochMilli(),
+                                occurredAt,
                                 title = label,
                                 subtitle = "$amount $currency",
                                 entityRef = HubEntityRef(moduleId, entityKind, uuid),
@@ -89,19 +87,19 @@ class SoldiTransactionHubAdapter(private val context: Context) : HubEntityAdapte
     private fun TransactionView.summary() = HubEntitySummary(
         HubEntityRef(moduleId, entityKind, value.uuid),
         title.ifBlank { value.notes.ifBlank { "${value.amount} ${value.currency}" } },
-        "${value.amount} ${value.currency} · ${value.occurredAt}", attributes = buildMap { put("time_ms", java.time.Instant.parse(value.occurredAt).toEpochMilli().toString()); value.placeId?.let { put("place_id", it) } },
+        "${value.amount} ${value.currency} · ${com.gernalix.personalhub.contracts.database.HubTimestamp.format(value.occurredAt)}", attributes = buildMap { put("time_ms", value.occurredAt.toString()); value.placeId?.let { put("place_id", it) } },
     )
 }
 
-private fun encodeFinanceCursor(occurredAt: String, uuid: String): String = buildString {
+private fun encodeFinanceCursor(occurredAt: Long, uuid: String): String = buildString {
     append(occurredAt)
     append(FINANCE_CURSOR_SEPARATOR)
     append(uuid)
 }
 
-private fun decodeFinanceCursor(value: String?): Pair<String, String>? {
+private fun decodeFinanceCursor(value: String?): Pair<Long, String>? {
     if (value.isNullOrBlank()) return null
     val separator = value.indexOf(FINANCE_CURSOR_SEPARATOR)
     if (separator <= 0 || separator >= value.lastIndex) return null
-    return value.substring(0, separator) to value.substring(separator + 1)
+    return (value.substring(0, separator).toLongOrNull() ?: return null) to value.substring(separator + 1)
 }

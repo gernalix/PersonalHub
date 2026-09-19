@@ -23,7 +23,7 @@ data class HubEntityBinding(
     @ColumnInfo(name = "entity_kind") val entityKind: String,
     @ColumnInfo(name = "canonical_id") val canonicalId: String,
     val lifecycle: String = HubEntityLifecycle.ACTIVE,
-    @ColumnInfo(name = "updated_at") val updatedAt: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )
 
 @Entity(
@@ -34,8 +34,8 @@ data class HubEntityBinding(
 data class HubContextType(
     val id: String,
     val name: String,
-    @ColumnInfo(name = "created_at") val createdAt: String,
-    @ColumnInfo(name = "updated_at") val updatedAt: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
     val locked: Boolean = false,
 )
 
@@ -78,8 +78,8 @@ data class HubContext(
     val id: String,
     @ColumnInfo(name = "context_type_id") val contextTypeId: String? = null,
     val title: String? = null,
-    @ColumnInfo(name = "created_at") val createdAt: String,
-    @ColumnInfo(name = "updated_at") val updatedAt: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )
 
 @Entity(

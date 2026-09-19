@@ -21,8 +21,8 @@ data class HubResource(
     val title: String?,
     val value: String,
     val persistedPermission: Boolean,
-    val createdAt: String,
-    val updatedAt: String,
+    val createdAt: Long,
+    val updatedAt: Long,
 )
 
 @Dao

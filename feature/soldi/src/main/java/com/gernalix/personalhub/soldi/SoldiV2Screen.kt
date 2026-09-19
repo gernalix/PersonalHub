@@ -176,7 +176,7 @@ internal fun SoldiV2Screen(
             if (!busy && editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null) {
                 when (bottom) {
                     BottomDestination.HOME -> if (tab == SoldiTab.TRANSACTIONS) FloatingActionButton(onClick = { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.EXPENSE) }) { Text("+") }
-                    BottomDestination.ACCOUNTS -> FloatingActionButton(onClick = { accountEditor = FinanceAccount(name = "", currency = accounts.firstOrNull()?.currency ?: "DKK", openedAt = Instant.now().toString()) }) { Text("+") }
+                    BottomDestination.ACCOUNTS -> FloatingActionButton(onClick = { accountEditor = FinanceAccount(name = "", currency = accounts.firstOrNull()?.currency ?: "DKK", openedAt = System.currentTimeMillis()) }) { Text("+") }
                     BottomDestination.RECURRENCES -> FloatingActionButton(onClick = {
                         val draft = defaultRecurrence(accounts)
                         if (draft == null) scope.launch { snackbar.showSnackbar("Crea prima almeno un conto") } else recurrenceEditor = draft

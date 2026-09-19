@@ -63,7 +63,7 @@ class HubContextRepositoryTest {
     }
 
     @Test fun typeFieldsAreDataAndCardinalityIsValidated() = runBlocking {
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         val type = HubContextType("meeting", "Meeting", now, now)
         repository.saveType(type, listOf(
             HubContextTypeField("meeting", "people", 0, "People", acceptedModuleId = "fake", acceptedEntityKind = "item", minCardinality = 1, maxCardinality = null),
@@ -74,7 +74,7 @@ class HubContextRepositoryTest {
     }
 
     @Test fun typedContextsCanBeEditedWithoutPairwiseFactsAndTemplatesCopyOnlyShape() = runBlocking {
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         val type = HubContextType("outing", "Uscita", now, now)
         val fields = listOf(
             HubContextTypeField("outing", "people", 0, "Con chi", "people", "fake", "item", minCardinality = 0, maxCardinality = null),
@@ -102,7 +102,7 @@ class HubContextRepositoryTest {
         val saved = requireNotNull(repository.type(savedTypeId))
         assertEquals(2, saved.second.size)
         assertFalse(saved.second.any { field -> field.label in setOf("giovanni", "maria", "parco") })
-        repository.saveType(type.copy(name = "Uscita aggiornata", updatedAt = Instant.now().toString()), fields.reversed().mapIndexed { index, field -> field.copy(position = index) })
+        repository.saveType(type.copy(name = "Uscita aggiornata", updatedAt = System.currentTimeMillis()), fields.reversed().mapIndexed { index, field -> field.copy(position = index) })
         assertEquals(setOf("giovanni", "maria", "parco"), repository.context(id)!!.members.map { it.ref.canonicalId }.toSet())
     }
 
@@ -179,7 +179,7 @@ class HubContextRepositoryTest {
     }
 
     @Test fun systemTypesAreLockedWhileUserTypesRemainEditableAndDeletable() = runBlocking {
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         val system = HubContextType("system", "System", now, now, locked = true)
         val fields = listOf(HubContextTypeField("system", "item", 0, "Item", acceptedModuleId = "fake", acceptedEntityKind = "item"))
         repository.saveSystemType(system, fields)

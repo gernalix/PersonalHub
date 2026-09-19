@@ -94,7 +94,7 @@ object HubContextRuntime {
     suspend fun explore(scope: List<HubEntityRef>, limit: Int = 100, offset: Int = 0) = requireRepository().explore(scope, limit, offset)
 
     suspend fun ensureTimerActivityType() {
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         requireRepository().saveSystemType(
             HubContextType(TIMER_ACTIVITY_TYPE, "Timer activity", now, now, locked = true),
             listOf(

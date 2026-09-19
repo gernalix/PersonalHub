@@ -493,7 +493,7 @@ private fun HubContextTypeEditorDialog(onDismiss: () -> Unit) {
             error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         } },
         confirmButton = { Button(onClick = { scope.launch {
-            val now = Instant.now().toString()
+            val now = System.currentTimeMillis()
             val persisted = fields.mapIndexed { index, field ->
                 val kind = field.acceptance.takeIf { it.startsWith("kind:") }?.removePrefix("kind:")?.split('/', limit = 2)
                 HubContextTypeField(id, field.id, index, field.label, field.role, kind?.get(0), kind?.get(1), field.acceptance.takeIf { it.startsWith("cap:") }?.removePrefix("cap:"), field.min.toIntOrNull() ?: 0, field.max.toIntOrNull())

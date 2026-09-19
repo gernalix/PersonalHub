@@ -60,7 +60,7 @@ data class IntakeEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "substance_id") val substanceId: Long,
     @ColumnInfo(name = "timestamp_ms") val timestampMs: Long,
-    @ColumnInfo(name = "timestamp_utc", defaultValue = "") val timestampUtc: String = "",
+    @ColumnInfo(name = "timestamp_utc", defaultValue = "0") val timestampUtc: Long = 0,
     val dose: Double,
     @ColumnInfo(name = "dose_unit") val doseUnit: String,
     @ColumnInfo(name = "tap_group_id") val tapGroupId: String? = null,
@@ -85,7 +85,7 @@ data class StockAdjustmentEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "substance_id") val substanceId: Long,
     @ColumnInfo(name = "timestamp_ms") val timestampMs: Long,
-    @ColumnInfo(name = "timestamp_utc", defaultValue = "") val timestampUtc: String = "",
+    @ColumnInfo(name = "timestamp_utc", defaultValue = "0") val timestampUtc: Long = 0,
     val delta: Double,
     val note: String? = null,
     @ColumnInfo(name = "resulting_stock") val resultingStock: Double,
@@ -175,9 +175,9 @@ data class NotificationStateEntity(
     val kind: String,
     @ColumnInfo(name = "entity_id") val entityId: Long,
     @ColumnInfo(name = "scheduled_for_ms") val scheduledForMs: Long,
-    @ColumnInfo(name = "scheduled_for_utc", defaultValue = "") val scheduledForUtc: String = "",
+    @ColumnInfo(name = "scheduled_for_utc", defaultValue = "0") val scheduledForUtc: Long = 0,
     @ColumnInfo(name = "sent_at_ms") val sentAtMs: Long? = null,
-    @ColumnInfo(name = "sent_at_utc") val sentAtUtc: String? = null,
+    @ColumnInfo(name = "sent_at_utc") val sentAtUtc: Long? = null,
 )
 
 @Entity(tableName = "settings")

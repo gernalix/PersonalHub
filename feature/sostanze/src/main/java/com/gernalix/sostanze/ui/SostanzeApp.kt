@@ -1070,7 +1070,7 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
                     FilterChip(
                         selected = costId == choice.id,
                         onClick = { costId = choice.id },
-                        label = { Column { Text(choice.title); Text(choice.occurredAt, style = MaterialTheme.typography.labelSmall) } },
+                        label = { Column { Text(choice.title); Text(com.gernalix.personalhub.contracts.database.HubTimestamp.format(choice.occurredAt), style = MaterialTheme.typography.labelSmall) } },
                     )
                 }
             }

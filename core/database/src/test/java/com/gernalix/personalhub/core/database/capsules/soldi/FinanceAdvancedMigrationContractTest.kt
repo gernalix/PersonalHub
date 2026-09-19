@@ -55,7 +55,7 @@ class FinanceAdvancedMigrationContractTest {
             assertEquals("", scalarText(sqlite, "SELECT category FROM finance_transactions WHERE id=1"))
             assertFalse(columnNullable(sqlite, "finance_transactions", "category"))
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='finance_transfers'"))
-            assertEquals(105L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(106L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
         } finally {
             database.close()
             context.deleteDatabase(name)
