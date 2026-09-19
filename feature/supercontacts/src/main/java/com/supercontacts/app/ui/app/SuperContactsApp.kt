@@ -211,15 +211,12 @@ fun SuperContactsApp(
     onCallPermissionsReady: () -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
-    val dataLayerGeneration by AppContainer.generation.collectAsState()
     val viewModel: ContactsViewModel = viewModel(
-        key = "contacts-$dataLayerGeneration",
         factory = ContactsViewModel.Factory(
             repository = AppContainer.contactsRepository(context),
             homePreferencesStore = AppContainer.homePreferencesStore(context),
             addressAutocompleteRepository = AppContainer.addressAutocompleteRepository(context),
             contactPhotoStore = AppContainer.contactPhotoStore(context),
-            backupManager = AppContainer.backupManager(context),
         ),
     )
     val uiState by viewModel.uiState.collectAsState()
@@ -244,7 +241,6 @@ fun SuperContactsApp(
     var isViewingGlobalHistory by rememberSaveable { mutableStateOf(false) }
     var isViewingContactInitiatives by rememberSaveable { mutableStateOf(false) }
     var isViewingGlobalInitiatives by rememberSaveable { mutableStateOf(false) }
-    var isViewingBackupSettings by rememberSaveable { mutableStateOf(false) }
     var timestampEditEvent by remember { mutableStateOf<ContactEvent?>(null) }
     var detailPhotoSourceUri by rememberSaveable { mutableStateOf<String?>(null) }
     var handledDeepLink by rememberSaveable { mutableStateOf<String?>(null) }
@@ -257,7 +253,6 @@ fun SuperContactsApp(
         isViewingGlobalHistory = false
         isViewingContactInitiatives = false
         isViewingGlobalInitiatives = false
-        isViewingBackupSettings = false
         viewModel.recordContactOpen(contactId)
     }
 
@@ -306,20 +301,6 @@ fun SuperContactsApp(
         )
     }
 
-    val backupFolderLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree(),
-    ) { treeUri ->
-        if (treeUri != null) {
-            viewModel.setBackupFolder(treeUri)
-        }
-    }
-    val backupImportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree(),
-    ) { treeUri ->
-        if (treeUri != null) {
-            viewModel.importBackupFolder(treeUri)
-        }
-    }
     val detailPhotoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
     ) { uri ->
@@ -428,7 +409,6 @@ fun SuperContactsApp(
                     isViewingGlobalHistory = false
                     isViewingContactInitiatives = false
                     isViewingGlobalInitiatives = false
-                    isViewingBackupSettings = false
                 }
             }
             return@LaunchedEffect
@@ -448,7 +428,6 @@ fun SuperContactsApp(
                 isViewingGlobalHistory = false
                 isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
-                isViewingBackupSettings = false
                 viewModel.clearError()
                 appScope.launch {
                     snackbarHostState.showSnackbar(context.getString(R.string.deep_link_contact_missing))
@@ -465,20 +444,6 @@ fun SuperContactsApp(
     }
 
     when {
-        isViewingBackupSettings -> BackupSettingsScreen(
-            snackbarHostState = snackbarHostState,
-            backupState = uiState.backupState,
-            errorMessage = uiState.errorMessage,
-            onBack = { isViewingBackupSettings = false },
-            onErrorDismiss = viewModel::clearError,
-            onPickFolder = { com.gernalix.personalhub.core.database.DatabaseNavigation.open(context) },
-            onToggleAutoExport = viewModel::setAutoExportEnabled,
-            onManualExport = viewModel::exportBackupNow,
-            onImportBackup = {
-                com.gernalix.personalhub.core.database.DatabaseNavigation.open(context)
-            },
-        )
-
         isViewingGlobalInitiatives -> HistoryCalendarScreen(
             snackbarHostState = snackbarHostState,
             calendarState = uiState.historyCalendar,
@@ -655,7 +620,6 @@ fun SuperContactsApp(
                 isViewingGlobalHistory = false
                 isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
-                isViewingBackupSettings = false
                 viewModel.clearAddressSuggestions()
                 viewModel.clearError()
             },
@@ -759,17 +723,6 @@ fun SuperContactsApp(
                 isViewingContactInitiatives = false
                 isViewingGlobalHistory = false
                 isViewingGlobalInitiatives = true
-                isViewingBackupSettings = false
-            },
-            onBackupSettings = {
-                selectedContactId = null
-                isCreating = false
-                isEditing = false
-                isViewingHistory = false
-                isViewingContactInitiatives = false
-                isViewingGlobalHistory = false
-                isViewingGlobalInitiatives = false
-                isViewingBackupSettings = true
             },
             onErrorDismiss = viewModel::clearError,
         )
@@ -845,7 +798,6 @@ private fun ContactListScreen(
     onNewContact: () -> Unit,
     onGlobalHistory: () -> Unit,
     onGlobalInitiatives: () -> Unit,
-    onBackupSettings: () -> Unit,
     onErrorDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -960,12 +912,6 @@ private fun ContactListScreen(
                         contentDescription = stringResource(R.string.messaging_scan_all),
                         testTag = "home-action-scan-messaging",
                         onClick = onScanAllMessagingLinks,
-                    )
-                    EmojiToolbarButton(
-                        emoji = "💾",
-                        contentDescription = stringResource(R.string.backup),
-                        testTag = "home-action-backup",
-                        onClick = onBackupSettings,
                     )
                     EmojiToolbarButton(
                         emoji = "↕️",

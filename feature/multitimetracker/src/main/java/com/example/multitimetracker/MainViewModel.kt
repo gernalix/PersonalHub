@@ -6,16 +6,12 @@ import com.example.multitimetracker.util.CapsuleWriteApi
 
 import com.example.multitimetracker.R
 import android.content.Context
-import android.net.Uri
 import android.util.Log
 import android.widget.Toast
-import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.multitimetracker.core.contracts.TaggedSessionRecord
 import com.example.multitimetracker.core.contracts.ClosedSessionRecord
-import com.example.multitimetracker.export.AuthoritativeExportPayload
-import com.example.multitimetracker.export.AuthoritativeExportPayloadBuilder
 import com.example.multitimetracker.capsules.alerts.controller.AlertsCapsuleViewModel
 import com.example.multitimetracker.capsules.alerts.public.TimeFenceEvent
 import com.example.multitimetracker.capsules.alerts.state.AlertsHostState
@@ -111,22 +107,6 @@ class MainViewModel : ViewModel() {
         com.example.multitimetracker.core.quickevent.DefaultQuickEventCore(ctx)
 
 
-    private fun buildAuthoritativeExportPayload(context: Context? = appContext): AuthoritativeExportPayload {
-        requireSessionOnlyMode(true)
-        val cur = _state.value
-        val resolvedContext = context ?: failLegacyTaskPath()
-        val quickEvents = quickEventsCapsule.snapshot()
-        return AuthoritativeExportPayloadBuilder.fromSessionTables(
-            tags = tagsCapsule.tags(),
-            appUsageMs = cur.appUsageMs,
-            sessionCore = sessionCore(resolvedContext),
-            lifePeriods = sinceWhenCapsule.lifePeriods(),
-            timeFenceRules = alertsCapsule.rules(),
-            quickEvents = quickEvents,
-            chains = chainsCapsule.snapshot(),
-            tagParentsByChild = tagsCapsule.tagParentsByChild(),
-        )
-    }
 // v201
 // === FEATURE CAPSULE: AppVersionAudit (ViewModel) START ===
 private fun logAppVersionIfNeeded(context: Context) {
@@ -678,7 +658,6 @@ private var initialized = false
                 )
             },
             exportRuntimeSnapshot = engine::exportRuntimeSnapshot,
-            buildAuthoritativeExportPayload = ::buildAuthoritativeExportPayload,
             readLifePeriods = { sinceWhenCapsule.lifePeriods() },
             replaceLifePeriods = { periods -> sinceWhenCapsule.replaceLifePeriods(periods) },
             readTimeFenceRules = { alertsCapsule.rules() },

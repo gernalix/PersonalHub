@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.supercontacts.app.data.backup.SuperContactsBackupManager
 import com.supercontacts.app.data.repository.AddressAutocompleteRepository
 import com.supercontacts.app.data.repository.AddressSuggestion
 import com.supercontacts.app.data.repository.ContactDuplicateCandidate
@@ -35,7 +34,6 @@ class ContactsViewModel(
     homePreferencesStore: HomePreferencesStore,
     addressAutocompleteRepository: AddressAutocompleteRepository,
     contactPhotoStore: ContactPhotoStore,
-    backupManager: SuperContactsBackupManager,
 ) : ViewModel() {
     private val statusOwner = ContactOperationStatusCapsule()
     private val detailOwner = ContactDetailCapsule(
@@ -77,11 +75,6 @@ class ContactsViewModel(
         status = statusOwner,
         scope = viewModelScope,
     )
-    private val backupOwner = ContactBackupCapsule(
-        backupManager = backupManager,
-        status = statusOwner,
-        scope = viewModelScope,
-    )
 
     val initiativeUndoRequests: SharedFlow<InitiativeUndoRequest> =
         initiativeOwner.initiativeUndoRequests
@@ -94,7 +87,6 @@ class ContactsViewModel(
             initiativeOwner.state,
             suggestionOwner.state,
             duplicateOwner.state,
-            backupOwner.state,
             statusOwner.state,
         ) { values ->
             @Suppress("UNCHECKED_CAST")
@@ -104,8 +96,7 @@ class ContactsViewModel(
             val initiative = values[3] as ContactInitiativeState
             val suggestion = values[4] as ContactSuggestionState
             val duplicate = values[5] as ContactDuplicateState
-            val backup = values[6] as ContactBackupState
-            val status = values[7] as OperationStatusState
+            val status = values[6] as OperationStatusState
             ContactsUiState(
                 searchQuery = home.searchQuery,
                 activeTagFilters = home.activeTagFilters,
@@ -140,9 +131,7 @@ class ContactsViewModel(
                 fieldSuggestions = suggestion.fieldSuggestions,
                 showAddedEdited = home.showAddedEdited,
                 duplicateCandidates = duplicate.duplicateCandidates,
-                backupState = backup.backupState,
                 isSaving = status.isSaving,
-                isBackupRunning = backup.isBackupRunning,
                 errorMessage = status.errorMessage,
             )
         }.stateIn(
@@ -286,18 +275,12 @@ class ContactsViewModel(
     fun clearDuplicateCandidates() = duplicateOwner.clearDuplicateCandidates()
 
     fun clearError() = statusOwner.clearError()
-    fun setBackupFolder(uri: Uri) = backupOwner.setBackupFolder(uri)
-    fun setAutoExportEnabled(enabled: Boolean) = backupOwner.setAutoExportEnabled(enabled)
-    fun exportBackupNow() = backupOwner.exportBackupNow()
-    fun importBackup(uri: Uri) = backupOwner.importBackup(uri)
-    fun importBackupFolder(uri: Uri) = backupOwner.importBackupFolder(uri)
 
     class Factory(
         private val repository: ContactsRepository,
         private val homePreferencesStore: HomePreferencesStore,
         private val addressAutocompleteRepository: AddressAutocompleteRepository,
         private val contactPhotoStore: ContactPhotoStore,
-        private val backupManager: SuperContactsBackupManager,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -307,7 +290,6 @@ class ContactsViewModel(
                     homePreferencesStore = homePreferencesStore,
                     addressAutocompleteRepository = addressAutocompleteRepository,
                     contactPhotoStore = contactPhotoStore,
-                    backupManager = backupManager,
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

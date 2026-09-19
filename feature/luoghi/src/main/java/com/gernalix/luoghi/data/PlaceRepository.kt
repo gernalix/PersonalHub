@@ -1,5 +1,8 @@
 package com.gernalix.luoghi.data
 
+import com.gernalix.personalhub.core.database.HubAutoExport
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
+
 import android.content.Context
 import androidx.room.withTransaction
 import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
@@ -10,7 +13,6 @@ import com.gernalix.luoghi.capsules.checkin.HistoryValidationError
 import com.gernalix.luoghi.capsules.checkin.CheckInAttemptOutcomes
 import com.gernalix.luoghi.capsules.checkin.PlaceEventTypes
 import com.gernalix.luoghi.capsules.location.LocationSample
-import com.gernalix.luoghi.capsules.safexport.PersistentMutationTracker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -28,7 +30,7 @@ sealed interface PlaceDeleteResult {
 
 class PlaceRepository(
     private val context: Context,
-    private val database: LuoghiDatabase = LuoghiDatabase.get(context),
+    private val database: PersonalHubDatabase = PersonalHubDatabase.get(context),
     private val dao: PlaceDao = database.placeDao(),
     private val placeReferences: PlaceReferenceReader = database,
 ) {
@@ -77,7 +79,7 @@ class PlaceRepository(
                 if (refs.isNotEmpty()) dao.insertPlaceTagCrossRefs(refs)
             }
         }
-        PersistentMutationTracker.record(context, "place_tags.replace")
+        HubAutoExport.request(context)
     }
 
     suspend fun savePlace(
@@ -112,14 +114,14 @@ class PlaceRepository(
             )
             resolved
         }
-        PersistentMutationTracker.record(context, "places.save")
+        HubAutoExport.request(context)
         return resolvedUuid
     }
 
     suspend fun beginCheckInAttempt(source: String = "Luoghi"): CheckInAttemptEntity {
         val attempt = CheckInAttemptEntity(source = source)
         dao.upsertCheckInAttempt(attempt)
-        PersistentMutationTracker.record(context, "check_in_attempts.begin")
+        HubAutoExport.request(context)
         return attempt
     }
 
@@ -133,7 +135,7 @@ class PlaceRepository(
                 accuracyM = location.accuracyM,
             )
         )
-        PersistentMutationTracker.record(context, "check_in_attempts.location")
+        HubAutoExport.request(context)
     }
 
     suspend fun markCheckInAttemptStage(
@@ -152,7 +154,7 @@ class PlaceRepository(
                 errorMessage = sanitizeAttemptError(errorMessage).cleanNullable(),
             )
         )
-        PersistentMutationTracker.record(context, "check_in_attempts.stage")
+        HubAutoExport.request(context)
     }
 
     suspend fun replaceCheckInAttemptCandidates(
@@ -163,7 +165,7 @@ class PlaceRepository(
             dao.deleteCheckInAttemptCandidates(attemptId)
             if (candidates.isNotEmpty()) dao.insertCheckInAttemptCandidates(candidates)
         }
-        PersistentMutationTracker.record(context, "check_in_attempt_candidates.replace")
+        HubAutoExport.request(context)
     }
 
     suspend fun checkInAttemptCandidates(attemptId: String): List<CheckInAttemptCandidateEntity> =
@@ -190,7 +192,7 @@ class PlaceRepository(
                 errorMessage = sanitizeAttemptError(errorMessage).cleanNullable(),
             )
         )
-        PersistentMutationTracker.record(context, "check_in_attempts.finish")
+        HubAutoExport.request(context)
     }
 
     suspend fun recoverInterruptedCheckInAttempts(): Int {
@@ -217,7 +219,7 @@ class PlaceRepository(
                 )
             )
         }
-        if (stale.isNotEmpty()) PersistentMutationTracker.record(context, "check_in_attempts.recover")
+        if (stale.isNotEmpty()) HubAutoExport.request(context)
         return stale.size
     }
 
@@ -237,12 +239,12 @@ class PlaceRepository(
         }
         when (result) {
             PlaceDeleteResult.Deleted -> {
-                PersistentMutationTracker.record(context, "places.delete")
+                HubAutoExport.request(context)
                 com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalDeletedIfInitialized(
                     com.gernalix.personalhub.contracts.database.HubEntityRef("places", "place", uuid),
                 )
             }
-            PlaceDeleteResult.ArchivedBecauseReferenced -> PersistentMutationTracker.record(context, "places.archive")
+            PlaceDeleteResult.ArchivedBecauseReferenced -> HubAutoExport.request(context)
             PlaceDeleteResult.NotFound -> Unit
         }
         return result
@@ -252,7 +254,7 @@ class PlaceRepository(
         val updated = DatabaseMutationCoordinator.mutex.withLock {
             dao.setPlaceArchived(uuid, archived, System.currentTimeMillis())
         }
-        if (updated > 0) PersistentMutationTracker.record(context, "places.archive")
+        if (updated > 0) HubAutoExport.request(context)
         return updated
     }
 
@@ -267,7 +269,7 @@ class PlaceRepository(
         val id = DatabaseMutationCoordinator.mutex.withLock {
             dao.upsertGeofenceConfig(saved)
         }
-        PersistentMutationTracker.record(context, "place_geofence_configs.save")
+        HubAutoExport.request(context)
         return id
     }
 
@@ -315,7 +317,7 @@ class PlaceRepository(
                 id
             }
         }
-        PersistentMutationTracker.record(context, mutationSource)
+        HubAutoExport.request(context)
         return inserted
     }
 
@@ -399,7 +401,7 @@ class PlaceRepository(
             }
         }
         if (result is HistoryMutationResult.Success) {
-            PersistentMutationTracker.record(context, "place_events.manual_check_out")
+            HubAutoExport.request(context)
         }
         return result
     }
@@ -473,7 +475,7 @@ class PlaceRepository(
                 HistoryMutationResult.Success
             }
         }
-        if (result is HistoryMutationResult.Success) PersistentMutationTracker.record(context, mutationSource)
+        if (result is HistoryMutationResult.Success) HubAutoExport.request(context)
         return result
     }
 
@@ -554,7 +556,7 @@ class PlaceRepository(
             }
         }
         if (result is HistoryMutationResult.Success) {
-            PersistentMutationTracker.record(context, "place_events.edit")
+            HubAutoExport.request(context)
         }
         return result
     }
@@ -605,7 +607,7 @@ class PlaceRepository(
             }
         }
         if (result is HistoryMutationResult.Success) {
-            PersistentMutationTracker.record(context, "place_events.delete")
+            HubAutoExport.request(context)
         }
         return result
     }
@@ -652,7 +654,7 @@ class PlaceRepository(
             }
         }
         if (result is HistoryMutationResult.Success) {
-            PersistentMutationTracker.record(context, "place_sessions.delete")
+            HubAutoExport.request(context)
         }
         return result
     }
@@ -687,7 +689,7 @@ class PlaceRepository(
             }
         }
         if (result is HistoryMutationResult.Success) {
-            PersistentMutationTracker.record(context, "history.undo")
+            HubAutoExport.request(context)
         }
         return result
     }
@@ -722,7 +724,7 @@ class PlaceRepository(
             }
         }
         if (result is HistoryMutationResult.Success) {
-            PersistentMutationTracker.record(context, "history.redo")
+            HubAutoExport.request(context)
         }
         return result
     }
@@ -857,7 +859,7 @@ class PlaceRepository(
                 )
             )
         }
-        PersistentMutationTracker.record(context, "aliases.create")
+        HubAutoExport.request(context)
         return id
     }
 
@@ -875,7 +877,7 @@ class PlaceRepository(
                 )
             )
         }
-        PersistentMutationTracker.record(context, "aliases.update")
+        HubAutoExport.request(context)
         return rowId
     }
 
@@ -883,7 +885,7 @@ class PlaceRepository(
         val deleted = runBlocking(Dispatchers.IO) {
             DatabaseMutationCoordinator.mutex.withLock { dao.deleteAliasByIdBlocking(id) }
         }
-        if (deleted > 0) PersistentMutationTracker.record(context, "aliases.delete")
+        if (deleted > 0) HubAutoExport.request(context)
         return deleted
     }
 
@@ -901,7 +903,7 @@ class PlaceRepository(
                 )
             )
         }
-        PersistentMutationTracker.record(context, "links.create")
+        HubAutoExport.request(context)
         return id
     }
 
@@ -920,7 +922,7 @@ class PlaceRepository(
                 )
             )
         }
-        PersistentMutationTracker.record(context, "links.update")
+        HubAutoExport.request(context)
         return rowId
     }
 
@@ -928,7 +930,7 @@ class PlaceRepository(
         val deleted = runBlocking(Dispatchers.IO) {
             DatabaseMutationCoordinator.mutex.withLock { dao.deleteLinkByIdBlocking(id) }
         }
-        if (deleted > 0) PersistentMutationTracker.record(context, "links.delete")
+        if (deleted > 0) HubAutoExport.request(context)
         return deleted
     }
 

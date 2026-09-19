@@ -8,8 +8,6 @@ import com.example.multitimetracker.core.contracts.TaggedSessionRecord
 import com.example.multitimetracker.core.contracts.ClosedSessionRecord
 import com.example.multitimetracker.core.session.AutoConsistencyCore
 import com.example.multitimetracker.core.session.SessionCore
-import com.example.multitimetracker.export.AuthoritativeExportPayload
-import com.example.multitimetracker.export.AuthoritativeExportPayloadBuilder
 import com.example.multitimetracker.export.buildSessionOnlyRuntimeTasks
 import com.example.multitimetracker.capsules.chains.public.ChainsSnapshot
 import com.example.multitimetracker.capsules.quickevents.public.QuickEventsSnapshot
@@ -56,7 +54,6 @@ internal class MainViewModelSnapshotCoordinator(
         runtimeSnapshot: TimeEngine.RuntimeSnapshot,
     ) -> Unit,
     private val exportRuntimeSnapshot: () -> TimeEngine.RuntimeSnapshot,
-    private val buildAuthoritativeExportPayload: (Context?) -> AuthoritativeExportPayload,
     private val readLifePeriods: () -> List<LifePeriod>,
     private val replaceLifePeriods: (List<LifePeriod>) -> Unit,
     private val readTimeFenceRules: () -> List<TimeFenceRule>,
@@ -146,7 +143,6 @@ internal class MainViewModelSnapshotCoordinator(
     private var snapshotHistoryCompactionJob: Job? = null
     private val persistenceGate = PersistentSnapshotSaveGate()
     private var lastPersistedSnapshot: SnapshotStore.Snapshot? = null
-    private var lastBackupSignature: String? = null
 
     fun markPersistenceLoading() {
         persistenceGate.markLoading()
@@ -412,15 +408,6 @@ internal class MainViewModelSnapshotCoordinator(
         setPersistenceFailureReport(null)
     }
 
-    fun computeBackupSignature(): String {
-        return AuthoritativeExportPayloadBuilder.signature(
-            buildAuthoritativeExportPayload(appContext())
-        )
-    }
-
-    fun setLastBackupSignature(signature: String) {
-        lastBackupSignature = signature
-    }
 
     fun scheduleAutoBackup() {
         val ctx = appContext() ?: return
@@ -782,23 +769,6 @@ internal class MainViewModelSnapshotCoordinator(
 
     private fun List<SnapshotStore.ActiveTag>.sortedByActiveTag(): List<SnapshotStore.ActiveTag> {
         return sortedWith(compareBy({ it.sessionId }, { it.tagId }, { it.startTs }))
-    }
-
-    private fun buildActivationPayloadFromSnapshot(
-        context: Context,
-        snap: SnapshotStore.Snapshot,
-        prepared: PreparedSnapshotRuntimeState,
-    ): AuthoritativeExportPayload {
-        return AuthoritativeExportPayloadBuilder.fromSessionTables(
-            tags = prepared.tags,
-            appUsageMs = snap.appUsageMs,
-            sessionCore = sessionCore(context),
-            lifePeriods = snap.lifePeriods,
-            timeFenceRules = snap.timeFenceRules,
-            quickEvents = snap.toQuickEventsSnapshot(),
-            chains = snap.toChainsSnapshot(),
-            tagParentsByChild = buildTagParentsByChild(snap.tagParents),
-        )
     }
 
     private fun SnapshotStore.Snapshot.toChainsSnapshot(): ChainsSnapshot {

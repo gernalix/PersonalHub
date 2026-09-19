@@ -13,18 +13,16 @@ import com.gernalix.luoghi.capsules.places.PlacesCapsule
 import com.gernalix.luoghi.capsules.routedistance.HttpGoogleRoutesClient
 import com.gernalix.luoghi.capsules.routedistance.RouteDistanceCapsule
 import com.gernalix.luoghi.capsules.routedistance.RouteDistanceRepository
-import com.gernalix.luoghi.capsules.safexport.PersistentMutationTracker
-import com.gernalix.luoghi.capsules.safexport.SafExportCapsule
 import com.gernalix.luoghi.capsules.stats.StatsCapsule
-import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.PlaceRepository
-import com.gernalix.luoghi.backup.RestoreCoordinator
 import com.gernalix.personalhub.core.alerts.PlaceAlertEngine
+import com.gernalix.personalhub.core.database.HubAutoExport
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.alerts.PlaceAlertRepository
 
 class LuoghiAppContainer(context: Context) {
     private val appContext = context.applicationContext
-    private val database = LuoghiDatabase.get(appContext)
+    private val database = PersonalHubDatabase.get(appContext)
     private val dao = database.placeDao()
     private val placeRepository = PlaceRepository(appContext, database, dao)
     private val placeAlertEngine = PlaceAlertEngine(appContext, database)
@@ -41,12 +39,10 @@ class LuoghiAppContainer(context: Context) {
         RouteDistanceRepository(
             dao = dao,
             googleRoutesClient = HttpGoogleRoutesClient(),
-            onCacheChanged = { PersistentMutationTracker.record(appContext, "route_distance_cache.upsert") },
+            onCacheChanged = { HubAutoExport.request(appContext) },
         )
         )
     }
     val location: LocationSource by lazy { FusedLocationCapsule(appContext) }
-    val safExport by lazy { SafExportCapsule(appContext) }
-    val restore by lazy { RestoreCoordinator(appContext, database) }
     val addressAutocomplete: AddressAutocompleteSource by lazy { AddressAutocompleteRepository(appContext) }
 }
