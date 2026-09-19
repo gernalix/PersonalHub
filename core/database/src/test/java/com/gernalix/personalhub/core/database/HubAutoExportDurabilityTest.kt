@@ -308,6 +308,32 @@ class HubAutoExportDurabilityTest {
         assertNotNull(error)
         assertEquals("Invalid SQLite file", DatabaseVault.error(context))
         assertEquals(-1, DatabaseVault.exportedGeneration(context))
+        assertFalse(publisher.files.containsKey(PersonalHubDatabase.DB_NAME))
+        assertFalse(publisher.files.containsKey("personalhub.db.tmp"))
+        assertFalse(publisher.files.containsKey("personalhub.db.old.tmp"))
+    }
+
+    @Test
+    fun promoteRenameFailureRestoresPreviousCanonical() {
+        configureFolderPreference()
+        val oldSnapshot = DatabaseVault.backupCurrent(context)
+        val oldBytes = oldSnapshot.readBytes()
+        oldSnapshot.delete()
+        PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL(
+            "INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)",
+            arrayOf("rename_failure_test", "{}"),
+        )
+        val publisher = RecordingExportPublisher(failPromoteRename = true)
+        publisher.files[PersonalHubDatabase.DB_NAME] = oldBytes
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+
+        val error = runCatching { DatabaseVault.exportNow(context) }.exceptionOrNull()
+
+        assertNotNull(error)
+        assertEquals(oldBytes.toList(), requireNotNull(publisher.files[PersonalHubDatabase.DB_NAME]).toList())
+        assertFalse(publisher.files.containsKey("personalhub.db.tmp"))
+        assertFalse(publisher.files.containsKey("personalhub.db.old.tmp"))
+        assertEquals(-1, DatabaseVault.exportedGeneration(context))
     }
 
     @Test
@@ -408,6 +434,7 @@ class HubAutoExportDurabilityTest {
         private val failCanonicalWrite: Boolean = false,
         private val corruptCanonicalReadback: Boolean = false,
         private val createdCanonicalName: String? = null,
+        private val failPromoteRename: Boolean = false,
     ) : DatabaseVault.ExportPublisher {
         val files = linkedMapOf<String, ByteArray>()
         var listingsVisible = true
@@ -426,6 +453,9 @@ class HubAutoExportDurabilityTest {
 
         override fun rename(source: DatabaseVault.ExportFile, newName: String): DatabaseVault.ExportFile {
             val oldName = requireNotNull(source.name)
+            if (failPromoteRename && oldName == "${PersonalHubDatabase.DB_NAME}.tmp" && newName == PersonalHubDatabase.DB_NAME) {
+                error("simulated canonical promote failure")
+            }
             val bytes = requireNotNull(files.remove(oldName))
             files[newName] = bytes
             return RecordingExportFile(this, newName)
