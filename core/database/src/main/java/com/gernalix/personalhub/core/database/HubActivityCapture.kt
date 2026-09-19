@@ -38,6 +38,41 @@ object HubActivityCapture {
      */
     private val rowSpecs = listOf(
         RowSpec(
+            table = "health_import_batches", moduleId = "salute", entityKind = "import",
+            entityIdNew = "NEW.`id`", labelNew = "NEW.`source_system`",
+            reversibleInsert = true, reversibleUpdate = true,
+        ),
+        RowSpec(
+            table = "health_events", moduleId = "salute", entityKind = "event",
+            entityIdNew = "NEW.`id`", labelNew = "COALESCE(NEW.`title_it`,NEW.`event_kind`)",
+            reversibleInsert = true, reversibleUpdate = true,
+        ),
+        RowSpec(
+            table = "health_samples", moduleId = "salute", entityKind = "sample",
+            entityIdNew = "NEW.`id`", labelNew = "COALESCE(NEW.`material_it`,NEW.`sample_kind`)",
+            reversibleInsert = true, reversibleUpdate = true,
+        ),
+        RowSpec(
+            table = "health_examinations", moduleId = "salute", entityKind = "examination",
+            entityIdNew = "NEW.`id`", labelNew = "NEW.`display_name_it`",
+            reversibleInsert = true, reversibleUpdate = true,
+        ),
+        RowSpec(
+            table = "health_measurements", moduleId = "salute", entityKind = "measurement",
+            entityIdNew = "NEW.`id`", labelNew = "NEW.`id`",
+            reversibleInsert = true, reversibleUpdate = true,
+        ),
+        RowSpec(
+            table = "health_journal_entries", moduleId = "salute", entityKind = "journal",
+            entityIdNew = "NEW.`id`", labelNew = "COALESCE(NEW.`title_it`,'Nota clinica')",
+            reversibleInsert = true, reversibleUpdate = true,
+        ),
+        RowSpec(
+            table = "health_ai_snapshots", moduleId = "salute", entityKind = "ai_snapshot",
+            entityIdNew = "NEW.`id`", labelNew = "NEW.`subject_kind`",
+            reversibleInsert = true, reversibleUpdate = true,
+        ),
+        RowSpec(
             table = "places",
             moduleId = "places",
             entityKind = "place",
@@ -173,6 +208,7 @@ object HubActivityCapture {
     )
 
     fun createInternalTables(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `hub_git_edit_context` (`id` INTEGER NOT NULL PRIMARY KEY, `actor` TEXT NOT NULL, `source` TEXT NOT NULL DEFAULT 'ui', `reason` TEXT, `group_id` TEXT)")
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `$UNDO_CONTEXT_TABLE` (`id` INTEGER NOT NULL PRIMARY KEY, `original_activity_id` TEXT NOT NULL)",
         )
@@ -441,10 +477,10 @@ object HubActivityCapture {
         ) VALUES(
             ${randomIdSql()}, ${nowMsSql()}, ${sqlString(moduleId)}, $actionSql,
             ${entityKind?.let(::sqlString) ?: "NULL"}, $entityIdSql, $entityLabelSql,
-            $detailKeySql, $detailValueSql, ${sqlString(origin)}, $systemSql,
+            $detailKeySql, $detailValueSql, COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1), ${sqlString(origin)}), $systemSql,
             ${sqlString(sourceTable)}, $sourceRowKeySql,
             ${payloadKind?.let(::sqlString) ?: "NULL"}, ${payloadColumns?.let(::sqlString) ?: "NULL"},
-            $beforePayloadSql, $afterPayloadSql, 1, $appVersion, NULL,
+            $beforePayloadSql, $afterPayloadSql, 1, $appVersion, (SELECT group_id FROM hub_git_edit_context WHERE id=1),
             CASE WHEN (SELECT original_activity_id FROM `$UNDO_CONTEXT_TABLE` WHERE id=1) IS NULL THEN $reversibleSql ELSE 0 END,
             'ACTIVE', NULL,
             (SELECT original_activity_id FROM `$UNDO_CONTEXT_TABLE` WHERE id=1)

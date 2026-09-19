@@ -11,7 +11,7 @@ Health ingestion uses the current PH patch format:
 ```json
 {
   "format_version": 1,
-  "schema_version": 17,
+  "schema_version": 18,
   "patch_id": "health-import-<stable-id>",
   "author": "chatgpt",
   "reason": "Import MinSP health data",
@@ -220,7 +220,7 @@ Illustrative only; no personal health data may be committed to the public PH rep
 ```json
 {
   "format_version": 1,
-  "schema_version": 17,
+  "schema_version": 18,
   "patch_id": "health-import-demo-001",
   "author": "chatgpt",
   "reason": "Synthetic Salute integration fixture",

@@ -39,7 +39,7 @@ sealed interface HubActivityUndoResult {
  * fail closed.
  */
 object HubActivityUndoEngine {
-    private val reversibleRowTables = setOf("places", "finance_accounts")
+    private val reversibleRowTables = setOf("places", "finance_accounts", "health_import_batches", "health_events", "health_samples", "health_examinations", "health_measurements", "health_journal_entries", "health_ai_snapshots")
 
     suspend fun undo(database: PersonalHubDatabase, activityId: String): HubActivityUndoResult =
         database.withTransaction {
@@ -98,7 +98,8 @@ object HubActivityUndoEngine {
         setUndoContext(db, activity.id)
         try {
             if (activity.beforePayload == null) {
-                if (hasForeignKeyReference(db, activity.sourceTable, primaryKey, primaryKeyValue)) {
+                if (hasForeignKeyReference(db, activity.sourceTable, primaryKey, primaryKeyValue) ||
+                    hasHealthSemanticReference(db, activity.sourceTable, primaryKeyValue)) {
                     database.activityDao().updateStatus(activity.id, HubActivityStatus.CONFLICT, null)
                     return HubActivityUndoResult.Conflict(HubActivityUndoConflict.REFERENCED)
                 }
@@ -132,6 +133,17 @@ object HubActivityUndoEngine {
         val ref = activity.toEntityRef()
         val effect = if (activity.beforePayload == null) HubActivityUndoEffect.DELETED else HubActivityUndoEffect.LIFECYCLE_CHANGED
         return HubActivityUndoResult.Success(ref, effect)
+    }
+
+    private fun hasHealthSemanticReference(db: SupportSQLiteDatabase, table: String, id: Any?): Boolean {
+        val kind=when(table) {
+            "health_measurements" -> "measurement"
+            "health_samples" -> "sample"
+            "health_journal_entries" -> "journal"
+            else -> return false
+        }
+        return db.query("SELECT 1 FROM health_ai_snapshots WHERE subject_kind=? AND subject_id=? LIMIT 1",arrayOf(kind,id)).use { it.moveToFirst() } ||
+            db.query("SELECT 1 FROM health_ai_evidence WHERE evidence_kind=? AND evidence_id=? LIMIT 1",arrayOf(kind,id)).use { it.moveToFirst() }
     }
 
     private suspend fun undoPeopleContact(
