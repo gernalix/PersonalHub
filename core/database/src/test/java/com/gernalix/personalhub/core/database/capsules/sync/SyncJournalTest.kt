@@ -37,7 +37,7 @@ class SyncJournalTest {
             val db = owner.openHelper.writableDatabase
             assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
             db.query("SELECT title,start_ms,end_ms FROM sessions").use { assertTrue(it.moveToFirst()); assertEquals("preserved", it.getString(0)); assertEquals(1000L, it.getLong(1)); assertEquals(2000L, it.getLong(2)) }
-            db.query("SELECT generation FROM hub_generation").use { it.moveToFirst(); assertEquals(53L, it.getLong(0)) }
+            db.query("SELECT generation FROM hub_generation").use { it.moveToFirst(); assertEquals(54L, it.getLong(0)) }
             db.execSQL("UPDATE sessions SET title='changed'")
             db.query("SELECT count(*) FROM hub_sync_pending WHERE table_name='sessions'").use { it.moveToFirst(); assertEquals(1, it.getInt(0)) }
         } finally { owner.close(); context.deleteDatabase("sync-upgrade-test.db") }
@@ -51,7 +51,7 @@ class SyncJournalTest {
             // Fixture values need not form a domain graph. This isolated DB is never uploaded.
             db.execSQL("PRAGMA foreign_keys=OFF")
             val tables = SyncJournal.tables(db)
-            assertEquals(77, tables.size)
+            assertEquals(81, tables.size)
             for (table in tables) {
                 db.execSQL("DELETE FROM `$table`")
                 db.execSQL("DELETE FROM hub_sync_pending")

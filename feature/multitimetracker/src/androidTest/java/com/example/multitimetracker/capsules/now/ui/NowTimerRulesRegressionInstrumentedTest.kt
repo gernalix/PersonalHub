@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -179,7 +180,8 @@ class NowTimerRulesRegressionInstrumentedTest {
         setNowScreen(capsule)
 
         composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { longClick() }
-        composeRule.onAllNodes(hasSetTextAction())[0].performTextReplacement("Updated editor title")
+        composeRule.onNode(hasSetTextAction() and hasText("Original editor title"))
+            .performTextReplacement("Updated editor title")
         composeRule.onNodeWithContentDescription(targetString(R.string.salva)).performClick()
 
         composeRule.runOnIdle {

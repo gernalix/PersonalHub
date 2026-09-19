@@ -609,4 +609,43 @@ interface PlaceDao {
 
     @Query("UPDATE history_actions SET status = :status, updated_at = :updatedAt WHERE action_uuid = :actionUuid")
     suspend fun updateHistoryActionStatus(actionUuid: String, status: String, updatedAt: Long): Int
+
+    // Places tags live in their own namespace; they never resolve against Timer tags.
+    @Query("SELECT * FROM place_tags ORDER BY name COLLATE NOCASE ASC, id ASC")
+    fun observePlaceTags(): Flow<List<PlaceTagEntity>>
+
+    @Query("SELECT * FROM place_tags ORDER BY name COLLATE NOCASE ASC, id ASC")
+    suspend fun listPlaceTags(): List<PlaceTagEntity>
+
+    @Query("SELECT * FROM place_tags WHERE normalized_name = :normalizedName LIMIT 1")
+    suspend fun getPlaceTagByNormalizedName(normalizedName: String): PlaceTagEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPlaceTag(tag: PlaceTagEntity): Long
+
+    @Query("""
+        SELECT t.* FROM place_tags t
+        INNER JOIN place_tag_cross_ref x ON x.tag_id = t.id
+        WHERE x.place_uuid = :placeUuid
+        ORDER BY t.name COLLATE NOCASE ASC, t.id ASC
+    """)
+    suspend fun tagsForPlace(placeUuid: String): List<PlaceTagEntity>
+
+    @Query("""
+        SELECT t.id FROM place_tags t
+        INNER JOIN place_tag_cross_ref x ON x.tag_id = t.id
+        WHERE x.place_uuid = :placeUuid
+        ORDER BY t.id ASC
+    """)
+    suspend fun tagIdsForPlace(placeUuid: String): List<Long>
+
+    @Query("SELECT * FROM place_tag_cross_ref ORDER BY place_uuid ASC, tag_id ASC")
+    suspend fun listPlaceTagCrossRefsForBackup(): List<PlaceTagCrossRef>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPlaceTagCrossRefs(refs: List<PlaceTagCrossRef>)
+
+    @Query("DELETE FROM place_tag_cross_ref WHERE place_uuid = :placeUuid")
+    suspend fun clearPlaceTagCrossRefs(placeUuid: String): Int
+
 }

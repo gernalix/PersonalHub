@@ -59,6 +59,7 @@ import com.gernalix.luoghi.ui.backup.RestoreBackupDialog
 import com.gernalix.luoghi.ui.home.HomeScreen
 import com.gernalix.luoghi.ui.place.PlaceDetailScreen
 import com.gernalix.luoghi.ui.place.PlaceEditorDialog
+import com.gernalix.luoghi.ui.place.PlaceAlertsDialog
 import com.gernalix.luoghi.ui.settings.SettingsScreen
 import com.gernalix.luoghi.ui.theme.LuoghiTheme
 
@@ -193,6 +194,7 @@ private fun LuoghiNavigation(
     var initialVisitId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorOpen by rememberSaveable { mutableStateOf(value = false) }
     var globalStatsOpen by rememberSaveable { mutableStateOf(value = false) }
+    var alertPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDeletePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var manualVisitPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var geofencePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -292,6 +294,10 @@ private fun LuoghiNavigation(
                 },
                 onCheckInNow = { vm.manualCheckIn(item.place.uuid) },
                 onAddManualVisit = { manualVisitPlaceId = item.place.uuid },
+                onAlerts = {
+                    alertPlaceId = item.place.uuid
+                    vm.loadPlaceAlertData()
+                },
                 onGeofenceSettings = { geofencePlaceId = item.place.uuid },
             )
         }
@@ -339,6 +345,7 @@ private fun LuoghiNavigation(
             onNicknameChange = vm::updateNickname,
             onRadiusChange = vm::updateRadius,
             onNotesChange = vm::updateNotes,
+            onTagsChange = vm::updatePlaceTags,
             onSave = {
                 vm.savePlace()
                 editorOpen = false
@@ -349,6 +356,26 @@ private fun LuoghiNavigation(
             },
         )
     }
+    alertPlaceId?.let { placeId ->
+        val place = state.places.firstOrNull { it.uuid == placeId }
+        if (place != null) {
+            PlaceAlertsDialog(
+                placeId = place.uuid,
+                placeName = place.nickname.ifBlank { place.address.orEmpty() },
+                tags = state.placeTags,
+                rules = state.placeAlertRules,
+                tagTargets = state.placeAlertTagTargets,
+                onCreate = vm::createPlaceAlert,
+                onUpdate = vm::updatePlaceAlert,
+                onDelete = vm::deletePlaceAlert,
+                onSetEnabled = vm::setPlaceAlertEnabled,
+                onDismiss = { alertPlaceId = null },
+            )
+        } else {
+            alertPlaceId = null
+        }
+    }
+
     if (globalStatsOpen) {
         GlobalStatsDialog(state = state, onDismiss = { globalStatsOpen = false })
     }

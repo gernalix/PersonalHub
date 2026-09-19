@@ -49,6 +49,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     com.gernalix.luoghi.data.HistoryActionEntity::class,
     com.gernalix.luoghi.data.PlaceGeofenceConfigEntity::class,
     com.gernalix.luoghi.data.PlaceGeofenceTransitionLogEntity::class,
+    com.gernalix.luoghi.data.PlaceTagEntity::class,
+    com.gernalix.luoghi.data.PlaceTagCrossRef::class,
+    com.gernalix.personalhub.alerts.AlertRuleEntity::class,
+    com.gernalix.personalhub.alerts.AlertPlaceTagTargetEntity::class,
     com.gernalix.sostanze.data.SubstanceEntity::class,
     com.gernalix.sostanze.data.IntakeEventEntity::class,
     com.gernalix.sostanze.data.StockAdjustmentEntity::class,
@@ -87,10 +91,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class, HubActivityEntity::class,
-], version = 15, exportSchema = true)
+], version = 16, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
+    abstract fun alertDao(): com.gernalix.personalhub.alerts.AlertDao
     abstract fun dao(): com.gernalix.sostanze.data.SostanzeDao
     abstract fun wordPulseDao(): com.wordpulse.app.data.WordPulseDao
     abstract fun financeDao(): com.gernalix.personalhub.core.database.capsules.soldi.FinanceDao
@@ -105,7 +110,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 15
+        const val SCHEMA_VERSION = 16
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -351,6 +356,75 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id` ON `check_in_attempt_candidates` (`attempt_id`)")
                                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_place_id` ON `check_in_attempt_candidates` (`place_id`)")
                                     db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_check_in_attempt_candidates_attempt_id_place_id` ON `check_in_attempt_candidates` (`attempt_id`, `place_id`)")
+                                    db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
+                                }
+                            },
+            object : androidx.room.migration.Migration(15, 16) {
+                                override fun migrate(db: SupportSQLiteDatabase) {
+                                    db.execSQL("""
+                                        CREATE TABLE IF NOT EXISTS `place_tags` (
+                                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                            `name` TEXT NOT NULL,
+                                            `normalized_name` TEXT NOT NULL,
+                                            `created_at` INTEGER NOT NULL,
+                                            `updated_at` INTEGER NOT NULL
+                                        )
+                                    """.trimIndent())
+                                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_place_tags_normalized_name` ON `place_tags` (`normalized_name`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_tags_name` ON `place_tags` (`name`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_tags_updated_at` ON `place_tags` (`updated_at`)")
+
+                                    db.execSQL("""
+                                        CREATE TABLE IF NOT EXISTS `place_tag_cross_ref` (
+                                            `place_uuid` TEXT NOT NULL,
+                                            `tag_id` INTEGER NOT NULL,
+                                            PRIMARY KEY(`place_uuid`, `tag_id`),
+                                            FOREIGN KEY(`place_uuid`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                                            FOREIGN KEY(`tag_id`) REFERENCES `place_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                                        )
+                                    """.trimIndent())
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_tag_cross_ref_place_uuid` ON `place_tag_cross_ref` (`place_uuid`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_place_tag_cross_ref_tag_id` ON `place_tag_cross_ref` (`tag_id`)")
+
+                                    db.execSQL("""
+                                        CREATE TABLE IF NOT EXISTS `alert_rules` (
+                                            `id` TEXT NOT NULL,
+                                            `domain` TEXT NOT NULL,
+                                            `trigger` TEXT NOT NULL,
+                                            `target_kind` TEXT NOT NULL,
+                                            `entity_id` TEXT,
+                                            `match_mode` TEXT NOT NULL,
+                                            `message` TEXT NOT NULL,
+                                            `scope` TEXT NOT NULL,
+                                            `enabled` INTEGER NOT NULL,
+                                            `cooldown_ms` INTEGER NOT NULL,
+                                            `last_fired_at` INTEGER,
+                                            `created_at` INTEGER NOT NULL,
+                                            `updated_at` INTEGER NOT NULL,
+                                            `deleted_at` INTEGER,
+                                            PRIMARY KEY(`id`)
+                                        )
+                                    """.trimIndent())
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_rules_domain` ON `alert_rules` (`domain`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_rules_trigger` ON `alert_rules` (`trigger`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_rules_target_kind` ON `alert_rules` (`target_kind`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_rules_entity_id` ON `alert_rules` (`entity_id`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_rules_enabled` ON `alert_rules` (`enabled`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_rules_deleted_at` ON `alert_rules` (`deleted_at`)")
+
+                                    db.execSQL("""
+                                        CREATE TABLE IF NOT EXISTS `alert_place_tag_targets` (
+                                            `rule_id` TEXT NOT NULL,
+                                            `place_tag_id` INTEGER NOT NULL,
+                                            PRIMARY KEY(`rule_id`, `place_tag_id`),
+                                            FOREIGN KEY(`rule_id`) REFERENCES `alert_rules`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                                            FOREIGN KEY(`place_tag_id`) REFERENCES `place_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                                        )
+                                    """.trimIndent())
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_place_tag_targets_rule_id` ON `alert_place_tag_targets` (`rule_id`)")
+                                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_alert_place_tag_targets_place_tag_id` ON `alert_place_tag_targets` (`place_tag_id`)")
+
+
                                     db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                                 }
                             },

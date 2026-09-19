@@ -288,4 +288,25 @@
     <string name="restore_error_inconsistent">The backup contains inconsistent or incomplete references.</string>
     <string name="restore_error_cannot_read">The selected backup cannot be read.</string>
     <string name="restore_error_invalid">The selected backup is not compatible.</string>
+
+    <string name="place_tags">Places tags</string>
+    <string name="place_tags_hint">Comma-separated, for example Lidl, groceries</string>
+    <string name="place_alerts">Alerts</string>
+    <string name="place_alerts_title">Alerts · %1$s</string>
+    <string name="place_alert_message">Alert text</string>
+    <string name="place_alert_link_hint">If the entire text is one http(s) or Workflowy link, tapping the notification opens it directly.</string>
+    <string name="place_alert_when">When</string>
+    <string name="place_alert_both">Both</string>
+    <string name="place_alert_where">Where</string>
+    <string name="place_alert_this_place">This place</string>
+    <string name="place_alert_no_tags">Add Places tags to at least one place before creating a tag-based alert.</string>
+    <string name="place_alert_all_tags">All selected tags</string>
+    <string name="place_alert_any_tag">Any selected tag</string>
+    <string name="place_alert_every_time">Every time</string>
+    <string name="place_alert_once">Next time only</string>
+    <string name="place_alert_add">Add alert</string>
+    <string name="place_alert_update">Save changes</string>
+    <string name="place_alert_edit">Edit</string>
+    <string name="place_alert_existing">Existing Places alerts</string>
+    <string name="place_alert_specific_place">Specific place</string>
 </resources>

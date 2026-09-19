@@ -89,6 +89,7 @@ source_roots: dict[str, Path] = {
     "contracts:database": ROOT / "contracts/database/src/main",
     "core:database": ROOT / "core/database/src/main",
     "core:hub-context": ROOT / "core/hub-context/src/main",
+    "core:alerts": ROOT / "core/alerts/src/main",
 }
 for feature_dir in sorted((ROOT / "feature").glob("*")):
     if feature_dir.is_dir():

@@ -14,13 +14,18 @@ data class PlaceMutation(
     val radiusM: Double?,
     val notes: String?,
     val sourceApp: String = "Luoghi",
+    val tagNames: Set<String> = emptySet(),
 )
 
 class PlacesCapsule(private val repository: PlaceRepository) {
     val places: Flow<List<PlaceEntity>> = repository.places
+    val tags = repository.placeTags
 
-    suspend fun save(mutation: PlaceMutation): String =
-        repository.savePlace(
+    suspend fun tagsForPlace(placeUuid: String) = repository.tagsForPlace(placeUuid)
+    suspend fun listTags() = repository.listPlaceTags()
+
+    suspend fun save(mutation: PlaceMutation): String {
+        val uuid = repository.savePlace(
             uuid = mutation.uuid,
             nickname = mutation.nickname,
             address = mutation.address,
@@ -30,6 +35,9 @@ class PlacesCapsule(private val repository: PlaceRepository) {
             notes = mutation.notes,
             sourceApp = mutation.sourceApp,
         )
+        repository.setPlaceTags(uuid, mutation.tagNames)
+        return uuid
+    }
 
     suspend fun delete(uuid: String): PlaceDeleteResult = repository.deletePlace(uuid)
 

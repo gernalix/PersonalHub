@@ -37,6 +37,9 @@ import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
 import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
+import com.gernalix.luoghi.data.PlaceTagEntity
+import com.gernalix.personalhub.alerts.AlertRuleEntity
+import com.gernalix.personalhub.core.alerts.PlaceAlertDraft
 import com.gernalix.luoghi.export.BackupFolderStore
 import androidx.core.content.edit
 import kotlinx.coroutines.CancellationException
@@ -62,6 +65,7 @@ data class PlaceFormState(
     val lon: Double? = null,
     val radiusM: String = CheckInPolicy.DEFAULT_RADIUS_M.toInt().toString(),
     val notes: String = "",
+    val tagsText: String = "",
     val sourceApp: String = "Luoghi",
 ) {
     companion object {
@@ -231,6 +235,9 @@ data class HomeUiState(
     val geofenceMessage: GeofenceMessage? = null,
     val restore: RestoreUiState = RestoreUiState(),
     val placeDeleteMessage: PlaceDeleteMessage? = null,
+    val placeTags: List<PlaceTagEntity> = emptyList(),
+    val placeAlertRules: List<AlertRuleEntity> = emptyList(),
+    val placeAlertTagTargets: Map<String, Set<Long>> = emptyMap(),
 )
 
 class LuoghiHomeViewModel(
@@ -674,6 +681,12 @@ class LuoghiHomeViewModel(
                 addressAutocomplete = it.addressAutocomplete.copy(loading = false, suggestions = emptyList()),
             )
         }
+        viewModelScope.launch {
+            val tagText = container.places.tagsForPlace(place.uuid).joinToString(", ") { it.name }
+            mutableState.update { current ->
+                if (current.form.uuid == place.uuid) current.copy(form = current.form.copy(tagsText = tagText)) else current
+            }
+        }
     }
 
     fun newPlace() {
@@ -727,6 +740,55 @@ class LuoghiHomeViewModel(
 
     fun updateNotes(value: String) {
         mutableState.update { it.copy(form = it.form.copy(notes = value)) }
+    }
+
+    fun updatePlaceTags(value: String) {
+        mutableState.update { it.copy(form = it.form.copy(tagsText = value)) }
+    }
+
+    fun loadPlaceAlertData() {
+        viewModelScope.launch { refreshPlaceAlertDataNow() }
+    }
+
+    fun createPlaceAlert(draft: PlaceAlertDraft) {
+        viewModelScope.launch {
+            container.alerts.create(draft)
+            refreshPlaceAlertDataNow()
+        }
+    }
+
+    fun updatePlaceAlert(ruleId: String, draft: PlaceAlertDraft) {
+        viewModelScope.launch {
+            container.alerts.update(ruleId, draft)
+            refreshPlaceAlertDataNow()
+        }
+    }
+
+    fun deletePlaceAlert(ruleId: String) {
+        viewModelScope.launch {
+            container.alerts.delete(ruleId)
+            refreshPlaceAlertDataNow()
+        }
+    }
+
+    fun setPlaceAlertEnabled(ruleId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            container.alerts.setEnabled(ruleId, enabled)
+            refreshPlaceAlertDataNow()
+        }
+    }
+
+    private suspend fun refreshPlaceAlertDataNow() {
+        val tags = container.places.listTags()
+        val rules = container.alerts.listRules()
+        val targets = container.alerts.placeTagTargets(rules.map { it.id })
+        mutableState.update {
+            it.copy(
+                placeTags = tags,
+                placeAlertRules = rules,
+                placeAlertTagTargets = targets,
+            )
+        }
     }
 
     fun updateAddress(value: String) {
@@ -860,6 +922,7 @@ class LuoghiHomeViewModel(
                 lon = form.lon,
                 radiusM = form.radiusM.toDoubleOrNull()?.coerceAtLeast(MIN_RADIUS_M),
                 notes = form.notes,
+                tagNames = parsePlaceTagText(form.tagsText),
                 sourceApp = form.sourceApp,
             )
             val createdFromUnknownLocation = (pendingLocation != null) && (form.uuid == null)
@@ -1306,6 +1369,12 @@ class LuoghiHomeViewModel(
         filter { it.isDigit() || it == '.' }.let { value ->
             if (value.count { it == '.' } <= 1) value else value.substringBefore('.') + "." + value.substringAfter('.').replace(".", "")
         }
+
+    private fun parsePlaceTagText(value: String): Set<String> =
+        value.split(',', ';', '\n')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toCollection(linkedSetOf())
 
     companion object {
         private const val MIN_RADIUS_M = 5.0

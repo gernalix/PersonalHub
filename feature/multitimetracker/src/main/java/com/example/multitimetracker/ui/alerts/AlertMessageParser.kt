@@ -1,6 +1,7 @@
 package com.example.multitimetracker.ui.alerts
 
 import java.net.URI
+import com.gernalix.personalhub.core.alerts.AlertLinkPolicy
 
 sealed interface AlertMessageSegment {
     data class Text(val value: String) : AlertMessageSegment
@@ -55,16 +56,8 @@ fun parseAlertMessageSegments(message: String): List<AlertMessageSegment> {
     return segments.mergeAdjacentText()
 }
 
-fun isAllowedAlertLink(url: String): Boolean {
-    val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false
-    val scheme = uri.scheme?.lowercase() ?: return false
-    if (uri.schemeSpecificPart.isNullOrBlank()) return false
-    return if (scheme == "https" || scheme == "http") {
-        !uri.host.isNullOrBlank()
-    } else {
-        true
-    }
-}
+fun isAllowedAlertLink(url: String): Boolean =
+    AlertLinkPolicy.isLinkOnlyUri(url)
 
 private data class ParsedLink(
     val label: String,

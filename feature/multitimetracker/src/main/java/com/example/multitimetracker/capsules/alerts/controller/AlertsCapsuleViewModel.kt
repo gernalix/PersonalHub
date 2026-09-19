@@ -21,6 +21,11 @@ import com.example.multitimetracker.model.TimeFenceMatchMode
 import com.example.multitimetracker.model.TimeFenceRule
 import com.example.multitimetracker.model.TimeFenceScope
 import com.example.multitimetracker.model.TimeFenceTrigger
+import com.gernalix.personalhub.core.alerts.AlertLinkPolicy
+import com.gernalix.personalhub.core.alerts.AlertNotificationDispatcher
+import com.gernalix.personalhub.core.alerts.AlertDomain
+import com.gernalix.personalhub.core.alerts.AlertFire
+import com.gernalix.personalhub.core.alerts.AlertTaskerBridge
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
@@ -163,6 +168,13 @@ class AlertsCapsuleViewModel(
 
     private fun showInAppPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long): Boolean {
         showNotificationOverride?.let { return it(ruleId, title, message) }
+        val context = getContext()
+        if (context != null && AlertLinkPolicy.linkOnlyUriOrNull(message) != null) {
+            val notificationId = ("timer-alert:" + ruleId + ":" + sessionId).hashCode() and Int.MAX_VALUE
+            if (AlertNotificationDispatcher.postNotification(context, notificationId, title, message)) {
+                return true
+            }
+        }
         showTimerAlertPrompt(ruleId, sessionId, title, message, firedAtMs)
         return true
     }
@@ -542,6 +554,25 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
                 val title = match.title
 
                 if (!showInAppPrompt(r.id, ev.sessionId, title, r.message, nowMs)) continue
+                getContext()?.let { context ->
+                    AlertTaskerBridge.emit(
+                        context,
+                        AlertFire(
+                            ruleId = r.id.toString(),
+                            domain = AlertDomain.TIMER,
+                            trigger = when (ev.trigger) {
+                                TimeFenceTrigger.ON_START -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_START
+                                TimeFenceTrigger.ON_STOP -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_STOP
+                            },
+                            entityId = ev.sessionId.toString(),
+                            tagIds = ev.sessionTagIds.mapTo(linkedSetOf()) { it.toString() },
+                            tagNames = ev.sessionTagIds.mapNotNullTo(linkedSetOf()) { tagNameById[it] },
+                            title = title,
+                            message = r.message,
+                            firedAtMs = nowMs,
+                        ),
+                    )
+                }
                 logSystemEvent(
                     "ALERT_FIRED",
                     "TIME_FENCE_RULE",

@@ -53,10 +53,12 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Run instrumentation suite on emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          PERSONALHUB_DATASETTE_RUNTIME_JSON: ${{ secrets.PERSONALHUB_DATASETTE_RUNTIME_JSON }}
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew --no-daemon --console=plain connectedDebugAndroidTest -Ppersonalhub.allowCiEmulatorDebug=true
+          script: timeout --signal=TERM --kill-after=2m 50m bash tools/run_ci_instrumentation.sh

@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import java.util.Locale
 
 sealed interface PlaceDeleteResult {
     data object Deleted : PlaceDeleteResult
@@ -32,12 +33,52 @@ class PlaceRepository(
     private val placeReferences: PlaceReferenceReader = database,
 ) {
     val places: Flow<List<PlaceEntity>> = dao.observePlaces()
+    val placeTags: Flow<List<PlaceTagEntity>> = dao.observePlaceTags()
     val events: Flow<List<PlaceEventEntity>> = dao.observeEvents()
     val recentCheckInAttempts: Flow<List<CheckInAttemptDiagnostic>> = dao.observeRecentCheckInAttemptDiagnostics(8)
     val geofenceConfigs: Flow<List<PlaceGeofenceConfigEntity>> = dao.observeGeofenceConfigs()
     val globalStatsState: Flow<GlobalStatsStateEntity?> = dao.observeGlobalStatsState()
     val latestUndoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestUndoableAction()
     val latestRedoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestRedoableAction()
+
+    suspend fun listPlaceTags(): List<PlaceTagEntity> = dao.listPlaceTags()
+
+    suspend fun tagsForPlace(placeUuid: String): List<PlaceTagEntity> = dao.tagsForPlace(placeUuid)
+
+    suspend fun setPlaceTags(placeUuid: String, names: Collection<String>) {
+        val normalizedNames = names
+            .asSequence()
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinctBy { it.lowercase(Locale.ROOT) }
+            .toList()
+
+        DatabaseMutationCoordinator.mutex.withLock {
+            database.withTransaction {
+                val refs = normalizedNames.map { displayName ->
+                    val normalized = displayName.lowercase(Locale.ROOT)
+                    val existing = dao.getPlaceTagByNormalizedName(normalized)
+                    val tagId = existing?.id ?: run {
+                        val now = System.currentTimeMillis()
+                        val inserted = dao.insertPlaceTag(
+                            PlaceTagEntity(
+                                name = displayName,
+                                normalizedName = normalized,
+                                createdAt = now,
+                                updatedAt = now,
+                            )
+                        )
+                        if (inserted > 0L) inserted
+                        else requireNotNull(dao.getPlaceTagByNormalizedName(normalized)).id
+                    }
+                    PlaceTagCrossRef(placeUuid = placeUuid, tagId = tagId)
+                }
+                dao.clearPlaceTagCrossRefs(placeUuid)
+                if (refs.isNotEmpty()) dao.insertPlaceTagCrossRefs(refs)
+            }
+        }
+        PersistentMutationTracker.record(context, "place_tags.replace")
+    }
 
     suspend fun savePlace(
         uuid: String?,

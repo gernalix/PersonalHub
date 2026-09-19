@@ -72,6 +72,16 @@ class DatabaseMigrationSafetyTest {
                     assertEquals(1L, scalar(db, "SELECT count(*) FROM check_in_attempt_candidates WHERE attempt_id='attempt-14'"))
                     assertEquals("Candidate Place", scalarText(db, "SELECT place_name_snapshot FROM check_in_attempt_candidates WHERE attempt_id='attempt-14'"))
                 }
+                if (version == 15) {
+                    assertTrue(tableExists(db, "place_tags"))
+                    assertTrue(tableExists(db, "place_tag_cross_ref"))
+                    assertTrue(tableExists(db, "alert_rules"))
+                    assertTrue(tableExists(db, "alert_place_tag_targets"))
+                    try {
+                        db.execSQL("INSERT INTO place_tag_cross_ref(place_uuid,tag_id) VALUES('missing',1)")
+                        fail("Expected place tag foreign-key failure")
+                    } catch (_: Exception) { }
+                }
             } finally { owner.close() }
             if (version == 12) {
                 val reopened = PersonalHubDatabase.openTemporary(context, file.absolutePath)
@@ -162,6 +172,9 @@ class DatabaseMigrationSafetyTest {
 
     private fun tableExists(db: SQLiteDatabase, table: String) =
         db.rawQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", arrayOf(table)).use { it.moveToFirst() }
+
+    private fun tableExists(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String) =
+        db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", arrayOf(table)).use { it.moveToFirst() }
 
     private fun scalar(db: androidx.sqlite.db.SupportSQLiteDatabase, sql: String) =
         db.query(sql).use { assertTrue(it.moveToFirst()); it.getLong(0) }

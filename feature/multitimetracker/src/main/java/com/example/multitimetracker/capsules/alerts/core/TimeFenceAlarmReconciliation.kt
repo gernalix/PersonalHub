@@ -10,6 +10,13 @@ import com.example.multitimetracker.model.TimedTagNotificationType
 import com.example.multitimetracker.model.TimeFenceMatchMode
 import com.example.multitimetracker.model.TimeFenceRule
 import com.example.multitimetracker.model.TimeFenceTrigger
+import com.gernalix.personalhub.core.alerts.AlertMatchMode
+import com.gernalix.personalhub.core.alerts.AlertDomain
+import com.gernalix.personalhub.core.alerts.AlertEventSpec
+import com.gernalix.personalhub.core.alerts.AlertMatching
+import com.gernalix.personalhub.core.alerts.AlertRuleSpec
+import com.gernalix.personalhub.core.alerts.AlertTargetKind
+import com.gernalix.personalhub.core.alerts.AlertTrigger
 
 internal data class LegacyTimerAlertKey(
     val ruleId: Long,
@@ -50,14 +57,38 @@ internal fun matchTimeFenceRuleForEvent(
     tagNameById: Map<Long, String>,
 ): TimeFenceRuntimeMatch? {
     if (!isLiveTimeFenceRule(rule)) return null
-    if (rule.trigger != event.trigger) return null
-    val matchesTags = when (rule.matchMode) {
-        TimeFenceMatchMode.AND -> rule.tagIds.all { event.sessionTagIds.contains(it) }
-        TimeFenceMatchMode.OR -> rule.tagIds.isEmpty() || rule.tagIds.any { event.sessionTagIds.contains(it) }
+    val ruleTrigger = when (rule.trigger) {
+        TimeFenceTrigger.ON_START -> AlertTrigger.TIMER_START
+        TimeFenceTrigger.ON_STOP -> AlertTrigger.TIMER_STOP
     }
-    if (!matchesTags) return null
-    val lastFired = rule.lastFiredAtMs ?: 0L
-    if (rule.cooldownMs > 0L && (nowMs - lastFired) < rule.cooldownMs) return null
+    val eventTrigger = when (event.trigger) {
+        TimeFenceTrigger.ON_START -> AlertTrigger.TIMER_START
+        TimeFenceTrigger.ON_STOP -> AlertTrigger.TIMER_STOP
+    }
+    val matches = AlertMatching.ruleMatches(
+        rule = AlertRuleSpec(
+            domain = AlertDomain.TIMER,
+            trigger = ruleTrigger,
+            targetKind = AlertTargetKind.TAGS,
+            requiredTagIds = rule.tagIds.mapTo(linkedSetOf()) { it.toString() },
+            matchMode = when (rule.matchMode) {
+                TimeFenceMatchMode.AND -> AlertMatchMode.ALL
+                TimeFenceMatchMode.OR -> AlertMatchMode.ANY
+            },
+            enabled = true,
+            cooldownMs = rule.cooldownMs,
+            lastFiredAtMs = rule.lastFiredAtMs,
+            emptyTagQueryMatches = rule.matchMode == TimeFenceMatchMode.OR,
+        ),
+        event = AlertEventSpec(
+            domain = AlertDomain.TIMER,
+            trigger = eventTrigger,
+            entityId = event.sessionId.toString(),
+            tagIds = event.sessionTagIds.mapTo(linkedSetOf()) { it.toString() },
+        ),
+        nowMs = nowMs,
+    )
+    if (!matches) return null
     val firstTagName = event.sessionTagIds.firstOrNull()
         ?.let { tagNameById[it] }
         ?.trim()

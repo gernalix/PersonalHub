@@ -288,4 +288,25 @@
     <string name="restore_error_inconsistent">Il backup contiene riferimenti incoerenti o incompleti.</string>
     <string name="restore_error_cannot_read">Non è possibile leggere il backup selezionato.</string>
     <string name="restore_error_invalid">Il backup selezionato non è compatibile.</string>
+
+    <string name="place_tags">Tag di Places</string>
+    <string name="place_tags_hint">Separati da virgole, per esempio Lidl, groceries</string>
+    <string name="place_alerts">Alert</string>
+    <string name="place_alerts_title">Alert · %1$s</string>
+    <string name="place_alert_message">Testo dell’alert</string>
+    <string name="place_alert_link_hint">Se tutto il testo è un singolo link http(s) o Workflowy, toccando la notifica il link si apre direttamente.</string>
+    <string name="place_alert_when">Quando</string>
+    <string name="place_alert_both">Entrambi</string>
+    <string name="place_alert_where">Dove</string>
+    <string name="place_alert_this_place">Questo luogo</string>
+    <string name="place_alert_no_tags">Aggiungi tag di Places ad almeno un luogo prima di creare un alert basato sui tag.</string>
+    <string name="place_alert_all_tags">Tutti i tag selezionati</string>
+    <string name="place_alert_any_tag">Almeno uno dei tag</string>
+    <string name="place_alert_every_time">Ogni volta</string>
+    <string name="place_alert_once">Solo la prossima volta</string>
+    <string name="place_alert_add">Aggiungi alert</string>
+    <string name="place_alert_update">Salva modifiche</string>
+    <string name="place_alert_edit">Modifica</string>
+    <string name="place_alert_existing">Alert Places esistenti</string>
+    <string name="place_alert_specific_place">Luogo specifico</string>
 </resources>
