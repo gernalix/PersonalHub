@@ -1,7 +1,5 @@
 package com.gernalix.luoghi
 
-import android.net.Uri
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressAutocompleteLatestGate
@@ -26,11 +24,6 @@ import com.gernalix.luoghi.capsules.stats.StatsSnapshot
 import com.gernalix.luoghi.capsules.visits.VisitMapper
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
-import com.gernalix.luoghi.backup.BackupValidationCode
-import com.gernalix.luoghi.backup.BackupValidationException
-import com.gernalix.luoghi.backup.RestoreResult
-import com.gernalix.luoghi.backup.RestoreSummary
-import com.gernalix.luoghi.backup.ValidatedBackup
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
@@ -40,8 +33,6 @@ import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
 import com.gernalix.luoghi.data.PlaceTagEntity
 import com.gernalix.personalhub.alerts.AlertRuleEntity
 import com.gernalix.personalhub.core.alerts.PlaceAlertDraft
-import com.gernalix.luoghi.export.BackupFolderStore
-import androidx.core.content.edit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -81,12 +72,6 @@ data class PlaceFormState(
         )
     }
 }
-
-data class SafGateState(
-    val status: BackupFolderStore.ValidationStatus = BackupFolderStore.ValidationStatus.MISSING,
-    val loading: Boolean = true,
-    val folderLabel: String? = null,
-)
 
 data class AddressAutocompleteState(
     val configured: Boolean,
@@ -166,62 +151,12 @@ data class HistoryUiState(
     val message: HistoryMessage? = null,
 )
 
-enum class RestoreFlowPhase {
-    IDLE,
-    DISCOVERING,
-    INSPECTING,
-    READY,
-    RESTORING,
-    DEFERRING,
-    DEFERRED,
-    SUCCESS,
-    ERROR,
-}
-
-enum class RestoreFlowOrigin {
-    FIRST_RUN,
-    MANUAL,
-}
-
-enum class RestoreUiError {
-    DISCOVERY_FAILED,
-    NO_COMPATIBLE_BACKUP,
-    INVALID_BACKUP,
-    RESTORE_FAILED,
-    PRESERVE_FAILED,
-}
-
-data class RestoreUiState(
-    val phase: RestoreFlowPhase = RestoreFlowPhase.IDLE,
-    val origin: RestoreFlowOrigin = RestoreFlowOrigin.FIRST_RUN,
-    val candidate: ValidatedBackup? = null,
-    val validationCode: BackupValidationCode? = null,
-    val error: RestoreUiError? = null,
-    val summary: RestoreSummary? = null,
-    val preservedFileName: String? = null,
-) {
-    val dialogVisible: Boolean
-        get() = phase in setOf(
-            RestoreFlowPhase.DISCOVERING,
-            RestoreFlowPhase.INSPECTING,
-            RestoreFlowPhase.READY,
-            RestoreFlowPhase.RESTORING,
-            RestoreFlowPhase.DEFERRING,
-            RestoreFlowPhase.SUCCESS,
-            RestoreFlowPhase.ERROR,
-        )
-
-    val hasDeferredBackup: Boolean
-        get() = (phase == RestoreFlowPhase.DEFERRED) && (candidate != null)
-}
-
 data class HomeUiState(
     val dataLoaded: Boolean = false,
     val places: List<PlaceEntity> = emptyList(),
     val placeItems: List<PlaceListUiModel> = emptyList(),
     val visits: List<VisitUiModel> = emptyList(),
     val form: PlaceFormState = PlaceFormState(),
-    val safGate: SafGateState = SafGateState(),
     val addressAutocomplete: AddressAutocompleteState = AddressAutocompleteState(configured = false),
     val checkIn: CheckInHomeState = CheckInHomeState(),
     val nowMs: Long = System.currentTimeMillis(),
@@ -233,7 +168,6 @@ data class HomeUiState(
     val listLocationUnavailable: Boolean = false,
     val geofenceConfigs: Map<String, PlaceGeofenceConfigEntity> = emptyMap(),
     val geofenceMessage: GeofenceMessage? = null,
-    val restore: RestoreUiState = RestoreUiState(),
     val placeDeleteMessage: PlaceDeleteMessage? = null,
     val placeTags: List<PlaceTagEntity> = emptyList(),
     val placeAlertRules: List<AlertRuleEntity> = emptyList(),
@@ -242,9 +176,7 @@ data class HomeUiState(
 
 class LuoghiHomeViewModel(
     private val container: LuoghiAppContainer,
-    context: Context,
 ) : ViewModel() {
-    private val restoreUiPrefs = context.applicationContext.getSharedPreferences(RESTORE_UI_PREFS, Context.MODE_PRIVATE)
     private val mutableState = MutableStateFlow(
         HomeUiState(
             addressAutocomplete = AddressAutocompleteState(
@@ -256,7 +188,6 @@ class LuoghiHomeViewModel(
     private var addressSearchJob: Job? = null
     private val addressLatestGate = AddressAutocompleteLatestGate()
     private var lastAddressSearchQuery: String? = null
-    private var safSetupJob: Job? = null
 
     private val historyActionState = combine(
         container.checkIns.latestUndoableHistoryAction,
@@ -315,360 +246,6 @@ class LuoghiHomeViewModel(
             }
         }
     }
-
-    fun refreshSafGate() {
-        safSetupJob?.cancel()
-        safSetupJob = viewModelScope.launch {
-            mutableState.update { it.copy(safGate = it.safGate.copy(loading = true)) }
-            val status = withContext(Dispatchers.IO) { container.safExport.verify() }
-            val gate = SafGateState(
-                status = status,
-                loading = false,
-                folderLabel = withContext(Dispatchers.IO) { container.safExport.folderLabel() },
-            )
-            mutableState.update { it.copy(safGate = gate) }
-            if ((status == BackupFolderStore.ValidationStatus.READY) && (!mutableState.value.restore.hasDeferredBackup)) {
-                resolveReadyBackupFolder()
-            }
-        }
-    }
-
-    fun saveSelectedSafFolder(uri: Uri) {
-        safSetupJob?.cancel()
-        safSetupJob = viewModelScope.launch {
-            mutableState.update {
-                it.copy(
-                    safGate = it.safGate.copy(loading = true),
-                    restore = RestoreUiState(
-                        phase = RestoreFlowPhase.DISCOVERING,
-                        origin = RestoreFlowOrigin.FIRST_RUN,
-                    ),
-                )
-            }
-            val status = withContext(Dispatchers.IO) {
-                container.safExport.saveSelectedFolder(uri, queueInitialExport = false)
-            }
-            val gate = SafGateState(
-                status = status,
-                loading = false,
-                folderLabel = withContext(Dispatchers.IO) { container.safExport.folderLabel() },
-            )
-            mutableState.update { it.copy(safGate = gate) }
-            if (status == BackupFolderStore.ValidationStatus.READY) {
-                container.restore.protectAutoExport()
-                resolveReadyBackupFolder()
-            } else {
-                mutableState.update { it.copy(restore = RestoreUiState()) }
-            }
-        }
-    }
-
-    fun inspectBackup(uri: Uri) {
-        val deferredBeforeInspection = mutableState.value.restore.takeIf { it.hasDeferredBackup }
-        val inspectionOrigin = if (container.restore.isAutoExportProtected()) {
-            RestoreFlowOrigin.FIRST_RUN
-        } else {
-            RestoreFlowOrigin.MANUAL
-        }
-        viewModelScope.launch {
-            mutableState.update {
-                it.copy(
-                    restore = RestoreUiState(
-                        phase = RestoreFlowPhase.INSPECTING,
-                        origin = inspectionOrigin,
-                    )
-                )
-            }
-            val inspected = withContext(Dispatchers.IO) { container.restore.inspectUri(uri) }
-            inspected.onSuccess { candidate ->
-                mutableState.update {
-                    it.copy(
-                        restore = RestoreUiState(
-                            phase = RestoreFlowPhase.READY,
-                            origin = inspectionOrigin,
-                            candidate = candidate,
-                        )
-                    )
-                }
-            }.onFailure { error ->
-                mutableState.update {
-                    it.copy(
-                        restore = (deferredBeforeInspection ?: RestoreUiState(origin = inspectionOrigin)).copy(
-                            phase = RestoreFlowPhase.ERROR,
-                            validationCode = (error as? BackupValidationException)?.code,
-                            error = RestoreUiError.INVALID_BACKUP,
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    fun restoreSelectedBackup() {
-        val current = mutableState.value.restore
-        val candidate = current.candidate ?: return
-        if (current.phase != RestoreFlowPhase.READY) return
-        viewModelScope.launch {
-            mutableState.update {
-                it.copy(restore = current.copy(phase = RestoreFlowPhase.RESTORING, error = null))
-            }
-            when (val result = withContext(Dispatchers.IO) { container.restore.restore(candidate) }) {
-                is RestoreResult.Success -> mutableState.update {
-                    clearDeferredRestore()
-                    it.copy(
-                        restore = RestoreUiState(
-                            phase = RestoreFlowPhase.SUCCESS,
-                            origin = current.origin,
-                            summary = result.summary,
-                        )
-                    )
-                }
-
-                is RestoreResult.InvalidBackup -> mutableState.update {
-                    it.copy(
-                        restore = current.copy(
-                            phase = RestoreFlowPhase.ERROR,
-                            validationCode = result.code,
-                            error = RestoreUiError.INVALID_BACKUP,
-                        )
-                    )
-                }
-
-                is RestoreResult.Failure -> mutableState.update {
-                    it.copy(
-                        restore = current.copy(
-                            phase = RestoreFlowPhase.ERROR,
-                            error = RestoreUiError.RESTORE_FAILED,
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    fun continueWithoutRestore() {
-        val current = mutableState.value.restore
-        val candidate = current.candidate ?: return
-        if (current.phase != RestoreFlowPhase.READY) return
-        viewModelScope.launch {
-            mutableState.update {
-                it.copy(restore = current.copy(phase = RestoreFlowPhase.DEFERRING, error = null))
-            }
-            val deferred = withContext(Dispatchers.IO) { container.restore.continueWithoutRestore(candidate) }
-            if (deferred.isSuccess) {
-                val preservedFileName = deferred.getOrThrow()
-                val preservedCandidate = preservingCancellation {
-                    withContext(Dispatchers.IO) {
-                        container.restore.discoverConfiguredBackups().compatible.firstOrNull {
-                            (it.preview.sha256.equals(candidate.preview.sha256, ignoreCase = true)) &&
-                                (it.preview.source.displayName == preservedFileName)
-                        }
-                    }
-                }.getOrNull() ?: candidate
-                rememberDeferredRestore(preservedCandidate, preservedFileName)
-                mutableState.update {
-                    it.copy(
-                        restore = current.copy(
-                            phase = RestoreFlowPhase.DEFERRED,
-                            candidate = preservedCandidate,
-                            preservedFileName = preservedFileName,
-                        )
-                    )
-                }
-            } else {
-                mutableState.update {
-                    it.copy(
-                        restore = current.copy(
-                            phase = RestoreFlowPhase.ERROR,
-                            error = RestoreUiError.PRESERVE_FAILED,
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    fun showDeferredRestore() {
-        val current = mutableState.value.restore
-        if (!current.hasDeferredBackup) return
-        viewModelScope.launch {
-            mutableState.update {
-                it.copy(restore = current.copy(phase = RestoreFlowPhase.INSPECTING))
-            }
-            val expectedSha = deferredRestoreSha() ?: current.candidate?.preview?.sha256
-            val preserved = preservingCancellation {
-                withContext(Dispatchers.IO) {
-                    container.restore.discoverConfiguredBackups().compatible.firstOrNull { candidate ->
-                        (expectedSha != null) && candidate.preview.sha256.equals(expectedSha, ignoreCase = true)
-                    }
-                }
-            }.getOrNull()
-            mutableState.update {
-                it.copy(
-                    restore = if (preserved == null) {
-                        current.copy(
-                            phase = RestoreFlowPhase.ERROR,
-                            error = RestoreUiError.DISCOVERY_FAILED,
-                        )
-                    } else {
-                        current.copy(
-                            phase = RestoreFlowPhase.READY,
-                            candidate = preserved,
-                            error = null,
-                        )
-                    }
-                )
-            }
-        }
-    }
-
-    fun closeRestoreStatus() {
-        mutableState.update {
-            val current = it.restore
-            val next = when (current.phase) {
-                RestoreFlowPhase.ERROR -> {
-                    if ((current.candidate != null) && (current.preservedFileName != null)) {
-                        current.copy(phase = RestoreFlowPhase.DEFERRED, error = null, validationCode = null)
-                    } else if (current.candidate != null) {
-                        current.copy(phase = RestoreFlowPhase.READY, error = null, validationCode = null)
-                    } else {
-                        RestoreUiState()
-                    }
-                }
-
-                RestoreFlowPhase.SUCCESS -> RestoreUiState()
-                else -> current
-            }
-            it.copy(restore = next)
-        }
-    }
-
-    private suspend fun resolveReadyBackupFolder() {
-        val hasData = preservingCancellation {
-            withContext(Dispatchers.IO) { container.restore.hasUserData() }
-        }.getOrElse {
-            mutableState.update {
-                it.copy(
-                    restore = RestoreUiState(
-                        phase = RestoreFlowPhase.ERROR,
-                        error = RestoreUiError.DISCOVERY_FAILED,
-                    )
-                )
-            }
-            return
-        }
-        val autoExportProtected = container.restore.isAutoExportProtected()
-        if (hasData && !autoExportProtected) {
-            container.restore.resumeAutoExport()
-            val deferredSha = deferredRestoreSha()
-            if (deferredSha == null) {
-                mutableState.update { it.copy(restore = RestoreUiState()) }
-            } else {
-                val discovery = preservingCancellation {
-                    withContext(Dispatchers.IO) { container.restore.discoverConfiguredBackups() }
-                }.getOrNull()
-                val deferred = discovery?.compatible?.firstOrNull {
-                    it.preview.sha256.equals(deferredSha, ignoreCase = true)
-                }
-                if (deferred == null) {
-                    clearDeferredRestore()
-                    mutableState.update { it.copy(restore = RestoreUiState()) }
-                } else {
-                    mutableState.update {
-                        it.copy(
-                            restore = RestoreUiState(
-                                phase = RestoreFlowPhase.DEFERRED,
-                                origin = RestoreFlowOrigin.FIRST_RUN,
-                                candidate = deferred,
-                                preservedFileName = deferredRestoreFileName(),
-                            )
-                        )
-                    }
-                }
-            }
-            return
-        }
-
-        container.restore.protectAutoExport()
-        mutableState.update {
-            it.copy(
-                restore = RestoreUiState(
-                    phase = RestoreFlowPhase.DISCOVERING,
-                    origin = RestoreFlowOrigin.FIRST_RUN,
-                )
-            )
-        }
-        val discovery = preservingCancellation {
-            withContext(Dispatchers.IO) { container.restore.discoverConfiguredBackups() }
-        }.getOrElse {
-            mutableState.update {
-                it.copy(
-                    restore = RestoreUiState(
-                        phase = RestoreFlowPhase.ERROR,
-                        origin = RestoreFlowOrigin.FIRST_RUN,
-                        error = RestoreUiError.DISCOVERY_FAILED,
-                    )
-                )
-            }
-            return
-        }
-        val preferred = discovery.preferred
-        when {
-            preferred != null -> {
-                val isDeferred = preferred.preview.sha256.equals(deferredRestoreSha(), ignoreCase = true)
-                if (isDeferred) container.restore.resumeAutoExport()
-                mutableState.update {
-                    it.copy(
-                        restore = RestoreUiState(
-                            phase = if (isDeferred) RestoreFlowPhase.DEFERRED else RestoreFlowPhase.READY,
-                            origin = RestoreFlowOrigin.FIRST_RUN,
-                            candidate = preferred,
-                            preservedFileName = deferredRestoreFileName().takeIf { isDeferred },
-                        )
-                    )
-                }
-            }
-            discovery.rejected.any { it.code != BackupValidationCode.EMPTY_BACKUP } -> {
-                mutableState.update {
-                    it.copy(
-                        restore = RestoreUiState(
-                            phase = RestoreFlowPhase.ERROR,
-                            origin = RestoreFlowOrigin.FIRST_RUN,
-                            validationCode = discovery.rejected.first { candidate ->
-                                candidate.code != BackupValidationCode.EMPTY_BACKUP
-                            }.code,
-                            error = RestoreUiError.NO_COMPATIBLE_BACKUP,
-                        )
-                    )
-                }
-            }
-            else -> {
-                clearDeferredRestore()
-                container.restore.resumeAutoExport()
-                mutableState.update { it.copy(restore = RestoreUiState()) }
-            }
-        }
-    }
-
-    private fun rememberDeferredRestore(candidate: ValidatedBackup, fileName: String) {
-        restoreUiPrefs.edit {
-            putString(KEY_DEFERRED_SHA256, candidate.preview.sha256)
-            putString(KEY_DEFERRED_FILE, fileName)
-        }
-    }
-
-    private fun clearDeferredRestore() {
-        restoreUiPrefs.edit {
-            remove(KEY_DEFERRED_SHA256)
-            remove(KEY_DEFERRED_FILE)
-        }
-    }
-
-    private fun deferredRestoreSha(): String? =
-        restoreUiPrefs.getString(KEY_DEFERRED_SHA256, null)?.takeIf { it.isNotBlank() }
-
-    private fun deferredRestoreFileName(): String? =
-        restoreUiPrefs.getString(KEY_DEFERRED_FILE, null)?.takeIf { it.isNotBlank() }
 
     fun editPlace(place: PlaceEntity) {
         container.addressAutocomplete.resetSession()
@@ -1378,9 +955,6 @@ class LuoghiHomeViewModel(
 
     companion object {
         private const val MIN_RADIUS_M = 5.0
-        private const val RESTORE_UI_PREFS = "luoghi_restore_ui"
-        private const val KEY_DEFERRED_SHA256 = "deferred_sha256"
-        private const val KEY_DEFERRED_FILE = "deferred_file"
     }
 }
 
