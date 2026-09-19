@@ -18,13 +18,21 @@ object CallOverlayPermission {
                 .getInstallSourceInfo(context.packageName)
                 .packageSource
         }.getOrNull()
-        return requiresRestrictedSettingsPrimer(Build.VERSION.SDK_INT, packageSource)
+        return requiresRestrictedSettingsPrimer(
+            sdkInt = Build.VERSION.SDK_INT,
+            packageSource = packageSource,
+        )
     }
 
-    internal fun requiresRestrictedSettingsPrimer(sdkInt: Int, packageSource: Int?): Boolean =
+    internal fun requiresRestrictedSettingsPrimer(
+        sdkInt: Int,
+        packageSource: Int?,
+    ): Boolean =
         sdkInt >= Build.VERSION_CODES.BAKLAVA &&
-            (packageSource == PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE ||
-                packageSource == PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE)
+            (
+                packageSource == PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE ||
+                    packageSource == PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE
+            )
 
     fun appInfoIntent(context: Context): Intent =
         Intent(
