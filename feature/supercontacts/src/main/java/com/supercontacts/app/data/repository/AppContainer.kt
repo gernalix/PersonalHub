@@ -2,9 +2,6 @@ package com.supercontacts.app.data.repository
 
 import android.content.Context
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 object AppContainer {
     @Volatile
@@ -16,9 +13,6 @@ object AppContainer {
     @Volatile
     private var homePreferencesStore: HomePreferencesStore? = null
 
-    private val dataLayerGeneration = MutableStateFlow(0)
-
-    val generation: StateFlow<Int> = dataLayerGeneration.asStateFlow()
 
     fun contactsRepository(context: Context): ContactsRepository =
         contactsRepository ?: synchronized(this) {
@@ -59,7 +53,4 @@ object AppContainer {
     /** Releases process caches for isolated database tests. */
     fun resetForTests() = closeDataLayer()
 
-    private fun notifyDataLayerChanged() {
-        dataLayerGeneration.value += 1
-    }
 }
