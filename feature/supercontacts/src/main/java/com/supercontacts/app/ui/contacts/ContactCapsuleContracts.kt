@@ -2,7 +2,6 @@ package com.supercontacts.app.ui.contacts
 
 import android.graphics.Bitmap
 import android.net.Uri
-import com.supercontacts.app.data.backup.BackupState
 import com.supercontacts.app.data.repository.AddressSuggestion
 import com.supercontacts.app.data.repository.ContactDetail
 import com.supercontacts.app.data.repository.ContactDuplicateCandidate
@@ -71,9 +70,7 @@ data class ContactsUiState(
     val fieldSuggestions: Map<String, List<ContactFieldSuggestion>> = emptyMap(),
     val showAddedEdited: Boolean = true,
     val duplicateCandidates: List<ContactDuplicateCandidate> = emptyList(),
-    val backupState: BackupState = BackupState(),
     val isSaving: Boolean = false,
-    val isBackupRunning: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -207,11 +204,3 @@ interface ContactDuplicateOwner {
     fun clearDuplicateCandidates()
 }
 
-interface ContactBackupOwner {
-    val state: StateFlow<ContactBackupState>
-    fun setBackupFolder(uri: Uri)
-    fun setAutoExportEnabled(enabled: Boolean)
-    fun exportBackupNow()
-    fun importBackup(uri: Uri)
-    fun importBackupFolder(uri: Uri)
-}
