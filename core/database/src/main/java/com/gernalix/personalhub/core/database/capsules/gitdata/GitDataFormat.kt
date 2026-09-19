@@ -40,15 +40,17 @@ internal object GitDataFormat {
         var pending: List<Pair<String, Long>> = emptyList()
         var events: List<GitEditEvent> = emptyList()
         var snapshot: File? = null
-        DatabaseGate.access {
-            val live = PersonalHubDatabase.get(context).openHelper.writableDatabase
-            GitHistoryStore.install(live)
-            pending = GitDataTracking.pending(live)
-            events = GitDataTracking.events(live)
-            if (pending.isEmpty() && events.isEmpty() &&
-                GitDataSettings.readCachedStateManifest(context) != null
-            ) return@access
-            snapshot = DatabaseVault.backupCurrent(context)
+        DatabaseVault.withOperations {
+            DatabaseGate.access {
+                val live = PersonalHubDatabase.get(context).openHelper.writableDatabase
+                GitHistoryStore.install(live)
+                pending = GitDataTracking.pending(live)
+                events = GitDataTracking.events(live)
+                if (pending.isEmpty() && events.isEmpty() &&
+                    GitDataSettings.readCachedStateManifest(context) != null
+                ) return@access
+                snapshot = DatabaseVault.backupCurrent(context)
+            }
         }
         val source = snapshot ?: return null
         try {
