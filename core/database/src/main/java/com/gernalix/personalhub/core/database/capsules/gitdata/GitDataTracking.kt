@@ -85,8 +85,9 @@ object GitDataTracking {
         val after = if (op == "DELETE") "NULL" else encodedPayload(columns, "NEW.")
         val columnCsv = columns.joinToString(",").replace("'", "''")
         val dirty = "CREATE TRIGGER `hub_git_dirty_${table}_$op` AFTER $op ON `$table` BEGIN " +
-            "INSERT OR IGNORE INTO $TABLE(table_name,revision) VALUES ('$table',0); " +
-            "UPDATE $TABLE SET revision=revision+1 WHERE table_name='$table'; "
+            "UPDATE $TABLE SET revision=revision+1 WHERE table_name='$table'; " +
+            "INSERT INTO $TABLE(table_name,revision) SELECT '$table',1 " +
+            "WHERE NOT EXISTS (SELECT 1 FROM $TABLE WHERE table_name='$table'); "
         if (table in semanticEventExcluded) return dirty + "END"
         return dirty +
             "INSERT INTO $EVENTS_TABLE(" +

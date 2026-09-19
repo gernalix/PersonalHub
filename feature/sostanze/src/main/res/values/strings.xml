@@ -17,6 +17,7 @@
     <string name="duplicate_name">A substance with this name already exists</string>
     <string name="restore_existing_name">An archived substance has this name: restore it instead</string>
     <string name="section_due_today">Due today</string>
+    <string name="section_taken">Taken today</string>
     <string name="section_later">Later</string>
     <string name="section_blocked">Blocked by interaction</string>
     <string name="section_prn">As needed</string>

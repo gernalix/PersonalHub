@@ -159,6 +159,24 @@ class SyncJournalTest {
         }
     }
 
+    @Test fun gitTrackingAllowsRoomReplaceWhenTableIsAlreadyPending() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val owner = PersonalHubDatabase.openTemporary(context, "git-replace-pending-test.db")
+        try {
+            val db = owner.openHelper.writableDatabase
+            db.execSQL("PRAGMA foreign_keys=OFF")
+            GitDataTracking.install(db, enqueueAll = false)
+            val row = "place_events(id,event_uuid,session_uuid,place_id,event_type,timestamp,lat,lon,accuracy_m,source,notes) " +
+                "VALUES (1,'event-replace','event-replace','place-1','CHECK_IN',1000,NULL,NULL,NULL,'test',NULL)"
+            db.execSQL("INSERT INTO $row")
+            db.execSQL("INSERT OR REPLACE INTO $row")
+            db.query("SELECT revision FROM hub_git_pending WHERE table_name='place_events'").use {
+                assertTrue(it.moveToFirst())
+                assertTrue(it.getLong(0) >= 2L)
+            }
+        } finally { owner.close(); context.deleteDatabase("git-replace-pending-test.db") }
+    }
+
     @Test fun reopeningWithMatchingJournalsDoesNotRebuildTriggers() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val owner = PersonalHubDatabase.openTemporary(context, "sync-git-idempotent-test.db")

@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 
@@ -29,6 +30,7 @@ internal class TimestampEpochMigration(private val context: Context) : Migration
     )
 
     override fun migrate(db: SupportSQLiteDatabase) {
+        val precision = JSONArray()
         val entities = JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/16.json")
             .bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
         val byName = (0 until entities.length()).associate { i ->
@@ -39,6 +41,7 @@ internal class TimestampEpochMigration(private val context: Context) : Migration
             val entity = requireNotNull(byName[table])
             val newTable = "${table}_epoch_new"
             val fields = entity.getJSONArray("fields")
+            val keyColumns = entity.getJSONObject("primaryKey").getJSONArray("columnNames")
             var ddl = entity.getString("createSql").replace("\${TABLE_NAME}", newTable)
             for (column in instants) {
                 val definition = Regex("(`${Regex.escape(column)}`\\s+)TEXT\\b")
@@ -68,7 +71,20 @@ internal class TimestampEpochMigration(private val context: Context) : Migration
                                 val companionIndex = old.getColumnIndexOrThrow(companion)
                                 require(!old.isNull(companionIndex)) { "Missing $table.$companion" }
                                 old.getLong(companionIndex)
-                            } else exactEpochMs(raw)
+                            } else {
+                                val instant = raw.toLongOrNull()?.let(Instant::ofEpochMilli) ?: Instant.parse(raw)
+                                val ms = instant.toEpochMilli()
+                                if (Instant.ofEpochMilli(ms) != instant) {
+                                    val key = JSONObject()
+                                    for (keyIndex in 0 until keyColumns.length()) {
+                                        val keyName = keyColumns.getString(keyIndex)
+                                        key.put(keyName, old.getString(old.getColumnIndexOrThrow(keyName)))
+                                    }
+                                    precision.put(JSONObject().put("table", table).put("key", key)
+                                        .put("column", name).put("original", raw))
+                                }
+                                ms
+                            }
                             values.put(name, epoch)
                         } else when (old.getType(index)) {
                             Cursor.FIELD_TYPE_INTEGER -> values.put(name, old.getLong(index))
@@ -86,6 +102,14 @@ internal class TimestampEpochMigration(private val context: Context) : Migration
             if (indices != null) for (i in 0 until indices.length()) {
                 db.execSQL(indices.getJSONObject(i).getString("createSql").replace("\${TABLE_NAME}", table))
             }
+        }
+        if (precision.length() > 0) {
+            // Keep every discarded fractional digit so the v16 value remains recoverable.
+            val namespace = "migration.v16_legacy_submillisecond_instants"
+            require(!db.query("SELECT 1 FROM hub_preferences WHERE namespace=?", arrayOf(namespace))
+                .use { it.moveToFirst() }) { "Legacy timestamp backup already exists" }
+            db.execSQL("INSERT INTO hub_preferences(namespace,json) VALUES (?,?)",
+                arrayOf(namespace, precision.toString()))
         }
         db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
     }
