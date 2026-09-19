@@ -13,12 +13,12 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCHEMA_DIR = ROOT / "core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase"
-MOMENT = re.compile(
-    r"(timestamp|(^|_)(created|updated|deleted|occurred|started|finished|scheduled|sent|saved|computed|fired|checked)_?at|At$|_utc$|_utc_ms$|_ms$)",
-    re.IGNORECASE,
-)
-# Calendar/date-only values are not instants and are intentionally excluded.
-DATE_ONLY = re.compile(r"(date$|_date$|epoch_day$|day_of_month$)", re.IGNORECASE)
+MOMENT = re.compile(r"(?:timestamp(?:_utc)?|(?:created|updated|deleted|occurred|started|finished|scheduled|sent|saved|computed|fired|checked|opened|reminder|last_fired)(?:_at|At)|scheduled_for_utc|sent_at_utc)$", re.IGNORECASE)
+# Dates, coordinates, elapsed times and measurements cannot be converted to instants.
+DATE_ONLY = re.compile(r"(?:date(?:_utc)?|epoch_day|day_of_month)$", re.IGNORECASE)
+
+def is_instant(column: str) -> bool:
+    return not DATE_ONLY.search(column) and bool(MOMENT.search(column))
 
 def main() -> int:
     versions = sorted(
@@ -36,9 +36,7 @@ def main() -> int:
         table = entity["tableName"]
         for field in entity["fields"]:
             column = field["columnName"]
-            if DATE_ONLY.search(column):
-                continue
-            if MOMENT.search(column) and field["affinity"] != "INTEGER":
+            if is_instant(column) and field["affinity"] != "INTEGER":
                 violations.append(f"{table}.{column}: {field['affinity']}")
     print(f"Room schema v{version}: {len(violations)} timestamp storage violation(s)")
     for violation in violations:
