@@ -42,7 +42,10 @@ val allowCiEmulatorDebug = providers.gradleProperty("personalhub.allowCiEmulator
 val ciDebugInstrumentation = allowCiEmulatorDebug.get() &&
     System.getenv("CI")?.equals("true", ignoreCase = true) == true &&
     requestedTaskNames.isNotEmpty() &&
-    requestedTaskNames.all { it == "connecteddebugandroidtest" }
+    requestedTaskNames.all {
+        it == "connecteddebugandroidtest" || it == "connectedqaandroidtest" ||
+            it == "assembleqa" || it == "assembleqaandroidtest"
+    }
 if (signingArtifactRequested && !unsignedPlayBundlePreflight && !ciDebugInstrumentation) {
     require(hasCanonicalSigning) {
         "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
