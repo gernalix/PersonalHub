@@ -1,11 +1,9 @@
 package com.gernalix.sostanze.ui
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.gernalix.sostanze.capsules.importexport.ExportResult
-import com.gernalix.sostanze.capsules.importexport.SostanzeImportExportCapsule
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.sostanze.data.IntakeUndoToken
 import com.gernalix.sostanze.data.IntakeOutcome
 import com.gernalix.sostanze.data.IntakeEditOutcome
@@ -17,7 +15,6 @@ import com.gernalix.sostanze.data.DoctorChoice
 import com.gernalix.sostanze.data.CostChoice
 import com.gernalix.sostanze.data.PrescriptionEntity
 import com.gernalix.sostanze.data.PrescriptionDraft
-import com.gernalix.sostanze.data.SostanzeDatabase
 import com.gernalix.sostanze.data.SostanzeRepository
 import com.gernalix.sostanze.data.StockOutcome
 import com.gernalix.sostanze.data.SubstanceSaveOutcome
@@ -72,11 +69,6 @@ data class MacroUi(
     val items: List<SubstanceEntity>,
 )
 
-enum class ExportStatusUi {
-    NotConfigured,
-    Ready,
-    Error,
-}
 
 data class SostanzeUiState(
     val substances: List<SubstanceEntity> = emptyList(),
@@ -89,19 +81,12 @@ data class SostanzeUiState(
     val interactionTargets: List<InteractionTargetEntity> = emptyList(),
     val notificationPlans: List<NotificationPlan> = emptyList(),
     val nowMs: Long = System.currentTimeMillis(),
-    val lastExportResult: ExportResult = ExportResult.Skipped,
-    val exportStatus: ExportStatusUi = ExportStatusUi.NotConfigured,
-    val lastExportError: String? = null,
-    val lastImportError: String? = null,
 )
 
 class SostanzeViewModel(application: Application) : AndroidViewModel(application) {
-    private val database = SostanzeDatabase.get(application)
+    private val database = PersonalHubDatabase.get(application)
     private val repository = SostanzeRepository(database)
-    private val importExport = SostanzeImportExportCapsule(application, database)
     private val nowMs = MutableStateFlow(System.currentTimeMillis())
-    private val lastExportResult = MutableStateFlow<ExportResult>(ExportResult.Skipped)
-    private val lastImportError = MutableStateFlow<String?>(null)
     private val secondaryStateEnabled = MutableStateFlow(false)
     private val scheduledNotificationKeys = mutableSetOf<String>()
     private var maintenanceStarted = false
@@ -111,7 +96,7 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         if (enabled) repository.snapshot else repository.homeSnapshot
     }
 
-    val uiState = combine(snapshot, nowMs, lastExportResult, lastImportError) { snapshot, now, exportResult, importError ->
+    val uiState = combine(snapshot, nowMs) { snapshot, now ->
         val substances = snapshot.substances
         val plans = substances.map { it.toPlan() }
         val intakes = snapshot.intakes.map { it.toRecord() }
@@ -184,10 +169,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                 SostanzeEngine.missedDoseNotifications(doseStates, now) +
                 refillPlans,
             nowMs = now,
-            lastExportResult = exportResult,
-            exportStatus = exportResult.toUiStatus(),
-            lastExportError = (exportResult as? ExportResult.Failure)?.message,
-            lastImportError = importError,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SostanzeUiState())
 
@@ -203,7 +184,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         maintenanceStarted = true
         secondaryStateEnabled.value = true
         SostanzeNotificationScheduler.ensureChannel(getApplication())
-        viewModelScope.launch { lastExportResult.value = importExport.exportStatusNow() }
         viewModelScope.launch {
             uiState.collect { state ->
                 val names = state.substances.associateBy({ it.id }, { it.name })
@@ -211,7 +191,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                     scheduledNotificationKeys.add("${plan.kind}:${plan.entityId}:${plan.scheduledForMs}")
                 }
                 repository.saveNotifications(newPlans)
-                if (newPlans.isNotEmpty()) refreshExport()
                 newPlans.forEach { plan ->
                     SostanzeNotificationScheduler.schedule(getApplication(), plan, names[plan.entityId].orEmpty())
                 }
@@ -229,7 +208,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     fun recordIntake(substanceId: Long, onResult: (IntakeOutcome, IntakeUndoToken?) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             val outcome = repository.recordIntake(substanceId)
-            if (outcome is IntakeOutcome.Recorded) refreshExport()
             onResult(outcome, (outcome as? IntakeOutcome.Recorded)?.let { IntakeUndoToken(listOf(it.id)) })
         }
     }
@@ -238,7 +216,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val outcomes = repository.recordMacro(macroId)
             val ids = outcomes.mapNotNull { (it as? IntakeOutcome.Recorded)?.id }
-            if (ids.isNotEmpty()) refreshExport()
             onRecorded(outcomes, ids.takeIf { it.isNotEmpty() }?.let(::IntakeUndoToken))
         }
     }
@@ -246,33 +223,29 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     fun undoLastIntake(substanceId: Long) {
         viewModelScope.launch {
             repository.undoLastIntake(substanceId)
-            refreshExport()
         }
     }
 
     fun undoToken(token: IntakeUndoToken) {
         viewModelScope.launch {
             repository.undoIntakes(token.intakeIds)
-            refreshExport()
         }
     }
 
     fun editIntake(id: Long, timestampMs: Long, quantity: Double, onResult: (IntakeEditOutcome) -> Unit = {}) {
         viewModelScope.launch {
             val result = repository.editIntake(id, timestampMs, quantity)
-            if (result == IntakeEditOutcome.Updated) refreshExport()
             onResult(result)
         }
     }
 
     fun deleteIntake(id: Long) {
-        viewModelScope.launch { if (repository.deleteIntake(id)) refreshExport() }
+        viewModelScope.launch { repository.deleteIntake(id) }
     }
 
     fun savePrescription(value: PrescriptionEntity, onSaved: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val saved = runCatching { repository.savePrescription(value) }.isSuccess
-            if (saved) refreshExport()
             onSaved(saved)
         }
     }
@@ -280,7 +253,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     fun createPrescription(value: PrescriptionDraft, onSaved: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val saved = runCatching { repository.createPrescription(value) }.isSuccess
-            if (saved) refreshExport()
             onSaved(saved)
         }
     }
@@ -298,13 +270,12 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun deletePrescription(id: Long) {
-        viewModelScope.launch { repository.deletePrescription(id); refreshExport() }
+        viewModelScope.launch { repository.deletePrescription(id) }
     }
 
     fun adjustStock(substanceId: Long, delta: Double, note: String?, onResult: (StockOutcome) -> Unit = {}) {
         viewModelScope.launch {
             val result = repository.adjustStock(substanceId, delta, note)
-            if (result is StockOutcome.Applied) refreshExport()
             onResult(result)
         }
     }
@@ -312,7 +283,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     fun setStock(substanceId: Long, target: Double, onResult: (StockOutcome) -> Unit = {}) {
         viewModelScope.launch {
             val result = repository.setStock(substanceId, target)
-            if (result is StockOutcome.Applied) refreshExport()
             onResult(result)
         }
     }
@@ -320,7 +290,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     fun saveSubstance(entity: SubstanceEntity, onResult: (SubstanceSaveOutcome) -> Unit = {}) {
         viewModelScope.launch {
             val result = repository.saveSubstance(entity)
-            if (result is SubstanceSaveOutcome.Saved) refreshExport()
             onResult(result)
         }
     }
@@ -339,12 +308,11 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
     fun archiveSubstance(id: Long) {
         viewModelScope.launch {
             repository.archiveSubstance(id)
-            refreshExport()
         }
     }
 
     fun restoreSubstance(id: Long) {
-        viewModelScope.launch { repository.restoreSubstance(id); refreshExport() }
+        viewModelScope.launch { repository.restoreSubstance(id) }
     }
 
     fun addPrescription(substanceId: Long, quantity: Double, refillMonths: Int, alert: Boolean) {
@@ -363,7 +331,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                     doseMg = uiState.value.substances.firstOrNull { it.id == substanceId }?.dosePerIntake ?: 1.0,
                 )
             )
-            refreshExport()
         }
     }
 
@@ -379,12 +346,11 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                 targetKind = InteractionTargetKinds.ALL_PRESENT_AND_FUTURE,
                 targetSubstanceId = null,
             )
-            refreshExport()
         }
     }
 
     fun deleteInteraction(ruleId: Long) {
-        viewModelScope.launch { repository.deleteInteractionRule(ruleId); refreshExport() }
+        viewModelScope.launch { repository.deleteInteractionRule(ruleId) }
     }
 
     fun defaultNewSubstance(): SubstanceEntity =
@@ -404,24 +370,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         return state.history.filter { it.substanceId == substanceId }.sortedByDescending { it.timestampMs }
     }
 
-    fun setExportFolder(uri: Uri) {
-        viewModelScope.launch {
-            importExport.setExportDestination(uri)
-            lastExportResult.value = importExport.exportStatusNow()
-        }
-    }
-
-    fun importDatabase(uri: Uri) {
-        viewModelScope.launch {
-            runCatching { importExport.importDatabase(uri) }
-                .onFailure { lastImportError.value = it.message }
-        }
-    }
-
-    private suspend fun refreshExport() {
-        lastExportResult.value = importExport.exportStatusNow()
-    }
-
     private fun sectionOrder(section: DoseSection): Int = when (section) {
         DoseSection.DUE_TODAY -> 0
         DoseSection.LATER -> 1
@@ -431,11 +379,6 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         DoseSection.ARCHIVED -> 5
     }
 
-    private fun ExportResult.toUiStatus(): ExportStatusUi = when (this) {
-        ExportResult.Skipped -> ExportStatusUi.NotConfigured
-        ExportResult.Success -> ExportStatusUi.Ready
-        is ExportResult.Failure -> ExportStatusUi.Error
-    }
 
 }
 
