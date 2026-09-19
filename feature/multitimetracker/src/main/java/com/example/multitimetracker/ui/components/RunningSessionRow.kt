@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.multitimetracker.R
 import com.example.multitimetracker.ui.theme.LocalSpacing
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * ===== FEATURE CAPSULE: Now.SessionRow (UI) — START =====
@@ -69,6 +71,7 @@ fun RunningSessionRow(
     val hiddenTagsCount = tagNames.size - visibleTagNames.size
 
     key(sessionId) {
+        val deleteRequested = remember(sessionId) { AtomicBoolean(false) }
         val dismissState = rememberSwipeToDismissBoxState(
             confirmValueChange = { value ->
                 when (value) {
@@ -78,8 +81,8 @@ fun RunningSessionRow(
                     }
 
                     SwipeToDismissBoxValue.EndToStart -> {
-                        onDelete()
-                        false
+                        if (deleteRequested.compareAndSet(false, true)) onDelete()
+                        true
                     }
 
                     else -> false
