@@ -111,11 +111,11 @@ class FinanceAccountsTest {
             val copy=FinanceExchange(other); copy.import(before,emptyMap()); assertEquals(before,copy.export())
         } finally { other.close();context.deleteDatabase("exchange-other.db") }
         val changed=JSONObject(before); val tx=changed.getJSONArray("transactions").getJSONObject(0)
-        tx.put("amount","-3");tx.put("updatedAt",Instant.now().plusSeconds(1).toString())
+        tx.put("amount","-3");tx.put("updatedAt",Instant.ofEpochMilli(System.currentTimeMillis()).plusSeconds(1).toString())
         val accepted=exchange.import(changed.toString(),baseline)
         val row=db.financeDao().allTransactions().single()
         finance.saveTransaction(TransactionDraft(id=row.id,title="local edit",amount="-4",accountId=account.id))
-        val local=exchange.export();tx.put("amount","-5");tx.put("updatedAt",Instant.now().plusSeconds(2).toString())
+        val local=exchange.export();tx.put("amount","-5");tx.put("updatedAt",Instant.ofEpochMilli(System.currentTimeMillis()).plusSeconds(2).toString())
         rejects { exchange.import(changed.toString(),accepted) }; assertEquals(local,exchange.export())
         val malformed=JSONObject(local);malformed.getJSONArray("accounts").getJSONObject(0).put("name","must rollback")
         malformed.getJSONArray("transactions").getJSONObject(0).put("accountId",UUID.randomUUID().toString())
