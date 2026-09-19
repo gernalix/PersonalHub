@@ -114,21 +114,21 @@ class GlobalDatabaseInstrumentedTest {
         DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
         val prefs = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
         val previousFolder = DatabaseVault.folder(context)
-        val previousBackupIdentity = prefs.getString(DatabaseVault.BACKUP_DOCUMENT_URI, null)
+        val previousBackupIdentity = prefs.getString("backup_document_uri", null)
         try {
             prefs.edit()
                 .putString("tree_uri", "content://personalhub.test/export")
-                .putString(DatabaseVault.BACKUP_DOCUMENT_URI, "personalhub.db.bak")
+                .putString("backup_document_uri", "personalhub.db.bak")
                 .commit()
             publisher.create("personalhub.db.bak")
             assertTrue(DatabaseVault.exportNow(context))
             assertEquals(setOf(PersonalHubDatabase.DB_NAME), publisher.files.keys)
-            assertNull(prefs.getString(DatabaseVault.BACKUP_DOCUMENT_URI, null))
+            assertNull(prefs.getString("backup_document_uri", null))
         } finally {
             prefs.edit().apply {
                 if (previousFolder == null) remove("tree_uri") else putString("tree_uri", previousFolder)
-                if (previousBackupIdentity == null) remove(DatabaseVault.BACKUP_DOCUMENT_URI)
-                else putString(DatabaseVault.BACKUP_DOCUMENT_URI, previousBackupIdentity)
+                if (previousBackupIdentity == null) remove("backup_document_uri")
+                else putString("backup_document_uri", previousBackupIdentity)
             }.commit()
             DatabaseVault.setExportPublisherFactoryForTests(null)
         }
