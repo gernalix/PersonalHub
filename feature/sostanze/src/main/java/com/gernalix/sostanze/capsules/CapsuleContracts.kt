@@ -1,7 +1,5 @@
 package com.gernalix.sostanze.capsules
 
-import android.net.Uri
-
 data class SubstanceRef(val id: Long, val name: String)
 data class DoseRef(val value: Double, val unit: String = "mg")
 data class IntakeUndoRef(val intakeIds: List<Long>)
@@ -36,11 +34,6 @@ interface HistoryCapsuleApi {
     fun substanceHistory(substanceId: Long): List<HistoryRowRef>
 }
 
-interface ImportExportCapsuleApi {
-    suspend fun setExportDestination(treeUri: Uri): CapsuleResult
-    suspend fun exportNow(): CapsuleResult
-    suspend fun importDatabase(sourceUri: Uri): CapsuleResult
-}
 
 interface NotificationsCapsuleApi {
     fun ensureReady()
