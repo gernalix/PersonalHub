@@ -32,10 +32,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -210,8 +208,6 @@ internal fun WordPulseScreen(
     onSearchSortChanged: (SearchSort) -> Unit,
     onSelectWord: (String) -> Unit,
     onClearSelectedWord: () -> Unit,
-    onImportCsv: () -> Unit,
-    onExportCsv: () -> Unit,
     initialSessionId: String? = null,
 ) {
     val context = LocalContext.current
@@ -295,8 +291,6 @@ internal fun WordPulseScreen(
                             onClearInput()
                             restoreTypingFocus()
                         },
-                        onExportCsv = onExportCsv,
-                        onImportCsv = onImportCsv,
                         onDataExplorer = { context.startActivity(DataExplorerContract.intent(context.packageName, "word_entries")) },
                         onDeleteAllData = { showDeleteConfirmation = true },
                     )
@@ -399,8 +393,6 @@ private fun Header(
     currentSessionId: String?,
     onStartNewSession: () -> Unit,
     onClearInput: () -> Unit,
-    onImportCsv: () -> Unit,
-    onExportCsv: () -> Unit,
     onDataExplorer: () -> Unit,
     onDeleteAllData: () -> Unit,
 ) {
@@ -428,12 +420,6 @@ private fun Header(
                 }
                 IconButton(onClick = onClearInput, modifier = Modifier.testTag("clear-input-button")) {
                     Icon(Icons.Filled.Clear, contentDescription = "Clear current input")
-                }
-                IconButton(onClick = onExportCsv, modifier = Modifier.testTag("export-csv-button")) {
-                    Icon(Icons.Filled.Download, contentDescription = "Export backup CSV")
-                }
-                IconButton(onClick = onImportCsv, modifier = Modifier.testTag("import-csv-button")) {
-                    Icon(Icons.Filled.Upload, contentDescription = "Import backup CSV")
                 }
                 IconButton(onClick = onDataExplorer, modifier = Modifier.testTag("data-explorer-button")) {
                     Icon(Icons.Filled.Storage, contentDescription = "Datasette")
