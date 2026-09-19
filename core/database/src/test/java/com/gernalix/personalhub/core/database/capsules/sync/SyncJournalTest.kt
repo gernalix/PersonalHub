@@ -52,7 +52,7 @@ class SyncJournalTest {
             // Fixture values need not form a domain graph. This isolated DB is never uploaded.
             db.execSQL("PRAGMA foreign_keys=OFF")
             val tables = SyncJournal.tables(db)
-            assertEquals(81, tables.size)
+            assertEquals(90, tables.size)
             for (table in tables) {
                 db.execSQL("DELETE FROM `$table`")
                 db.execSQL("DELETE FROM hub_sync_pending")
