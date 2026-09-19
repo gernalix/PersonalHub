@@ -370,21 +370,6 @@ class WordPulseViewModel(
         mutablePvtTest.value = PvtTestState()
     }
 
-    suspend fun exportCsv(): String = repository.exportCsv()
-
-    suspend fun exportBackupCsv(): String = repository.exportBackupCsv()
-
-    fun importCsv(csv: String) {
-        viewModelScope.launch {
-            val result = repository.importCsv(csv)
-            mutableEvents.emit(
-                WordPulseEvent(
-                    "Imported ${result.wordsImported} words, ${result.sessionsImported} sessions, " +
-                        "${result.correctionsImported} corrections and ${result.pvtResultsImported} vigilance tests",
-                ),
-            )
-        }
-    }
 
     fun notify(message: String) {
         mutableEvents.tryEmit(WordPulseEvent(message))
