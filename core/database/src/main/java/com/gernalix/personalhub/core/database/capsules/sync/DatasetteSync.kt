@@ -14,7 +14,13 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/** One uploader; HTTP never holds the database writer gate. Pending rows survive retries/restarts. */
+/**
+ * Outbound-only Datasette replica.
+ *
+ * personalhub.db remains authoritative. This component uploads detached row state and tombstones;
+ * it has no remote-to-local hydration path and never replaces the local database. HTTP never holds
+ * the database writer gate. Pending rows survive retries/restarts.
+ */
 object DatasetteSync {
     private const val WORK = "personalhub-datasette"
     internal const val RECOVERY_WORK = "personalhub-datasette-recovery"
