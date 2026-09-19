@@ -29,9 +29,9 @@ object CallOverlayPermission {
         packageSource: Int?,
     ): Boolean =
         sdkInt >= Build.VERSION_CODES.BAKLAVA &&
-            packageSource in setOf(
-                PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE,
-                PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE,
+            (
+                packageSource == PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE ||
+                    packageSource == PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE
             )
 
     fun appInfoIntent(context: Context): Intent =
