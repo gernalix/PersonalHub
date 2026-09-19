@@ -27,6 +27,8 @@ class ImportRolledBack(cause: Throwable) : IllegalStateException("Import rolled 
 
 object DatabaseVault {
     private val operations = ReentrantLock(true)
+    /** Acquire this before DatabaseGate when a transfer needs both locks. */
+    internal fun <T> withOperations(block: () -> T): T = operations.withLock(block)
     private const val PRE_IMPORT_BACKUP_PREFIX = "personalhub-pre-import-"
     private const val PRE_IMPORT_BACKUP_SUFFIX = ".db"
     internal const val CANONICAL_DOCUMENT_URI = "canonical_document_uri"
