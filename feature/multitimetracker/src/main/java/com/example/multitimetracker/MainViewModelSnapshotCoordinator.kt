@@ -507,7 +507,9 @@ internal class MainViewModelSnapshotCoordinator(
         )
 
         if (rememberPersisted) {
-            rememberCurrentStateAsPersisted()
+            // This is the snapshot just read from the authoritative DB. Re-capturing it here
+            // repeats several DB reads and delays the first frame without strengthening rollback.
+            lastPersistedSnapshot = snap
             clearPersistenceFailureReport()
         }
 

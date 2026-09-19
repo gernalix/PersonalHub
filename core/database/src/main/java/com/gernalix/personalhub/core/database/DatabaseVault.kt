@@ -25,6 +25,8 @@ import kotlin.concurrent.withLock
 /** Whole-database transfer capsule. Neither feature code nor UI replaces database files. */
 class ImportRolledBack(cause: Throwable) : IllegalStateException("Import rolled back; reopening the previous database", cause)
 
+internal val LEGACY_TIMER_SYNC_TABLES = setOf("sync_meta", "sync_queue", "sync_shadow")
+
 object DatabaseVault {
     private val operations = ReentrantLock(true)
     /** Acquire this before DatabaseGate when a transfer needs both locks. */
@@ -334,7 +336,10 @@ object DatabaseVault {
                     val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
                     val expected = when (name) {
                         "hub_dirty_${table}_$op" -> {
-                            require(table !in SyncJournal.excluded)
+                            // Older Timer sync tables can retain valid generation triggers from
+                            // before they were excluded from new trigger installation. Validate
+                            // their exact SQL here; Room removes them on the next database open.
+                            require(table !in SyncJournal.excluded || table in LEGACY_TIMER_SYNC_TABLES)
                             "CREATE TRIGGER `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
                         }
                         "hub_sync_${table}_$op" -> {

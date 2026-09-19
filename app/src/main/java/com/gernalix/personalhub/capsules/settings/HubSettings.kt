@@ -404,15 +404,15 @@ private fun ConnectionSettings(onBack: () -> Unit, onSaved: () -> Unit) {
     var failed by remember { mutableStateOf(false) }
     SettingsPage(R.string.datasette_connection, onBack) {
         Text(stringResource(R.string.datasette_connection_help))
-        OutlinedTextField(url, { url = it }, label = { Text(stringResource(R.string.datasette_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(database, { database = it }, label = { Text(stringResource(R.string.datasette_database)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(table, { table = it }, label = { Text(stringResource(R.string.datasette_table)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(token, { token = it }, label = { Text(stringResource(R.string.datasette_token)) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Text(
             stringResource(R.string.datasette_token_help),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        OutlinedTextField(url, { url = it }, label = { Text(stringResource(R.string.datasette_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(database, { database = it }, label = { Text(stringResource(R.string.datasette_database)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(table, { table = it }, label = { Text(stringResource(R.string.datasette_table)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(token, { token = it }, label = { Text(stringResource(R.string.datasette_token)) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         if (initial?.hasToken == true) Text(stringResource(R.string.datasette_token_saved))
         Button(enabled = !busy, onClick = {
             busy = true
@@ -498,6 +498,11 @@ private fun GitDataSyncSettings(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+        Text(
+            stringResource(R.string.git_data_sync_token_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         OutlinedTextField(
             repository,
             { repository = it },
@@ -512,11 +517,6 @@ private fun GitDataSyncSettings(onBack: () -> Unit) {
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            stringResource(R.string.git_data_sync_token_help),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (initial?.hasToken == true) {
             Text(stringResource(R.string.git_data_sync_token_saved))

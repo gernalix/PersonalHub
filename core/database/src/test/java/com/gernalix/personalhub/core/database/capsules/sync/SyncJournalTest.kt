@@ -159,5 +159,24 @@ class SyncJournalTest {
         }
     }
 
+    @Test fun reopeningWithMatchingJournalsDoesNotRebuildTriggers() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val owner = PersonalHubDatabase.openTemporary(context, "sync-git-idempotent-test.db")
+        try {
+            val db = owner.openHelper.writableDatabase
+            GitDataTracking.install(db, enqueueAll = false)
+            val before = db.query("PRAGMA schema_version").use { it.moveToFirst(); it.getInt(0) }
+            SyncJournal.install(db)
+            GitDataTracking.install(db, enqueueAll = false)
+            val after = db.query("PRAGMA schema_version").use { it.moveToFirst(); it.getInt(0) }
+            assertEquals(before, after)
+            assertTrue(db.query("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='hub_sync_places_INSERT'").use { it.moveToFirst() })
+            assertTrue(db.query("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='hub_git_dirty_places_INSERT'").use { it.moveToFirst() })
+        } finally {
+            owner.close()
+            context.deleteDatabase("sync-git-idempotent-test.db")
+        }
+    }
+
 
 }
