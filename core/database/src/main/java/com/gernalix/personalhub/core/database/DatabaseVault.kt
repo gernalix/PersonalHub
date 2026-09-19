@@ -665,6 +665,9 @@ object DatabaseVault {
                         publisher.find(canonicalName)?.let { require(it.delete()) }
                         val restored = publisher.rename(previousNow, canonicalName)
                         persistCanonicalExportIdentity(prefs, restored)
+                    } else if (previous == null) {
+                        // First-ever export: a failed readback must not leave a corrupt canonical.
+                        publisher.find(canonicalName)?.delete()
                     }
                     publisher.find(stageName)?.delete()
                 }
