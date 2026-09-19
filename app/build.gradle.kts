@@ -211,6 +211,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
+    androidTestImplementation(project(":core:alerts"))
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.documentfile)
     androidTestImplementation(libs.androidx.junit)

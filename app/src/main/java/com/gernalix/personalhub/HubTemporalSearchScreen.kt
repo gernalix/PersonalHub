@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 internal data class TemporalEntry(
@@ -45,6 +46,11 @@ internal data class TemporalEntry(
     val refs: List<HubEntityRef>,
     val selectable: Boolean = true,
 )
+
+private val temporalInputFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+
+private fun formatTemporalInput(epochMs: Long): String =
+    Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).format(temporalInputFormatter)
 
 internal data class SavedEpisodeEntry(
     val contextId: String,
@@ -206,10 +212,10 @@ fun HubTemporalSearchScreen(
         mutableStateOf(requested.ifEmpty { allModules })
     }
     var fromText by rememberSaveable(initialFromMs) {
-        mutableStateOf(formatHubDateTime(initialFromMs ?: (System.currentTimeMillis() - 24 * 60 * 60 * 1000L)))
+        mutableStateOf(formatTemporalInput(initialFromMs ?: (System.currentTimeMillis() - 24 * 60 * 60 * 1000L)))
     }
     var toText by rememberSaveable(initialToMs) {
-        mutableStateOf(formatHubDateTime(initialToMs ?: (System.currentTimeMillis() + 60_000L)))
+        mutableStateOf(formatTemporalInput(initialToMs ?: (System.currentTimeMillis() + 60_000L)))
     }
     var records by rememberSaveable(saver = TemporalRecordStateSaver) { mutableStateOf(emptyList<HubTemporalRecord>()) }
     var boundedPeople by rememberSaveable(saver = HubSummaryStateSaver) { mutableStateOf(emptyList<HubEntitySummary>()) }

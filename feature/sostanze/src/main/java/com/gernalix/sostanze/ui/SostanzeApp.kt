@@ -460,6 +460,7 @@ private fun HomeScreen(
 ) {
     val sections = listOf(
         DoseSection.DUE_TODAY to stringResource(R.string.section_due_today),
+        DoseSection.TAKEN to stringResource(R.string.section_taken),
         DoseSection.LATER to stringResource(R.string.section_later),
         DoseSection.BLOCKED to stringResource(R.string.section_blocked),
         DoseSection.PRN to stringResource(R.string.section_prn),

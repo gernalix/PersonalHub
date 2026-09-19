@@ -168,15 +168,22 @@ object DatasetteSync {
         }
         // Record only prepared identities, before any HTTP. Import still serializes with uploads.
         if (items.isEmpty()) return items
+        recordKnownIdentities(context, items.map { it.table to it.key })
+        return items
+    }
+
+    /** Persist the identities prepared for upload; shared with the persistence contract test. */
+    fun recordKnownIdentities(context: Context, identities: List<Pair<String, String>>) {
         DatabaseGate.access {
             val db = db(context)
             db.beginTransaction()
             try {
-                items.forEach { db.execSQL("INSERT OR IGNORE INTO hub_sync_known VALUES (?,?)", arrayOf(it.table, it.key)) }
+                identities.forEach { (table, key) ->
+                    db.execSQL("INSERT OR IGNORE INTO hub_sync_known VALUES (?,?)", arrayOf(table, key))
+                }
                 db.setTransactionSuccessful()
             } finally { db.endTransaction() }
         }
-        return items
     }
 
     fun run(context: Context, stopped: () -> Boolean = { false }, send: (DatasetteConfiguration, String, List<JSONObject>) -> Boolean = DatasetteClient::upsert, encodeBlob: (ByteArray) -> String = { Base64.encodeToString(it, Base64.NO_WRAP) }): Boolean = uploads.withLock {

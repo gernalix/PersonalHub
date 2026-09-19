@@ -168,6 +168,8 @@ internal class RemoteSyncQueueSqlite(context: Context, dbName: String = DB_NAME)
     }
 
     private fun nextRevisionLocked(db: SQLiteDatabase): Long {
+        db.execSQL("INSERT INTO sync_meta(`key`,long_value) SELECT 'revision',0 " +
+            "WHERE NOT EXISTS (SELECT 1 FROM sync_meta WHERE `key`='revision')")
         db.execSQL("UPDATE sync_meta SET long_value = long_value + 1 WHERE key = 'revision'")
         return db.rawQuery("SELECT long_value FROM sync_meta WHERE key = 'revision'", emptyArray()).use { cursor ->
             check(cursor.moveToFirst()) { "Missing remote sync revision" }

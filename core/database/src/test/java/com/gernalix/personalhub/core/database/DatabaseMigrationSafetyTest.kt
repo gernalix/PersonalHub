@@ -86,6 +86,31 @@ class DatabaseMigrationSafetyTest {
         } finally { context.deleteDatabase(name) }
     }
 
+    @Test fun submillisecondV16InstantMigratesWithExactOriginalPreserved() {
+        val name = "timestamp-precision-${UUID.randomUUID()}.db"
+        val file = context.getDatabasePath(name).also { it.parentFile!!.mkdirs() }
+        createVersion(file, 16)
+        val original = "2026-09-04T00:38:48.392253Z"
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { old ->
+            old.execSQL("INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) " +
+                "VALUES('precision','Precision','EUR','0','$original',1)")
+        }
+        val owner = PersonalHubDatabase.openTemporary(context, name)
+        try {
+            val db = owner.openHelper.writableDatabase
+            assertEquals(17, db.version)
+            assertEquals(java.time.Instant.parse(original).toEpochMilli(),
+                scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='precision'"))
+            val saved = JSONArray(scalarText(db, "SELECT json FROM hub_preferences " +
+                "WHERE namespace='migration.v16_legacy_submillisecond_instants'"))
+            assertEquals(1, saved.length())
+            assertEquals("finance_accounts", saved.getJSONObject(0).getString("table"))
+            assertEquals("precision", saved.getJSONObject(0).getJSONObject("key").getString("id"))
+            assertEquals("openedAt", saved.getJSONObject(0).getString("column"))
+            assertEquals(original, saved.getJSONObject(0).getString("original"))
+        } finally { owner.close(); context.deleteDatabase(name) }
+    }
+
     @Test fun legacyParserAcceptsOnlyExactMillisecondInstants() {
         assertEquals(1767312123456L, TimestampEpochMigration.exactEpochMs("2026-01-02T01:02:03.456+01:00"))
         assertEquals(1767312123456L, TimestampEpochMigration.exactEpochMs("1767312123456"))
