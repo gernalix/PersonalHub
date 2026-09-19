@@ -50,7 +50,7 @@
     <string name="module_wordpulse">WordPulse</string>
     <string name="module_wordpulse_subtitle">Words, sessions, corrections</string>
     <string name="database_title">Database and backup</string>
-    <string name="database_description">One file contains all modules and contact photos. Import replaces the current data after validation and keeps a recovery copy.</string>
+    <string name="database_description">The active personalhub.db is the single source of truth for every writable module. SAF export creates backup copies only; Import explicitly replaces the active database after validation and keeps a recovery copy.</string>
     <string name="database_import">Import personalhub.db</string>
     <string name="database_folder">Choose automatic export folder</string>
     <string name="database_folder_missing">Choose a folder to enable automatic export.</string>
@@ -96,7 +96,7 @@
     <string name="home_autoexport_no_error">None</string>
     <string name="home_autoexport_close">Close</string>
     <string name="git_data_sync_title">Git data sync</string>
-    <string name="git_data_sync_description">Optional. When enabled, PersonalHub stores deterministic data snapshots in the configured private GitHub repository, pulls verified patches and migration instructions, and can restore a selected Git revision. No Git requests are made while disabled.</string>
+    <string name="git_data_sync_description">Optional versioned history. Background sync publishes local snapshots/history and checks verified remote control metadata. It never silently replaces personalhub.db; full inbound replacement requires the explicit Restore action. No Git requests are made while disabled.</string>
     <string name="git_data_sync_configure">Configure Git repository</string>
     <string name="git_data_sync_repository">Private GitHub repository URL (HTTPS)</string>
     <string name="git_data_sync_token">GitHub access token</string>
@@ -116,7 +116,7 @@
     <string name="git_data_sync_error">Git data sync failed. Check the repository, token, compatibility, and network connection.</string>
     <string name="datasette_sync_title">Datasette sync</string>
     <string name="datasette_enable">Enable sync</string>
-    <string name="datasette_description">When enabled, all current data and subsequent changes are sent. Local changes remain saved while offline. Disabling waits for any current request to finish.</string>
+    <string name="datasette_description">Optional outbound replica. When enabled, all current local data and later changes are sent to Datasette for remote browsing/analysis. Datasette never writes back into PersonalHub. Local changes remain saved while offline.</string>
     <string name="datasette_connection">Connection settings</string>
     <string name="datasette_url">Base URL (HTTPS)</string>
     <string name="datasette_database">Database name</string>
@@ -255,4 +255,33 @@
     <string name="git_history_known_bad">Known bad date (YYYY-MM-DD)</string>
     <string name="git_history_bisect_action">Find suspect edits</string>
     <string name="git_history_semantic_truncated">Diff reached the safety limit; narrow the revisions or inspect individual tables for the remaining changes.</string>
+
+    <string name="settings_data_model_summary">Your app always runs from the active local SQLite database. Backups and remote services copy or restore that data; they are not competing live databases.</string>
+    <string name="settings_guided_data_setup">Guided data setup</string>
+    <string name="data_setup_intro">Set up data in this order. PersonalHub has one live source of truth; every other destination has a narrower role.</string>
+    <string name="data_setup_local_title">Local SQLite</string>
+    <string name="data_setup_authoritative">AUTHORITATIVE — used by every module</string>
+    <string name="data_setup_local_body">personalhub.db is the only writable runtime database. People, Timer, Places, Substances, WordPulse and the other modules read and write this active profile.</string>
+    <string name="data_setup_active_profile">Active profile: %1$s</string>
+    <string name="data_setup_saf_title">SAF backup folder</string>
+    <string name="data_setup_backup_role">BACKUP — outbound automatically, inbound only when you explicitly import</string>
+    <string name="data_setup_saf_body">Choosing a folder creates verified copies of personalhub.db after local changes. The folder never silently populates the app. Import is a separate, explicit, validated replacement operation.</string>
+    <string name="data_setup_datasette_title">Datasette</string>
+    <string name="data_setup_replica_role">REMOTE REPLICA — local → server</string>
+    <string name="data_setup_datasette_body">Datasette receives a row-level replica for remote browsing and analysis. It never hydrates or overwrites the local database. You only need its HTTPS endpoint and write credential if you enable this optional replica.</string>
+    <string name="data_setup_git_title">Git data history</string>
+    <string name="data_setup_history_role">VERSIONED HISTORY — local → Git; restore is explicit</string>
+    <string name="data_setup_git_body">Normal Git sync publishes deterministic snapshots/history and checks verified control metadata. It does not silently replace local data. A full inbound replacement happens only when you explicitly choose Restore from Git; patches also require an explicit action.</string>
+    <string name="data_setup_security">Secrets are device-local and encrypted with Android Keystore. They are not stored in personalhub.db, SAF exports, Git data files, logs, or saved UI state.</string>
+    <string name="data_setup_open_database">Open database &amp; backup</string>
+    <string name="data_setup_configure">Configure</string>
+    <string name="data_setup_configured">Configured (optional service is off)</string>
+    <string name="data_setup_not_configured">Not configured — this is fine</string>
+    <string name="data_setup_enabled">Enabled</string>
+    <string name="datasette_direction_notice">Direction: personalhub.db → Datasette. Datasette is never used to populate PersonalHub.</string>
+    <string name="datasette_connection_help">These values identify the optional Datasette write endpoint. They do not select which local data PersonalHub opens.</string>
+    <string name="datasette_token_help">The token authorizes HTTPS uploads to your Datasette endpoint. It is encrypted in Android Keystore storage and never enters the PersonalHub database or exports.</string>
+    <string name="git_data_sync_direction_notice">Normal direction: personalhub.db → Git history. Remote content can replace local data only through an explicit Restore action below.</string>
+    <string name="git_data_sync_token_help">The GitHub token is used only to access the configured private data repository. It is encrypted in Android Keystore storage and is never committed, exported, or written to personalhub.db.</string>
+
 </resources>
