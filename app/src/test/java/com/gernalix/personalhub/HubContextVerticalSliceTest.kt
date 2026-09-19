@@ -9,7 +9,6 @@ import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.util.CapsuleWriteApi
 import com.gernalix.luoghi.capsules.stats.StatsCapsule
 import com.gernalix.luoghi.capsules.visits.VisitMapper
-import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
