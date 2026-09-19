@@ -40,12 +40,12 @@ class HubContextMigrationTest {
             val sqlite = database.openHelper.writableDatabase
             assertEquals(PersonalHubDatabase.SCHEMA_VERSION, sqlite.version)
             assertEquals("{\"kept\":true}", scalarText(sqlite, "SELECT json FROM hub_preferences WHERE namespace='migration-proof'"))
-            assertEquals(51L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(52L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
             assertEquals(5L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('hub_entity_bindings','hub_contexts','hub_context_members','hub_context_types','hub_context_type_fields')"))
             assertTrue(scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='index' AND name='index_hub_context_members_entity_id_context_id'") == 1L)
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='hub_resources'"))
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='hub_activity_log'"))
-            sqlite.execSQL("INSERT INTO hub_contexts VALUES('ctx',NULL,NULL,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
+            sqlite.execSQL("INSERT INTO hub_contexts VALUES('ctx',NULL,NULL,1767225600000,1767225600000)")
             try {
                 sqlite.execSQL("INSERT INTO hub_context_members VALUES('ctx','missing','',0)")
                 fail("Expected binding foreign-key failure")
@@ -86,7 +86,7 @@ class HubContextMigrationTest {
             assertEquals(0L, scalarLong(sqlite, "SELECT locked FROM hub_context_types WHERE id='user_type'"))
             assertEquals("Kept", scalarText(sqlite, "SELECT title FROM hub_contexts WHERE id='ctx'"))
             assertEquals("Kept resource", scalarText(sqlite, "SELECT title FROM hub_resources WHERE id='res'"))
-            assertEquals(16L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(17L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='hub_activity_log'"))
         } finally {
             database.close()
