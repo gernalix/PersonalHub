@@ -34,6 +34,15 @@ class GlobalDatabaseInstrumentedTest {
         override fun create(name: String): DatabaseVault.ExportFile = MemoryExportFile(name, this).also { files[name] = it }
         override fun open(identity: String): DatabaseVault.ExportFile? = files[identity]
         override fun find(name: String): DatabaseVault.ExportFile? = files[name]
+        override fun rename(source: DatabaseVault.ExportFile, newName: String): DatabaseVault.ExportFile {
+            val current = source as MemoryExportFile
+            val bytes = current.bytes
+            files.remove(requireNotNull(current.name))
+            return MemoryExportFile(newName, this).also {
+                it.bytes = bytes
+                files[newName] = it
+            }
+        }
         override fun writeFrom(source: File, target: DatabaseVault.ExportFile) {
             (target as MemoryExportFile).bytes = source.readBytes()
         }
