@@ -2,7 +2,7 @@ package com.wordpulse.app
 
 import android.content.Context
 import com.wordpulse.app.data.SystemTimeProvider
-import com.wordpulse.app.data.WordPulseDatabase
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.wordpulse.app.data.WordRepository
 
 /**
@@ -17,7 +17,7 @@ internal object WordPulseRuntime {
         repositoryInstance?.let { return it }
         return synchronized(this) {
             repositoryInstance ?: WordRepository(
-                database = WordPulseDatabase.create(context.applicationContext),
+                database = PersonalHubDatabase.get(context.applicationContext),
                 timeProvider = SystemTimeProvider,
             ).also { repositoryInstance = it }
         }
