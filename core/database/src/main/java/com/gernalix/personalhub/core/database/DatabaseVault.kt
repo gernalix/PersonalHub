@@ -35,6 +35,7 @@ object DatabaseVault {
     private const val PRE_IMPORT_BACKUP_SUFFIX = ".db"
     private const val TRANSIENT_BACKUP_NAME = "personalhub-backup.db"
     private const val LEGACY_TRANSIENT_BACKUP_PREFIX = "personalhub-backup-"
+    private const val STARTUP_ROLLBACK_PREFIX = "personalhub-startup-v"
     internal const val CANONICAL_DOCUMENT_URI = "canonical_document_uri"
     internal const val BACKUP_DOCUMENT_URI = "backup_document_uri"
     private val noTransferHooks = object : TransferHooks {}
@@ -114,6 +115,19 @@ object DatabaseVault {
             ?.filter {
                 it.isFile &&
                     it.name.startsWith(LEGACY_TRANSIENT_BACKUP_PREFIX) &&
+                    it.name.endsWith(".db")
+            }
+            ?.forEach { backup ->
+                sidecars(backup)
+                backup.delete()
+            }
+    }
+
+    private fun cleanupCompletedStartupRollbacks(context: Context) {
+        databaseDir(context).listFiles()
+            ?.filter {
+                it.isFile &&
+                    it.name.startsWith(STARTUP_ROLLBACK_PREFIX) &&
                     it.name.endsWith(".db")
             }
             ?.forEach { backup ->
@@ -215,7 +229,10 @@ object DatabaseVault {
         if (
             prefs.getInt("startup_gate_schema", -1) == PersonalHubDatabase.SCHEMA_VERSION &&
             prefs.getLong("startup_gate_app_version", -1L) == appVersion && target.isFile
-        ) return@withLock true
+        ) {
+            cleanupCompletedStartupRollbacks(context)
+            return@withLock true
+        }
 
         fun pass() = prefs.edit()
             .putInt("startup_gate_schema", PersonalHubDatabase.SCHEMA_VERSION)
@@ -243,8 +260,10 @@ object DatabaseVault {
             return@withLock fail("Database version is unsupported; existing data was preserved")
         }
         if (sourceVersion == PersonalHubDatabase.SCHEMA_VERSION) {
-            return@withLock runCatching { validate(context, target); pass() }
-                .getOrElse { fail("Database validation failed; existing data was preserved") }
+            return@withLock runCatching {
+                validate(context, target)
+                pass().also { ready -> if (ready) cleanupCompletedStartupRollbacks(context) }
+            }.getOrElse { fail("Database validation failed; existing data was preserved") }
         }
 
         val snapshot = File(target.parentFile, "personalhub-startup-v$sourceVersion.db")
@@ -282,7 +301,13 @@ object DatabaseVault {
             val temporary = PersonalHubDatabase.openTemporary(context, target.absolutePath)
             try { temporary.openHelper.writableDatabase } finally { temporary.close() }
             validate(context, target)
-            pass()
+            pass().also { ready ->
+                if (ready) {
+                    sidecars(snapshot)
+                    snapshot.delete()
+                    syncDirectory(target.parentFile!!)
+                }
+            }
         }.getOrElse {
             PersonalHubDatabase.closeInstance()
             if (snapshot.isFile) {
