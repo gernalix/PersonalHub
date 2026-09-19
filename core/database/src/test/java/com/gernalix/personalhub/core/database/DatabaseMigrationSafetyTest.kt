@@ -86,6 +86,17 @@ class DatabaseMigrationSafetyTest {
         } finally { context.deleteDatabase(name) }
     }
 
+    @Test fun legacyParserAcceptsOnlyExactMillisecondInstants() {
+        assertEquals(1767312123456L, TimestampEpochMigration.exactEpochMs("2026-01-02T01:02:03.456+01:00"))
+        assertEquals(1767312123456L, TimestampEpochMigration.exactEpochMs("1767312123456"))
+        assertThrows(IllegalArgumentException::class.java) {
+            TimestampEpochMigration.exactEpochMs("2026-01-02T00:02:03.456789Z")
+        }
+        assertThrows(java.time.format.DateTimeParseException::class.java) {
+            TimestampEpochMigration.exactEpochMs("2026-01-02")
+        }
+    }
+
     @Test fun productionRegistryIsTheRealContinuousGraph() {
         val edges = PersonalHubDatabase.productionMigrationEdges(context)
         assertEquals((1 until PersonalHubDatabase.SCHEMA_VERSION).map { it to it + 1 }.toSet(), edges)
