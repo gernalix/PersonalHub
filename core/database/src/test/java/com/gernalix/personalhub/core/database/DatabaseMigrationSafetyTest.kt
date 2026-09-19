@@ -17,6 +17,59 @@ import org.robolectric.annotation.Config
 class DatabaseMigrationSafetyTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    @Test fun realV16TimestampRowsMigrateWithNullsDatesAndForeignKeysIntact() {
+        val name = "timestamp-v16-${UUID.randomUUID()}.db"
+        val file = context.getDatabasePath(name).also { it.parentFile!!.mkdirs() }
+        createVersion(file, 16)
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { old ->
+            old.execSQL("INSERT INTO hub_generation(id,generation) VALUES(1,16)")
+            old.execSQL("INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) VALUES('a','Account','EUR','0','2026-01-01T00:00:00.123Z',1)")
+            old.execSQL("INSERT INTO finance_transactions(id,accountId,uuid,amount,currency,fromReceipt,notes,occurredAt,createdAt,updatedAt) VALUES(1,'a','tx','1','EUR',0,'note','2026-01-02T01:02:03.456+01:00','2026-01-01T00:00:00Z','1767312123456')")
+            old.execSQL("INSERT INTO hub_context_types(id,name,created_at,updated_at,locked) VALUES('type','Type','2026-01-01T00:00:00Z','2026-01-01T00:00:01Z',0)")
+            old.execSQL("INSERT INTO hub_contexts(id,context_type_id,title,created_at,updated_at) VALUES('ctx','type','Kept','2026-01-01T00:00:00Z','2026-01-01T00:00:02Z')")
+            old.execSQL("INSERT INTO hub_entity_bindings(id,module_id,entity_kind,canonical_id,lifecycle,updated_at) VALUES('binding','soldi','transaction','tx','ACTIVE','2026-01-01T00:00:03Z')")
+            old.execSQL("INSERT INTO hub_context_members(context_id,entity_id,role,position) VALUES('ctx','binding','',0)")
+            old.execSQL("INSERT INTO hub_resources(id,kind,value,persistedPermission,createdAt,updatedAt) VALUES('res','note','kept',0,'2026-01-01T00:00:00Z','2026-01-01T00:00:04Z')")
+            old.execSQL("INSERT INTO substances(id,name,canonical_name,type,stock_current,stock_unit,dose_per_intake,dose_unit,daily_frequency,start_epoch_day,forever,archived,prn) VALUES(1,'Test','test','farmaco',1,'mg',1,'mg',1,20000,1,0,0)")
+            old.execSQL("INSERT INTO intake_events(id,substance_id,timestamp_ms,timestamp_utc,dose,dose_unit) VALUES(1,1,1767225600123,'2026-01-01T00:00:00.123Z',1,'mg')")
+            old.execSQL("INSERT INTO stock_adjustments(id,substance_id,timestamp_ms,timestamp_utc,delta,resulting_stock) VALUES(1,1,1767225600123,'',-1,0)")
+            old.execSQL("INSERT INTO notification_state(id,kind,entity_id,scheduled_for_ms,scheduled_for_utc,sent_at_ms,sent_at_utc) VALUES(1,'dose',1,1767225600123,'2026-01-01T00:00:00.123Z',NULL,NULL)")
+            old.execSQL("INSERT INTO prescriptions(id,substance_id,prescription_epoch_day,prescription_date_utc,quantity_prescribed,refill_every_months,alert_refill) VALUES(1,1,20000,'2026-01-01',1,1,0)")
+        }
+        val owner = PersonalHubDatabase.openTemporary(context, name)
+        try {
+            val db = owner.openHelper.writableDatabase
+            assertEquals(17, db.version)
+            assertEquals(1767225600123L, scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='a'"))
+            assertEquals(1767312123456L, scalar(db, "SELECT occurredAt FROM finance_transactions WHERE id=1"))
+            assertEquals(1L, scalar(db, "SELECT count(*) FROM finance_transactions WHERE reminderAt IS NULL"))
+            assertEquals(1L, scalar(db, "SELECT count(*) FROM hub_context_members WHERE context_id='ctx' AND entity_id='binding'"))
+            assertEquals(1767225600123L, scalar(db, "SELECT timestamp_utc FROM stock_adjustments WHERE id=1"))
+            assertEquals("2026-01-01", scalarText(db, "SELECT prescription_date_utc FROM prescriptions WHERE id=1"))
+            assertEquals("ok", scalarText(db, "PRAGMA quick_check"))
+            assertFalse(db.query("PRAGMA foreign_key_check").use { it.moveToFirst() })
+        } finally { owner.close(); context.deleteDatabase(name) }
+    }
+
+    @Test fun malformedV16InstantFailsClosedWithoutLosingDatabase() {
+        val name = "timestamp-invalid-${UUID.randomUUID()}.db"
+        val file = context.getDatabasePath(name).also { it.parentFile!!.mkdirs() }
+        createVersion(file, 16)
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { old ->
+            old.execSQL("INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) VALUES('bad','Bad','EUR','0','tomorrow',1)")
+        }
+        try {
+            val owner = PersonalHubDatabase.openTemporary(context, name)
+            try { owner.openHelper.writableDatabase; fail("Expected invalid legacy instant") }
+            catch (_: java.time.format.DateTimeParseException) { }
+            finally { owner.close() }
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { old ->
+                assertEquals(16, old.version)
+                assertEquals("tomorrow", old.rawQuery("SELECT openedAt FROM finance_accounts WHERE id='bad'", null).use { it.moveToFirst(); it.getString(0) })
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
     @Test fun productionRegistryIsTheRealContinuousGraph() {
         val edges = PersonalHubDatabase.productionMigrationEdges(context)
         assertEquals((1 until PersonalHubDatabase.SCHEMA_VERSION).map { it to it + 1 }.toSet(), edges)

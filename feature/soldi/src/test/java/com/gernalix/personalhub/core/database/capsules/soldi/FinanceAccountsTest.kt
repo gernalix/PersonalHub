@@ -71,14 +71,14 @@ class FinanceAccountsTest {
         assertEquals(newest.copy(id=draft.id, occurredAt=draft.occurredAt), filled)
         assertEquals(2, db.financeDao().allTransactions().size)
         val id = finance.saveTransaction(filled.copy(id=null))
-        assertEquals(draft.occurredAt, db.financeDao().transaction(id)!!.occurredAt)
+        assertEquals(Instant.parse(draft.occurredAt).toEpochMilli(), db.financeDao().transaction(id)!!.occurredAt)
         assertEquals(b.id, db.financeDao().transaction(id)!!.accountId)
         assertEquals(listOf("food", "weekly"), finance.tags(id))
     }
     @Test fun sameDayRecurrenceMaterializesAtAccountOpeningInstant() = db { db, finance ->
         val date = LocalDate.of(2026, 9, 13)
         val openedAt = date.atTime(14, 30).atZone(ZoneId.systemDefault()).toInstant().toString()
-        val account = FinanceAccount(name="Same-day EUR", currency="EUR", openedAt=openedAt)
+        val account = FinanceAccount(name="Same-day EUR", currency="EUR", openedAt=Instant.parse(openedAt).toEpochMilli())
         finance.saveAccount(account)
         val recurrenceId = finance.saveRecurrence(
             RecurrenceDraft(
@@ -95,10 +95,10 @@ class FinanceAccountsTest {
 
         assertEquals(1, ids.size)
         val row = requireNotNull(db.financeDao().transaction(ids.single()))
-        assertEquals(openedAt, row.occurredAt)
+        assertEquals(account.openedAt, row.occurredAt)
         assertEquals(recurrenceId, row.recurrenceId)
         assertEquals(date.toString(), row.occurrenceKey)
-        assertTrue(Instant.parse(row.occurredAt) >= Instant.parse(account.openedAt))
+        assertTrue(row.occurredAt >= account.openedAt)
     }
     @Test fun deterministicExchangeAtomicConflictsAndCredentialFreeConfiguration() = db { db,finance ->
         val account=FinanceAccount(name="QA",currency="DKK"); finance.saveAccount(account)
