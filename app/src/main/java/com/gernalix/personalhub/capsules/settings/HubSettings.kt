@@ -23,6 +23,7 @@ import com.gernalix.personalhub.capsules.shortcuts.HomeShortcutsSettings
 import com.gernalix.personalhub.core.database.ImportRolledBack
 import com.gernalix.personalhub.core.database.DatabaseProfileInitMode
 import com.gernalix.personalhub.core.database.DatabaseProfiles
+import com.gernalix.personalhub.core.database.DatabaseVault
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSettings
 import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
@@ -41,6 +42,18 @@ fun HubSettings(onBack: () -> Unit) {
     when (page) {
         "shortcuts" -> HomeShortcutsSettings { page = "root" }
         "profiles" -> DatabaseProfilesSettings { page = "root" }
+        "data-guide" -> DataSetupGuide(
+            onBack = { page = "root" },
+            onOpenDatabase = {
+                val context = LocalContext.current
+                context.startActivity(Intent(context, DatabaseActivity::class.java))
+            },
+            onOpenDatasette = { page = "sync" },
+            onOpenGit = {
+                enableGitAfterConfigure = false
+                page = "git-data"
+            },
+        )
         "sync" -> SyncSettings { page = "root" }
         "git-data" -> GitDataSyncSettings(
             onBack = { page = "root"; enableGitAfterConfigure = false },
@@ -53,6 +66,11 @@ fun HubSettings(onBack: () -> Unit) {
             val context = LocalContext.current
             val privacyPolicyUrl = stringResource(R.string.privacy_policy_url)
             SettingsPage(R.string.settings_title, ::back) {
+                Text(stringResource(R.string.settings_data_model_summary))
+                Button(onClick = { page = "data-guide" }) {
+                    Text(stringResource(R.string.settings_guided_data_setup))
+                }
+                HorizontalDivider()
                 OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
                 OutlinedButton(onClick = { page = "profiles" }) { Text(stringResource(R.string.database_profiles_title)) }
                 OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) { Text(stringResource(R.string.database_title)) }
@@ -233,6 +251,104 @@ private fun SettingsPage(title: Int, onBack: () -> Unit, content: @Composable Co
 }
 
 @Composable
+private fun DataSetupGuide(
+    onBack: () -> Unit,
+    onOpenDatabase: () -> Unit,
+    onOpenDatasette: () -> Unit,
+    onOpenGit: () -> Unit,
+) {
+    val context = LocalContext.current
+    val activeProfile = remember { DatabaseProfiles.active(context) }
+    val safConfigured = remember { DatabaseVault.folder(context) != null }
+    val datasette = remember {
+        runCatching { DatasetteSettings.configuration(context) }.getOrNull()
+    }
+    val git = remember {
+        runCatching { GitDataSettings.configuration(context) }.getOrNull()
+    }
+
+    SettingsPage(R.string.settings_guided_data_setup, onBack) {
+        Text(stringResource(R.string.data_setup_intro))
+        DataRoleCard(
+            number = 1,
+            title = stringResource(R.string.data_setup_local_title),
+            role = stringResource(R.string.data_setup_authoritative),
+            body = stringResource(R.string.data_setup_local_body),
+            status = stringResource(R.string.data_setup_active_profile, activeProfile.name),
+            action = stringResource(R.string.data_setup_open_database),
+            onAction = onOpenDatabase,
+        )
+        DataRoleCard(
+            number = 2,
+            title = stringResource(R.string.data_setup_saf_title),
+            role = stringResource(R.string.data_setup_backup_role),
+            body = stringResource(R.string.data_setup_saf_body),
+            status = stringResource(
+                if (safConfigured) R.string.data_setup_configured else R.string.data_setup_not_configured,
+            ),
+            action = stringResource(R.string.data_setup_open_database),
+            onAction = onOpenDatabase,
+        )
+        DataRoleCard(
+            number = 3,
+            title = stringResource(R.string.data_setup_datasette_title),
+            role = stringResource(R.string.data_setup_replica_role),
+            body = stringResource(R.string.data_setup_datasette_body),
+            status = stringResource(
+                if (datasette?.enabled == true) R.string.data_setup_enabled
+                else if (datasette?.hasToken == true) R.string.data_setup_configured
+                else R.string.data_setup_not_configured,
+            ),
+            action = stringResource(R.string.data_setup_configure),
+            onAction = onOpenDatasette,
+        )
+        DataRoleCard(
+            number = 4,
+            title = stringResource(R.string.data_setup_git_title),
+            role = stringResource(R.string.data_setup_history_role),
+            body = stringResource(R.string.data_setup_git_body),
+            status = stringResource(
+                if (git?.enabled == true) R.string.data_setup_enabled
+                else if (git?.configured == true) R.string.data_setup_configured
+                else R.string.data_setup_not_configured,
+            ),
+            action = stringResource(R.string.data_setup_configure),
+            onAction = onOpenGit,
+        )
+        HorizontalDivider()
+        Text(
+            stringResource(R.string.data_setup_security),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DataRoleCard(
+    number: Int,
+    title: String,
+    role: String,
+    body: String,
+    status: String,
+    action: String,
+    onAction: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("$number. $title", style = MaterialTheme.typography.titleMedium)
+            Text(role, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Text(body)
+            Text(status, style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = onAction) { Text(action) }
+        }
+    }
+}
+
+@Composable
 private fun SyncSettings(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -264,6 +380,11 @@ private fun SyncSettings(onBack: () -> Unit) {
             })
         }
         Text(stringResource(R.string.datasette_description))
+        Text(
+            stringResource(R.string.datasette_direction_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         OutlinedButton(onClick = { connection = true }, enabled = !busy) { Text(stringResource(R.string.datasette_connection)) }
         Text(stringResource(if (config?.enabled != true) R.string.datasette_off else when (state) {
             "sending" -> R.string.datasette_sending
@@ -289,10 +410,16 @@ private fun ConnectionSettings(onBack: () -> Unit, onSaved: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     SettingsPage(R.string.datasette_connection, onBack) {
+        Text(stringResource(R.string.datasette_connection_help))
         OutlinedTextField(url, { url = it }, label = { Text(stringResource(R.string.datasette_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(database, { database = it }, label = { Text(stringResource(R.string.datasette_database)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(table, { table = it }, label = { Text(stringResource(R.string.datasette_table)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(token, { token = it }, label = { Text(stringResource(R.string.datasette_token)) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        Text(
+            stringResource(R.string.datasette_token_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (initial?.hasToken == true) Text(stringResource(R.string.datasette_token_saved))
         Button(enabled = !busy, onClick = {
             busy = true
@@ -404,6 +531,11 @@ private fun GitDataSyncSettings(
 
     SettingsPage(R.string.git_data_sync_title, onBack) {
         Text(stringResource(R.string.git_data_sync_description))
+        Text(
+            stringResource(R.string.git_data_sync_direction_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         OutlinedTextField(
             repository,
             { repository = it },
@@ -418,6 +550,11 @@ private fun GitDataSyncSettings(
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            stringResource(R.string.git_data_sync_token_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (initial?.hasToken == true) {
             Text(stringResource(R.string.git_data_sync_token_saved))
