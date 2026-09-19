@@ -423,22 +423,9 @@ object SnapshotStore {
         )
     }
 
-    fun loadAsOf(context: Context, targetMs: Long): Snapshot? {
-        return loadFromJson(
-            context = context,
-            json = SnapshotSqlite.readSnapshotAsOf(context, targetMs) ?: return null
-        )
-    }
-
     private fun loadSnapshotJson(context: Context): String? {
         val internalDb = SnapshotSqlite.internalDbFile(context)
-        val hadInternalDbBeforeRestore = internalDb.exists() && internalDb.length() > 0L
-
-        // 0) If internal DB is missing (fresh reinstall), attempt recovery from the user folder.
-        SqliteVault.restoreFromUserFolderIfPossible(context)
-
-        val hasInternalDbAfterRestore = internalDb.exists() && internalDb.length() > 0L
-        val allowLegacyFallback = !hadInternalDbBeforeRestore && !hasInternalDbAfterRestore
+        val allowLegacyFallback = !internalDb.exists() || internalDb.length() == 0L
 
         // 1) Primary: SQLite
         val jsonFromDb = SnapshotSqlite.readSnapshot(context)

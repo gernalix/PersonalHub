@@ -5,7 +5,7 @@ import com.example.multitimetracker.core.contracts.TaggedSessionRecord
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
 import com.example.multitimetracker.model.Task
-import com.example.multitimetracker.model.TemporalContext
+import com.example.multitimetracker.model.EffectiveTimeContext
 
 data class TagsUiState(
     val tags: List<Tag>,
@@ -22,15 +22,13 @@ data class TagsUiState(
     val tagTotalsMsByTagId: Map<Long, Long>,
     val nowMs: Long,
     val effectiveNowMs: Long,
-    val timeMachineTargetMs: Long?,
     val isReadOnly: Boolean,
 ) {
-    fun effectiveTimeContext() = TemporalContext(timeMachineTargetMs).effectiveTime(nowMs)
+    fun effectiveTimeContext() = EffectiveTimeContext(nowMs)
 }
 
 data class TagsHostState(
     val nowMs: Long,
     val effectiveNowMs: Long,
-    val timeMachineTargetMs: Long?,
     val isReadOnly: Boolean,
 )

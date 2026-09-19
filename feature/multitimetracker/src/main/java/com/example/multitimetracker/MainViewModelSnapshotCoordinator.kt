@@ -10,7 +10,6 @@ import com.example.multitimetracker.core.session.AutoConsistencyCore
 import com.example.multitimetracker.core.session.SessionCore
 import com.example.multitimetracker.export.AuthoritativeExportPayload
 import com.example.multitimetracker.export.AuthoritativeExportPayloadBuilder
-import com.example.multitimetracker.export.BackupFolderStore
 import com.example.multitimetracker.export.buildSessionOnlyRuntimeTasks
 import com.example.multitimetracker.capsules.chains.public.ChainsSnapshot
 import com.example.multitimetracker.capsules.quickevents.public.QuickEventsSnapshot
@@ -32,7 +31,6 @@ import com.example.multitimetracker.persistence.PersistentSaveOrigin
 import com.example.multitimetracker.persistence.PersistentSnapshotSaveGate
 import com.example.multitimetracker.persistence.SnapshotSqlite
 import com.example.multitimetracker.persistence.SnapshotStore
-import com.example.multitimetracker.util.AppRestarter
 import com.example.multitimetracker.util.CapsuleWriteApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,13 +54,6 @@ internal class MainViewModelSnapshotCoordinator(
         closedSessions: List<ClosedSessionRecord>,
         tagSessions: List<TaggedSessionRecord>,
         runtimeSnapshot: TimeEngine.RuntimeSnapshot,
-    ) -> Unit,
-    private val loadImportedSnapshot: (
-        tasks: List<Task>,
-        tags: List<Tag>,
-        importedClosedSessionRecords: List<ClosedSessionRecord>,
-        importedTaggedSessionRecords: List<TaggedSessionRecord>,
-        runtimeSnapshot: TimeEngine.RuntimeSnapshot?,
     ) -> Unit,
     private val exportRuntimeSnapshot: () -> TimeEngine.RuntimeSnapshot,
     private val buildAuthoritativeExportPayload: (Context?) -> AuthoritativeExportPayload,
@@ -119,7 +110,6 @@ internal class MainViewModelSnapshotCoordinator(
     private val reconcileRuntimeAlarms: (Context, List<TimeFenceRule>, List<SessionUi>, List<Tag>, Long) -> Unit,
     private val setPersistenceFailureReport: (String?) -> Unit,
     private val onSnapshotReloaded: (Context) -> Unit = {},
-    private val onPostImport: (Context) -> Unit = {},
     private val showPersistenceFailureToast: (Context) -> Unit,
 ) {
     private val trackedTimedSessionAlarmIds = mutableSetOf<Long>()
@@ -145,21 +135,15 @@ internal class MainViewModelSnapshotCoordinator(
         val snapshotTasks: List<Task>,
     )
 
-    private enum class SnapshotLoadMode {
-        STANDARD,
-        IMPORTED,
-    }
-
     private enum class InstallAtMsPolicy {
         FROM_SNAPSHOT,
         KEEP_EARLIEST,
-        KEEP_CURRENT,
     }
 
     private var sessionsRefreshJob: Job? = null
     private var postLoadSyncJob: Job? = null
     private var autoBackupJob: Job? = null
-    private var timeMachineCompactionJob: Job? = null
+    private var snapshotHistoryCompactionJob: Job? = null
     private val persistenceGate = PersistentSnapshotSaveGate()
     private var lastPersistedSnapshot: SnapshotStore.Snapshot? = null
     private var lastBackupSignature: String? = null
@@ -253,7 +237,6 @@ internal class MainViewModelSnapshotCoordinator(
         val applied = applySnapshot(
             context = context,
             snap = snap,
-            loadMode = SnapshotLoadMode.STANDARD,
             installAtMsPolicy = InstallAtMsPolicy.FROM_SNAPSHOT,
             rememberPersisted = true,
         )
@@ -266,7 +249,7 @@ internal class MainViewModelSnapshotCoordinator(
             runAutoConsistency = true,
         )
         scheduleAutoBackup()
-        scheduleTimeMachineStorageCompaction(context)
+        scheduleSnapshotHistoryCompaction(context)
         return true
     }
 
@@ -292,7 +275,6 @@ internal class MainViewModelSnapshotCoordinator(
         val applied = applySnapshot(
             context = context,
             snap = snap,
-            loadMode = SnapshotLoadMode.STANDARD,
             installAtMsPolicy = InstallAtMsPolicy.KEEP_EARLIEST,
             rememberPersisted = true,
         )
@@ -305,84 +287,7 @@ internal class MainViewModelSnapshotCoordinator(
         )
         onSnapshotReloaded(context)
         scheduleAutoBackup()
-        scheduleTimeMachineStorageCompaction(context)
-    }
-
-    fun applyImportedSnapshotFromStore(context: Context, snap: SnapshotStore.Snapshot) {
-        postLoadSyncJob?.cancel()
-        sessionsRefreshJob?.cancel()
-        replaceRuntimeCanonicalTags(snap.tags)
-        applySnapshot(
-            context = context,
-            snap = snap,
-            loadMode = SnapshotLoadMode.IMPORTED,
-            installAtMsPolicy = InstallAtMsPolicy.KEEP_CURRENT,
-            rememberPersisted = false,
-        )
-        replaceRuntimeCanonicalTags(snap.tags)
-        persistCurrentSnapshotOrThrow(
-            showFailureUi = false,
-            allowDuringPendingRestart = true,
-            origin = PersistentSaveOrigin.IMPORT,
-        )
-        SnapshotStore.load(context)?.let { repaired ->
-            replaceRuntimeCanonicalTags(snap.tags)
-            applySnapshot(
-                context = context,
-                snap = repaired,
-                loadMode = SnapshotLoadMode.IMPORTED,
-                installAtMsPolicy = InstallAtMsPolicy.KEEP_CURRENT,
-                rememberPersisted = true,
-            )
-            persistCurrentSnapshotOrThrow(
-                showFailureUi = false,
-                allowDuringPendingRestart = true,
-                origin = PersistentSaveOrigin.IMPORT,
-            )
-            repairPersistedTagNames(context, snap.tags)
-            lastPersistedSnapshot = SnapshotStore.load(context)
-        }
-        onPostImport(context)
-    }
-
-    fun applyImportedCsvSnapshot(snapshot: com.example.multitimetracker.export.CsvImporter.ImportedSnapshot) {
-        appContext()?.let { context ->
-            runCatching {
-                com.example.multitimetracker.core.quickevent.DefaultQuickEventCore(context)
-                    .replaceAll(
-                        snapshot.quickEventTemplates,
-                        snapshot.quickEventEntries,
-                        snapshot.quickEventFieldDefinitions,
-                        snapshot.quickEventFieldValues,
-                        snapshot.quickEventMacros,
-                        snapshot.quickEventMacroActions
-                    )
-            }
-            applySnapshot(
-                context = context,
-                snap = snapshot.toSnapshotStoreSnapshot(installAtMs = readState().installAtMs),
-                loadMode = SnapshotLoadMode.IMPORTED,
-                installAtMsPolicy = InstallAtMsPolicy.KEEP_CURRENT,
-                rememberPersisted = false,
-            )
-        }
-        updateState {
-            it.copy(
-                appUsageMs = snapshot.appUsageMs,
-                installAtMs = it.installAtMs,
-                appUsageRunningSinceMs = null,
-                nowMs = System.currentTimeMillis(),
-            )
-        }
-        replaceLifePeriods(snapshot.lifePeriods)
-        replaceTimeFenceRules(snapshot.timeFenceRules)
-        replaceQuickEvents(snapshot.toQuickEventsSnapshot())
-        replaceChains(snapshot.toChainsSnapshot())
-        replaceTagParentsByChild(snapshot.tagParentsByChild)
-        appContext()?.let(onPostImport)
-
-        persist()
-        scheduleAutoBackup()
+        scheduleSnapshotHistoryCompaction(context)
     }
 
     fun persist(origin: PersistentSaveOrigin = PersistentSaveOrigin.STATE_MUTATION) {
@@ -419,8 +324,6 @@ internal class MainViewModelSnapshotCoordinator(
         allowDuringPendingRestart: Boolean,
         origin: PersistentSaveOrigin,
     ) {
-        if (!allowDuringPendingRestart && AppRestarter.isRestartPending()) return
-
         persistenceGate.execute(origin) { _, _ ->
             persistReadySnapshotOrThrow(
                 showFailureUi = showFailureUi,
@@ -521,37 +424,29 @@ internal class MainViewModelSnapshotCoordinator(
 
     fun scheduleAutoBackup() {
         val ctx = appContext() ?: return
-        if (BackupFolderStore.getTreeUri(ctx) == null) return
-
         autoBackupJob?.cancel()
         autoBackupJob = viewModelScope.launch(Dispatchers.IO) {
             delay(1200)
-            runCatching {
-                val signature = computeBackupSignature()
-                if (signature == lastBackupSignature) return@runCatching
-
-                PersistentMutationTracker.requestExport(ctx)
-                lastBackupSignature = signature
-            }
+            PersistentMutationTracker.requestExport(ctx)
         }
     }
 
-    private fun scheduleTimeMachineStorageCompaction(context: Context) {
-        timeMachineCompactionJob?.cancel()
+    private fun scheduleSnapshotHistoryCompaction(context: Context) {
+        snapshotHistoryCompactionJob?.cancel()
         val appCtx = context.applicationContext
-        timeMachineCompactionJob = viewModelScope.launch(Dispatchers.IO) {
+        snapshotHistoryCompactionJob = viewModelScope.launch(Dispatchers.IO) {
             delay(5_000)
             var compactedInThisRun = false
             repeat(12) {
                 val compacted = runCatching {
-                    SnapshotSqlite.compactTimeMachineStorage(appCtx)
+                    SnapshotSqlite.compactSnapshotHistoryStorage(appCtx)
                 }.getOrDefault(false)
                 if (!compacted) {
                     val retained = runCatching {
                         SnapshotSqlite.applyStorageRetention(appCtx)
                     }.getOrDefault(false)
                     if (compactedInThisRun || retained) {
-                        runCatching { SnapshotSqlite.vacuumTimeMachineStorageIfCompacted(appCtx) }
+                        runCatching { SnapshotSqlite.vacuumSnapshotHistoryIfCompacted(appCtx) }
                     }
                     return@launch
                 }
@@ -561,114 +456,22 @@ internal class MainViewModelSnapshotCoordinator(
         }
     }
 
-    fun buildManualExportZipName(nowMs: Long): String {
-        val dt = java.time.ZonedDateTime.ofInstant(
-            java.time.Instant.ofEpochMilli(nowMs),
-            java.time.ZoneId.systemDefault(),
-        )
-        val stamp = dt.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
-        return "multitimer_export_${stamp}.zip"
-    }
-
-    fun verifyImportedSnapshotApplied(expected: SnapshotStore.Snapshot): String? {
-        val actual = captureCurrentSnapshot()
-        val normalizedExpected = expected.copy(installAtMs = actual.installAtMs)
-        val mismatches = mutableListOf<String>()
-
-        fun <T> diff(name: String, exp: T, act: T) {
-            if (exp != act) mismatches += name
-        }
-
-        val actualRuntime = readSessionsRuntime()
-        diff("tasks", normalizedExpected.tasks, actualRuntime.tasks)
-        diff("tags", normalizedExpected.tags, readTags())
-        diff("closedSessions", normalizedExpected.closedSessions, actualRuntime.closedSessions)
-        diff("tagSessions", normalizedExpected.tagSessions, actualRuntime.tagSessions)
-        diff("lifePeriods", normalizedExpected.lifePeriods, readLifePeriods())
-        diff("timeFenceRules", normalizedExpected.timeFenceRules, readTimeFenceRules())
-        diff("activeSessionStart", normalizedExpected.activeSessionStart, actual.activeSessionStart)
-        diff("activeTagStart", normalizedExpected.activeTagStart, actual.activeTagStart)
-        diff("tagParents", normalizedExpected.tagParents, actual.tagParents)
-        diff("chains", normalizedExpected.chains, readChains().chains)
-        diff("activeChainRun", normalizedExpected.activeChainRun, readChains().activeChainRun)
-        diff("appUsageMs", normalizedExpected.appUsageMs, actual.appUsageMs)
-
-        return mismatches.takeIf { it.isNotEmpty() }?.joinToString(", ")
-    }
-
-    fun verifyCurrentPersistedSnapshotActivated(context: Context): String? {
-        val expected = SnapshotStore.load(context)
-            ?: return context.getString(R.string.import_snapshot_unreadable)
-        val prepared = prepareSnapshotRuntimeState(context, expected)
-        val expectedPayload = buildActivationPayloadFromSnapshot(
-            context = context,
-            snap = expected,
-            prepared = prepared,
-        )
-        val expectedSignature = AuthoritativeExportPayloadBuilder.activationSignature(
-            expectedPayload
-        )
-        val actualSignature = AuthoritativeExportPayloadBuilder.activationSignature(
-            buildAuthoritativeExportPayload(context)
-        )
-        val mismatches = verifyRuntimeStateMatchesPrepared(
-            expected = expected,
-            prepared = prepared,
-        ).toMutableList()
-        val preparedActiveTagStart = prepared.sessions.runtimeSnapshot.activeTagStart
-            .map { (sessionId, tagId, startTs) ->
-                SnapshotStore.ActiveTag(sessionId = sessionId, tagId = tagId, startTs = startTs)
-            }
-            .sortedByActiveTag()
-        lastPersistedSnapshot?.let { activated ->
-            if (activated.activeSessionStart != prepared.sessions.runtimeSnapshot.activeSessionStart &&
-                "runtime.activeSessionStart" !in mismatches
-            ) {
-                mismatches += "runtime.activeSessionStart"
-            }
-            if (activated.activeTagStart.sortedByActiveTag() != preparedActiveTagStart &&
-                "runtime.activeTagStart" !in mismatches
-            ) {
-                mismatches += "runtime.activeTagStart"
-            }
-        }
-        if (expectedSignature != actualSignature) {
-            mismatches += "activation-signature"
-        }
-        if (mismatches.isEmpty()) return null
-        return context.getString(
-            R.string.import_runtime_verify_failed_fmt,
-            mismatches.joinToString(", "),
-        )
-    }
-
     private fun applySnapshot(
         context: Context,
         snap: SnapshotStore.Snapshot,
-        loadMode: SnapshotLoadMode,
         installAtMsPolicy: InstallAtMsPolicy,
         rememberPersisted: Boolean,
     ): AppliedSnapshotState {
         val prepared = prepareSnapshotRuntimeState(context = context, snap = snap)
         val tagParentsByChild = buildTagParentsByChild(snap.tagParents)
 
-        when (loadMode) {
-            SnapshotLoadMode.STANDARD -> importRuntimeSnapshot(
-                prepared.sessions.runtimeState.tasks,
-                prepared.tags,
-                prepared.sessions.runtimeState.closedSessions,
-                prepared.sessions.runtimeState.tagSessions,
-                prepared.sessions.runtimeSnapshot,
-            )
-
-            SnapshotLoadMode.IMPORTED -> loadImportedSnapshot(
-                prepared.sessions.runtimeState.tasks,
-                prepared.tags,
-                prepared.sessions.runtimeState.closedSessions,
-                prepared.sessions.runtimeState.tagSessions,
-                prepared.sessions.runtimeSnapshot,
-            )
-        }
+        importRuntimeSnapshot(
+            prepared.sessions.runtimeState.tasks,
+            prepared.tags,
+            prepared.sessions.runtimeState.closedSessions,
+            prepared.sessions.runtimeState.tagSessions,
+            prepared.sessions.runtimeSnapshot,
+        )
 
         updateState { current ->
             current.copy(
@@ -677,7 +480,6 @@ internal class MainViewModelSnapshotCoordinator(
                 installAtMs = when (installAtMsPolicy) {
                     InstallAtMsPolicy.FROM_SNAPSHOT -> snap.installAtMs
                     InstallAtMsPolicy.KEEP_EARLIEST -> minOf(current.installAtMs, snap.installAtMs)
-                    InstallAtMsPolicy.KEEP_CURRENT -> current.installAtMs
                 },
                 nowMs = System.currentTimeMillis(),
                 homeLoadState = homeLoadStateFor(prepared.sessions.runtimeState.runningSessions),
@@ -850,25 +652,8 @@ internal class MainViewModelSnapshotCoordinator(
         val context = appContext()
         val currentRuntime = readSessionsRuntime()
         val currentTags = readTags()
-        if (
-            preferPersistedSnapshotDuringPendingRestart &&
-            AppRestarter.isRestartPending() &&
-            context != null
-        ) {
-            SnapshotStore.load(context)?.let { persisted ->
-                return persisted
-            }
-        }
-
         val persistedCanonicalTags = context?.let { SnapshotStore.load(it)?.tags }.orEmpty()
-        val preferredCanonicalTags = if (AppRestarter.isRestartPending() && persistedCanonicalTags.isNotEmpty()) {
-            persistedCanonicalTags
-        } else {
-            selectCanonicalTags(
-                currentTags,
-                persistedCanonicalTags,
-            )
-        }
+        val preferredCanonicalTags = selectCanonicalTags(currentTags, persistedCanonicalTags)
         val cacheTags = if (preferredCanonicalTags.isNotEmpty()) preferredCanonicalTags else currentTags
         val authoritative = context?.let { resolvedContext ->
             readAuthoritativeSessionsSnapshotReadModel(
@@ -1032,60 +817,12 @@ internal class MainViewModelSnapshotCoordinator(
         )
     }
 
-    private fun com.example.multitimetracker.export.CsvImporter.ImportedSnapshot.toQuickEventsSnapshot(): QuickEventsSnapshot {
-        return QuickEventsSnapshot(
-            templates = quickEventTemplates,
-            entries = quickEventEntries,
-            fieldDefinitions = quickEventFieldDefinitions,
-            fieldValues = quickEventFieldValues,
-            macros = quickEventMacros,
-            macroActions = quickEventMacroActions,
-        )
-    }
-
-    private fun com.example.multitimetracker.export.CsvImporter.ImportedSnapshot.toChainsSnapshot(): ChainsSnapshot {
-        return ChainsSnapshot(
-            chains = chains,
-            activeChainRun = activeChainRun,
-        )
-    }
-
-    private fun com.example.multitimetracker.export.CsvImporter.ImportedSnapshot.toSnapshotStoreSnapshot(
-        installAtMs: Long,
-    ): SnapshotStore.Snapshot {
-        val runtime = runtimeSnapshot
-        return SnapshotStore.Snapshot(
-            tasks = tasks,
-            tags = tags,
-            closedSessions = closedSessions,
-            tagSessions = tagSessions,
-            lifePeriods = lifePeriods,
-            timeFenceRules = timeFenceRules,
-            installAtMs = installAtMs,
-            appUsageMs = appUsageMs,
-            activeSessionStart = runtime?.activeSessionStart.orEmpty(),
-            activeTagStart = runtime?.activeTagStart.orEmpty().map { (sessionId, tagId, startTs) ->
-                SnapshotStore.ActiveTag(sessionId = sessionId, tagId = tagId, startTs = startTs)
-            },
-            tagParents = flattenTagParents(tagParentsByChild),
-            chains = chains,
-            activeChainRun = activeChainRun,
-            quickEventTemplates = quickEventTemplates,
-            quickEventEntries = quickEventEntries,
-            quickEventFieldDefinitions = quickEventFieldDefinitions,
-            quickEventFieldValues = quickEventFieldValues,
-            quickEventMacros = quickEventMacros,
-            quickEventMacroActions = quickEventMacroActions,
-        )
-    }
-
     private fun restoreLastPersistedSnapshotInMemory() {
         val snap = lastPersistedSnapshot ?: return
         val context = appContext() ?: return
         applySnapshot(
             context = context,
             snap = snap,
-            loadMode = SnapshotLoadMode.STANDARD,
             installAtMsPolicy = InstallAtMsPolicy.FROM_SNAPSHOT,
             rememberPersisted = false,
         )

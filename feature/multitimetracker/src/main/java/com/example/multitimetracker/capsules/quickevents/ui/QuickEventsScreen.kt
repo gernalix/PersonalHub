@@ -121,7 +121,7 @@ fun QuickEventsScreen(
 ) {
     val state by capsule.uiState.collectAsState()
     val context = LocalContext.current
-    val effectiveTime = remember(state.nowMs, state.timeMachineTargetMs) { state.effectiveTimeContext() }
+    val effectiveTime = remember(state.nowMs) { state.effectiveTimeContext() }
     val visibleTags = remember(state.tags) { state.tags.filter { !it.isDeleted && !it.isArchived }.distinctBy { it.id } }
     val fieldsByTemplate = remember(state.quickEventFieldDefinitions) { state.quickEventFieldDefinitions.groupBy { it.templateId } }
     val valuesByEntry = remember(state.quickEventFieldValues) { state.quickEventFieldValues.groupBy { it.entryId } }

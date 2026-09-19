@@ -6,8 +6,6 @@ import android.content.Context
 import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import com.example.multitimetracker.AppPatchVersion
 import com.example.multitimetracker.R
-import com.example.multitimetracker.export.BackupFolderStore
-import com.example.multitimetracker.export.VaultFolders
 import org.json.JSONObject
 
 /**
@@ -77,8 +75,6 @@ object DataIntegrityGate {
                 }.trim()
 
                 // v435: best-effort external report for recovery/debug (SAF/logs/integrity_report.txt)
-                writeSafReportBestEffort(context, report)
-
                 GateResult(
                     ok = false,
                     blockingTitle = context.getString(R.string.integrity_gate_title),
@@ -88,32 +84,12 @@ object DataIntegrityGate {
                 )
             }
         }.getOrElse {
-            writeSafReportBestEffort(
-                context,
-                "Integrity gate crashed: ${it::class.java.simpleName}: ${it.message}"
-            )
             GateResult(
                 ok = false,
                 blockingTitle = context.getString(R.string.integrity_gate_title),
                 blockingBody = context.getString(R.string.integrity_gate_body),
                 technicalReport = "Integrity gate crashed: ${it::class.java.simpleName}: ${it.message}"
             )
-        }
-    }
-
-    private fun writeSafReportBestEffort(context: Context, report: String) {
-        // Only if SAF is configured. Never throw from here.
-        if (BackupFolderStore.getTreeUri(context) == null) return
-        runCatching {
-            val root = VaultFolders.ensureRoot(context)
-            val logs = root.logs
-            val doc = logs.findFile(REPORT_FILE)?.takeIf { it.isFile }
-                ?: logs.createFile("text/plain", REPORT_FILE)
-                ?: return
-            context.contentResolver.openOutputStream(doc.uri, "wt")?.use { out ->
-                out.write(report.toByteArray(Charsets.UTF_8))
-                out.flush()
-            }
         }
     }
 

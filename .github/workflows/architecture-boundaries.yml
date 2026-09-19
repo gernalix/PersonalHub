@@ -11,6 +11,7 @@ on:
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'tools/check_architecture_boundaries.py'
+      - 'tools/android_shortcut_alias_smoke.py'
       - 'docs/CAPSULE_BOUNDARIES.md'
       - '.github/workflows/architecture-boundaries.yml'
   pull_request:
@@ -44,4 +45,6 @@ jobs:
       - name: Verify capsule boundaries
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 tools/check_architecture_boundaries.py
+        run: |
+          python3 -m py_compile tools/check_architecture_boundaries.py tools/android_shortcut_alias_smoke.py
+          python3 tools/check_architecture_boundaries.py

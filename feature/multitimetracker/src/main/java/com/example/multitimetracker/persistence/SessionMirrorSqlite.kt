@@ -445,9 +445,6 @@ fun buildDiagnosticsReport(
     val sb = StringBuilder()
     runCatching {
         val dbFile = SnapshotSqlite.internalDbFile(context)
-        val manual = UiPrefsStore.getLastManualExportMeta(context)
-        val importMeta = UiPrefsStore.getLastImportMeta(context)
-        val lastAuto = UiPrefsStore.getLastAutoExportMs(context)
         fun tableCount(db: com.gernalix.personalhub.core.database.LegacyDatabase, table: String): Long {
             val exists = db.rawQuery(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
@@ -465,9 +462,6 @@ fun buildDiagnosticsReport(
         sb.appendLine("dbVersion=${SnapshotSqlite.DB_VERSION}")
         sb.appendLine("dbPath=${dbFile.absolutePath}")
         sb.appendLine("dbBytes=${if (dbFile.exists()) dbFile.length() else 0L}")
-        sb.appendLine("lastBackupAutoMs=$lastAuto")
-        sb.appendLine("lastBackupManualZip=${manual.zipName.orEmpty()}")
-        sb.appendLine("lastImportDb=${importMeta.dbFileName.orEmpty()}")
         SnapshotSqlite.openReadableDb(context).use { db ->
             sb.appendLine("sessionCount=${tableCount(db, "sessions")}")
             sb.appendLine("tagCount=${tags.size}")
@@ -475,8 +469,6 @@ fun buildDiagnosticsReport(
             sb.appendLine("quickEventsCount=${tableCount(db, "quick_event_entries")}")
             sb.appendLine("quickActionsCount=${tableCount(db, "quick_event_templates")}")
             sb.appendLine("macroCount=${tableCount(db, "quick_event_macros")}")
-            sb.appendLine("auditEventsCount=${tableCount(db, "audit_events")}")
-            sb.appendLine("snapshotHistoryCount=${tableCount(db, "snapshot_history")}")
         }
         sb.appendLine()
     }.onFailure {
@@ -484,28 +476,6 @@ fun buildDiagnosticsReport(
         sb.appendLine()
     }
     sb.append(buildDeveloperIntegrityReport(context = context, nowMs = nowMs))
-
-    // v271: show backup/import context to make drift reports actionable.
-    runCatching {
-        val exp = UiPrefsStore.getLastManualExportMeta(context)
-        val imp = UiPrefsStore.getLastImportMeta(context)
-        if (!exp.zipName.isNullOrBlank() || !imp.dbFileName.isNullOrBlank()) {
-            sb.appendLine()
-            sb.appendLine()
-            sb.appendLine("Backup/Import context (UI prefs)")
-            if (!exp.zipName.isNullOrBlank()) {
-                sb.appendLine("lastExportZip=${exp.zipName}")
-                if (!exp.zipSha256.isNullOrBlank()) sb.appendLine("lastExportZipSha256=${exp.zipSha256}")
-                if (!exp.backupSignature.isNullOrBlank()) sb.appendLine("lastExportSignature=${exp.backupSignature}")
-            }
-            if (!imp.dbFileName.isNullOrBlank()) {
-                sb.appendLine("lastImportDb=${imp.dbFileName}")
-                if (!imp.dbSha256.isNullOrBlank()) sb.appendLine("lastImportDbSha256=${imp.dbSha256}")
-                if (!imp.beforeSignature.isNullOrBlank()) sb.appendLine("lastImportBeforeSignature=${imp.beforeSignature}")
-                if (!imp.afterSignature.isNullOrBlank()) sb.appendLine("lastImportAfterSignature=${imp.afterSignature}")
-            }
-        }
-    }
 
     sb.appendLine()
     sb.appendLine()
@@ -769,5 +739,4 @@ fun buildDeveloperIntegrityReport(
 }
 
 }
-
 

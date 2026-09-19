@@ -7,7 +7,7 @@ import com.example.multitimetracker.model.QuickEventMacro
 import com.example.multitimetracker.model.QuickEventMacroAction
 import com.example.multitimetracker.model.QuickEventTemplate
 import com.example.multitimetracker.model.Tag
-import com.example.multitimetracker.model.TemporalContext
+import com.example.multitimetracker.model.EffectiveTimeContext
 
 data class QuickEventsUiState(
     val tags: List<Tag>,
@@ -19,16 +19,14 @@ data class QuickEventsUiState(
     val quickEventMacroActions: List<QuickEventMacroAction>,
     val tagLastUsedMsByTagId: Map<Long, Long>,
     val nowMs: Long,
-    val timeMachineTargetMs: Long?,
     val isReadOnly: Boolean,
 ) {
-    fun effectiveTimeContext() = TemporalContext(timeMachineTargetMs).effectiveTime(nowMs)
+    fun effectiveTimeContext() = EffectiveTimeContext(nowMs)
 }
 
 data class QuickEventsHostState(
     val tags: List<Tag>,
     val tagLastUsedMsByTagId: Map<Long, Long>,
     val nowMs: Long,
-    val timeMachineTargetMs: Long?,
     val isReadOnly: Boolean,
 )

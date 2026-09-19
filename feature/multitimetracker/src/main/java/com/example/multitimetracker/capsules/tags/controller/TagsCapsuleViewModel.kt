@@ -11,7 +11,6 @@ import com.example.multitimetracker.capsules.sessions.public.SessionsRuntimeStat
 import com.example.multitimetracker.capsules.system.CapsuleRuntimeChange
 import com.example.multitimetracker.capsules.system.CapsuleRuntimeParticipant
 import com.example.multitimetracker.capsules.tags.public.TagsSnapshotProjection
-import com.example.multitimetracker.capsules.tags.public.TagsTimeMachineProjection
 import com.example.multitimetracker.capsules.system.TagsCapsuleAccess
 import com.example.multitimetracker.canonicalizeTaggedSessionRecords
 import com.example.multitimetracker.core.contracts.TaggedSessionRecord
@@ -49,22 +48,13 @@ class TagsCapsuleViewModel(
 ) : CapsuleRuntimeParticipant {
     override val capsuleId: String = "tags"
     private val liveTags = MutableStateFlow<List<Tag>>(emptyList())
-    private val timeMachineTags = MutableStateFlow<List<Tag>?>(null)
     private val liveTagParentsByChild = MutableStateFlow<Map<Long, Set<Long>>>(emptyMap())
-    private val timeMachineTagParentsByChild = MutableStateFlow<Map<Long, Set<Long>>?>(null)
     private var runtimeCanonicalTags: List<Tag> = emptyList()
-    private val visibleTags: StateFlow<List<Tag>> = combine(liveTags, timeMachineTags) { live, projected ->
-        projected ?: live
-    }.stateIn(access.runtimeScope(), SharingStarted.Eagerly, emptyList())
-    private val visibleTagParentsByChild: StateFlow<Map<Long, Set<Long>>> =
-        combine(liveTagParentsByChild, timeMachineTagParentsByChild) { live, projected ->
-            projected ?: live
-        }.stateIn(access.runtimeScope(), SharingStarted.Eagerly, emptyMap())
     val uiState: StateFlow<TagsUiState> = combine(
         access.hostStateFlow(),
         sessionsRuntime.runtimeState,
-        visibleTags,
-        visibleTagParentsByChild,
+        liveTags,
+        liveTagParentsByChild,
     ) { host, runtime, tags, parents ->
         buildUiState(
             host = host,
@@ -88,20 +78,6 @@ class TagsCapsuleViewModel(
 
     fun replaceTags(tags: List<Tag>) {
         liveTags.value = tags
-    }
-
-    fun showTimeMachineTags(tags: List<Tag>) {
-        timeMachineTags.value = tags
-    }
-
-    fun clearTimeMachineTags() {
-        timeMachineTags.value = null
-    }
-
-    fun showTimeMachineSnapshotTags(snapshot: SnapshotStore.Snapshot): TagsTimeMachineProjection {
-        val projection = projectTimeMachineTags(snapshot)
-        showTimeMachineTags(projection.tags)
-        return projection
     }
 
     fun replaceTagParentsByChild(parentsByChild: Map<Long, Set<Long>>) {
@@ -277,14 +253,6 @@ class TagsCapsuleViewModel(
                 tagIds = currentSession.tagIds,
             )
         }
-    }
-
-    fun showTimeMachineTagParentsByChild(parentsByChild: Map<Long, Set<Long>>) {
-        timeMachineTagParentsByChild.value = parentsByChild
-    }
-
-    fun clearTimeMachineTagParentsByChild() {
-        timeMachineTagParentsByChild.value = null
     }
 
     fun addTag(
@@ -617,16 +585,7 @@ class TagsCapsuleViewModel(
             tagTotalsMsByTagId = runtime.tagTotalsMsByTagId,
             nowMs = host.nowMs,
             effectiveNowMs = host.effectiveNowMs,
-            timeMachineTargetMs = host.timeMachineTargetMs,
             isReadOnly = host.isReadOnly,
-        )
-    }
-
-    private fun projectTimeMachineTags(snapshot: SnapshotStore.Snapshot): TagsTimeMachineProjection {
-        val projection = projectSnapshotTags(snapshot)
-        return TagsTimeMachineProjection(
-            tags = projection.tags,
-            activeTagStartByTagId = projection.activeTagStartByTagId,
         )
     }
 

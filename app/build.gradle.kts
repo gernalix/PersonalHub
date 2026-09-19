@@ -36,10 +36,17 @@ val unsignedPlayPreflightTasks = setOf("processplaymainmanifest", "lintplay", "b
 val unsignedPlayBundlePreflight = allowUnsignedPlayBundle.get() &&
     "bundleplay" in requestedTaskNames &&
     requestedTaskNames.all { it in unsignedPlayPreflightTasks }
-if (signingArtifactRequested && !unsignedPlayBundlePreflight) {
+val allowCiEmulatorDebug = providers.gradleProperty("personalhub.allowCiEmulatorDebug")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
+val ciDebugInstrumentation = allowCiEmulatorDebug.get() &&
+    System.getenv("CI")?.equals("true", ignoreCase = true) == true &&
+    requestedTaskNames.isNotEmpty() &&
+    requestedTaskNames.all { it == "connecteddebugandroidtest" }
+if (signingArtifactRequested && !unsignedPlayBundlePreflight && !ciDebugInstrumentation) {
     require(hasCanonicalSigning) {
         "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
-            "Only the CI Play preflight task set may opt into an unsigned bundle with -Ppersonalhub.allowUnsignedPlayBundle=true."
+            "Only the CI Play preflight or ephemeral CI emulator instrumentation may opt out of canonical signing."
     }
     require(!gradle.startParameter.isConfigurationCacheRequested) {
         "Signed APK/AAB/device tasks require --no-configuration-cache."
@@ -127,6 +134,14 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+    sourceSets {
+        named("testDebug") {
+            assets.srcDir(rootProject.file("core/database/src/main/assets"))
+        }
+    }
 }
 
 androidComponents {
@@ -156,7 +171,9 @@ tasks.configureEach {
         }
         taskPath == ":app:connecteddebugandroidtest" -> {
             doFirst {
-                realPackageDestructiveOptIn.requireRealPackageDestructiveOptIn(path)
+                if (!ciDebugInstrumentation) {
+                    realPackageDestructiveOptIn.requireRealPackageDestructiveOptIn(path)
+                }
             }
         }
     }

@@ -22,7 +22,6 @@ class SinceWhenCapsuleViewModel(
     private val lifePeriodSubmitGuard = SingleSubmitGuard()
     private var hostState: SinceWhenHostState = access.hostState()
     private val liveLifePeriods = MutableStateFlow<List<LifePeriod>>(emptyList())
-    private val timeMachineLifePeriods = MutableStateFlow<List<LifePeriod>?>(null)
     private val _uiState = MutableStateFlow(buildUiState())
     val uiState: StateFlow<SinceWhenUiState> = _uiState
 
@@ -39,16 +38,6 @@ class SinceWhenCapsuleViewModel(
 
     fun replaceLifePeriods(periods: List<LifePeriod>) {
         liveLifePeriods.value = periods
-        refreshUiState()
-    }
-
-    fun showTimeMachineLifePeriods(periods: List<LifePeriod>) {
-        timeMachineLifePeriods.value = periods
-        refreshUiState()
-    }
-
-    fun clearTimeMachineLifePeriods() {
-        timeMachineLifePeriods.value = null
         refreshUiState()
     }
 
@@ -170,9 +159,8 @@ class SinceWhenCapsuleViewModel(
     private fun buildUiState(): SinceWhenUiState {
         return SinceWhenUiState(
             tags = hostState.tags,
-            lifePeriods = timeMachineLifePeriods.value ?: liveLifePeriods.value,
+            lifePeriods = liveLifePeriods.value,
             nowMs = hostState.nowMs,
-            timeMachineTargetMs = hostState.timeMachineTargetMs,
         )
     }
 

@@ -108,7 +108,7 @@ fun NowScreen(
 ) {
     val state by capsule.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val effectiveTime = remember(state.nowMs, state.timeMachineTargetMs) { state.effectiveTimeContext() }
+    val effectiveTime = remember(state.nowMs) { state.effectiveTimeContext() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current

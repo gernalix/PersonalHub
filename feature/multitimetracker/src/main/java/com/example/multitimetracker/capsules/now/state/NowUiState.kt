@@ -3,7 +3,7 @@ package com.example.multitimetracker.capsules.now.state
 import com.example.multitimetracker.model.HomeLoadState
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.model.Tag
-import com.example.multitimetracker.model.TemporalContext
+import com.example.multitimetracker.model.EffectiveTimeContext
 
 data class NowUiState(
     val tags: List<Tag>,
@@ -14,9 +14,8 @@ data class NowUiState(
     val tagLastUsedMsByTagId: Map<Long, Long>,
     val tagParentsByChild: Map<Long, Set<Long>>,
     val nowMs: Long,
-    val timeMachineTargetMs: Long?,
     val isReadOnly: Boolean,
     val homeLoadState: HomeLoadState,
 ) {
-    fun effectiveTimeContext() = TemporalContext(timeMachineTargetMs).effectiveTime(nowMs)
+    fun effectiveTimeContext() = EffectiveTimeContext(nowMs)
 }

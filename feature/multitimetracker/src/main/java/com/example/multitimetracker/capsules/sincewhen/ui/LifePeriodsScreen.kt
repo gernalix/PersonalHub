@@ -119,9 +119,7 @@ fun LifePeriodsScreen(
     var durationModeMenuExpanded by remember { mutableStateOf(false) }
     var durationMode by rememberSaveable { mutableStateOf(UiPrefsStore.getLifePeriodDurationMode(context)) }
     var selectedActiveIds by rememberSaveable { mutableStateOf(emptySet<Long>()) }
-    val referenceNowMs = remember(state.nowMs, state.timeMachineTargetMs) {
-        state.timeMachineTargetMs ?: state.nowMs
-    }
+    val referenceNowMs = state.nowMs
 
     val visibleTags = remember(state.tags) {
         state.tags

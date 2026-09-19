@@ -74,18 +74,6 @@ class NowCapsuleViewModel(
         access.addTag(name)
     }
 
-    fun exportBackup(context: Context) {
-        access.exportBackup(context)
-    }
-
-    fun importDbFromUri(context: Context, uri: Uri) {
-        access.importDbFromUri(context, uri)
-    }
-
-    fun setBackupRootFolder(context: Context, uri: Uri) {
-        access.setBackupRootFolder(context, uri)
-    }
-
     companion object {
 
     /**

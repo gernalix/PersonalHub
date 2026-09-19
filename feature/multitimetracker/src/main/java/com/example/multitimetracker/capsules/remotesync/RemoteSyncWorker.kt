@@ -3,12 +3,16 @@ package com.example.multitimetracker.capsules.remotesync
 import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 
 internal class RemoteSyncWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : Worker(appContext, params) {
     override fun doWork(): Result {
+        if (!matchesActiveProfile(applicationContext, inputData.getString(PROFILE_ID))) {
+            return Result.success()
+        }
         val config = RemoteSyncConfig.fromBuildConfig()
         if (!config.isEnabled) return Result.success()
         val queue = RemoteSyncQueueSqlite(applicationContext)
@@ -50,5 +54,11 @@ internal class RemoteSyncWorker(
             RemoteSyncStatusStore.markFailure(applicationContext, "LOCAL_PROJECTION", pending)
             Result.retry()
         }
+    }
+
+    companion object {
+        const val PROFILE_ID = "profile_id"
+        internal fun matchesActiveProfile(context: Context, profileId: String?): Boolean =
+            profileId == DatabaseProfiles.activeProfileId(context)
     }
 }

@@ -80,7 +80,7 @@ object DatabaseProfiles {
 
     internal fun exportStem(context: Context): String =
         activeProfileId(context).let {
-            if (it == DEFAULT_PROFILE_ID) "personalhub" else "personalhub-${it.take(8)}"
+            if (it == DEFAULT_PROFILE_ID) "personalhub" else "personalhub-$it"
         }
 
     internal fun databaseFile(context: Context, profileId: String): File =
@@ -170,7 +170,14 @@ object DatabaseProfiles {
             clearPendingSwitch(context)
             return true
         } catch (error: Throwable) {
-            rollbackPendingSwitch(context)
+            // The marker retirement is the commit point. A failure injected immediately after
+            // it leaves the target DB mounted and its profile id already active; reverting only
+            // the preference here would create a cross-profile mismatch.
+            if (activeProfileId(context) == target.id) {
+                clearPendingSwitch(context)
+            } else {
+                rollbackPendingSwitch(context)
+            }
             throw error
         }
     }
@@ -196,7 +203,7 @@ object DatabaseProfiles {
     }
 
     @Synchronized
-    private fun clearPendingSwitch(context: Context) {
+    internal fun clearPendingSwitch(context: Context) {
         check(
             prefs(context).edit()
                 .remove(KEY_PENDING_FROM)

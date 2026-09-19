@@ -49,6 +49,8 @@
     <string name="module_substances_subtitle">Assunzioni, scorte, prescrizioni</string>
     <string name="module_wordpulse">WordPulse</string>
     <string name="module_wordpulse_subtitle">Parole, sessioni, correzioni</string>
+    <string name="module_salute">Salute</string>
+    <string name="module_salute_subtitle">Timeline, esami e diario clinico</string>
     <string name="database_title">Database e backup</string>
     <string name="database_description">Un file contiene tutti i moduli e le foto dei contatti. L’importazione sostituisce i dati attuali dopo la verifica e conserva una copia di recupero.</string>
     <string name="database_import">Import personalhub.db</string>

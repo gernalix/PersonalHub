@@ -206,7 +206,7 @@ private fun TimelineScreenContent(
 ) {
     // === FEATURE CAPSULE: TimelineScreen (UI) START ===
     val context = LocalContext.current
-    val effectiveTime = remember(state.nowMs, state.timeMachineTargetMs) { state.effectiveTimeContext() }
+    val effectiveTime = remember(state.nowMs) { state.effectiveTimeContext() }
     val isDarkTheme = isSystemInDarkTheme()
     val zone = remember { ZoneId.systemDefault() }
     val locale = remember { Locale.getDefault() }
@@ -244,7 +244,7 @@ var editingSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showTagsInList by rememberSaveable {
         mutableStateOf(UiPrefsStore.getTimelineShowTagsInList(context))
     }
-    LaunchedEffect(state.timeMachineTargetMs) {
+    LaunchedEffect(effectiveTodayEpochDay) {
         fromEpochDay = effectiveTodayEpochDay
         toEpochDay = effectiveTodayEpochDay
     }

@@ -7,6 +7,7 @@ import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.util.CapsuleWriteApi
 import com.example.multitimetracker.widget.QuickSessionWidgetProvider
+import com.gernalix.personalhub.core.database.DatabaseProfiles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,6 +17,7 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return
         if (action != ACTION_FIRE_TIMED_SESSION && action != ACTION_ACK_TIMED_SESSION && action != ACTION_RANDOM_ALERT) return
+        if (!isForActiveProfile(context, intent)) return
         val pendingResult = goAsync()
         val appContext = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
@@ -74,10 +76,14 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        internal fun isForActiveProfile(context: Context, intent: Intent): Boolean =
+            intent.getStringExtra(EXTRA_PROFILE_ID) == DatabaseProfiles.activeProfileId(context)
+
         const val ACTION_FIRE_TIMED_SESSION = "com.example.multitimetracker.ACTION_TIMED_SESSION"
         const val ACTION_ACK_TIMED_SESSION = "com.example.multitimetracker.ACTION_ACK_TIMED_SESSION"
         const val ACTION_RANDOM_ALERT = "com.example.multitimetracker.ACTION_RANDOM_ALERT"
         const val EXTRA_SESSION_ID = "extra_session_id"
+        const val EXTRA_PROFILE_ID = "profile_id"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
         const val EXTRA_RANDOM_ALERT_TITLE = "extra_random_alert_title"
         const val EXTRA_RANDOM_ALERT_TEXT = "extra_random_alert_text"

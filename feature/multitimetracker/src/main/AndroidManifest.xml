@@ -1,1 +1,99 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <application>
+        <provider
+            android:name=".api.MttPublicSessionsProvider"
+            android:authorities="${applicationId}.mtt.sessions"
+            android:exported="false"
+            android:grantUriPermissions="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.MultiTimeTracker"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity-alias
+            android:name="com.gernalix.personalhub.shortcut.TimerShortcutActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:host="module" android:path="/timer" android:scheme="personalhub" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
+            android:name=".TimeFenceFullScreenActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.MultiTimeTracker"
+            android:turnScreenOn="true" />
+
+        <activity
+            android:name=".widget.QuickSessionWidgetClickActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.MultiTimeTracker.Transparent" />
+
+        <activity
+            android:name=".widget.QuickEventWidgetClickActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.MultiTimeTracker.Transparent" />
+
+        <activity
+            android:name=".widget.QuickEventWidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MultiTimeTracker" />
+
+        <receiver
+            android:name=".widget.QuickSessionWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_task_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QuickEventWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_event_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".TimeFenceTimerReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".TimeFenceRestoreReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

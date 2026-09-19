@@ -10,7 +10,6 @@ import com.example.multitimetracker.MainActivity
 import com.example.multitimetracker.R
 import com.example.multitimetracker.core.quickevent.DefaultQuickEventCore
 import com.example.multitimetracker.core.quickevent.QuickEventTarget
-import com.example.multitimetracker.persistence.AuditLogSqlite
 import com.example.multitimetracker.persistence.PersistentMutationTracker
 import com.example.multitimetracker.util.CapsuleWriteApi
 
@@ -29,9 +28,7 @@ class QuickEventWidgetClickActivity : Activity() {
 
         val result = QuickEventWidgetTapRunner(
             core = DefaultQuickEventCore(appCtx),
-            audit = { action, entityType, entityId, summary, payload ->
-                AuditLogSqlite.insert(appCtx, isSystem = false, action = action, entityType = entityType, entityId = entityId, summary = summary, payload = payload)
-            },
+            audit = { _, _, _, _, _ -> Unit },
             afterSuccessfulWrite = {
                 PersistentMutationTracker.requestExport(appCtx)
                 appCtx.sendBroadcast(

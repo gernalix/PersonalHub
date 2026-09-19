@@ -61,19 +61,6 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) = Unit
     private const val KEY_IGNORE_SHORT_SESSIONS = "ignore_short_sessions"
     private const val KEY_IGNORE_SHORT_THRESHOLD_SECS = "ignore_short_threshold_secs"
 
-    // Legacy audit toggles (kept for migration)
-    private const val KEY_AUDIT_SHOW_SYSTEM = "audit_show_system"
-    private const val KEY_AUDIT_SHOW_UNDONE = "audit_show_undone"
-
-    // Audit log filters
-    private const val KEY_AUDIT_FILTER_TASKS = "audit_filter_tasks"
-    private const val KEY_AUDIT_FILTER_TAGS = "audit_filter_tags"
-    private const val KEY_AUDIT_FILTER_ALERTS = "audit_filter_alerts"
-    private const val KEY_AUDIT_FILTER_CHAINS = "audit_filter_chains"
-    private const val KEY_AUDIT_FILTER_SYSTEM = "audit_filter_system"
-    private const val KEY_AUDIT_FILTER_UNDONE = "audit_filter_undone"
-
-    private const val KEY_AUDIT_UNDO_ENABLED = "audit_undo_enabled"
     private const val KEY_LAST_LOGGED_APP_VERSION_CODE = "last_logged_app_version_code"
     private const val KEY_FIRST_INSTALLED_APP_VERSION_CODE = "first_installed_app_version_code"
     private const val KEY_FIRST_INSTALL_TIME_MS = "first_install_time_ms"
@@ -114,21 +101,6 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) = Unit
     // Prevents accidental resurrection when the user intentionally deletes all sessions.
     private const val KEY_SESSION_BOOTSTRAP_DONE = "session_bootstrap_done"
 
-    private const val KEY_LAST_IMPORT_MS = "last_import_ms"
-    private const val KEY_LAST_AUTO_EXPORT_MS = "last_auto_export_ms"
-    private const val KEY_LAST_MANUAL_EXPORT_MS = "last_manual_export_ms"
-
-    // v271: backup UX — persist last export/import signatures & hashes so UI can display them.
-    private const val KEY_LAST_MANUAL_EXPORT_ZIP_NAME = "last_manual_export_zip_name"
-    private const val KEY_LAST_MANUAL_EXPORT_ZIP_SHA256 = "last_manual_export_zip_sha256"
-    private const val KEY_LAST_MANUAL_EXPORT_BACKUP_SIGNATURE = "last_manual_export_backup_signature"
-
-    private const val KEY_LAST_IMPORT_DB_FILE_NAME = "last_import_db_file_name"
-    private const val KEY_LAST_IMPORT_DB_SHA256 = "last_import_db_sha256"
-    private const val KEY_LAST_IMPORT_BEFORE_SIGNATURE = "last_import_before_signature"
-    private const val KEY_LAST_IMPORT_AFTER_SIGNATURE = "last_import_after_signature"
-    // v211: cold-start guardrail — never auto-restore DB from user folder unless explicitly enabled.
-    private const val KEY_VAULT_AUTO_RESTORE_ENABLED = "vault_auto_restore_enabled"
 
     fun getHideInactiveTime(context: Context): Boolean =
         com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
@@ -217,63 +189,6 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) = Unit
         trackPersistentSetting(context, "setLifePeriodDurationMode")
     }
 
-    data class LastManualExportMeta(
-        val zipName: String?,
-        val zipSha256: String?,
-        val backupSignature: String?
-    )
-
-    fun getLastManualExportMeta(context: Context): LastManualExportMeta {
-        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-        return LastManualExportMeta(
-            zipName = prefs.getString(KEY_LAST_MANUAL_EXPORT_ZIP_NAME, null),
-            zipSha256 = prefs.getString(KEY_LAST_MANUAL_EXPORT_ZIP_SHA256, null),
-            backupSignature = prefs.getString(KEY_LAST_MANUAL_EXPORT_BACKUP_SIGNATURE, null)
-        )
-    }
-
-    fun setLastManualExportMeta(context: Context, zipName: String?, zipSha256: String?, backupSignature: String?) {
-        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-            .edit()
-            .putString(KEY_LAST_MANUAL_EXPORT_ZIP_NAME, zipName)
-            .putString(KEY_LAST_MANUAL_EXPORT_ZIP_SHA256, zipSha256)
-            .putString(KEY_LAST_MANUAL_EXPORT_BACKUP_SIGNATURE, backupSignature)
-            .apply()
-    }
-
-    data class LastImportMeta(
-        val dbFileName: String?,
-        val dbSha256: String?,
-        val beforeSignature: String?,
-        val afterSignature: String?
-    )
-
-    fun getLastImportMeta(context: Context): LastImportMeta {
-        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-        return LastImportMeta(
-            dbFileName = prefs.getString(KEY_LAST_IMPORT_DB_FILE_NAME, null),
-            dbSha256 = prefs.getString(KEY_LAST_IMPORT_DB_SHA256, null),
-            beforeSignature = prefs.getString(KEY_LAST_IMPORT_BEFORE_SIGNATURE, null),
-            afterSignature = prefs.getString(KEY_LAST_IMPORT_AFTER_SIGNATURE, null)
-        )
-    }
-
-    fun setLastImportMeta(
-        context: Context,
-        dbFileName: String?,
-        dbSha256: String?,
-        beforeSignature: String?,
-        afterSignature: String?
-    ) {
-        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-            .edit()
-            .putString(KEY_LAST_IMPORT_DB_FILE_NAME, dbFileName)
-            .putString(KEY_LAST_IMPORT_DB_SHA256, dbSha256)
-            .putString(KEY_LAST_IMPORT_BEFORE_SIGNATURE, beforeSignature)
-            .putString(KEY_LAST_IMPORT_AFTER_SIGNATURE, afterSignature)
-            .apply()
-    }
-
     fun getTimeFenceCriticalDisclaimerShown(context: Context): Boolean =
         com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
             .getBoolean(KEY_TIME_FENCE_CRITICAL_DISCLAIMER_SHOWN, false)
@@ -312,21 +227,6 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) = Unit
         prefs.edit().putBoolean(KEY_IGNORE_SHORT_SESSIONS, value).apply()
         trackPersistentSetting(context, "setIgnoreShortSessions")
 
-        val thresholdSecs = getIgnoreShortSessionsThresholdSecs(context)
-        val payload = JSONObject()
-            .put("enabled", value)
-            .put("thresholdSecs", thresholdSecs)
-
-        val mm = (thresholdSecs / 60).coerceAtLeast(0)
-        val ss = (thresholdSecs % 60).coerceAtLeast(0)
-        val mmss = "%02d:%02d".format(mm, ss)
-        AuditLogSqlite.insert(
-            context = context,
-            action = "PREF_IGNORE_SHORT_SESSIONS",
-            summary = "ignore_short_sessions=${if (value) "ON" else "OFF"} (threshold=$mmss)",
-            payload = payload,
-            isSystem = true,
-        )
     }
 
     fun getIgnoreShortSessionsThresholdSecs(context: Context): Int =
@@ -342,24 +242,7 @@ fun restoreAllFromSqliteIfPresent(context: Context, overwrite: Boolean) = Unit
         prefs.edit().putInt(KEY_IGNORE_SHORT_THRESHOLD_SECS, v).apply()
         trackPersistentSetting(context, "setIgnoreShortSessionsThresholdSecs")
 
-        val enabled = getIgnoreShortSessions(context)
-        val payload = JSONObject()
-            .put("enabled", enabled)
-            .put("thresholdSecs", v)
-
-        val mm = (v / 60).coerceAtLeast(0)
-        val ss = (v % 60).coerceAtLeast(0)
-        val mmss = "%02d:%02d".format(mm, ss)
-        AuditLogSqlite.insert(
-            context = context,
-            action = "PREF_IGNORE_SHORT_THRESHOLD",
-            summary = "ignore_short_threshold=$mmss (enabled=${if (enabled) "ON" else "OFF"})",
-            payload = payload,
-            isSystem = true,
-        )
     }
-
-    // --- Audit log filters ---
 
     private fun prefs(context: Context) = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
     private fun trackPersistentSetting(context: Context, source: String) {
@@ -382,82 +265,6 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
     }
     return v
 }
-
-    fun getAuditFilterTasks(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_AUDIT_FILTER_TASKS, true)
-
-    fun setAuditFilterTasks(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean(KEY_AUDIT_FILTER_TASKS, value).apply()
-        trackPersistentSetting(context, "setAuditFilterTasks")
-    }
-
-    fun getAuditFilterTags(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_AUDIT_FILTER_TAGS, true)
-
-    fun setAuditFilterTags(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean(KEY_AUDIT_FILTER_TAGS, value).apply()
-        trackPersistentSetting(context, "setAuditFilterTags")
-    }
-
-    fun getAuditFilterAlerts(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_AUDIT_FILTER_ALERTS, true)
-
-    fun setAuditFilterAlerts(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean(KEY_AUDIT_FILTER_ALERTS, value).apply()
-        trackPersistentSetting(context, "setAuditFilterAlerts")
-    }
-
-    fun getAuditFilterChains(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_AUDIT_FILTER_CHAINS, true)
-
-    fun setAuditFilterChains(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean(KEY_AUDIT_FILTER_CHAINS, value).apply()
-        trackPersistentSetting(context, "setAuditFilterChains")
-    }
-
-    fun getAuditFilterSystem(context: Context): Boolean {
-        val p = prefs(context)
-        // Migration: if the new key is not present, fall back to legacy KEY_AUDIT_SHOW_SYSTEM (default=true).
-        return if (p.contains(KEY_AUDIT_FILTER_SYSTEM)) {
-            p.getBoolean(KEY_AUDIT_FILTER_SYSTEM, true)
-        } else {
-            p.getBoolean(KEY_AUDIT_SHOW_SYSTEM, true)
-        }
-    }
-
-    fun setAuditFilterSystem(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean(KEY_AUDIT_FILTER_SYSTEM, value).apply()
-        trackPersistentSetting(context, "setAuditFilterSystem")
-    }
-
-    fun getAuditFilterUndone(context: Context): Boolean {
-        val p = prefs(context)
-        // Migration: if the new key is not present, fall back to legacy KEY_AUDIT_SHOW_UNDONE.
-        return if (p.contains(KEY_AUDIT_FILTER_UNDONE)) {
-            p.getBoolean(KEY_AUDIT_FILTER_UNDONE, true)
-        } else {
-            p.getBoolean(KEY_AUDIT_SHOW_UNDONE, true)
-        }
-    }
-
-    fun setAuditFilterUndone(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean(KEY_AUDIT_FILTER_UNDONE, value).apply()
-        trackPersistentSetting(context, "setAuditFilterUndone")
-    }
-
-    // Backwards-compat wrappers (older call sites)
-    fun getAuditShowSystem(context: Context): Boolean = getAuditFilterSystem(context)
-    fun setAuditShowSystem(context: Context, value: Boolean) = setAuditFilterSystem(context, value)
-    fun getAuditShowUndone(context: Context): Boolean = getAuditFilterUndone(context)
-    fun setAuditShowUndone(context: Context, value: Boolean) = setAuditFilterUndone(context, value)
-
-    fun getAuditUndoEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_AUDIT_UNDO_ENABLED, false)
-
-    fun setAuditUndoEnabled(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean(KEY_AUDIT_UNDO_ENABLED, value).apply()
-        trackPersistentSetting(context, "setAuditUndoEnabled")
-    }
 
     // --- Session-only bootstrap guard ---
     // NOTE: historical key names existed in the wild (singular vs plural). To avoid
@@ -555,55 +362,6 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
             .apply()
     }
 
-
-    fun getLastImportMs(context: Context): Long? {
-        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-        return (getLongCompat(prefs, KEY_LAST_IMPORT_MS) ?: 0L).takeIf { it > 0L }
-    }
-
-    fun setLastImportMs(context: Context, valueMs: Long) {
-        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-            .edit()
-            .putLong(KEY_LAST_IMPORT_MS, valueMs)
-            .apply()
-    }
-
-    fun getLastAutoExportMs(context: Context): Long? {
-        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-        return (getLongCompat(prefs, KEY_LAST_AUTO_EXPORT_MS) ?: 0L).takeIf { it > 0L }
-    }
-
-    fun setLastAutoExportMs(context: Context, valueMs: Long) {
-        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-            .edit()
-            .putLong(KEY_LAST_AUTO_EXPORT_MS, valueMs)
-            .apply()
-    }
-
-    fun getLastManualExportMs(context: Context): Long? {
-        val prefs = com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-        return (getLongCompat(prefs, KEY_LAST_MANUAL_EXPORT_MS) ?: 0L).takeIf { it > 0L }
-    }
-
-    fun setLastManualExportMs(context: Context, valueMs: Long) {
-        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-            .edit()
-            .putLong(KEY_LAST_MANUAL_EXPORT_MS, valueMs)
-            .apply()
-    }
-
-    // v211: default=false. This prevents “data spawn a freddo” after reinstall/clear-data when Android restores prefs.
-    fun isVaultAutoRestoreEnabled(context: Context): Boolean =
-        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-            .getBoolean(KEY_VAULT_AUTO_RESTORE_ENABLED, false)
-
-    fun setVaultAutoRestoreEnabled(context: Context, enabled: Boolean) {
-        com.gernalix.personalhub.core.database.DatabasePreferences(context, PREFS)
-            .edit()
-            .putBoolean(KEY_VAULT_AUTO_RESTORE_ENABLED, enabled)
-            .apply()
-        trackPersistentSetting(context, "setVaultAutoRestoreEnabled")
-    }
 
 
     fun isSessionOnlyMode(context: Context): Boolean =

@@ -9,7 +9,6 @@
     <string name="cd_open_app_menu">Apri menu laterale</string>
     <string name="cd_open_help">Apri aiuto</string>
     <string name="now">Ora</string>
-    <string name="export_data">Esporta dati</string>
     <string name="import_data">Importa dati</string>
     <string name="add">Aggiungi</string>
     <string name="show_summary">Mostra riepilogo</string>
@@ -94,14 +93,6 @@
     <string name="audit_session_meta_updated">Metadati sessione audit aggiornati: %1$s</string>
     <string name="audit_session_deleted">Sessione audit eliminata: %1$s</string>
     <string name="audit_session_ignored_short">Sessione audit ignorata (breve)</string>
-    <string name="audit_filter_alerts">Audit filter alerts</string>
-    <string name="audit_filter_chains">Audit filter chains</string>
-    <string name="audit_filter_system">Audit filter system</string>
-    <string name="audit_filter_tags">Audit filter tags</string>
-    <string name="audit_filter_tasks">Sessioni</string>
-    <string name="audit_filter_undone">Audit filter undone</string>
-    <string name="audit_filters">Audit filters</string>
-    <string name="audit_log">Registro</string>
     <string name="audit_running_start_edited">Audit running start edited</string>
     <string name="audit_session_times_edited">Audit session times edited</string>
     <string name="audit_task_start_new">Audit avvio sessione (nuova)</string>
@@ -151,7 +142,6 @@
     <string name="eliminare_task">Eliminare sessione</string>
     <string name="eliminata">Eliminata</string>
     <string name="enable_undo">Enable undo</string>
-    <string name="export_cd">Export</string>
     <string name="extend_session_to_now">Extend session to now</string>
     <string name="extend_session_to_now_body">Extend session to now body</string>
     <string name="extend_session_to_now_title">Extend session to now title</string>
@@ -340,7 +330,6 @@
     <string name="drawer_vaults">Vault</string>
     <string name="drawer_info">Info</string>
     <string name="info_app_name">MultiTimeTracker</string>
-    <string name="drawer_read_only_unavailable">Non disponibile in Time Machine</string>
 
     <!-- Chains -->
     <string name="chain_add_title">Aggiungi catena</string>
@@ -394,13 +383,7 @@
     <string name="copied_to_clipboard">Copiato negli appunti</string>
     <string name="copy">Copia</string>
     <string name="session_only_task_write_disabled">Modifica/eliminazione disattivata in questa schermata. Modifica le sessioni da Cronologia.</string>
-    <string name="export_no_sessions_hint">Nessuna sessione trovata: esporto comunque l’anagrafica tag per non perdere nulla.</string>
-    <string name="export_done_zip">Export completato: %1$s</string>
-    <string name="export_already_running">Export gia in corso</string>
-    <string name="audit_export_manual">Export manuale creato: %1$s</string>
     <string name="audit_import">Import eseguito da: %1$s</string>
-    <string name="audit_export_completed">Export completato: %1$s</string>
-    <string name="audit_import_completed">Import completato: %1$s</string>
     <string name="backup_last_import">Ultimo import</string>
     <string name="backup_last_auto_export">Ultimo export auto</string>
     <string name="backup_last_manual_export">Ultimo export manuale</string>
@@ -461,25 +444,17 @@
     <string name="import_prompt_body">Ho trovato i CSV di una precedente installazione nella cartella dati. Vuoi importarli ora?\nFile: %1$s</string>
     <string name="import_prompt_confirm">Sì, importa</string>
     <string name="import_prompt_dismiss">No, elimina</string>
-    <string name="import_toast_success">Import completato</string>
-    <string name="import_toast_failed">Import fallito</string>
     <string name="session_write_failed">Impossibile salvare le ultime modifiche. Ripristinata l ultima copia sicura.</string>
     <string name="persistence_failure_title">Salvataggio fallito</string>
     <string name="persistence_failure_body">Non e stato possibile salvare le ultime modifiche. Ripristinata l ultima copia sicura.</string>
-    <string name="import_toast_deleted">Dati precedenti eliminati</string>
     <string name="import_legacy_csv_disabled">L import automatico dei vecchi CSV e disattivato. Usa invece l import del database.</string>
-    <string name="export_share_title">Export MultiTimeTracker</string>
     <string name="tracking_active">Tracking attivo</string>
     <string name="tracking_active_one_session">Tracking attivo: 1 sessione</string>
     <string name="tracking_active_n_sessions">Tracking attivo: %1$d sessioni</string>
     <string name="timezone_utc_z">UTC/Z</string>
     <string name="cleanup_failed_fmt">Cleanup fallito: %1$s</string>
     <string name="tag_hierarchy_cycle_not_allowed">Ciclo non permesso nella gerarchia tag</string>
-    <string name="export_nothing_to_export">Nessuna sessione da esportare (avvia e ferma almeno una sessione)</string>
     <string name="import_done">Import verificato e attivato.</string>
-    <string name="import_failed">Import fallito: %1$s</string>
-    <string name="import_completed_counts_fmt">Import completato: %1$d sessioni, %2$d tag</string>
-    <string name="import_failed_fmt">Import fallito: %1$s</string>
     <string name="session_only_no_matching_running_session">Impossibile trovare la sessione in corso per questa riga.</string>
     <string name="session_deleted_toast">Sessione eliminata.</string>
     <string name="task_already_created_recently">Sessione gia creata (tap ignorato).</string>
@@ -490,8 +465,6 @@
     <string name="reward_toast_today_count">%1$d sessioni oggi</string>
     <string name="reward_toast_hour_count">%1$d sessioni in quest’ora</string>
     <string name="reward_toast_generic_good">Bene: %1$d oggi</string>
-    <string name="backup_folder_error_fmt">Errore cartella dati: %1$s%2$s</string>
-    <string name="export_failed_fmt">Export fallito: %1$s</string>
     <string name="session_history_title">Cronologia sessione</string>
     <string name="session_history_placeholder">La cronologia delle sessioni ora si apre direttamente nei dettagli del tag, per una vista piu pulita.</string>
     <string name="tags_add_tag">Aggiungi tag</string>
@@ -505,18 +478,6 @@
     <string name="quick_session_title_prefix">Quick-%1$s</string>
 
     <string name="audit_session_start_new_widget">Sessione avviata dal widget: %1$s</string>
-    <string name="backup_folder_not_configured">Cartella dati non ancora configurata.</string>
-    <string name="backup_folder_access_failed">Impossibile aprire la cartella dati selezionata.</string>
-    <string name="backup_folder_missing_read">Manca il permesso di lettura sulla cartella dati selezionata.</string>
-    <string name="backup_folder_missing_write">Manca il permesso di scrittura sulla cartella dati selezionata.</string>
-    <string name="export_tmp_folder_create_failed">Impossibile creare la cartella temporanea di export.</string>
-    <string name="export_zip_create_failed_fmt">Impossibile creare il file ZIP: %1$s</string>
-    <string name="export_zip_open_failed_fmt">Impossibile aprire lo stream di output del ZIP: %1$s</string>
-    <string name="export_zip_empty_tmp_folder">L’esportazione non ha prodotto file da zippare</string>
-    <string name="vault_create_bak_failed_fmt">Impossibile creare il file di backup: %1$s</string>
-    <string name="vault_create_db_failed_fmt">Impossibile creare il file: %1$s</string>
-    <string name="vault_open_output_failed_fmt">Impossibile aprire lo stream di output per %1$s</string>
-    <string name="vault_open_input_failed_fmt">Impossibile aprire lo stream di input per %1$s</string>
     <string name="backup_db_empty">Il DB di backup è vuoto.</string>
     <string name="backup_db_integrity_check_failed">Controllo integrità fallito.</string>
     <string name="backup_db_open_failed_fmt">Impossibile aprire il DB: %1$s</string>
@@ -524,7 +485,6 @@
     <string name="backup_db_swap_failed">Impossibile sostituire il DB importato.</string>
     <string name="backup_db_integrity_failed_fmt">DB di backup non valido: %1$s</string>
     <string name="import_snapshot_unreadable">Import fallito: non e stato possibile leggere in modo sicuro il backup selezionato.</string>
-    <string name="export_share_failed_fmt">Esportazione fallita: %1$s</string>
     <string name="start_time_cannot_be_future" formatted="false">L’orario di inizio non può essere nel futuro</string>
     <string name="task_history_running_since_fmt">In corso: %1$s</string>
     <string name="task_history_no_sessions">Nessuna sessione ancora.</string>
@@ -598,7 +558,6 @@
     <string name="integrity_gate_body">Il database sembra incoerente. Per evitare perdite di dati silenziose, l’app viene bloccata finché non ripristini una copia sicura.</string>
     <string name="integrity_gate_body_generic">Il database sembra incoerente. L’app resta bloccata finché non ripristini una copia sicura.</string>
     <string name="integrity_gate_restore_preimport">Ripristina ultimo backup pre-import</string>
-    <string name="integrity_gate_restore_from_folder">Ripristina dalla cartella Backup</string>
     <string name="integrity_gate_restore_ok">Ripristino verificato e attivato.</string>
     <string name="integrity_gate_restore_failed">Ripristino fallito.</string>
 
@@ -665,32 +624,6 @@
     <string name="life_period_unit_hours">Ore</string>
     <string name="life_period_unit_minutes">Minuti</string>
     <string name="life_period_unit_seconds">Secondi</string>
-    <string name="time_machine_title">Time Machine</string>
-    <string name="time_machine_enter">Entra in Time Machine</string>
-    <string name="time_machine_enter_moment">Vai al momento</string>
-    <string name="time_machine_exit">Esci dalla Time Machine</string>
-    <string name="time_machine_pick_datetime">Scegli data e ora</string>
-    <string name="time_machine_picker_label">Target: %1$s</string>
-    <string name="time_machine_banner">Time Machine: %1$s. Ogni modifica e disabilitata. Premi qui per uscire.</string>
-    <string name="time_machine_write_blocked">Time Machine attiva: modifiche disabilitate.</string>
-    <string name="time_machine_target_in_future">Scegli una data e ora passate.</string>
-    <string name="time_machine_no_snapshot">Nessuno stato storico disponibile per quel momento.</string>
-    <string name="time_machine_mode_moment">Momento</string>
-    <string name="time_machine_mode_period">Periodo</string>
-    <string name="time_machine_pick_start">Scegli inizio</string>
-    <string name="time_machine_pick_end">Scegli fine</string>
-    <string name="time_machine_period_start">Inizio: %1$s</string>
-    <string name="time_machine_period_end">Fine: %1$s</string>
-    <string name="time_machine_period_invalid">La fine deve essere dopo l’inizio.</string>
-    <string name="time_machine_show_period">Mostra periodo</string>
-    <string name="time_machine_period_range">%1$s - %2$s</string>
-    <string name="time_machine_no_period_totals">Nessun totale tag per questo periodo.</string>
-    <string name="time_machine_compare_with_today">Confronta con oggi</string>
-    <string name="time_machine_compare_range">Giorno selezionato: %1$s</string>
-    <string name="time_machine_compare_empty">Nessun totale tag da confrontare.</string>
-    <string name="time_machine_compare_selected_day">Giorno selezionato: %1$s</string>
-    <string name="time_machine_compare_today">Oggi: %1$s</string>
-    <string name="time_machine_compare_difference">Differenza: %1$s</string>
     <string name="now_intro_title">Tieni sotto controllo cosa e attivo adesso</string>
     <string name="now_intro_body">Usa il pulsante play per creare una sessione al volo. Tocca una riga in corso per fermarla, oppure fai swipe o pressione lunga per modificarla.</string>
     <string name="now_intro_counts">%1$d sessioni in corso • %2$d tag attivi</string>

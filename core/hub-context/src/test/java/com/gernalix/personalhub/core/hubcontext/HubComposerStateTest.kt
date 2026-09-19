@@ -13,7 +13,15 @@ class HubComposerStateTest {
             ComposerMember(HubEntitySummary(anchor, "Giovanni"), "people"),
             ComposerMember(HubEntitySummary(HubEntityRef("places", "place", "piazza"), "Piazza Savona"), "place"),
         )
-        val state = HubComposerState(anchor, "context-1", members, "uscita", "savona", "Nuovo luogo", "places/place")
+        val state = HubComposerState(
+            anchor = anchor,
+            editingContextId = "context-1",
+            restoredMembers = members,
+            restoredTypeId = "uscita",
+            restoredQuery = "savona",
+            restoredDraft = "Nuovo luogo",
+            restoredKind = "places/place",
+        )
         val snapshot = requireNotNull(with(HubComposerState.Saver) { SaverScope { true }.save(state) })
         val restored = requireNotNull(HubComposerState.Saver.restore(snapshot))
 

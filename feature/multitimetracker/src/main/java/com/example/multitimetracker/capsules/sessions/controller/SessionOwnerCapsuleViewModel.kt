@@ -22,17 +22,13 @@ import com.example.multitimetracker.core.session.SessionMirrorCore
 import com.example.multitimetracker.newSessionSubmitKey
 import com.example.multitimetracker.persistence.AuthoritativeSessionCache
 import com.example.multitimetracker.persistence.AuthoritativeSessionCacheBuilder
-import com.example.multitimetracker.persistence.AuditLogSqlite
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.persistence.UiPrefsStore
 import com.example.multitimetracker.requireNoLegacyRuntimeBootstrap
 import com.example.multitimetracker.shouldEmitStartForRunningSessionMetaUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -43,15 +39,7 @@ class SessionOwnerCapsuleViewModel(
 ) : SessionOwnerPublicApi, SessionsRuntimePublicApi {
     private val newSessionSubmitGuard = SingleSubmitGuard()
     private val liveRuntimeState = MutableStateFlow(SessionsRuntimeState())
-    private val timeMachineRuntimeState = MutableStateFlow<SessionsRuntimeState?>(null)
-    override val runtimeState: StateFlow<SessionsRuntimeState> =
-        combine(liveRuntimeState, timeMachineRuntimeState) { live, projected ->
-            projected ?: live
-        }.stateIn(
-            access.runtimeScope(),
-            SharingStarted.Eagerly,
-            SessionsRuntimeState(),
-        )
+    override val runtimeState: StateFlow<SessionsRuntimeState> = liveRuntimeState
 
     override fun runtimeStateValue(): SessionsRuntimeState = runtimeState.value
 
@@ -184,28 +172,6 @@ class SessionOwnerCapsuleViewModel(
         } catch (_: Throwable) {
             // Best-effort only.
         }
-    }
-
-    fun showTimeMachineRuntimeState(state: SessionsRuntimeState) {
-        timeMachineRuntimeState.value = state
-    }
-
-    fun showTimeMachineSnapshot(
-        snapshot: SnapshotStore.Snapshot,
-        tags: List<Tag>,
-        activeTagStartByTagId: Map<Long, Long>,
-    ): SessionsRuntimeState {
-        val runtime = buildTimeMachineRuntimeState(
-            snapshot = snapshot,
-            tags = tags,
-            activeTagStartByTagId = activeTagStartByTagId,
-        )
-        showTimeMachineRuntimeState(runtime)
-        return runtime
-    }
-
-    fun clearTimeMachineRuntimeState() {
-        timeMachineRuntimeState.value = null
     }
 
     fun toggleSession(sessionId: Long) {
@@ -586,20 +552,6 @@ class SessionOwnerCapsuleViewModel(
         }
     }
 
-    fun restoreStoppedSessionFromAudit(sessionId: Long, startMs: Long, endMs: Long, eventId: Long) {
-        val ctx = access.appContextOrNull() ?: return
-        val session = access.sessionCore(ctx)
-        val cur = session.readSessionById(sessionId)
-        if (cur != null && cur.endMs != null) {
-            if (!AuditLogSqlite.hasLaterEventsForEntity(ctx, entityType = "SESSION", entityId = sessionId, afterId = eventId)) {
-                session.updateSessionTimes(sessionId = sessionId, startMs = startMs, endMs = null)
-                access.scheduleSessionsRefresh(ctx, System.currentTimeMillis())
-                access.scheduleAutoBackup()
-                access.persist()
-            }
-        }
-    }
-
     suspend fun stopSessionWithPolicies(ctx: Context, sessionId: Long, endMs: Long) {
         val session = access.sessionCore(ctx)
         val before = session.readSessionById(sessionId) ?: return
@@ -889,83 +841,4 @@ class SessionOwnerCapsuleViewModel(
         return sortedWith(compareBy({ it.first }, { it.second }, { it.third })).toList()
     }
 
-    private fun buildTimeMachineRuntimeState(
-        snapshot: SnapshotStore.Snapshot,
-        tags: List<Tag>,
-        activeTagStartByTagId: Map<Long, Long>,
-    ): SessionsRuntimeState {
-        val hasSnapshotSessionReadModel =
-            snapshot.chronologySessions.isNotEmpty() || snapshot.runningSessions.isNotEmpty()
-        if (hasSnapshotSessionReadModel) {
-            val readModel = AuthoritativeSessionCacheBuilder.fromReadModel(
-                tags = tags,
-                chronologySessions = snapshot.chronologySessions,
-                runningSessions = snapshot.runningSessions,
-            )
-            val sessionTitlesById = (readModel.chronologySessions + readModel.runningSessions)
-                .distinctBy { it.id }
-                .associate { it.id to it.title }
-            return SessionsRuntimeState(
-                tasks = snapshot.tasks,
-                closedSessions = snapshot.closedSessions,
-                tagSessions = canonicalizeTaggedSessionRecords(
-                    tagSessions = snapshot.tagSessions,
-                    tags = readModel.tags,
-                    sessionTitlesById = sessionTitlesById,
-                ),
-                chronologySessions = readModel.chronologySessions,
-                runningSessions = readModel.runningSessions,
-                activeTagTotalsMsByTagId = readModel.activeTagTotalsMsByTagId,
-                runningMinStartByTagId = readModel.runningMinStartByTagId,
-                tagTotalsMsByTagId = readModel.tagTotalsMsByTagId,
-                tagLastUsedMsByTagId = readModel.tagLastUsedMsByTagId,
-            )
-        }
-
-        fun unionTotalMs(intervals: List<Pair<Long, Long>>): Long {
-            if (intervals.isEmpty()) return 0L
-            val sorted = intervals.sortedBy { it.first }
-            var total = 0L
-            var curStart = sorted[0].first
-            var curEnd = sorted[0].second
-            for (i in 1 until sorted.size) {
-                val (start, end) = sorted[i]
-                if (end <= start) continue
-                if (start <= curEnd) {
-                    if (end > curEnd) curEnd = end
-                } else {
-                    total += curEnd - curStart
-                    curStart = start
-                    curEnd = end
-                }
-            }
-            total += curEnd - curStart
-            return total.coerceAtLeast(0L)
-        }
-
-        val tagLastUsedMsByTagId = snapshot.tagSessions
-            .groupBy { it.tagId }
-            .mapValues { (_, sessions) -> sessions.maxOfOrNull { it.startTs } ?: 0L }
-            .filterValues { it > 0L }
-
-        val activeTagTotalsMsByTagId = activeTagStartByTagId.keys.associateWith { tagId ->
-            unionTotalMs(
-                snapshot.tagSessions
-                    .filter { it.tagId == tagId }
-                    .map { it.startTs to it.endTs }
-            )
-        }
-
-        return SessionsRuntimeState(
-            tasks = snapshot.tasks,
-            closedSessions = snapshot.closedSessions,
-            tagSessions = snapshot.tagSessions,
-            chronologySessions = snapshot.chronologySessions,
-            runningSessions = snapshot.runningSessions,
-            activeTagTotalsMsByTagId = activeTagTotalsMsByTagId,
-            runningMinStartByTagId = activeTagStartByTagId,
-            tagTotalsMsByTagId = tags.associate { it.id to it.totalMs },
-            tagLastUsedMsByTagId = tagLastUsedMsByTagId,
-        )
-    }
 }

@@ -42,7 +42,6 @@ import com.gernalix.personalhub.R
 enum class HubModule(
     @param:StringRes val titleRes: Int,
     @param:StringRes val subtitleRes: Int,
-    val activityClassName: String,
     val shortcutActivityAliasName: String,
     val shortcutPath: String,
     val shortcutIconRes: Int,
@@ -50,7 +49,6 @@ enum class HubModule(
     PEOPLE(
         titleRes = R.string.module_people,
         subtitleRes = R.string.module_people_subtitle,
-        activityClassName = "com.supercontacts.app.MainActivity",
         shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.PeopleShortcutActivity",
         shortcutPath = "people",
         shortcutIconRes = R.drawable.ic_shortcut_people,
@@ -58,7 +56,6 @@ enum class HubModule(
     TIMER(
         titleRes = R.string.module_timer,
         subtitleRes = R.string.module_timer_subtitle,
-        activityClassName = "com.example.multitimetracker.MainActivity",
         shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.TimerShortcutActivity",
         shortcutPath = "timer",
         shortcutIconRes = R.drawable.ic_shortcut_timer,
@@ -66,7 +63,6 @@ enum class HubModule(
     PLACES(
         titleRes = R.string.module_places,
         subtitleRes = R.string.module_places_subtitle,
-        activityClassName = "com.gernalix.luoghi.MainActivity",
         shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.PlacesShortcutActivity",
         shortcutPath = "places",
         shortcutIconRes = R.drawable.ic_shortcut_places,
@@ -74,7 +70,6 @@ enum class HubModule(
     SUBSTANCES(
         titleRes = R.string.module_substances,
         subtitleRes = R.string.module_substances_subtitle,
-        activityClassName = "com.gernalix.sostanze.MainActivity",
         shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.SubstancesShortcutActivity",
         shortcutPath = "substances",
         shortcutIconRes = R.drawable.ic_shortcut_substances,
@@ -82,7 +77,6 @@ enum class HubModule(
     WORDPULSE(
         titleRes = R.string.module_wordpulse,
         subtitleRes = R.string.module_wordpulse_subtitle,
-        activityClassName = "com.wordpulse.app.MainActivity",
         shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.WordPulseShortcutActivity",
         shortcutPath = "wordpulse",
         shortcutIconRes = R.drawable.ic_shortcut_wordpulse,
@@ -90,7 +84,6 @@ enum class HubModule(
     SOLDI(
         titleRes = R.string.module_soldi,
         subtitleRes = R.string.module_soldi_subtitle,
-        activityClassName = "com.gernalix.personalhub.soldi.SoldiActivity",
         shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.SoldiShortcutActivity",
         shortcutPath = "soldi",
         shortcutIconRes = R.drawable.ic_shortcut_soldi,
@@ -98,7 +91,6 @@ enum class HubModule(
     SALUTE(
         titleRes = R.string.module_salute,
         subtitleRes = R.string.module_salute_subtitle,
-        activityClassName = "com.gernalix.personalhub.salute.SaluteActivity",
         shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.SaluteShortcutActivity",
         shortcutPath = "salute",
         shortcutIconRes = R.drawable.ic_shortcut_salute,

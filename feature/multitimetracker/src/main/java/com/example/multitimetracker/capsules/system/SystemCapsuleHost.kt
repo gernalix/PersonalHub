@@ -2,9 +2,7 @@
 package com.example.multitimetracker.capsules.system
 
 import com.example.multitimetracker.capsules.alerts.controller.AlertsCapsuleViewModel
-import com.example.multitimetracker.capsules.auditlog.controller.AuditLogCapsuleViewModel
 import com.example.multitimetracker.capsules.chains.controller.ChainsCapsuleViewModel
-import com.example.multitimetracker.capsules.importexport.controller.createImportExportCapsule
 import com.example.multitimetracker.capsules.now.controller.NowCapsuleViewModel
 import com.example.multitimetracker.capsules.quickevents.controller.QuickEventsCapsuleViewModel
 import com.example.multitimetracker.capsules.sessions.controller.SessionOwnerCapsuleViewModel
@@ -22,9 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 class SystemCapsuleHost(
     runtimeScope: CoroutineScope,
     alertsAccess: AlertsCapsuleAccess,
-    auditLogAccess: AuditLogCapsuleAccess,
     chainsAccess: ChainsCapsuleAccess,
-    importExportAccess: ImportExportCapsuleAccess,
     nowAccess: NowCapsuleAccess,
     quickEventsAccess: QuickEventsCapsuleAccess,
     sessionOwnerAccess: SessionOwnerCapsuleAccess,
@@ -45,20 +41,6 @@ class SystemCapsuleHost(
         scheduleAutoBackup = { alertsAccess.scheduleAutoBackup() },
         logUserEvent = { a, et, eid, s, p, u -> alertsAccess.logUserEvent(a, et, eid, s, p, u) },
         logSystemEvent = { a, et, eid, s, p -> alertsAccess.logSystemEvent(a, et, eid, s, p) }
-        )
-    }
-
-    val importExport: ImportExportCapsule by lazy {
-        createImportExportCapsule(
-            getExportSnapshot = { importExportAccess.exportSnapshot() },
-            applyImportedCsvSnapshot = { snapshot -> importExportAccess.applyImportedCsvSnapshot(snapshot) },
-            activateImportedSnapshotFromStore = { ctx, snap -> importExportAccess.activateImportedSnapshotFromStore(ctx, snap) },
-            persist = { importExportAccess.persist() },
-            scheduleAutoBackup = { importExportAccess.scheduleAutoBackup() },
-            computeBackupSignature = { importExportAccess.computeBackupSignature() },
-            setLastBackupSignature = { sig -> importExportAccess.setLastBackupSignature(sig) },
-            buildManualExportZipName = { now -> importExportAccess.buildManualExportZipName(now) },
-            setImportVerificationReport = { r -> importExportAccess.setImportVerificationReport(r) }
         )
     }
 
@@ -107,9 +89,4 @@ class SystemCapsuleHost(
         )
     }
 
-    val auditLog: AuditLogCapsuleViewModel by lazy {
-        AuditLogCapsuleViewModel(
-            access = auditLogAccess
-        )
-    }
 }

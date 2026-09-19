@@ -308,7 +308,6 @@ class QuickStartTimedHierarchyInstrumentedTest {
                 tagLastUsedMsByTagId = emptyMap(),
                 tagParentsByChild = tagParentsByChild,
                 nowMs = nowMs,
-                timeMachineTargetMs = null,
                 isReadOnly = false,
                 homeLoadState = HomeLoadState.ReadyEmpty,
             )
@@ -368,8 +367,5 @@ class QuickStartTimedHierarchyInstrumentedTest {
     ) : NowCapsuleAccess {
         override fun uiStateFlow(): StateFlow<NowUiState> = state
         override fun addTag(name: String) = Unit
-        override fun exportBackup(context: Context) = Unit
-        override fun importDbFromUri(context: Context, uri: Uri) = Unit
-        override fun setBackupRootFolder(context: Context, uri: Uri) = Unit
     }
 }

@@ -6,6 +6,8 @@ package com.example.multitimetracker.model
 import com.example.multitimetracker.core.contracts.ClosedSessionRecord
 import com.example.multitimetracker.core.contracts.TaggedSessionRecord
 
+data class EffectiveTimeContext(val nowMs: Long, val isReadOnly: Boolean = false)
+
 enum class TimeFenceTrigger { ON_START, ON_STOP }
 
 enum class TimeFenceDelivery { NOTIFICATION, PREFENCE }
@@ -246,7 +248,6 @@ data class UiState(
     /** Timestamp of app install (or fallback: first tracked data). */
     val installAtMs: Long = 0L,
     val nowMs: Long = 0L,
-    val timeMachineTargetMs: Long? = null,
     val isReadOnly: Boolean = false,
     val homeLoadState: HomeLoadState = HomeLoadState.Loading
 )

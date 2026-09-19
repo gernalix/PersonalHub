@@ -5,6 +5,9 @@ import com.gernalix.personalhub.contracts.database.HubTimestamp
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.ChronoField
+import java.util.Locale
 
 enum class HubTemporalKind { POINT, INTERVAL }
 
@@ -63,10 +66,20 @@ fun mergeTemporalSlices(
         .toList()
 }
 
-private val hubDateTimeInputFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+private val legacyHubDateTimeInputFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+
+private fun hubDateTimeDisplayFormatter(locale: Locale = Locale.getDefault()): DateTimeFormatter =
+    DateTimeFormatterBuilder()
+        .appendPattern(HubTimestamp.DISPLAY_PATTERN)
+        .parseDefaulting(ChronoField.AMPM_OF_DAY, 0)
+        .toFormatter(locale)
 
 fun formatHubDateTime(epochMs: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
     HubTimestamp.format(epochMs, zoneId)
 
-fun parseHubDateTime(value: String, zoneId: ZoneId = ZoneId.systemDefault()): Long =
-    LocalDateTime.parse(value.trim(), hubDateTimeInputFormatter).atZone(zoneId).toInstant().toEpochMilli()
+fun parseHubDateTime(value: String, zoneId: ZoneId = ZoneId.systemDefault()): Long {
+    val normalized = value.trim()
+    val local = runCatching { LocalDateTime.parse(normalized, hubDateTimeDisplayFormatter()) }
+        .getOrElse { LocalDateTime.parse(normalized, legacyHubDateTimeInputFormatter) }
+    return local.atZone(zoneId).toInstant().toEpochMilli()
+}

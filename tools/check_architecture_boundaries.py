@@ -7,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 import re
 import sys
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 errors: list[str] = []
@@ -19,6 +20,8 @@ TOP_LEVEL_DECLARATION = re.compile(
     r"(?:class|interface|object|typealias|fun|val|var)\s+([A-Za-z_][A-Za-z0-9_]*)",
     re.MULTILINE,
 )
+
+FQCN_STRING = re.compile(r'"((?:[a-z_][A-Za-z0-9_]*\.){2,}[A-Z][A-Za-z0-9_]*)"')
 
 
 def project_dependencies(build_file: Path) -> set[str]:
@@ -128,11 +131,25 @@ def resolve_import_owner(import_name: str) -> str | None:
     return None
 
 
+def is_direct_feature_public_surface(import_name: str) -> bool:
+    """Only the feature's direct .api or .hub package is host-visible; nested implementation packages are private."""
+    target = import_name.removesuffix(".*")
+    parts = target.split(".")
+    for size in range(len(parts), 0, -1):
+        package = ".".join(parts[:size])
+        owners = package_owners.get(package)
+        if owners and len(owners) == 1:
+            owner = next(iter(owners))
+            if owner.startswith("feature:"):
+                return package.endswith(".api") or package.endswith(".hub")
+    return False
+
+
 # Source-level capsule rules:
 # - feature implementations never import another feature implementation;
 # - core never imports a feature implementation;
 # - contracts never import core/feature/application implementations;
-# - the app composition root may see a feature only through explicit api/ or hub/ packages.
+# - the app composition root may see a feature only through the feature's direct api/ or hub/ package.
 for owner, files in source_files.items():
     for kotlin in files:
         relative = kotlin.relative_to(ROOT)
@@ -150,11 +167,98 @@ for owner, files in source_files.items():
             ):
                 errors.append(f"{relative} contract imports implementation {imported}")
             elif owner == "app" and imported_owner.startswith("feature:"):
-                if ".api." not in imported and ".hub." not in imported:
+                if not is_direct_feature_public_surface(imported):
                     errors.append(
                         f"{relative} composition root bypasses feature public surface: {imported} "
-                        "(allowed feature surfaces: api, hub)"
+                        "(allowed feature surfaces: direct api or hub package only)"
                     )
+
+
+# String-based component routing must not smuggle implementation class names around import checks.
+# Public Android entrypoints are stable host aliases owned by feature manifests.
+for kotlin in source_files.get("app", []):
+    relative = kotlin.relative_to(ROOT)
+    for referenced in FQCN_STRING.findall(kotlin.read_text()):
+        referenced_owner = resolve_import_owner(referenced)
+        if referenced_owner and referenced_owner.startswith("feature:"):
+            errors.append(
+                f"{relative} embeds private feature implementation class name: {referenced}"
+            )
+
+
+ANDROID_ATTR = "{http://schemas.android.com/apk/res/android}"
+SHORTCUT_ALIAS_PREFIX = "com.gernalix.personalhub.shortcut."
+PUBLIC_SHORTCUT_ALIASES = {
+    "luoghi": f"{SHORTCUT_ALIAS_PREFIX}PlacesShortcutActivity",
+    "multitimetracker": f"{SHORTCUT_ALIAS_PREFIX}TimerShortcutActivity",
+    "salute": f"{SHORTCUT_ALIAS_PREFIX}SaluteShortcutActivity",
+    "soldi": f"{SHORTCUT_ALIAS_PREFIX}SoldiShortcutActivity",
+    "sostanze": f"{SHORTCUT_ALIAS_PREFIX}SubstancesShortcutActivity",
+    "supercontacts": f"{SHORTCUT_ALIAS_PREFIX}PeopleShortcutActivity",
+    "wordpulse": f"{SHORTCUT_ALIAS_PREFIX}WordPulseShortcutActivity",
+}
+
+
+def manifest_class_references(manifest: Path) -> list[str]:
+    if not manifest.is_file():
+        return []
+    root = ET.parse(manifest).getroot()
+    references: list[str] = []
+    for element in root.iter():
+        for attribute in ("name", "targetActivity"):
+            value = element.attrib.get(ANDROID_ATTR + attribute)
+            if value and not value.startswith("."):
+                references.append(value)
+    return references
+
+
+# The host manifest owns host/core components only. Each feature owns its Activities,
+# providers, receivers, services and public shortcut alias in its own manifest.
+app_manifest = ROOT / "app/src/main/AndroidManifest.xml"
+for referenced in manifest_class_references(app_manifest):
+    if referenced.startswith(SHORTCUT_ALIAS_PREFIX):
+        errors.append(
+            f"{app_manifest.relative_to(ROOT)} declares feature shortcut alias {referenced}; "
+            "move it to the owning feature manifest"
+        )
+        continue
+    referenced_owner = resolve_import_owner(referenced)
+    if referenced_owner and referenced_owner.startswith("feature:"):
+        errors.append(
+            f"{app_manifest.relative_to(ROOT)} declares feature implementation component {referenced}; "
+            "move it to the owning feature manifest"
+        )
+
+seen_shortcut_aliases: dict[str, list[str]] = defaultdict(list)
+for feature_dir in sorted((ROOT / "feature").glob("*")):
+    if not feature_dir.is_dir():
+        continue
+    owner = f"feature:{feature_dir.name}"
+    manifest = feature_dir / "src/main/AndroidManifest.xml"
+    expected_alias = PUBLIC_SHORTCUT_ALIASES.get(feature_dir.name)
+    for referenced in manifest_class_references(manifest):
+        if referenced.startswith(SHORTCUT_ALIAS_PREFIX):
+            if referenced != expected_alias:
+                errors.append(
+                    f"{manifest.relative_to(ROOT)} declares shortcut alias not owned by this feature: {referenced}"
+                )
+            else:
+                seen_shortcut_aliases[referenced].append(feature_dir.name)
+            continue
+        referenced_owner = resolve_import_owner(referenced)
+        if referenced_owner and referenced_owner != owner and (
+            referenced_owner == "app" or referenced_owner.startswith("feature:")
+        ):
+            errors.append(
+                f"{manifest.relative_to(ROOT)} declares component owned by {referenced_owner}: {referenced}"
+            )
+
+for feature_name, alias in PUBLIC_SHORTCUT_ALIASES.items():
+    owners = seen_shortcut_aliases.get(alias, [])
+    if owners != [feature_name]:
+        errors.append(
+            f"shortcut alias ownership mismatch for {alias}: expected feature:{feature_name}, found {owners or 'none'}"
+        )
 
 
 if errors:

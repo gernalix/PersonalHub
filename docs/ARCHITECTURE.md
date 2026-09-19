@@ -19,6 +19,10 @@ Places tags are first-class canonical rows in `place_tags` with a many-to-many `
 
 If an alert message consists only of one supported `http://`, `https://` or Workflowy URI, the notification content intent opens that URI directly. Other text keeps the normal PersonalHub destination. Unsafe schemes such as `intent:`, `file:` and `content:` are not auto-opened. The optional Tasker bridge sends `com.gernalix.personalhub.ALERT_FIRED` explicitly to Tasker's package, so no generic broadcast leaks alert contents to unrelated apps.
 
+## Android feature runtime ownership
+
+Each feature owns its Android runtime declaration in its own library manifest: Activities, receivers, providers, services, feature-specific permissions and its stable `com.gernalix.personalhub.shortcut.*` public alias. The host manifest declares only host/core components and therefore does not need to know feature implementation class names. Home navigation, pinned shortcuts and static shortcuts all target the same stable aliases. `checkArchitectureBoundaries` rejects host-manifest feature components, private feature class names embedded in host Kotlin and host imports outside the direct `.api`/`.hub` surfaces.
+
 ## Salute external read-only capsule
 
 Salute is deliberately different from the writable feature capsules. `:feature:salute` consumes the private `gernalix/salute` repository and its canonical `salute.db` as an **external read-only artifact**. It does not add health tables to `personalhub.db`, does not use Room for health data, and has no create/edit/delete workflow.
@@ -53,7 +57,7 @@ Persistent SQLite triggers increment `hub_generation` inside the modifying trans
 
 `version.txt` at repository root is the sole source of truth for `versionCode`, `versionName`, and the debug APK filename. Each future PersonalHub development prompt increments its integer exactly once by one. The debug output is exactly `<version>.apk`; versions are never generated from time, Git state, or source files. The Home heading stays `PersonalHub` and displays only the small numeric version at bottom-right.
 
-Static launcher shortcuts route through `MainActivity` to People, Timer, Places, Substances, and WordPulse using the `personalhub://module/<feature>` URI. They preserve the current single-database import/export shell and include no migration destination. Home `Settings → Home shortcuts` exposes the same five modules as official pinned shortcuts, reusing their vector icons and detecting an existing pinned static or Home shortcut before requesting another. Pixel Launcher intentionally shows only four static items in the long-press menu; WordPulse remains available through Settings for pinning to Home.
+Static launcher shortcuts route directly to feature-owned public aliases for People, Timer, Places, Substances, and WordPulse using the `personalhub://module/<feature>` URI. The Home grid and pinned shortcuts use the same aliases, so the host never needs the private feature Activity class names. They preserve the current single-database import/export shell and include no migration destination. Home `Settings → Home shortcuts` exposes the same five modules as official pinned shortcuts, reusing their vector icons and detecting an existing pinned static or Home shortcut before requesting another. Pixel Launcher intentionally shows only four static items in the long-press menu; WordPulse remains available through Settings for pinning to Home.
 
 ## Building the real database offline
 

@@ -1,0 +1,54 @@
+name: Android unit CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'contracts/**'
+      - 'core/**'
+      - 'feature/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'version.txt'
+      - '.github/workflows/android-unit-ci.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'contracts/**'
+      - 'core/**'
+      - 'feature/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'version.txt'
+      - '.github/workflows/android-unit-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personalhub-unit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GOOGLE_MAPS_API_KEY: CI_NOT_A_REAL_KEY
+      GOOGLE_ROUTES_API_KEY: CI_NOT_A_REAL_KEY
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Run all debug unit tests and lint
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --console=plain             testDebugUnitTest             lintDebug             checkArchitectureBoundaries

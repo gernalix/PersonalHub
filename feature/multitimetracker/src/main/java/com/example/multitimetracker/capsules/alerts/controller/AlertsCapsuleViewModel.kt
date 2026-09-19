@@ -100,12 +100,11 @@ class AlertsCapsuleViewModel(
     override val capsuleId: String = "alerts"
     private val ruleMutationLock = Any()
     private val liveRules = MutableStateFlow<List<TimeFenceRule>>(emptyList())
-    private val timeMachineRules = MutableStateFlow<List<TimeFenceRule>?>(null)
     private val preFencePrompts = MutableStateFlow<List<PreFencePrompt>>(emptyList())
-    val uiState: StateFlow<AlertsUiState> = combine(hostStateFlow, liveRules, timeMachineRules, preFencePrompts) { host, currentRules, projectedRules, prompts ->
+    val uiState: StateFlow<AlertsUiState> = combine(hostStateFlow, liveRules, preFencePrompts) { host, currentRules, prompts ->
         AlertsUiState(
             tags = host.tags,
-            timeFenceRules = projectedRules ?: currentRules,
+            timeFenceRules = currentRules,
             tagLastUsedMsByTagId = host.tagLastUsedMsByTagId,
             preFencePrompts = prompts,
         )
@@ -121,9 +120,7 @@ class AlertsCapsuleViewModel(
     )
 
     override fun onCapsuleRuntimeChanged(context: Context?, change: CapsuleRuntimeChange) {
-        if (change != CapsuleRuntimeChange.TIME_MACHINE_CHANGED) {
-            preFencePrompts.value = emptyList()
-        }
+        preFencePrompts.value = emptyList()
     }
 
     fun dismissPreFencePrompt(prompt: PreFencePrompt? = null) {
@@ -155,14 +152,6 @@ class AlertsCapsuleViewModel(
 
     fun replaceTimeFenceRules(newRules: List<TimeFenceRule>) {
         replaceRules(newRules)
-    }
-
-    fun showTimeMachineRules(newRules: List<TimeFenceRule>) {
-        timeMachineRules.value = newRules
-    }
-
-    fun clearTimeMachineRules() {
-        timeMachineRules.value = null
     }
 
     fun showTimerAlertPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long) {
