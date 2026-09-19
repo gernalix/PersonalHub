@@ -273,7 +273,7 @@ class HubAutoExportDurabilityTest {
     }
 
     @Test
-    fun canonicalWriteFailureKeepsValidBackupWithoutMarkingSuccess() {
+    fun stagedWriteFailureKeepsPreviousCanonicalWithoutMarkingSuccess() {
         configureFolderPreference()
         val oldSnapshot = DatabaseVault.backupCurrent(context)
         val oldBytes = oldSnapshot.readBytes()
@@ -289,7 +289,10 @@ class HubAutoExportDurabilityTest {
         val error = runCatching { DatabaseVault.exportNow(context) }.exceptionOrNull()
 
         assertNotNull(error)
-        assertEquals(oldBytes.toList(), requireNotNull(publisher.files["personalhub.db.bak"]).toList())
+        assertEquals(oldBytes.toList(), requireNotNull(publisher.files[PersonalHubDatabase.DB_NAME]).toList())
+        assertFalse(publisher.files.containsKey("personalhub.db.tmp"))
+        assertFalse(publisher.files.containsKey("personalhub.db.old.tmp"))
+        assertFalse(publisher.files.containsKey("personalhub.db.bak"))
         assertEquals(-1, DatabaseVault.exportedGeneration(context))
         assertEquals("simulated canonical write failure", DatabaseVault.error(context))
     }
@@ -308,7 +311,7 @@ class HubAutoExportDurabilityTest {
     }
 
     @Test
-    fun providerRenamedFirstCanonicalIsRejected() {
+    fun providerRenamedStagedExportIsRejected() {
         configureFolderPreference()
         val publisher = RecordingExportPublisher(createdCanonicalName = "personalhub (1).db")
         DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
@@ -318,11 +321,11 @@ class HubAutoExportDurabilityTest {
         assertNotNull(error)
         assertEquals(-1, DatabaseVault.exportedGeneration(context))
         assertFalse(publisher.files.containsKey("personalhub (1).db"))
-        assertEquals("Provider created personalhub (1).db instead of personalhub.db", DatabaseVault.error(context))
+        assertEquals("Provider created personalhub (1).db instead of personalhub.db.tmp", DatabaseVault.error(context))
     }
 
     @Test
-    fun invalidCanonicalIsRegeneratedWithoutOverwritingValidBackup() {
+    fun invalidCanonicalIsReplacedAndLegacyBackupIsRetired() {
         configureFolderPreference()
         val oldSnapshot = DatabaseVault.backupCurrent(context)
         val oldBytes = oldSnapshot.readBytes()
@@ -340,7 +343,10 @@ class HubAutoExportDurabilityTest {
         assertTrue(DatabaseVault.exportNow(context))
 
         assertEquals(current, DatabaseVault.exportedGeneration(context))
-        assertEquals(oldBytes.toList(), requireNotNull(publisher.files["personalhub.db.bak"]).toList())
+        assertFalse(publisher.files.containsKey("personalhub.db.bak"))
+        assertFalse(publisher.files.containsKey("personalhub.db.tmp"))
+        assertFalse(publisher.files.containsKey("personalhub.db.old.tmp"))
+        assertEquals(setOf(PersonalHubDatabase.DB_NAME), publisher.files.keys)
         val exported = File(context.cacheDir, "recovered-canonical.db")
         exported.writeBytes(requireNotNull(publisher.files[PersonalHubDatabase.DB_NAME]))
         try {
@@ -407,7 +413,7 @@ class HubAutoExportDurabilityTest {
         var listingsVisible = true
 
         override fun create(name: String): DatabaseVault.ExportFile {
-            val actualName = if (name == PersonalHubDatabase.DB_NAME) createdCanonicalName ?: name else name
+            val actualName = if (name == "${PersonalHubDatabase.DB_NAME}.tmp") createdCanonicalName ?: name else name
             files[actualName] = ByteArray(0)
             return RecordingExportFile(this, actualName)
         }
@@ -418,9 +424,16 @@ class HubAutoExportDurabilityTest {
         override fun find(name: String): DatabaseVault.ExportFile? =
             if (listingsVisible && files.containsKey(name)) RecordingExportFile(this, name) else null
 
+        override fun rename(source: DatabaseVault.ExportFile, newName: String): DatabaseVault.ExportFile {
+            val oldName = requireNotNull(source.name)
+            val bytes = requireNotNull(files.remove(oldName))
+            files[newName] = bytes
+            return RecordingExportFile(this, newName)
+        }
+
         override fun writeFrom(source: File, target: DatabaseVault.ExportFile) {
-            if (target.name == PersonalHubDatabase.DB_NAME && failCanonicalWrite) {
-                files[PersonalHubDatabase.DB_NAME] = byteArrayOf(0)
+            if (target.name == "${PersonalHubDatabase.DB_NAME}.tmp" && failCanonicalWrite) {
+                files[requireNotNull(target.name)] = byteArrayOf(0)
                 error("simulated canonical write failure")
             }
             files[requireNotNull(target.name)] = source.readBytes()
