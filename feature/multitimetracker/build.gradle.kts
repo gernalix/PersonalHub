@@ -14,8 +14,6 @@ android {
         buildConfigField("int", "VERSION_CODE", "539")
         buildConfigField("String", "VERSION_NAME", "\"539\"")
         buildConfigField("String", "PATCH_VERSION", "\"539\"")
-        buildConfigField("String", "MTT_DATASETTE_SYNC_BASE_URL", "\"\"")
-        buildConfigField("String", "MTT_DATASETTE_SYNC_TOKEN", "\"\"")
     }
 
     compileOptions {
@@ -49,7 +47,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.profileinstaller)
-    implementation(libs.androidx.work.runtime)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
