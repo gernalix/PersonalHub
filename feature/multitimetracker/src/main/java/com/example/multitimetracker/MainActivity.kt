@@ -123,8 +123,8 @@ private fun MultiTimeTrackerApp(
         val app = context.applicationContext
         withContext(Dispatchers.IO) {
             SnapshotSqlite.ensureStartupSessionSchema(app)
-            vm.loadStartupHomeFromSessionTables(app)
-            vm.initialize(app)
+            val fastHomeApplied = vm.loadStartupHomeFromSessionTables(app)
+            vm.initialize(app, fastHomeAlreadyApplied = fastHomeApplied)
             SnapshotSqlite.ensureStartupQuickEventSchema(app)
         }
         StartupPerfTrace.firstFrame()
