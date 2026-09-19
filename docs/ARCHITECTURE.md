@@ -1,5 +1,26 @@
 # PersonalHub architecture
 
+## Data authority and remote-copy contract
+
+For all writable PersonalHub modules, the active local `personalhub.db` is the **only runtime
+source of truth**. SQLite, SAF, Datasette and Git are not peers and must never compete to populate
+the application:
+
+- **Local SQLite / `personalhub.db` — authoritative.** Every writable module reads and writes the
+  active database profile.
+- **SAF folder — backup/export.** Automatic export publishes verified database copies. Nothing is
+  read back automatically. An inbound SAF database is accepted only through the explicit validated
+  Import flow, which atomically replaces the active database and keeps rollback state.
+- **Datasette — outbound replica.** The mobile app sends row-level state/tombstones for remote
+  browsing and analysis. Datasette never hydrates or overwrites `personalhub.db`.
+- **Git data — outbound versioned history plus explicit recovery/control.** Background sync publishes
+  deterministic state/history and may read verified patch/migration metadata. It does not silently
+  restore remote state. Full inbound replacement requires an explicit Restore from Git action;
+  applying a data patch is also explicit.
+
+Credentials for Datasette and Git are device-local Android-Keystore-encrypted connection material,
+not application data. They must not enter SQLite, SAF exports, Git payloads, logs or saved UI state.
+
 See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch/migration and restore architecture.
 
 PersonalHub contains People, Timer, Places, Substances, WordPulse, Soldi and Salute. The application package is `com.gernalix.personalhub`.
