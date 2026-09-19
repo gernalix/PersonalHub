@@ -284,4 +284,10 @@
     <string name="git_data_sync_direction_notice">Normal direction: personalhub.db → Git history. Remote content can replace local data only through an explicit Restore action below.</string>
     <string name="git_data_sync_token_help">The GitHub token is used only to access the configured private data repository. It is encrypted in Android Keystore storage and is never committed, exported, or written to personalhub.db.</string>
 
+
+    <string name="settings_local_data_section">Local data</string>
+    <string name="settings_optional_services_section">Optional remote services</string>
+    <string name="git_data_sync_enable">Enable automatic Git history sync</string>
+    <string name="git_data_sync_enable_after_configure">Save a valid repository connection first. Git remains optional and off until you enable it.</string>
+
 </resources>
