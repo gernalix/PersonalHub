@@ -11,7 +11,7 @@ import androidx.room.ColumnInfo
 import kotlinx.coroutines.flow.Flow
 
 data class DoctorChoice(val id: Long, val name: String)
-data class CostChoice(val id: Long, val title: String, val amount: String, val occurredAt: String)
+data class CostChoice(val id: Long, val title: String, val amount: String, val occurredAt: Long)
 data class PrescriptionDetail(
     @Embedded val prescription: PrescriptionEntity,
     @ColumnInfo(name = "doctor_name") val doctorName: String?,

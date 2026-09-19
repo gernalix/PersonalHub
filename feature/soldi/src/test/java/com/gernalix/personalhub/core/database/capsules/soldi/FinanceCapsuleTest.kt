@@ -97,7 +97,7 @@ class FinanceCapsuleTest {
             names.forEach { assertEquals(0, scalar(owner, "SELECT count(*) FROM $it")) }
             owner.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
             owner.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
-            assertEquals(54, DatabaseVault.validate(context, file))
+            assertEquals(55, DatabaseVault.validate(context, file))
         } finally { owner.close(); context.deleteDatabase(name) }
     }
 }
