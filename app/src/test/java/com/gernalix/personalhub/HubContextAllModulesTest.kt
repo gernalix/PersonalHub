@@ -67,7 +67,8 @@ class HubContextAllModulesTest {
         finance.add(FinanceAccount(id = "cash", name = "Cash", currency = "EUR"))
         val titleId = finance.add(FinanceTitle(name = "Pranzo"))
         val transactionUuid = UUID.randomUUID().toString()
-        finance.add(FinanceTransaction(accountId = "cash", uuid = transactionUuid, titleId = titleId, productId = null, amount = "12.50", currency = "EUR", chainId = null, placeId = null, notes = "", occurredAt = "2026-02-12T12:00:00Z", createdAt = "2026-02-12T12:00:00Z", updatedAt = "2026-02-12T12:00:00Z"))
+        val financeAt = Instant.parse("2026-02-12T12:00:00Z").toEpochMilli()
+        finance.add(FinanceTransaction(accountId = "cash", uuid = transactionUuid, titleId = titleId, productId = null, amount = "12.50", currency = "EUR", chainId = null, placeId = null, notes = "", occurredAt = financeAt, createdAt = financeAt, updatedAt = financeAt))
         val transaction = requireNotNull(soldi.summaries(setOf(transactionUuid))[transactionUuid])
 
         val substanceId = db.dao().insertSubstance(substance("Vitamina D", "vitamina d"))
@@ -93,7 +94,7 @@ class HubContextAllModulesTest {
         }
         assertTrue(HubContextRuntime.explore(listOf(person.ref, place.ref)).facets.flatMap { it.candidates }.any { it.summary.ref == workflowy.ref })
 
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         HubContextRuntime.saveContextType(
             HubContextType("finance-template", "Finance activity", now, now),
             listOf(HubContextTypeField("finance-template", "transaction", 0, "Transaction", acceptedModuleId = "soldi", acceptedEntityKind = "transaction", minCardinality = 1)),
