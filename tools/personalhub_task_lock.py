@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local lease for serialized PersonalHub integration, shared QA and release work."""
+"""Resource-scoped local leases for PersonalHub shared QA/release runtime state."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ from typing import Any
 
 
 DEFAULT_LOCK_PATH = Path.home() / ".cache" / "codex" / "personalhub-task.lock"
+DEFAULT_LOCK_ROOT = Path.home() / ".cache" / "codex"
+RESOURCE_NAMES = ("emulator", "pixel", "release", "signing")
 DEFAULT_TTL_SECONDS = 12 * 60 * 60
 DEFAULT_ROADMAP_REPOSITORY = "gernalix/codex-roadmap"
 DEFAULT_ROADMAP_BRANCH = "main"
@@ -205,28 +207,34 @@ def status(path: Path, ttl_seconds: int) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Serialize PersonalHub canonical integration, shared QA and release with a local lease.")
+    parser = argparse.ArgumentParser(description="Serialize only a genuinely shared PersonalHub runtime resource.")
     parser.add_argument("command", choices=("acquire", "release", "status"))
     parser.add_argument("--prompt-id", help="Current roadmap PROMPT_ID.")
-    parser.add_argument("--lock-path", type=Path, default=DEFAULT_LOCK_PATH)
+    parser.add_argument("--resource", choices=RESOURCE_NAMES, help="Shared resource to serialize. Omit only for legacy compatibility.")
+    parser.add_argument("--lock-path", type=Path)
     parser.add_argument("--ttl-seconds", type=int, default=DEFAULT_TTL_SECONDS)
     parser.add_argument("--roadmap-repository", default=DEFAULT_ROADMAP_REPOSITORY)
     parser.add_argument("--roadmap-branch", default=DEFAULT_ROADMAP_BRANCH)
     args = parser.parse_args()
+    lock_path = args.lock_path or (
+        DEFAULT_LOCK_ROOT / f"personalhub-{args.resource}.lock"
+        if args.resource
+        else DEFAULT_LOCK_PATH
+    )
 
     if args.command == "acquire":
         if not args.prompt_id:
             parser.error("--prompt-id is required for acquire")
         return acquire(
-            args.lock_path,
+            lock_path,
             args.prompt_id,
             args.ttl_seconds,
             roadmap_repository=args.roadmap_repository,
             roadmap_branch=args.roadmap_branch,
         )
     if args.command == "release":
-        return release(args.lock_path, args.prompt_id)
-    return status(args.lock_path, args.ttl_seconds)
+        return release(lock_path, args.prompt_id)
+    return status(lock_path, args.ttl_seconds)
 
 
 if __name__ == "__main__":
