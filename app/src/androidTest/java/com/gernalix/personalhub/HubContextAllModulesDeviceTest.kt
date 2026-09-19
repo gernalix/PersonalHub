@@ -70,8 +70,10 @@ class HubContextAllModulesDeviceTest {
             finance.add(FinanceAccount(account, "QA", "EUR"))
             val title = finance.add(FinanceTitle(name = "Pranzo $suffix"))
             val linkedTitle = finance.add(FinanceTitle(name = "Cena $suffix"))
-            finance.add(FinanceTransaction(accountId = account, uuid = transactionUuid, titleId = title, productId = null, amount = "12.50", currency = "EUR", chainId = null, placeId = null, notes = "", occurredAt = "2026-02-12T12:00:00Z", createdAt = "2026-02-12T12:00:00Z", updatedAt = "2026-02-12T12:00:00Z"))
-            finance.add(FinanceTransaction(accountId = account, uuid = linkedTransactionUuid, titleId = linkedTitle, productId = null, amount = "18.50", currency = "EUR", chainId = null, placeId = null, notes = "", occurredAt = "2026-02-12T13:00:00Z", createdAt = "2026-02-12T13:00:00Z", updatedAt = "2026-02-12T13:00:00Z"))
+            val noon = java.time.Instant.parse("2026-02-12T12:00:00Z").toEpochMilli()
+            val one = java.time.Instant.parse("2026-02-12T13:00:00Z").toEpochMilli()
+            finance.add(FinanceTransaction(accountId = account, uuid = transactionUuid, titleId = title, productId = null, amount = "12.50", currency = "EUR", chainId = null, placeId = null, notes = "", occurredAt = noon, createdAt = noon, updatedAt = noon))
+            finance.add(FinanceTransaction(accountId = account, uuid = linkedTransactionUuid, titleId = linkedTitle, productId = null, amount = "18.50", currency = "EUR", chainId = null, placeId = null, notes = "", occurredAt = one, createdAt = one, updatedAt = one))
         }
         val transaction = runBlocking { requireNotNull(soldi.summaries(setOf(transactionUuid))[transactionUuid]) }
         val linkedTransaction = runBlocking { requireNotNull(soldi.summaries(setOf(linkedTransactionUuid))[linkedTransactionUuid]) }
