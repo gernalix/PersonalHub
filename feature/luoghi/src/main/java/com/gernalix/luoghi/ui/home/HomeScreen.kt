@@ -13,12 +13,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -83,11 +85,20 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val recentVisits = state.visits.take(3)
+    var diagnosticsOpen by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.home_title)) },
                 actions = {
+                    if (state.checkIn.recentAttempts.isNotEmpty()) {
+                        IconButton(onClick = { diagnosticsOpen = true }) {
+                            Icon(
+                                Icons.Outlined.BugReport,
+                                contentDescription = stringResource(R.string.checkin_diagnostics_open),
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "places")) },
                     ) {
@@ -141,11 +152,6 @@ fun HomeScreen(
                     title = stringResource(R.string.places),
                     action = stringResource(R.string.places_count_format, state.placeItems.size),
                 )
-            }
-            if (state.checkIn.recentAttempts.isNotEmpty()) {
-                item(key = "checkin-diagnostics") {
-                    CheckInDiagnosticsPanel(state.checkIn.recentAttempts)
-                }
             }
             item(key = "places-sort") {
                 PlacesSortBar(
@@ -204,41 +210,47 @@ fun HomeScreen(
             }
         }
     }
+    if (diagnosticsOpen) {
+        AlertDialog(
+            onDismissRequest = { diagnosticsOpen = false },
+            title = { Text(stringResource(R.string.checkin_diagnostics_title)) },
+            text = { CheckInDiagnosticsContent(state.checkIn.recentAttempts) },
+            confirmButton = {
+                TextButton(onClick = { diagnosticsOpen = false }) {
+                    Text(stringResource(R.string.close))
+                }
+            },
+        )
+    }
 }
 
 @Composable
-private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptDiagnostic>) {
+private fun CheckInDiagnosticsContent(attempts: List<CheckInAttemptDiagnostic>) {
     val clipboard = LocalClipboardManager.current
     var outcomeFilter by remember { mutableStateOf("") }
     var placeFilter by remember { mutableStateOf("") }
     val filteredAttempts = filteredDiagnosticAttempts(attempts, outcomeFilter, placeFilter)
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                stringResource(R.string.checkin_diagnostics_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = outcomeFilter,
                     onValueChange = { outcomeFilter = it },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    label = { Text("Outcome") },
+                    label = { Text(stringResource(R.string.checkin_diagnostics_outcome_filter)) },
                 )
                 OutlinedTextField(
                     value = placeFilter,
                     onValueChange = { placeFilter = it },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    label = { Text("Luogo") },
+                    label = { Text(stringResource(R.string.checkin_diagnostics_place_filter)) },
                 )
             }
-            filteredAttempts.take(5).forEach { diagnostic ->
+        filteredAttempts.take(5).forEach { diagnostic ->
                 val attempt = diagnostic.attempt
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -260,7 +272,6 @@ private fun CheckInDiagnosticsPanel(attempts: List<CheckInAttemptDiagnostic>) {
                         Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.checkin_diagnostics_copy))
                     }
                 }
-            }
         }
     }
 }
