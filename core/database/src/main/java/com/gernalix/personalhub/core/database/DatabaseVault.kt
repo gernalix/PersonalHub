@@ -33,6 +33,8 @@ object DatabaseVault {
     internal fun <T> withOperations(block: () -> T): T = operations.withLock(block)
     private const val PRE_IMPORT_BACKUP_PREFIX = "personalhub-pre-import-"
     private const val PRE_IMPORT_BACKUP_SUFFIX = ".db"
+    private const val TRANSIENT_BACKUP_NAME = "personalhub-backup.db"
+    private const val LEGACY_TRANSIENT_BACKUP_PREFIX = "personalhub-backup-"
     internal const val CANONICAL_DOCUMENT_URI = "canonical_document_uri"
     internal const val BACKUP_DOCUMENT_URI = "backup_document_uri"
     private val noTransferHooks = object : TransferHooks {}
@@ -106,6 +108,20 @@ object DatabaseVault {
     private fun marker(context: Context) = File(context.filesDir, "personalhub-import.pending")
     private fun damagedMarker(context: Context) = File(context.filesDir, "personalhub-import.pending.damaged")
     private fun databaseDir(context: Context) = context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile!!
+
+    private fun cleanupLegacyTransientBackups(context: Context) {
+        databaseDir(context).listFiles()
+            ?.filter {
+                it.isFile &&
+                    it.name.startsWith(LEGACY_TRANSIENT_BACKUP_PREFIX) &&
+                    it.name.endsWith(".db")
+            }
+            ?.forEach { backup ->
+                sidecars(backup)
+                backup.delete()
+            }
+    }
+
     private fun validPendingBackup(context: Context, marker: File): File? {
         val expectedDir = databaseDir(context).canonicalFile
         val raw = runCatching { marker.readText().trim() }.getOrElse { "" }
@@ -164,6 +180,7 @@ object DatabaseVault {
 
     /** Run before any feature/database initialization. An interrupted replacement restores the last good DB. */
     fun recoverInterruptedImport(context: Context) {
+        cleanupLegacyTransientBackups(context)
         val marker = marker(context)
         if (!marker.isFile) {
             // A process can die after the profile intent is persisted but before the database
@@ -405,7 +422,12 @@ object DatabaseVault {
     }
 
     fun backupCurrent(context: Context): File = operations.withLock {
-        File(context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile, "personalhub-backup-${UUID.randomUUID()}.db").also { snapshot(context, it) }
+        cleanupLegacyTransientBackups(context)
+        File(context.cacheDir, TRANSIENT_BACKUP_NAME).also { target ->
+            sidecars(target)
+            target.delete()
+            snapshot(context, target)
+        }
     }
 
     private fun verifyExportFile(
@@ -429,12 +451,32 @@ object DatabaseVault {
     }
 
     private fun canonicalExportName(context: Context) = DatabaseProfiles.exportStem(context) + ".db"
-    private fun backupExportName(context: Context) = canonicalExportName(context) + ".bak"
+    private fun legacyBackupExportName(context: Context) = canonicalExportName(context) + ".bak"
 
     private fun documentUriPreference(context: Context, name: String) = when (name) {
         canonicalExportName(context) -> CANONICAL_DOCUMENT_URI
-        backupExportName(context) -> BACKUP_DOCUMENT_URI
         else -> error("Unsupported stable export name: $name")
+    }
+
+    private fun retireLegacyExportBackup(
+        context: Context,
+        prefs: android.content.SharedPreferences,
+        publisher: ExportPublisher,
+    ) {
+        val backupName = legacyBackupExportName(context)
+        val seen = mutableSetOf<String>()
+        fun remove(file: ExportFile?) {
+            if (file == null || !seen.add(file.identity)) return
+            require(file.name == backupName) { "Stored backup identity now names ${file.name}" }
+            require(file.delete()) { "Cannot delete obsolete auto-export backup $backupName" }
+        }
+        prefs.getString(BACKUP_DOCUMENT_URI, null)?.let { identity ->
+            remove(publisher.open(identity))
+        }
+        remove(publisher.find(backupName))
+        require(prefs.edit().remove(BACKUP_DOCUMENT_URI).commit()) {
+            "Cannot retire obsolete auto-export backup identity"
+        }
     }
 
     private fun existingStableExportFile(
@@ -486,30 +528,14 @@ object DatabaseVault {
         val prefs = preferences(context)
         val stage = File(context.cacheDir, "personalhub-export-${UUID.randomUUID()}.db")
         val canonicalName = canonicalExportName(context)
-        val backupName = backupExportName(context)
         try {
             val generation = snapshot(context, stage)
             val publisher = exportPublisherFactory(context, uri)
-            val previous = existingStableExportFile(context, prefs, publisher, canonicalName)
-            if (previous != null) {
-                val previousSnapshot = File(context.cacheDir, "personalhub-previous-${UUID.randomUUID()}.db")
-                try {
-                    publisher.readTo(previous, previousSnapshot)
-                    val previousGeneration = runCatching { validate(context, previousSnapshot) }.getOrNull()
-                    if (previousGeneration != null) {
-                        val backup = stableExportFile(context, prefs, publisher, backupName)
-                        publisher.writeFrom(previousSnapshot, backup)
-                        val actualBackup = refreshedStableExportFile(publisher, backup, backupName)
-                        verifyExportFile(context, publisher, previousSnapshot, actualBackup, previousGeneration)
-                    }
-                } finally {
-                    previousSnapshot.delete()
-                }
-            }
             val canonical = stableExportFile(context, prefs, publisher, canonicalName)
             publisher.writeFrom(stage, canonical)
             val actualCanonical = refreshedStableExportFile(publisher, canonical, canonicalName)
             verifyExportFile(context, publisher, stage, actualCanonical, generation)
+            retireLegacyExportBackup(context, prefs, publisher)
             require(
                 prefs.edit().putLong("exported_generation", generation)
                     .putLong("exported_at", System.currentTimeMillis()).remove("error").commit()
