@@ -378,19 +378,9 @@ fun SuperContactsApp(
         }
     }
 
-    LaunchedEffect(dataLayerGeneration) {
-        selectedContactId = null
-        isCreating = false
-        isEditing = false
-        isViewingHistory = false
-        isViewingGlobalHistory = false
-        isViewingContactInitiatives = false
-        isViewingGlobalInitiatives = false
-    }
-
-    LaunchedEffect(launchIntent?.dataString, dataLayerGeneration) {
+    LaunchedEffect(launchIntent?.dataString) {
         val dataString = launchIntent?.dataString ?: return@LaunchedEffect
-        val deepLinkGeneration = "$dataLayerGeneration:$dataString"
+        val deepLinkGeneration = dataString
         if (handledDeepLink == deepLinkGeneration) return@LaunchedEffect
         handledDeepLink = deepLinkGeneration
         val savedSearchPublicId = ContactDeepLink.parseSavedSearch(dataString)

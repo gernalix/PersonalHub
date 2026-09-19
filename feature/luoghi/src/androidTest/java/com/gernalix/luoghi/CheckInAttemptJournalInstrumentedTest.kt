@@ -12,7 +12,6 @@ import com.gernalix.luoghi.capsules.location.LocationSample
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
 import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
 import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
-import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceRepository
@@ -46,7 +45,7 @@ class CheckInAttemptJournalInstrumentedTest {
 
     @Test
     fun permissionDeniedUnknownAmbiguousAndSuccessAreJournaledWithoutPollutingFailures() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         val repository = PlaceRepository(context)
         dao.upsertPlace(place("home", "Home", 45.0, 9.0, 75.0))

@@ -33,7 +33,7 @@ import com.gernalix.luoghi.capsules.mapviewer.MapMarkerMode
 import com.gernalix.luoghi.capsules.mapviewer.MapOverlayMarker
 import com.gernalix.luoghi.capsules.mapviewer.MapViewerModel
 import com.gernalix.luoghi.capsules.mapviewer.MapViewerRepository
-import com.gernalix.luoghi.data.LuoghiDatabase
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.osmdroid.config.Configuration
@@ -69,7 +69,7 @@ class MapViewerActivity : ComponentActivity() {
                                 } else {
                                     null
                                 }
-                                MapViewerRepository(LuoghiDatabase.get(applicationContext).placeDao())
+                                MapViewerRepository(PersonalHubDatabase.get(applicationContext).placeDao())
                                     .load(title, callerMode, markerMode, uuids, labels, currentLocation)
                             }
                         }.fold(
