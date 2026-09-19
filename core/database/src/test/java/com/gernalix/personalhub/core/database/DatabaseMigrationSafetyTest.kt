@@ -46,7 +46,7 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(17, db.version)
+            assertEquals(18, db.version)
             assertEquals(1767225600123L, scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='a'"))
             assertEquals(1767312123456L, scalar(db, "SELECT occurredAt FROM finance_transactions WHERE id=1"))
             assertEquals(1L, scalar(db, "SELECT count(*) FROM finance_transactions WHERE reminderAt IS NULL"))
@@ -98,7 +98,7 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(17, db.version)
+            assertEquals(18, db.version)
             assertEquals(java.time.Instant.parse(original).toEpochMilli(),
                 scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='precision'"))
             val saved = JSONArray(scalarText(db, "SELECT json FROM hub_preferences " +
@@ -120,6 +120,31 @@ class DatabaseMigrationSafetyTest {
         assertThrows(java.time.format.DateTimeParseException::class.java) {
             TimestampEpochMigration.exactEpochMs("2026-01-02")
         }
+    }
+
+    @Test fun healthV17MigrationPreservesRowsAndAcceptsCanonicalPatchShape() {
+        val name = "health-v17-${UUID.randomUUID()}.db"
+        val file = context.getDatabasePath(name).also { it.parentFile!!.mkdirs() }
+        createVersion(file, 17)
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { old ->
+            old.execSQL("INSERT INTO hub_generation(id,generation) VALUES(1,77)")
+        }
+        val owner = PersonalHubDatabase.openTemporary(context, name)
+        try {
+            val db = owner.openHelper.writableDatabase
+            assertEquals(18, db.version)
+            assertEquals(77L, scalar(db, "SELECT generation FROM hub_generation WHERE id=1"))
+            db.execSQL("INSERT INTO health_import_batches(id,received_at_ms,imported_at_ms,source_system,author) VALUES('batch',1000,2000,'MinSP','chatgpt')")
+            db.execSQL("INSERT INTO health_events(id,import_batch_id,event_kind,occurred_at_ms,time_precision,title_it,source_system,created_at_ms,updated_at_ms) VALUES('event','batch','sample',1000,'datetime','Prelievo','MinSP',2000,2000)")
+            db.execSQL("INSERT INTO health_samples(id,event_id,sample_kind) VALUES('sample','event','blood')")
+            db.execSQL("INSERT INTO health_examinations(id,canonical_name,display_name_it,category_it) VALUES('exam','exam','Esame','Categoria')")
+            db.execSQL("INSERT INTO health_measurements(id,sample_id,examination_id,numeric_value,received_at_ms,availability_basis) VALUES('measure','sample','exam',8.9,3700000,'chat_received_proxy')")
+            db.execSQL("INSERT INTO health_ai_snapshots(id,subject_kind,subject_id,as_of_ms,generated_at_ms,generated_by,assessment_version,comment_it) VALUES('ai','measurement','measure',1000,2000,'ChatGPT',1,'Sintetico')")
+            assertEquals(3699000L, scalar(db, "SELECT delta_ms FROM v_health_measurement_turnaround WHERE measurement_id='measure'"))
+            assertEquals("Sintetico",scalarText(db,"SELECT ai_comment FROM v_health_timeline WHERE entity_id='measure'"))
+            assertEquals("ok",scalarText(db,"PRAGMA quick_check"))
+            assertFalse(db.query("PRAGMA foreign_key_check").use { it.moveToFirst() })
+        } finally { owner.close(); context.deleteDatabase(name) }
     }
 
     @Test fun productionRegistryIsTheRealContinuousGraph() {

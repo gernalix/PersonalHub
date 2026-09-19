@@ -40,17 +40,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
-private enum class HealthTab { TIMELINE, EXAMS, JOURNAL }
+private enum class HealthTab { TIMELINE, EXAMS, SAMPLES, JOURNAL }
 private enum class TimelineFilter { ALL, EXAMS, JOURNAL, ABNORMAL }
 private sealed interface HealthDetail {
-    data class Measurement(val sourceId: Long) : HealthDetail
-    data class Journal(val sourceId: Long) : HealthDetail
+    data class Measurement(val sourceId: String) : HealthDetail
+    data class Journal(val sourceId: String) : HealthDetail
+    data class Sample(val sourceId: String) : HealthDetail
 }
 
 @Composable
@@ -92,6 +95,7 @@ fun HealthScreen(
             sourceId = selected.sourceId,
             onBack = { detail = null },
         )
+        is HealthDetail.Sample -> SampleDetail(repository, selected.sourceId, { detail = null }, { detail = HealthDetail.Measurement(it) })
         null -> HealthHome(
             result = result,
             tab = tab,
@@ -103,7 +107,9 @@ fun HealthScreen(
             onRetry = { reload(true) },
             onBack = onBack,
             onOpen = { item ->
-                detail = if (item.sourceKind == "journal") {
+                detail = if (item.sourceKind == "sample") {
+                    HealthDetail.Sample(item.sourceId)
+                } else if (item.sourceKind == "journal") {
                     HealthDetail.Journal(item.sourceId)
                 } else {
                     HealthDetail.Measurement(item.sourceId)
@@ -137,15 +143,15 @@ private fun HealthHome(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("Indietro") }
+            TextButton(onClick = onBack) { Text(stringResource(R.string.health_back)) }
             Text(
-                text = "Salute",
+                text = stringResource(R.string.health_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             OutlinedButton(onClick = onRefresh, enabled = !refreshing) {
-                Text(if (refreshing) "Aggiorno…" else "Aggiorna")
+                Text(if (refreshing) stringResource(R.string.health_loading) else stringResource(R.string.health_reload))
             }
         }
 
@@ -153,17 +159,22 @@ private fun HealthHome(
             FilterChip(
                 selected = tab == HealthTab.TIMELINE,
                 onClick = { onTab(HealthTab.TIMELINE) },
-                label = { Text("Timeline") },
+                label = { Text(stringResource(R.string.health_timeline)) },
             )
             FilterChip(
                 selected = tab == HealthTab.EXAMS,
                 onClick = { onTab(HealthTab.EXAMS) },
-                label = { Text("Esami") },
+                label = { Text(stringResource(R.string.health_exams)) },
+            )
+            FilterChip(
+                selected = tab == HealthTab.SAMPLES,
+                onClick = { onTab(HealthTab.SAMPLES) },
+                label = { Text(stringResource(R.string.health_samples)) },
             )
             FilterChip(
                 selected = tab == HealthTab.JOURNAL,
                 onClick = { onTab(HealthTab.JOURNAL) },
-                label = { Text("Diario") },
+                label = { Text(stringResource(R.string.health_journal)) },
             )
         }
 
@@ -174,21 +185,14 @@ private fun HealthHome(
             is HealthLoadResult.Error -> ErrorState(result.message, onRetry)
             is HealthLoadResult.Ready -> {
                 val snapshot = result.snapshot
-                snapshot.sync.warning?.let {
-                    Text(
-                        "Aggiornamento Salute non riuscito · dati precedenti ancora disponibili",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
                 if (tab == HealthTab.TIMELINE) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         TimelineFilter.entries.forEach { item ->
                             val label = when (item) {
-                                TimelineFilter.ALL -> "Tutto"
-                                TimelineFilter.EXAMS -> "Esami"
-                                TimelineFilter.JOURNAL -> "Diario"
-                                TimelineFilter.ABNORMAL -> "Anomalie"
+                                TimelineFilter.ALL -> stringResource(R.string.health_all)
+                                TimelineFilter.EXAMS -> stringResource(R.string.health_exams)
+                                TimelineFilter.JOURNAL -> stringResource(R.string.health_journal)
+                                TimelineFilter.ABNORMAL -> stringResource(R.string.health_abnormal)
                             }
                             FilterChip(
                                 selected = filter == item,
@@ -207,9 +211,9 @@ private fun HealthHome(
                     ) {
                         Text(
                             text = if (summary == null) {
-                                "Tempo prelievo → ricezione: dati con orario esatto ancora insufficienti"
+                                stringResource(R.string.health_turnaround_insufficient)
                             } else {
-                                "Tempo medio prelievo → ricezione: ${summary.formatted} · ${summary.count} risultati"
+                                stringResource(R.string.health_turnaround_average, summary.formatted, summary.count)
                             },
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodyMedium,
@@ -226,6 +230,7 @@ private fun HealthHome(
                             TimelineFilter.ABNORMAL -> !item.flag.isNullOrBlank()
                         }
                         HealthTab.EXAMS -> item.sourceKind == "measurement"
+                        HealthTab.SAMPLES -> item.sourceKind == "sample"
                         HealthTab.JOURNAL -> item.sourceKind == "journal"
                     }
                 }
@@ -243,7 +248,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(message, color = MaterialTheme.colorScheme.error)
-        Button(onClick = onRetry) { Text("Sincronizza") }
+        Button(onClick = onRetry) { Text(stringResource(R.string.health_retry)) }
     }
 }
 
@@ -253,10 +258,10 @@ private fun TimelineList(
     onOpen: (HealthTimelineItem) -> Unit,
 ) {
     if (items.isEmpty()) {
-        Text("Nessun dato disponibile.")
+        Text(stringResource(R.string.health_empty))
         return
     }
-    val grouped = items.groupBy { it.data ?: "Data sconosciuta" }
+    val grouped = items.groupBy { it.data ?: stringResource(R.string.health_unknown_date) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -285,6 +290,7 @@ private fun HealthTimelineCard(
     item: HealthTimelineItem,
     onClick: () -> Unit,
 ) {
+    val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
@@ -303,7 +309,7 @@ private fun HealthTimelineCard(
                     Text(
                         buildString {
                             append(it)
-                            item.flag?.let { flag -> append(" ").append(flag) }
+                            item.flag?.let { flag -> append(" ").append(healthFlagLabel(context, flag)) }
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
@@ -315,7 +321,7 @@ private fun HealthTimelineCard(
             }
             item.tempoReferto?.let {
                 Text(
-                    "Prelievo → ricezione: $it",
+                    stringResource(R.string.health_turnaround, it),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -331,7 +337,7 @@ private fun HealthTimelineCard(
                 }
                 if (!item.commentoAi.isNullOrBlank()) {
                     Text(
-                        "Analisi AI disponibile",
+                        stringResource(R.string.health_ai_available),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -348,7 +354,7 @@ private fun HealthTimelineCard(
 @Composable
 private fun MeasurementDetail(
     repository: HealthRepository,
-    sourceId: Long,
+    sourceId: String,
     onBack: () -> Unit,
 ) {
     var history by remember(sourceId) { mutableStateOf<List<HealthMeasurementHistoryItem>?>(null) }
@@ -360,33 +366,38 @@ private fun MeasurementDetail(
             .onFailure { error = it.message }
     }
 
-    DetailScaffold(onBack = onBack, title = history?.firstOrNull()?.esame ?: "Esame") {
+    val context = LocalContext.current
+    DetailScaffold(onBack = onBack, title = history?.firstOrNull()?.esame ?: stringResource(R.string.health_exam)) {
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         val rows = history
         if (rows == null) {
             CircularProgressIndicator()
         } else if (rows.isEmpty()) {
-            Text("Storico non disponibile.")
+            Text(stringResource(R.string.health_history_empty))
         } else {
             val current = rows.firstOrNull { it.sourceId == sourceId } ?: rows.first()
             Text(
                 buildString {
                     append(current.risultato ?: "—")
                     current.unita?.let { append(" ").append(it) }
-                    current.flag?.let { append(" ").append(it) }
+                    current.flag?.let { append(" ").append(healthFlagLabel(context, it)) }
                 },
                 style = MaterialTheme.typography.headlineMedium,
             )
             current.tempoReferto?.let {
-                Text("Prelievo → ricezione: $it", color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.health_turnaround, it), color = MaterialTheme.colorScheme.primary)
+            }
+            current.commentoAi?.let {
+                SectionTitle(stringResource(R.string.health_ai_analysis))
+                Text(it)
             }
             val numeric = rows.filter { it.numericValue != null }.sortedBy { it.dataMs }
             if (numeric.size >= 2) {
-                Text("Trend", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.health_trend), style = MaterialTheme.typography.titleMedium)
                 TrendChart(numeric)
             }
             HorizontalDivider()
-            Text("Storico", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.health_history), style = MaterialTheme.typography.titleMedium)
             rows.forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(row.data ?: "—")
@@ -394,13 +405,13 @@ private fun MeasurementDetail(
                         buildString {
                             append(row.risultato ?: "—")
                             row.unita?.let { append(" ").append(it) }
-                            row.flag?.let { append(" ").append(it) }
+                            row.flag?.let { append(" ").append(healthFlagLabel(context, it)) }
                         },
                     )
                 }
                 row.tempoReferto?.let {
                     Text(
-                        "Referto in $it",
+                        stringResource(R.string.health_result_in, it),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -445,7 +456,7 @@ private fun TrendChart(rows: List<HealthMeasurementHistoryItem>) {
 @Composable
 private fun JournalDetail(
     repository: HealthRepository,
-    sourceId: Long,
+    sourceId: String,
     onBack: () -> Unit,
 ) {
     var detail by remember(sourceId) { mutableStateOf<HealthJournalDetail?>(null) }
@@ -460,7 +471,7 @@ private fun JournalDetail(
         }.onFailure { error = it.message }
     }
 
-    DetailScaffold(onBack = onBack, title = detail?.titolo ?: "Diario clinico") {
+    DetailScaffold(onBack = onBack, title = detail?.titolo ?: stringResource(R.string.health_clinical_journal)) {
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         val row = detail
         if (row == null && error == null) {
@@ -476,38 +487,39 @@ private fun JournalDetail(
                 Text(it, style = MaterialTheme.typography.bodySmall)
             }
 
-            SectionTitle("NOTA CLINICA")
+            SectionTitle(stringResource(R.string.health_clinical_note))
             Text(row.nota)
 
-            SectionTitle("ANALISI AI")
+            SectionTitle(stringResource(R.string.health_ai_analysis))
+            row.stanceAi?.let { stance -> Text(healthStanceLabel(stance)) }
             if (row.commentoAi.isNullOrBlank()) {
-                Text("Nessuna analisi AI disponibile per questa nota.")
+                Text(stringResource(R.string.health_ai_missing))
             } else {
                 Text(row.commentoAi)
             }
             row.incertezzeAi?.takeIf(String::isNotBlank)?.let {
                 Text(
-                    "Incertezze: $it",
+                    stringResource(R.string.health_uncertainty, it),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            SectionTitle("EVIDENZE")
+            SectionTitle(stringResource(R.string.health_evidence))
             if (evidence.isEmpty()) {
-                Text("Nessuna evidenza collegata.")
+                Text(stringResource(R.string.health_evidence_empty))
             } else {
                 evidence.forEach { item ->
-                    Text("• ${item.label ?: item.kind}: ${item.relevance}")
+                    Text(stringResource(R.string.health_evidence_item, item.label ?: item.kind, item.relevance))
                 }
             }
 
             HorizontalDivider()
             TextButton(onClick = { showOriginal = !showOriginal }) {
-                Text(if (showOriginal) "Nascondi originale danese" else "Mostra originale danese")
+                Text(if (showOriginal) stringResource(R.string.health_hide_danish) else stringResource(R.string.health_show_danish))
             }
             if (showOriginal) {
-                SectionTitle("ORIGINALE DANESE")
+                SectionTitle(stringResource(R.string.health_danish_original))
                 Text(row.originaleDa)
             }
         }
@@ -528,7 +540,7 @@ private fun DetailScaffold(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TextButton(onClick = onBack) { Text("Indietro") }
+        TextButton(onClick = onBack) { Text(stringResource(R.string.health_back)) }
         Text(title, style = MaterialTheme.typography.headlineMedium)
         content()
         Spacer(Modifier.height(24.dp))
@@ -543,4 +555,38 @@ private fun SectionTitle(text: String) {
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
     )
+}
+
+@Composable
+private fun SampleDetail(repository: HealthRepository, sourceId: String, onBack: () -> Unit, onOpenMeasurement: (String) -> Unit) {
+    var sample by remember(sourceId) { mutableStateOf<HealthSampleDetail?>(null) }
+    LaunchedEffect(sourceId) { sample = repository.sampleDetail(sourceId) }
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TextButton(onClick = onBack) { Text(stringResource(R.string.health_back)) }
+        val current = sample
+        if (current == null) { CircularProgressIndicator() } else {
+            Text(stringResource(R.string.health_sample_heading, current.date ?: stringResource(R.string.health_unknown_date)), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.health_sample_counts, current.resultCount, current.abnormalCount))
+            current.sourceComment?.let { Text(stringResource(R.string.health_clinician_comment, it)) }
+            current.commentAi?.let { Text(stringResource(R.string.health_ai_comment, it)) }
+            LazyColumn { items(current.results) { row -> HealthTimelineCard(row, onClick = { onOpenMeasurement(row.sourceId) }) } }
+        }
+    }
+}
+
+@Composable
+private fun healthStanceLabel(value: String): String = when (value) {
+    "concordant" -> stringResource(R.string.health_stance_concordant)
+    "partially_concordant" -> stringResource(R.string.health_stance_partially_concordant)
+    "questioned" -> stringResource(R.string.health_stance_questioned)
+    "insufficient_evidence" -> stringResource(R.string.health_stance_insufficient_evidence)
+    "not_applicable" -> stringResource(R.string.health_stance_not_applicable)
+    else -> value
+}
+
+private fun healthFlagLabel(context: android.content.Context, value: String): String = when (value.lowercase()) {
+    "high" -> context.getString(R.string.health_flag_high)
+    "low" -> context.getString(R.string.health_flag_low)
+    "abnormal" -> context.getString(R.string.health_flag_abnormal)
+    else -> value
 }

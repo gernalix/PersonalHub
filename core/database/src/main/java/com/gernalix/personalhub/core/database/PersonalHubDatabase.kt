@@ -92,7 +92,17 @@ import java.security.MessageDigest
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class, HubActivityEntity::class,
-], version = 17, exportSchema = true)
+    com.gernalix.personalhub.core.database.capsules.health.HealthImportBatches::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthSourceMetadata::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthEvents::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthSamples::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthExaminations::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthMeasurements::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthJournalEntries::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthAiSnapshots::class,
+    com.gernalix.personalhub.core.database.capsules.health.HealthAiEvidence::class,
+
+], version = 18, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -111,7 +121,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 17
+        const val SCHEMA_VERSION = 18
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -452,6 +462,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
+                        com.gernalix.personalhub.core.database.capsules.health.HealthViews.install(context, db)
                         val appVersion = runCatching {
                             androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
                                 context.packageManager.getPackageInfo(context.packageName, 0),

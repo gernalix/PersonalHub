@@ -18,6 +18,7 @@ import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.ResourceHubAdapter
 import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
 import com.gernalix.personalhub.workflowydays.WorkflowyDaysSync
+import com.gernalix.personalhub.salute.hub.HealthHubAdapter
 import com.gernalix.sostanze.hub.SubstanceHubAdapter
 import com.gernalix.sostanze.hub.SubstanceIntakeHubAdapter
 import com.supercontacts.app.hub.PeopleHubAdapter
@@ -54,6 +55,10 @@ class PersonalHubApplication : Application(), Configuration.Provider {
                     PlacesHubAdapter(this),
                     SoldiTransactionHubAdapter(this),
                     SubstanceHubAdapter(this),
+                    HealthHubAdapter(this, "event"),
+                    HealthHubAdapter(this, "sample"),
+                    HealthHubAdapter(this, "measurement"),
+                    HealthHubAdapter(this, "journal"),
                     SubstanceIntakeHubAdapter(this),
                     WordSessionHubAdapter(this),
                     ResourceHubAdapter(this),

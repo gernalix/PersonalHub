@@ -1,4 +1,10 @@
 {
   "format_version": 1,
-  "migrations": []
+  "migrations": [
+    {
+      "from": 17,
+      "to": 18,
+      "file": "17_18_health.json"
+    }
+  ]
 }

@@ -746,6 +746,7 @@ internal object GitPatchEngine {
                 groupId = patchId,
             )
             for (i in 0 until operations.length()) applyOperation(db, operations.getJSONObject(i))
+            com.gernalix.personalhub.core.database.capsules.health.HealthPatchContract.validate(db, operations)
             db.query("PRAGMA foreign_key_check").use {
                 require(!it.moveToFirst()) { "Patch would break database relationships" }
             }
