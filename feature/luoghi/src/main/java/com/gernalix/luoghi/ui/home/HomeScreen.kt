@@ -16,7 +16,6 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Map
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -81,7 +80,6 @@ fun HomeScreen(
     onGlobalStats: () -> Unit,
     onOpenHistory: (String?) -> Unit,
     onNewPlace: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val recentVisits = state.visits.take(3)
@@ -103,9 +101,6 @@ fun HomeScreen(
                         onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "places")) },
                     ) {
                         Icon(Icons.Outlined.Storage, contentDescription = "Datasette")
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.settings_title))
                     }
                     IconButton(onClick = onNewPlace) {
                         Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.new_place))
