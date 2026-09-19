@@ -36,7 +36,6 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HubSettings(onBack: () -> Unit) {
     var page by rememberSaveable { mutableStateOf("root") }
-    var enableGitAfterConfigure by rememberSaveable { mutableStateOf(false) }
     fun back() { if (page == "root") onBack() else page = "root" }
     BackHandler { back() }
     when (page) {
@@ -50,18 +49,11 @@ fun HubSettings(onBack: () -> Unit) {
                     context.startActivity(Intent(context, DatabaseActivity::class.java))
                 },
                 onOpenDatasette = { page = "sync" },
-                onOpenGit = {
-                    enableGitAfterConfigure = false
-                    page = "git-data"
-                },
+                onOpenGit = { page = "git-data" },
             )
         }
         "sync" -> SyncSettings { page = "root" }
-        "git-data" -> GitDataSyncSettings(
-            onBack = { page = "root"; enableGitAfterConfigure = false },
-            enableAfterSave = enableGitAfterConfigure,
-            onConfigured = { enableGitAfterConfigure = false },
-        )
+        "git-data" -> GitDataSyncSettings(onBack = { page = "root" })
         "git-history" -> GitHistorySettings { page = "root" }
         "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
         else -> {
@@ -73,20 +65,19 @@ fun HubSettings(onBack: () -> Unit) {
                     Text(stringResource(R.string.settings_guided_data_setup))
                 }
                 HorizontalDivider()
-                OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
-                OutlinedButton(onClick = { page = "profiles" }) { Text(stringResource(R.string.database_profiles_title)) }
-                OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) { Text(stringResource(R.string.database_title)) }
-                OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
-                GitDataSyncToggle(
-                    onConfigure = { requestedEnable ->
-                        enableGitAfterConfigure = requestedEnable
-                        page = "git-data"
-                    },
-                )
-                OutlinedButton(onClick = { page = "git-history" }) {
-                    Text(stringResource(R.string.git_history_title))
+                Text(stringResource(R.string.settings_local_data_section), style = MaterialTheme.typography.titleMedium)
+                OutlinedButton(onClick = { context.startActivity(Intent(context, DatabaseActivity::class.java)) }) {
+                    Text(stringResource(R.string.database_title))
                 }
+                OutlinedButton(onClick = { page = "profiles" }) { Text(stringResource(R.string.database_profiles_title)) }
+                HorizontalDivider()
+                Text(stringResource(R.string.settings_optional_services_section), style = MaterialTheme.typography.titleMedium)
+                OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
+                OutlinedButton(onClick = { page = "git-data" }) { Text(stringResource(R.string.git_data_sync_title)) }
+                OutlinedButton(onClick = { page = "git-history" }) { Text(stringResource(R.string.git_history_title)) }
                 OutlinedButton(onClick = { page = "workflowy-days" }) { Text(stringResource(R.string.workflowy_days_title)) }
+                HorizontalDivider()
+                OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
                 OutlinedButton(
                     onClick = {
                         context.startActivity(
@@ -437,61 +428,7 @@ private fun ConnectionSettings(onBack: () -> Unit, onSaved: () -> Unit) {
 
 
 @Composable
-private fun GitDataSyncToggle(onConfigure: (Boolean) -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var config by remember {
-        mutableStateOf(runCatching { GitDataSettings.configuration(context) }.getOrNull())
-    }
-    var busy by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(stringResource(R.string.git_data_sync_title), Modifier.weight(1f))
-            Switch(
-                checked = config?.enabled == true,
-                enabled = !busy,
-                onCheckedChange = { enabled ->
-                    if (enabled && config?.configured != true) {
-                        onConfigure(true)
-                    } else {
-                        busy = true
-                        scope.launch {
-                            failed = withContext(Dispatchers.IO) {
-                                runCatching { GitDataSync.setEnabled(context, enabled) }.isFailure
-                            }
-                            config = runCatching {
-                                GitDataSettings.configuration(context)
-                            }.getOrNull()
-                            busy = false
-                        }
-                    }
-                },
-            )
-        }
-        Text(stringResource(R.string.git_data_sync_description))
-        TextButton(onClick = { onConfigure(false) }, enabled = !busy) {
-            Text(stringResource(R.string.git_data_sync_configure))
-        }
-        if (failed) {
-            Text(
-                stringResource(R.string.git_data_sync_error),
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
-
-@Composable
-private fun GitDataSyncSettings(
-    onBack: () -> Unit,
-    enableAfterSave: Boolean,
-    onConfigured: () -> Unit,
-) {
+private fun GitDataSyncSettings(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val initial = remember {
@@ -538,6 +475,29 @@ private fun GitDataSyncSettings(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.git_data_sync_enable), Modifier.weight(1f))
+            Switch(
+                checked = status.enabled,
+                enabled = !busy && status.configured,
+                onCheckedChange = { enabled ->
+                    runOperation(
+                        block = { GitDataSync.setEnabled(context, enabled) },
+                        onSuccess = { status = GitDataSync.status(context) },
+                    )
+                },
+            )
+        }
+        if (!status.configured) {
+            Text(
+                stringResource(R.string.git_data_sync_enable_after_configure),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         OutlinedTextField(
             repository,
             { repository = it },
@@ -567,11 +527,10 @@ private fun GitDataSyncSettings(
                 runOperation(
                     block = {
                         GitDataSync.save(context, repository, token)
-                        if (enableAfterSave) GitDataSync.setEnabled(context, true)
                     },
                     onSuccess = {
                         token = ""
-                        onConfigured()
+                        status = GitDataSync.status(context)
                     },
                 )
             },
