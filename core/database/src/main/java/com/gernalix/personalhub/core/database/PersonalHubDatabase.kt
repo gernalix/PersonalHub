@@ -92,7 +92,7 @@ import java.security.MessageDigest
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubResource::class, HubActivityEntity::class,
-], version = 16, exportSchema = true)
+], version = 17, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -111,7 +111,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 16
+        const val SCHEMA_VERSION = 17
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -429,7 +429,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                                 }
                             },
-        ) + DeclarativeMigrations.load(context)
+        ) + arrayOf(TimestampEpochMigration(context)) + DeclarativeMigrations.load(context)
 
         private fun schemaFingerprint(db: SupportSQLiteDatabase): String {
             val digest = MessageDigest.getInstance("SHA-256")

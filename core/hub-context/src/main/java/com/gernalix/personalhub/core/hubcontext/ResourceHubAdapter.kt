@@ -30,7 +30,7 @@ class ResourceHubAdapter(private val context: Context) : HubEntityAdapter {
         if (kind == HubResourceKinds.WEB_URL && uri?.scheme !in setOf("http", "https")) return null
         if (kind == HubResourceKinds.ANDROID_URI && uri?.scheme.isNullOrBlank()) return null
         if (kind == HubResourceKinds.SAF_DOCUMENT && uri?.scheme != "content") return null
-        val now = Instant.now().toString()
+        val now = System.currentTimeMillis()
         val resource = HubResource(UUID.randomUUID().toString(), kind, request.suggestedLabel?.trim()?.takeIf(String::isNotBlank), value, request.extras["persisted_permission"] == "true", now, now)
         dao.insert(resource)
         return resource.summary()

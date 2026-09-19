@@ -128,7 +128,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                 IntakeEventEntity(
                     substanceId = substanceId,
                     timestampMs = timestampMs,
-                    timestampUtc = UtcDateCodec.isoUtc(timestampMs),
+                    timestampUtc = timestampMs,
                     dose = substance.dosePerIntake,
                     doseUnit = substance.doseUnit,
                     tapGroupId = idempotencyKey,
@@ -142,7 +142,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                 StockAdjustmentEntity(
                     substanceId = substanceId,
                     timestampMs = timestampMs,
-                    timestampUtc = UtcDateCodec.isoUtc(timestampMs),
+                    timestampUtc = timestampMs,
                     delta = appliedStockDelta,
                     note = "intake",
                     resultingStock = newStock,
@@ -171,7 +171,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                 StockAdjustmentEntity(
                     substanceId = substanceId,
                     timestampMs = System.currentTimeMillis(),
-                    timestampUtc = UtcDateCodec.isoUtc(System.currentTimeMillis()),
+                    timestampUtc = System.currentTimeMillis(),
                     delta = restored,
                     note = "undo intake",
                     resultingStock = newStock,
@@ -200,7 +200,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                     StockAdjustmentEntity(
                         substanceId = intake.substanceId,
                         timestampMs = now,
-                        timestampUtc = UtcDateCodec.isoUtc(now),
+                        timestampUtc = now,
                         delta = restored,
                         note = "undo tap",
                         resultingStock = newStock,
@@ -229,7 +229,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
         dao.updateIntake(
             intake.copy(
                 timestampMs = timestampMs,
-                timestampUtc = UtcDateCodec.isoUtc(timestampMs),
+                timestampUtc = timestampMs,
                 quantity = quantity,
                 appliedStockDelta = newApplied,
             )
@@ -240,7 +240,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
             StockAdjustmentEntity(
                 substanceId = intake.substanceId,
                 timestampMs = now,
-                timestampUtc = UtcDateCodec.isoUtc(now),
+                timestampUtc = now,
                 delta = newApplied - intake.appliedStockDelta,
                 note = "edit intake:$id",
                 resultingStock = correctedStock,
@@ -262,7 +262,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                 StockAdjustmentEntity(
                     substanceId = substanceId,
                     timestampMs = System.currentTimeMillis(),
-                    timestampUtc = UtcDateCodec.isoUtc(System.currentTimeMillis()),
+                    timestampUtc = System.currentTimeMillis(),
                     delta = delta,
                     note = note?.takeIf { it.isNotBlank() },
                     resultingStock = newStock,
@@ -371,7 +371,7 @@ class SostanzeRepository(private val db: SostanzeDatabase) {
                     kind = plan.kind,
                     entityId = plan.entityId,
                     scheduledForMs = plan.scheduledForMs,
-                    scheduledForUtc = UtcDateCodec.isoUtc(plan.scheduledForMs),
+                    scheduledForUtc = plan.scheduledForMs,
                 )
             )
         }
