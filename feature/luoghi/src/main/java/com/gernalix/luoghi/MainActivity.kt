@@ -1,12 +1,7 @@
 package com.gernalix.luoghi
 
 import android.Manifest
-import android.app.Activity
 import android.content.Intent
-import android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-import android.content.Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
-import android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-import android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
@@ -20,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -50,17 +44,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gernalix.luoghi.capsules.mapviewer.MapViewerCapsule
 import com.gernalix.luoghi.capsules.geofence.PlaceGeofenceAction
 import com.gernalix.luoghi.capsules.places.PlaceListUiModel
-import com.gernalix.luoghi.export.BackupFolderStore
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
 import com.gernalix.luoghi.ui.history.HistoryScreen
 import com.gernalix.luoghi.ui.history.formatHistoryTimestampForInput
 import com.gernalix.luoghi.ui.history.parseHistoryTimestampInput
-import com.gernalix.luoghi.ui.backup.RestoreBackupDialog
 import com.gernalix.luoghi.ui.home.HomeScreen
 import com.gernalix.luoghi.ui.place.PlaceDetailScreen
 import com.gernalix.luoghi.ui.place.PlaceEditorDialog
 import com.gernalix.luoghi.ui.place.PlaceAlertsDialog
-import com.gernalix.luoghi.ui.settings.SettingsScreen
 import com.gernalix.luoghi.ui.theme.LuoghiTheme
 
 class MainActivity : ComponentActivity() {
@@ -87,7 +78,7 @@ private fun Intent?.hubPlaceId(): String? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/places" }
     ?.getQueryParameter("placeId")?.takeIf(String::isNotBlank)
 
-private enum class AppDestination { HOME, PLACE_DETAIL, HISTORY, SETTINGS }
+private enum class AppDestination { HOME, PLACE_DETAIL, HISTORY }
 
 @Composable
 fun LuoghiHome(initialPlaceId: String? = null) {
@@ -98,40 +89,10 @@ fun LuoghiHome(initialPlaceId: String? = null) {
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 LuoghiHomeViewModel(
                     container = LuoghiAppContainer(context.applicationContext),
-                    context = context.applicationContext,
                 ) as T
         },
     )
     val state by vm.state.collectAsState()
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        vm.refreshSafGate()
-    }
-    val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val uri = result.data?.data
-        if ((result.resultCode == Activity.RESULT_OK) && (uri != null)) {
-            val flags = result.data?.flags
-                ?.and(FLAG_GRANT_READ_URI_PERMISSION or FLAG_GRANT_WRITE_URI_PERMISSION)
-                ?.takeIf { it != 0 }
-                ?: (FLAG_GRANT_READ_URI_PERMISSION or FLAG_GRANT_WRITE_URI_PERMISSION)
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, flags) }
-                .onSuccess { vm.saveSelectedSafFolder(uri) }
-                .onFailure { vm.refreshSafGate() }
-        } else {
-            vm.refreshSafGate()
-        }
-    }
-    val backupFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val uri = result.data?.data
-        if ((result.resultCode == Activity.RESULT_OK) && (uri != null)) {
-            val flags = result.data?.flags
-                ?.and(FLAG_GRANT_READ_URI_PERMISSION)
-                ?.takeIf { it != 0 }
-                ?: FLAG_GRANT_READ_URI_PERMISSION
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, flags) }
-            vm.inspectBackup(uri)
-        }
-    }
     val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants.values.any { it }) vm.onPrimaryCheckAction() else vm.onLocationPermissionDenied()
     }
@@ -147,35 +108,13 @@ fun LuoghiHome(initialPlaceId: String? = null) {
             vm.onPrimaryCheckAction()
         }
     }
-    val allowPersonalHubLocalDataWithoutSaf =
-        context.packageName in setOf("com.gernalix.personalhub", "com.gernalix.personalhub.qa") && state.dataLoaded
-
-    when {
-        state.safGate.loading && !allowPersonalHubLocalDataWithoutSaf -> LoadingGate()
-        state.safGate.status != BackupFolderStore.ValidationStatus.READY && !allowPersonalHubLocalDataWithoutSaf -> SafRequiredGate(
-            status = state.safGate.status,
-        ) {
-            folderLauncher.launch(openDocumentTreeIntent())
-        }
-        else -> LuoghiNavigation(
-            state = state,
-            vm = vm,
-            initialPlaceId = initialPlaceId,
-            onCheckAction = onCheckAction,
-            onChooseSafFolder = {
-                folderLauncher.launch(openDocumentTreeIntent())
-            },
-        ) {
-            backupFileLauncher.launch(openBackupDocumentIntent())
-        }
-    }
-    RestoreBackupDialog(
-        state = state.restore,
-        onRestore = vm::restoreSelectedBackup,
-        onNotNow = vm::continueWithoutRestore,
-        onChooseAnother = { backupFileLauncher.launch(openBackupDocumentIntent()) },
-        onCloseStatus = vm::closeRestoreStatus,
+    LuoghiNavigation(
+        state = state,
+        vm = vm,
+        initialPlaceId = initialPlaceId,
+        onCheckAction = onCheckAction,
     )
+
 }
 
 @Composable
@@ -184,8 +123,6 @@ private fun LuoghiNavigation(
     vm: LuoghiHomeViewModel,
     initialPlaceId: String?,
     onCheckAction: () -> Unit,
-    onChooseSafFolder: () -> Unit,
-    onChooseBackupFile: () -> Unit,
 ) {
     val context = LocalContext.current
     var destinationName by rememberSaveable { mutableStateOf(AppDestination.HOME.name) }
@@ -235,9 +172,7 @@ private fun LuoghiNavigation(
     fun navigateBack() {
         when (destination) {
             AppDestination.HOME -> Unit
-            AppDestination.PLACE_DETAIL,
-            AppDestination.SETTINGS,
-            -> openHome()
+            AppDestination.PLACE_DETAIL -> openHome()
 
             AppDestination.HISTORY -> {
                 val detail = historyFilterPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
@@ -278,9 +213,7 @@ private fun LuoghiNavigation(
                 vm.newPlace()
                 editorOpen = true
             },
-        ) {
-            destinationName = AppDestination.SETTINGS.name
-        }
+        )
 
         AppDestination.PLACE_DETAIL -> selectedItem?.let { item ->
             PlaceDetailScreen(
@@ -326,14 +259,6 @@ private fun LuoghiNavigation(
                 onClearMessage = vm::clearHistoryMessage,
             )
         }
-        AppDestination.SETTINGS -> SettingsScreen(
-            folderLabel = state.safGate.folderLabel,
-            restoreState = state.restore,
-            onBack = ::openHome,
-            onImportBackup = { com.gernalix.personalhub.core.database.DatabaseNavigation.open(context) },
-            onReviewDeferredBackup = vm::showDeferredRestore,
-            onChangeFolder = onChooseSafFolder,
-        )
     }
 
     if (editorOpen) {
@@ -599,55 +524,6 @@ private fun ActionRow(automatic: Boolean, onAutomaticChange: (Boolean) -> Unit) 
             RadioButton(selected = automatic, onClick = { onAutomaticChange(true) })
             Text(stringResource(R.string.geofence_action_automatic))
         }
-    }
-}
-
-private fun openDocumentTreeIntent(): Intent =
-    Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
-        FLAG_GRANT_READ_URI_PERMISSION or FLAG_GRANT_WRITE_URI_PERMISSION or
-            FLAG_GRANT_PERSISTABLE_URI_PERMISSION or FLAG_GRANT_PREFIX_URI_PERMISSION,
-    )
-
-private fun openBackupDocumentIntent(): Intent =
-    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-        addCategory(Intent.CATEGORY_OPENABLE)
-        type = "*/*"
-        addFlags(FLAG_GRANT_READ_URI_PERMISSION or FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-    }
-
-@Composable
-private fun LoadingGate() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(R.string.saf_gate_checking))
-    }
-}
-
-@Composable
-private fun SafRequiredGate(
-    status: BackupFolderStore.ValidationStatus,
-    onChooseFolder: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(R.string.saf_gate_required))
-        Text(
-            when (status) {
-                BackupFolderStore.ValidationStatus.MISSING -> stringResource(R.string.saf_gate_missing)
-                BackupFolderStore.ValidationStatus.PERMISSION_REVOKED -> stringResource(R.string.saf_gate_permission_revoked)
-                BackupFolderStore.ValidationStatus.NOT_WRITABLE -> stringResource(R.string.saf_gate_not_writable)
-                BackupFolderStore.ValidationStatus.READY -> stringResource(R.string.export_status_configured)
-            }
-        )
-        Button(onClick = onChooseFolder) { Text(stringResource(R.string.choose_saf_folder)) }
     }
 }
 
