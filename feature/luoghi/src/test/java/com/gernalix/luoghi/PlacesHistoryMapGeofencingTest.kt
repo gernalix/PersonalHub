@@ -22,7 +22,6 @@ import com.gernalix.luoghi.capsules.places.PlaceSortCriterion
 import com.gernalix.luoghi.capsules.places.PlaceSortDirection
 import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.visits.VisitMapper
-import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
 import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
 import com.gernalix.luoghi.data.CheckInAttemptWithPlaceName
@@ -132,7 +131,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun geofenceNotifyOnlyDoesNotMutateVisitsAndAutomaticEnterExitMutatesOnce() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         dao.upsertPlace(place("home", "Home", 45.0, 9.0))
         dao.upsertGeofenceConfig(
@@ -178,7 +177,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun geofenceAutomaticEnterRejectsOverlappingOpenVisit() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         dao.upsertPlace(place("home", "Home", 45.0, 9.0))
         dao.upsertPlace(place("office", "Office", 45.1, 9.1))
@@ -203,7 +202,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun unrelatedHistoricalOverlapDoesNotPoisonIndependentMutations() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         val repository = com.gernalix.luoghi.data.PlaceRepository(context)
         dao.upsertPlace(place("legacy-a", "Legacy A"))
@@ -256,7 +255,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun automaticGeofenceMutationsAllowUnrelatedHistoricalOverlapButRejectIntroducedOverlap() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         dao.upsertPlace(place("legacy-a", "Legacy A"))
         dao.upsertPlace(place("legacy-b", "Legacy B"))
@@ -292,7 +291,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun geofenceReconcileReturnsPermissionMissingWhenBackgroundLocationIsUnavailable() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         dao.upsertPlace(place("home", "Home", 45.0, 9.0))
         dao.upsertGeofenceConfig(
@@ -314,7 +313,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun checkInAttemptJournalRecordsCandidatesAndDoesNotCreateVisitForFailure() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         val repository = com.gernalix.luoghi.data.PlaceRepository(context)
         dao.upsertPlace(place("near", "Near", 0.0, 0.0, radiusM = 100.0))
@@ -387,7 +386,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun checkInAttemptJournalRecordsSuccessAlongsideRealVisit() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         val repository = com.gernalix.luoghi.data.PlaceRepository(context)
         dao.upsertPlace(place("home", "Home", 0.0, 0.0))
@@ -410,7 +409,7 @@ class PlacesHistoryMapGeofencingTest {
 
     @Test
     fun checkInAttemptRecoveryMarksOnlyInProgressRowsOnce() = runBlocking {
-        val db = LuoghiDatabase.get(context)
+        val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         val repository = com.gernalix.luoghi.data.PlaceRepository(context)
         val pending = repository.beginCheckInAttempt()

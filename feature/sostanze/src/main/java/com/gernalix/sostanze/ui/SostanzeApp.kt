@@ -138,7 +138,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     var interactionDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
     var interactionRuleDraft by remember { mutableStateOf<InteractionRuleEntity?>(null) }
     var randomAlertDialog by remember { mutableStateOf<SubstanceEntity?>(null) }
-    var pendingImport by remember { mutableStateOf<android.net.Uri?>(null) }
     var handledInitialSubstanceId by rememberSaveable { mutableStateOf<Long?>(null) }
     LaunchedEffect(initialSubstanceId, state.substances) {
         val id = initialSubstanceId ?: return@LaunchedEffect
@@ -151,12 +150,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    val exportFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) viewModel.setExportFolder(uri)
-    }
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        pendingImport = uri
-    }
     val recordedMessage = stringResource(R.string.recorded)
     val blockedMessage = stringResource(R.string.intake_blocked)
     val earlyMessage = stringResource(R.string.intake_early)
@@ -177,12 +170,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                         ) {
                             Text("Data")
                         }
-                        TextButton(onClick = { exportFolderLauncher.launch(null) }) {
-                            Text(stringResource(R.string.export_action))
-                        }
-                        TextButton(onClick = { importLauncher.launch(arrayOf("application/vnd.sqlite3", "application/octet-stream", "*/*")) }) {
-                            Text(stringResource(R.string.import_action))
-                        }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             IconButton(onClick = { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
                                 Text(stringResource(R.string.notifications_short))
@@ -199,7 +186,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                         )
                     }
                 }
-                ImportExportStatusBar(state)
             }
         },
         floatingActionButton = {
@@ -393,44 +379,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                 editingSubstance = null
             }
         )
-    }
-    pendingImport?.let { uri ->
-        ConfirmImportDialog(
-            onDismiss = { pendingImport = null },
-            onConfirm = {
-                viewModel.importDatabase(uri)
-                pendingImport = null
-            }
-        )
-    }
-}
-
-@Composable
-private fun ImportExportStatusBar(state: SostanzeUiState) {
-    val hasError = state.lastImportError != null || state.exportStatus == ExportStatusUi.Error
-    Surface(
-        color = if (hasError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (hasError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            val exportText = when (state.exportStatus) {
-                ExportStatusUi.NotConfigured -> stringResource(R.string.export_status_not_configured)
-                ExportStatusUi.Ready -> stringResource(R.string.export_status_ready)
-                ExportStatusUi.Error -> stringResource(R.string.export_status_failed, state.lastExportError.orEmpty())
-            }
-            Text(exportText, style = MaterialTheme.typography.labelMedium)
-            state.lastImportError?.let { error ->
-                Text(
-                    stringResource(R.string.import_status_failed, error),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            } ?: Text(
-                stringResource(R.string.export_folder_hint),
-                style = MaterialTheme.typography.labelSmall
-            )
-        }
     }
 }
 
@@ -1200,17 +1148,6 @@ private fun ConfirmDeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: 
         title = { Text(stringResource(R.string.delete_substance_title)) },
         text = { Text(stringResource(R.string.delete_substance_message, name)) },
         confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.archive)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
-    )
-}
-
-@Composable
-private fun ConfirmImportDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.import_confirm_title)) },
-        text = { Text(stringResource(R.string.import_confirm_message)) },
-        confirmButton = { Button(onClick = onConfirm) { Text(stringResource(R.string.import_action)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 }

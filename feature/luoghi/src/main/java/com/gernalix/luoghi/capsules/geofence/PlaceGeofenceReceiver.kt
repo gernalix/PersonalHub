@@ -3,10 +3,10 @@ package com.gernalix.luoghi.capsules.geofence
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.PlaceGeofenceTransitionLogEntity
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.core.database.DatabaseProfiles
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import kotlinx.coroutines.CoroutineScope
@@ -45,7 +45,7 @@ class PlaceGeofenceReceiver : BroadcastReceiver() {
     }
 
     private suspend fun restore(context: Context) {
-        val db = LuoghiDatabase.get(context.applicationContext)
+        val db = PersonalHubDatabase.get(context.applicationContext)
         PlaceGeofenceRegistrar(context.applicationContext, db.placeDao()).reconcile()
     }
 
@@ -63,7 +63,7 @@ class PlaceGeofenceReceiver : BroadcastReceiver() {
             transition: PlaceGeofenceTransition,
             nowMs: Long,
         ): PlaceGeofenceResult {
-            val db = LuoghiDatabase.get(context.applicationContext)
+            val db = PersonalHubDatabase.get(context.applicationContext)
             val dao = db.placeDao()
             val config = dao.geofenceConfig(placeUuid) ?: return PlaceGeofenceResult.PlaceMissing
             val enabled = when (transition) {

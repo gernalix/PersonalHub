@@ -1,7 +1,6 @@
 package com.supercontacts.app.data.repository
 
 import androidx.room.withTransaction
-import com.supercontacts.app.data.backup.SuperContactsBackupManager
 import com.supercontacts.app.data.local.ContactEntity
 import com.supercontacts.app.data.local.ContactEventEntity
 import com.supercontacts.app.data.local.ContactEventWithContactName
@@ -18,7 +17,7 @@ import com.supercontacts.app.data.local.InitiativeCalendarDayRow
 import com.supercontacts.app.data.local.SavedSearchEntity
 import com.supercontacts.app.data.local.SavedSearchTagCrossRef
 import com.supercontacts.app.data.local.SavedSearchWithTags
-import com.supercontacts.app.data.local.SuperContactsDatabase
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.supercontacts.app.data.local.TagEntity
 import java.time.Instant
 import java.time.LocalDate
@@ -31,8 +30,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 class ContactsRepository(
-    private val database: SuperContactsDatabase,
-    private val backupManager: SuperContactsBackupManager,
+    private val database: PersonalHubDatabase,
 ) {
     private val dao: ContactsDao = database.contactsDao()
 
@@ -246,7 +244,6 @@ class ContactsRepository(
             tag.toModel()
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
         return result
     }
@@ -266,7 +263,6 @@ class ContactsRepository(
             }
         }
         if (changedCount > 0) {
-            backupManager.notifyDatabaseChanged()
         }
         return changedCount
     }
@@ -289,7 +285,6 @@ class ContactsRepository(
             }
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -328,7 +323,6 @@ class ContactsRepository(
             }
             id
         }
-        backupManager.notifyDatabaseChanged()
         return savedSearchId
     }
 
@@ -338,7 +332,6 @@ class ContactsRepository(
     suspend fun deleteSavedSearch(savedSearchId: Long): Boolean {
         val deleted = dao.deleteSavedSearchById(savedSearchId) > 0
         if (deleted) {
-            backupManager.notifyDatabaseChanged()
         }
         return deleted
     }
@@ -441,7 +434,6 @@ class ContactsRepository(
             actionType = EventActionType.Opened,
             eventType = ContactEventType.CONTACT_OPEN,
         )
-        backupManager.notifyDatabaseChanged()
     }
 
     suspend fun recordFieldOpen(contactId: Long, fieldType: String) {
@@ -452,7 +444,6 @@ class ContactsRepository(
             eventType = ContactEventType.FIELD_OPEN,
             fieldType = fieldType,
         )
-        backupManager.notifyDatabaseChanged()
     }
 
     suspend fun recordInitiative(
@@ -482,7 +473,6 @@ class ContactsRepository(
             initiativeId
         }
         if (initiativeId > 0L) {
-            backupManager.notifyDatabaseChanged()
         }
         return initiativeId
     }
@@ -501,7 +491,6 @@ class ContactsRepository(
             }
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -520,7 +509,6 @@ class ContactsRepository(
             }
         }
         if (deleted) {
-            backupManager.notifyDatabaseChanged()
         }
         return deleted
     }
@@ -552,7 +540,6 @@ class ContactsRepository(
             contactId
         }
         com.gernalix.personalhub.core.database.PhotoCapsule.discard(input.photoPath)
-        backupManager.notifyDatabaseChanged()
         return contactId
     }
 
@@ -611,7 +598,6 @@ class ContactsRepository(
         }
         com.gernalix.personalhub.core.database.PhotoCapsule.discard(input.photoPath)
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
         return ContactPhotoCleanupResult(oldPhotoPath = deletableOldPhotoPath, changed = changed)
     }
@@ -636,7 +622,6 @@ class ContactsRepository(
         }
         com.gernalix.personalhub.core.database.PhotoCapsule.discard(photoPath)
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
         return ContactPhotoCleanupResult(oldPhotoPath = deletableOldPhotoPath, changed = changed)
     }
@@ -690,7 +675,6 @@ class ContactsRepository(
             changed = true
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -707,7 +691,6 @@ class ContactsRepository(
             }
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -736,7 +719,6 @@ class ContactsRepository(
             changed = true
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -760,7 +742,6 @@ class ContactsRepository(
             }
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -788,7 +769,6 @@ class ContactsRepository(
             changed = true
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
             deletedPublicId?.let {
                 com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalDeletedIfInitialized(
                     com.gernalix.personalhub.contracts.database.HubEntityRef("people", "person", it),
@@ -823,7 +803,6 @@ class ContactsRepository(
             }
         }
         if (changedCount > 0) {
-            backupManager.notifyDatabaseChanged()
         }
         return changedCount
     }
@@ -837,7 +816,6 @@ class ContactsRepository(
             changed = synchronizeMessagingLinksForContact(contactId, System.currentTimeMillis())
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -850,7 +828,6 @@ class ContactsRepository(
             }
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 
@@ -875,7 +852,6 @@ class ContactsRepository(
             changed = true
         }
         if (changed) {
-            backupManager.notifyDatabaseChanged()
         }
     }
 

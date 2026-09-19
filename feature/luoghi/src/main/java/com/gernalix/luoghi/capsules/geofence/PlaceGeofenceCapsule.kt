@@ -15,7 +15,7 @@ class PlaceGeofenceCapsule(
         repository.saveGeofenceConfig(config)
         return PlaceGeofenceRegistrar(
             context.applicationContext,
-            com.gernalix.luoghi.data.LuoghiDatabase.get(context.applicationContext).placeDao(),
+            com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context.applicationContext).placeDao(),
         ).reconcile()
     }
 }

@@ -8,10 +8,10 @@ import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
 import com.gernalix.luoghi.capsules.places.GeoSearch
-import com.gernalix.luoghi.capsules.safexport.PersistentMutationTracker
+import com.gernalix.personalhub.core.database.HubAutoExport
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.luoghi.data.PlaceDao
 import com.gernalix.luoghi.data.DatabaseMutationCoordinator
-import com.gernalix.luoghi.data.LuoghiDatabase
 import com.gernalix.luoghi.data.PlaceAliasEntity
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceEventEntity
@@ -47,7 +47,7 @@ class PlacesProvider : ContentProvider() {
         sortOrder: String?,
     ): Cursor {
         val places = providerIo {
-            val dao = LuoghiDatabase.get(requireNotNull(context)).placeDao()
+            val dao = PersonalHubDatabase.get(requireNotNull(context)).placeDao()
             when (matcher.match(uri)) {
                 PLACES -> dao.listPlacesBlocking()
                 PLACE_BY_UUID -> listOfNotNull(dao.getPlaceBlocking(uri.lastPathSegment.orEmpty()))
@@ -86,7 +86,7 @@ class PlacesProvider : ContentProvider() {
         val v = requireNotNull(values) { "ContentValues required" }
         val match = matcher.match(uri)
         return providerIo {
-            val dao = LuoghiDatabase.get(requireNotNull(context)).placeDao()
+            val dao = PersonalHubDatabase.get(requireNotNull(context)).placeDao()
             if (match == EVENTS) {
                 val now = System.currentTimeMillis()
                 val id = PlaceRepository(requireNotNull(context)).recordPlaceEventEntity(
@@ -136,7 +136,7 @@ class PlacesProvider : ContentProvider() {
             }
         }.also {
             if (match != EVENTS) {
-                context?.let { appContext -> PersistentMutationTracker.record(appContext, mutationSource(match, "insert")) }
+                context?.let { appContext -> HubAutoExport.request(appContext) }
             }
             context?.contentResolver?.notifyChange(PlacesContract.Places.CONTENT_URI, null)
         }
@@ -152,7 +152,7 @@ class PlacesProvider : ContentProvider() {
         val v = requireNotNull(values)
         val updated = providerIo {
             DatabaseMutationCoordinator.mutex.withLock {
-                val dao = LuoghiDatabase.get(requireNotNull(context)).placeDao()
+                val dao = PersonalHubDatabase.get(requireNotNull(context)).placeDao()
                 when (match) {
                 PLACE_BY_UUID -> {
                     val existing = dao.getPlaceBlocking(uuid) ?: return@providerIo 0
@@ -203,7 +203,7 @@ class PlacesProvider : ContentProvider() {
             }
         }
         if (updated == 0) return 0
-        context?.let { PersistentMutationTracker.record(it, mutationSource(match, "update")) }
+        context?.let { HubAutoExport.request(it) }
         context?.contentResolver?.notifyChange(PlacesContract.Places.CONTENT_URI, null)
         return updated
     }
@@ -212,8 +212,8 @@ class PlacesProvider : ContentProvider() {
         val match = matcher.match(uri)
         val deleted = providerIo {
             DatabaseMutationCoordinator.mutex.withLock {
-                val dao = LuoghiDatabase.get(requireNotNull(context)).placeDao()
-                val db = LuoghiDatabase.get(requireNotNull(context))
+                val dao = PersonalHubDatabase.get(requireNotNull(context)).placeDao()
+                val db = PersonalHubDatabase.get(requireNotNull(context))
                 when (match) {
                 PLACE_BY_UUID -> db.openHelper.writableDatabase.delete("places", "uuid = ?", arrayOf(uri.lastPathSegment.orEmpty()))
                 LINK_BY_ID -> dao.deleteLinkByIdBlocking(uri.lastPathSegment.orEmpty().toLongOrNull() ?: -1L)
@@ -223,7 +223,7 @@ class PlacesProvider : ContentProvider() {
             }
         }
         if (deleted > 0) {
-            context?.let { PersistentMutationTracker.record(it, mutationSource(match, "delete")) }
+            context?.let { HubAutoExport.request(it) }
             context?.contentResolver?.notifyChange(PlacesContract.Places.CONTENT_URI, null)
         }
         return deleted

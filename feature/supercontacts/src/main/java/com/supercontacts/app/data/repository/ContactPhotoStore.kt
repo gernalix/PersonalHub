@@ -8,7 +8,6 @@ import android.media.ExifInterface
 import android.net.Uri
 import android.util.Log
 import com.supercontacts.app.R
-import com.supercontacts.app.data.backup.BackupPreferencesStore
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream

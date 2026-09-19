@@ -2,7 +2,7 @@ package com.gernalix.luoghi.hub
 
 import android.content.Context
 import androidx.sqlite.db.SimpleSQLiteQuery
-import com.gernalix.luoghi.data.LuoghiDatabase
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.contracts.database.*
@@ -14,7 +14,7 @@ class PlacesHubAdapter(private val context: Context) : HubEntityAdapter, HubTemp
     override val moduleId = "places"
     override val entityKind = "place"
     override val capabilities = setOf("place", "location")
-    private val database get() = LuoghiDatabase.get(context)
+    private val database get() = PersonalHubDatabase.get(context)
     private val dao get() = database.placeDao()
 
     override suspend fun exists(canonicalId: String) = dao.getPlace(canonicalId) != null
