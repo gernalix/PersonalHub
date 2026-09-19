@@ -27,7 +27,7 @@ interface SostanzeDao {
     @Query("SELECT c.id AS id, f.value AS name FROM contacts c JOIN contact_fields f ON f.contact_id=c.id AND f.field_type='name' WHERE c.deleted_at IS NULL AND c.archived_at IS NULL AND f.value LIKE '%' || :query || '%' ORDER BY f.value COLLATE NOCASE LIMIT 20")
     suspend fun doctorChoices(query: String): List<DoctorChoice>
 
-    @Query("SELECT t.id AS id, COALESCE(p.name,n.name,'') AS title, t.amount AS amount, t.occurredAt AS occurredAt FROM finance_transactions t LEFT JOIN finance_products p ON p.id=t.productId LEFT JOIN finance_titles n ON n.id=t.titleId WHERE lower(trim(COALESCE(p.name,n.name,'')))=lower(trim(:name)) ORDER BY t.occurredAt DESC,t.id DESC LIMIT 5")
+    @Query("SELECT t.id AS id, COALESCE(p.name,n.name,'') AS title, t.amount AS amount, CAST(t.occurredAt AS INTEGER) AS occurredAt FROM finance_transactions t LEFT JOIN finance_products p ON p.id=t.productId LEFT JOIN finance_titles n ON n.id=t.titleId WHERE lower(trim(COALESCE(p.name,n.name,'')))=lower(trim(:name)) ORDER BY t.occurredAt DESC,t.id DESC LIMIT 5")
     suspend fun recentMatchingCosts(name: String): List<CostChoice>
 
     @Query("SELECT value FROM contact_fields WHERE contact_id=:contactId AND field_type='name' ORDER BY is_primary DESC,position,id LIMIT 1")
