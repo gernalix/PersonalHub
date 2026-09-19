@@ -1,5 +1,7 @@
 package com.gernalix.sostanze.data
 
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
+
 import androidx.room.withTransaction
 import com.gernalix.sostanze.domain.InteractionEnforcementMode
 import com.gernalix.sostanze.domain.InteractionRulePlan
@@ -24,7 +26,7 @@ data class SostanzeSnapshot(
     val macroItems: List<MacroItemEntity> = emptyList(),
 )
 
-class SostanzeRepository(private val db: SostanzeDatabase) {
+class SostanzeRepository(private val db: PersonalHubDatabase) {
     private val dao = db.dao()
 
     val homeSnapshot: Flow<SostanzeSnapshot> = combine(
