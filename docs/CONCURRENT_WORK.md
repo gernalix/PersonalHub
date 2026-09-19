@@ -1,45 +1,55 @@
 # Concurrent PersonalHub work
 
-PersonalHub separates **implementation** from **integration**.
+PersonalHub uses **parallel workers + asynchronous single integration**.
 
-## Implementation
+## Worker phase
 
-Independent tasks may run at the same time only when each task:
+Independent tasks may run at the same time when each task:
 
-1. works on its own dedicated branch;
-2. never writes to the canonical/default branch;
-3. runs only branch-local host checks during implementation;
-4. pushes its branch and opens a PR when ready;
-5. does not merge while still acting as the implementation worker.
+1. uses its own dedicated task worktree/branch from the current remote canonical tip;
+2. never writes to the canonical checkout;
+3. runs branch-local host checks needed by its change;
+4. pushes its branch and opens/updates its queued PR;
+5. stops repository work once the PR is queued.
 
-A worker must not acquire the PersonalHub task lock merely to edit code on its isolated branch. After the PR is ready, the same Codex session may immediately transition into the integrating role: it must acquire the lease first, refresh the canonical branch once, perform the semantic review below, and only then merge. This preserves one-at-a-time integration without forcing a second Codex session for every task.
+A worker never waits for CI/canonical merge and never acquires a repository-wide integration lease.
 
 ## Integration queue
 
-Open PRs targeting the canonical branch are the queue. Integration is deliberately one-at-a-time.
+Open queued PRs targeting the canonical branch are processed FIFO per repository by `repo-integrator`.
 
-The integrating Codex session:
+The integrator:
 
-1. acquires `tools/personalhub_task_lock.py`;
-2. chooses one ready PR;
-3. refreshes the canonical branch once;
-4. runs `tools/personalhub_integration_context.py --branch <branch>` for bounded branch facts;
-5. reads the relevant diff/code and checks semantic interaction with changes already present in the latest canonical branch;
-6. resolves conflicts or necessary compatibility fixes in the candidate branch, never by guessing;
-7. runs the smallest tests/compile gates that cover the interaction;
-8. merges only after semantic review and gates PASS;
-9. deletes the merged branch;
-10. releases the lock.
+1. waits asynchronously for the current PR checks;
+2. if canonical advanced, rebases the clean task branch onto the latest canonical tip;
+3. pushes that refreshed task branch with `--force-with-lease` scoped to the exact observed task head;
+4. waits for checks on the refreshed head;
+5. merges only when the PR is mergeable and checks pass;
+6. cleans the merged task branch/worktree and advances to the next PR.
 
-A Git merge that reports no textual conflict is **not** sufficient approval. The helper never makes a merge-safety decision.
+Pending CI, temporary GitHub errors and canonical advances are queue states, not Codex blockers. A real rebase conflict is a semantic conflict: abort the rebase, preserve the task branch and create one focused repair task rather than guessing.
 
-## Shared QA and release
+## Shared runtime resources
 
-Shared emulator/device QA and release also require the same lease, because they mutate shared runtime state. Branch-local host tests do not.
+Git integration does not use `tools/personalhub_task_lock.py`.
+
+Use a lease only for a resource that cannot safely be shared:
+
+- `--resource emulator`
+- `--resource pixel`
+- `--resource release`
+- `--resource signing`
+
+Resources are independent. Code-only work needs no lease. The legacy no-`--resource` lock exists only for compatibility with old prompts.
+
+## Versioning
+
+Ordinary parallel development branches do not edit `version.txt`. The explicit final release/delivery task increments it once from latest integrated canonical immediately before the final build. This removes a high-frequency synthetic merge conflict between unrelated workers.
 
 ## Failure behavior
 
-- Textual conflict: Codex resolves it with the task intent and current code in view.
-- No textual conflict but semantic incompatibility: Codex fixes the candidate branch and reruns only relevant gates.
-- Ambiguous interaction or required out-of-scope redesign: BLOCKED; do not merge.
-- PASS: merge/push, delete the branch, release the lease, then take the next PR.
+- CI pending/in progress: stay queued; no new prompt.
+- Canonical advanced: automatic task-branch rebase and refreshed CI.
+- Push race: retry only after new evidence, with force-with-lease limited to the task branch.
+- Real textual/semantic rebase conflict: preserve branch and request a focused repair.
+- PASS: integrator merges, cleans up and the roadmap terminal PASS is queued automatically.
