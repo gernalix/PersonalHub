@@ -1,8 +1,7 @@
 package com.supercontacts.app.data.repository
 
 import android.content.Context
-import com.supercontacts.app.data.backup.SuperContactsBackupManager
-import com.supercontacts.app.data.local.SuperContactsDatabase
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,8 +14,6 @@ object AppContainer {
     @Volatile
     private var contactPhotoStore: ContactPhotoStore? = null
     @Volatile
-    private var backupManager: SuperContactsBackupManager? = null
-    @Volatile
     private var homePreferencesStore: HomePreferencesStore? = null
 
     private val dataLayerGeneration = MutableStateFlow(0)
@@ -25,10 +22,7 @@ object AppContainer {
 
     fun contactsRepository(context: Context): ContactsRepository =
         contactsRepository ?: synchronized(this) {
-            contactsRepository ?: ContactsRepository(
-                database(context),
-                backupManager(context),
-            ).also { contactsRepository = it }
+            contactsRepository ?: ContactsRepository(database(context)).also { contactsRepository = it }
         }
 
     fun addressAutocompleteRepository(context: Context): AddressAutocompleteRepository =
@@ -45,14 +39,6 @@ object AppContainer {
             ).also { contactPhotoStore = it }
         }
 
-    fun backupManager(context: Context): SuperContactsBackupManager =
-        backupManager ?: synchronized(this) {
-            backupManager ?: SuperContactsBackupManager(
-                context = context.applicationContext,
-                closeDataLayer = ::closeDataLayer,
-                notifyDataLayerChanged = ::notifyDataLayerChanged,
-            ).also { backupManager = it }
-        }
 
     fun homePreferencesStore(context: Context): HomePreferencesStore =
         homePreferencesStore ?: synchronized(this) {
@@ -61,13 +47,12 @@ object AppContainer {
             ).also { homePreferencesStore = it }
         }
 
-    private fun database(context: Context): SuperContactsDatabase =
-        SuperContactsDatabase.getInstance(context.applicationContext)
+    private fun database(context: Context): PersonalHubDatabase =
+        PersonalHubDatabase.get(context.applicationContext)
 
     private fun closeDataLayer() {
         synchronized(this) {
             contactsRepository = null
-            SuperContactsDatabase.closeInstance()
         }
     }
 
