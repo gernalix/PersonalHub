@@ -186,8 +186,11 @@ class DatabaseMigrationSafetyTest {
                 db.execSQL("INSERT INTO word_entries(original_word,normalized_word,created_at_utc_ms,session_id) VALUES('kept','kept',1000,'startup-kept')")
             }
             assertTrue(DatabaseVault.ensureStartupReady(context))
+            assertFalse("Successful startup migration must retire its rollback snapshot", snapshot.exists())
+            snapshot.writeText("stale completed rollback")
             assertTrue(snapshot.isFile)
             assertTrue(DatabaseVault.ensureStartupReady(context))
+            assertFalse("Memoized healthy startup must remove stale completed rollback snapshots", snapshot.exists())
             SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
                 assertEquals(1, db.rawQuery("SELECT count(*) FROM word_entries WHERE original_word='kept'", null).use { it.moveToFirst(); it.getInt(0) })
