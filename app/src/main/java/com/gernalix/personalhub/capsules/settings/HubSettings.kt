@@ -42,18 +42,20 @@ fun HubSettings(onBack: () -> Unit) {
     when (page) {
         "shortcuts" -> HomeShortcutsSettings { page = "root" }
         "profiles" -> DatabaseProfilesSettings { page = "root" }
-        "data-guide" -> DataSetupGuide(
-            onBack = { page = "root" },
-            onOpenDatabase = {
-                val context = LocalContext.current
-                context.startActivity(Intent(context, DatabaseActivity::class.java))
-            },
-            onOpenDatasette = { page = "sync" },
-            onOpenGit = {
-                enableGitAfterConfigure = false
-                page = "git-data"
-            },
-        )
+        "data-guide" -> {
+            val context = LocalContext.current
+            DataSetupGuide(
+                onBack = { page = "root" },
+                onOpenDatabase = {
+                    context.startActivity(Intent(context, DatabaseActivity::class.java))
+                },
+                onOpenDatasette = { page = "sync" },
+                onOpenGit = {
+                    enableGitAfterConfigure = false
+                    page = "git-data"
+                },
+            )
+        }
         "sync" -> SyncSettings { page = "root" }
         "git-data" -> GitDataSyncSettings(
             onBack = { page = "root"; enableGitAfterConfigure = false },
