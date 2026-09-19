@@ -477,6 +477,8 @@ object DatabaseVault {
 
     private fun canonicalExportName(context: Context) = DatabaseProfiles.exportStem(context) + ".db"
     private fun legacyBackupExportName(context: Context) = canonicalExportName(context) + ".bak"
+    private fun stagedExportName(context: Context) = canonicalExportName(context) + ".tmp"
+    private fun previousExportName(context: Context) = canonicalExportName(context) + ".old.tmp"
 
     private fun documentUriPreference(context: Context, name: String) = when (name) {
         canonicalExportName(context) -> CANONICAL_DOCUMENT_URI
@@ -502,6 +504,82 @@ object DatabaseVault {
         require(prefs.edit().remove(BACKUP_DOCUMENT_URI).commit()) {
             "Cannot retire obsolete auto-export backup identity"
         }
+    }
+
+    private fun persistCanonicalExportIdentity(
+        prefs: android.content.SharedPreferences,
+        file: ExportFile,
+    ) {
+        require(
+            prefs.edit().putString(CANONICAL_DOCUMENT_URI, file.identity).commit()
+        ) { "Cannot persist canonical export identity" }
+    }
+
+    private fun createNamedExportFile(publisher: ExportPublisher, name: String): ExportFile {
+        val created = publisher.create(name)
+        if (created.name != name) {
+            runCatching { created.delete() }
+            error("Provider created ${created.name ?: "an unnamed document"} instead of $name")
+        }
+        return created
+    }
+
+    /**
+     * Repairs a publish interrupted while only transient SAF documents existed.
+     * Steady state is exactly one canonical database document.
+     */
+    private fun recoverInterruptedExport(
+        context: Context,
+        prefs: android.content.SharedPreferences,
+        publisher: ExportPublisher,
+    ): ExportFile? {
+        val canonicalName = canonicalExportName(context)
+        val stageName = stagedExportName(context)
+        val oldName = previousExportName(context)
+        val stored = prefs.getString(CANONICAL_DOCUMENT_URI, null)?.let(publisher::open)
+        if (stored != null && stored.name != canonicalName) {
+            require(prefs.edit().remove(CANONICAL_DOCUMENT_URI).commit()) {
+                "Cannot retire stale canonical export identity"
+            }
+        }
+        val canonical = publisher.find(canonicalName)
+            ?: stored?.takeIf { it.name == canonicalName }
+        val old = publisher.find(oldName)
+        val staged = publisher.find(stageName)
+
+        if (canonical != null) {
+            if (old != null) require(old.delete()) { "Cannot delete stale previous export" }
+            if (staged != null) require(staged.delete()) { "Cannot delete stale staged export" }
+            persistCanonicalExportIdentity(prefs, canonical)
+            return canonical
+        }
+
+        if (old != null) {
+            val restored = publisher.rename(old, canonicalName)
+            if (staged != null) require(staged.delete()) { "Cannot delete stale staged export" }
+            persistCanonicalExportIdentity(prefs, restored)
+            return restored
+        }
+
+        if (staged != null) {
+            val verify = File(context.cacheDir, "personalhub-export-recovery-${UUID.randomUUID()}.db")
+            try {
+                publisher.readTo(staged, verify)
+                validate(context, verify)
+                val promoted = publisher.rename(staged, canonicalName)
+                persistCanonicalExportIdentity(prefs, promoted)
+                return promoted
+            } catch (_: Throwable) {
+                runCatching { staged.delete() }
+            } finally {
+                verify.delete()
+            }
+        }
+
+        require(prefs.edit().remove(CANONICAL_DOCUMENT_URI).commit()) {
+            "Cannot clear missing canonical export identity"
+        }
+        return null
     }
 
     private fun existingStableExportFile(
@@ -553,19 +631,45 @@ object DatabaseVault {
         val prefs = preferences(context)
         val stage = File(context.cacheDir, "personalhub-export-${UUID.randomUUID()}.db")
         val canonicalName = canonicalExportName(context)
+        val stageName = stagedExportName(context)
+        val oldName = previousExportName(context)
         try {
             val generation = snapshot(context, stage)
             val publisher = exportPublisherFactory(context, uri)
-            val canonical = stableExportFile(context, prefs, publisher, canonicalName)
-            publisher.writeFrom(stage, canonical)
-            val actualCanonical = refreshedStableExportFile(publisher, canonical, canonicalName)
-            verifyExportFile(context, publisher, stage, actualCanonical, generation)
-            retireLegacyExportBackup(context, prefs, publisher)
-            require(
-                prefs.edit().putLong("exported_generation", generation)
-                    .putLong("exported_at", System.currentTimeMillis()).remove("error").commit()
-            ) { "Cannot persist successful export state" }
-            true
+            val previous = recoverInterruptedExport(context, prefs, publisher)
+            val staged = createNamedExportFile(publisher, stageName)
+            var old: ExportFile? = null
+            try {
+                publisher.writeFrom(stage, staged)
+                verifyExportFile(context, publisher, stage, staged, generation)
+                if (previous != null) {
+                    old = publisher.rename(previous, oldName)
+                }
+                val canonical = publisher.rename(staged, canonicalName)
+                verifyExportFile(context, publisher, stage, canonical, generation)
+                if (old != null) {
+                    require(old.delete()) { "Cannot retire previous canonical export" }
+                    old = null
+                }
+                retireLegacyExportBackup(context, prefs, publisher)
+                persistCanonicalExportIdentity(prefs, canonical)
+                require(
+                    prefs.edit().putLong("exported_generation", generation)
+                        .putLong("exported_at", System.currentTimeMillis()).remove("error").commit()
+                ) { "Cannot persist successful export state" }
+                true
+            } catch (error: Throwable) {
+                runCatching {
+                    val previousNow = old ?: publisher.find(oldName)
+                    if (previousNow != null) {
+                        publisher.find(canonicalName)?.let { require(it.delete()) }
+                        val restored = publisher.rename(previousNow, canonicalName)
+                        persistCanonicalExportIdentity(prefs, restored)
+                    }
+                    publisher.find(stageName)?.delete()
+                }
+                throw error
+            }
         } catch (error: Throwable) {
             prefs.edit().putString("error", error.message ?: error.javaClass.simpleName).commit()
             throw error
@@ -817,6 +921,7 @@ object DatabaseVault {
         fun create(name: String): ExportFile
         fun open(identity: String): ExportFile?
         fun find(name: String): ExportFile?
+        fun rename(source: ExportFile, newName: String): ExportFile
         fun writeFrom(source: File, target: ExportFile)
         fun readTo(source: ExportFile, target: File)
     }
@@ -872,6 +977,20 @@ object DatabaseVault {
                 }
             }
             return null
+        }
+
+        override fun rename(source: ExportFile, newName: String): ExportFile {
+            val file = source as DocumentExportFile
+            val renamedUri = requireNotNull(
+                DocumentsContract.renameDocument(resolver, file.uri, newName)
+            ) { "Provider could not rename ${file.name} to $newName" }
+            val renamed = requireNotNull(queryDocument(renamedUri)) {
+                "Provider returned an unreadable URI after renaming to $newName"
+            }
+            require(renamed.name == newName) {
+                "Provider renamed ${file.name} to ${renamed.name} instead of $newName"
+            }
+            return renamed
         }
 
         override fun writeFrom(source: File, target: ExportFile) {
