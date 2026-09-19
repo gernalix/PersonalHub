@@ -113,14 +113,14 @@ internal fun TransactionView.toDraft(tags: List<String>) = TransactionDraft(
     notes = value.notes,
     tags = tags.joinToString(", "),
     fromReceipt = value.fromReceipt,
-    occurredAt = value.occurredAt,
+    occurredAt = Instant.ofEpochMilli(value.occurredAt).toString(),
     accountId = value.accountId,
     productId = value.productId,
     personId = value.personId,
     macroId = value.macroId,
     recurrenceId = value.recurrenceId,
     occurrenceKey = value.occurrenceKey,
-    reminderAt = value.reminderAt,
+    reminderAt = value.reminderAt?.let { Instant.ofEpochMilli(it).toString() },
     category = value.category,
 )
 
@@ -171,8 +171,8 @@ internal fun transferState(
     category = source.value.category,
     tags = tags.joinToString(", "),
     personId = source.value.personId,
-    occurredAt = source.value.occurredAt,
-    reminderAt = source.value.reminderAt,
+    occurredAt = Instant.ofEpochMilli(source.value.occurredAt).toString(),
+    reminderAt = source.value.reminderAt?.let { Instant.ofEpochMilli(it).toString() },
 )
 
 internal fun signedAmount(value: String, kind: EntryKind): String {
@@ -182,6 +182,7 @@ internal fun signedAmount(value: String, kind: EntryKind): String {
 }
 
 internal fun localDate(iso: String): LocalDate = Instant.parse(iso).atZone(ZoneId.systemDefault()).toLocalDate()
+internal fun localDate(epochMs: Long): LocalDate = Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).toLocalDate()
 
 internal fun money(amount: BigDecimal, currency: String): String {
     val nf = NumberFormat.getNumberInstance(Locale.getDefault()).apply {

@@ -470,7 +470,7 @@ internal fun AccountEditorV2(value: FinanceAccount, onChange: (FinanceAccount) -
             OutlinedTextField(value.name, { onChange(value.copy(name = it)) }, label = { Text("Nome conto") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(value.currency, { onChange(value.copy(currency = it.uppercase())) }, label = { Text("Valuta") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(value.openingBalance, { onChange(value.copy(openingBalance = it)) }, label = { Text("Saldo iniziale") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            DateTimeButton("Aperto il", value.openedAt) { onChange(value.copy(openedAt = it)) }
+            DateTimeButton("Aperto il", Instant.ofEpochMilli(value.openedAt).toString()) { onChange(value.copy(openedAt = Instant.parse(it).toEpochMilli())) }
             Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(value.included, { onChange(value.copy(included = it)) }); Text("Includi nel patrimonio") }
             Button(onClick = onSave, enabled = value.name.isNotBlank() && value.currency.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Salva") }
         }

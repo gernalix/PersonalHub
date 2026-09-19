@@ -39,7 +39,7 @@ internal object FinanceReminderScheduler {
         val scheduled = linkedSetOf<String>()
 
         db.financeDao().allTransactions().filter { it.reminderAt != null }.forEach { row ->
-            val whenAt = runCatching { Instant.parse(row.reminderAt) }.getOrNull() ?: return@forEach
+            val whenAt = row.reminderAt?.let(Instant::ofEpochMilli) ?: return@forEach
             if (whenAt.isAfter(now)) {
                 val key = "transaction:${row.uuid}"
                 schedule(context, key, titleFor(row.titleId, row.productId, db), whenAt)

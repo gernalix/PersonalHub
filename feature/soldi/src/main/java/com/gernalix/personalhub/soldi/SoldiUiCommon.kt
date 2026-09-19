@@ -318,6 +318,7 @@ internal fun LocalDateButton(label: String, value: String?, allowClear: Boolean 
 
 internal fun formatDateTime(iso: String): String = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     .format(Instant.parse(iso).atZone(ZoneId.systemDefault()))
+internal fun formatDateTime(epochMs: Long): String = formatDateTime(Instant.ofEpochMilli(epochMs).toString())
 
 internal fun pickDateTime(context: Context, initial: Instant, onResult: (String) -> Unit) {
     val current = initial.atZone(ZoneId.systemDefault())

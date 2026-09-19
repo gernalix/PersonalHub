@@ -143,7 +143,7 @@ private fun buildLedgerEntries(
     val now = Instant.now()
     val monthRows = rows.filter { row ->
         YearMonth.from(localDate(row.value.occurredAt)) == month &&
-            (!hideFuture || !Instant.parse(row.value.occurredAt).isAfter(now))
+            (!hideFuture || row.value.occurredAt <= now.toEpochMilli())
     }
     val rowMap = rows.associateBy { it.value.id }
     val transferMap = buildMap<Long, FinanceTransfer> {
