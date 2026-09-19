@@ -4,16 +4,23 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import socket
+import sqlite3
+import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 
 DEFAULT_LOCK_PATH = Path.home() / ".cache" / "codex" / "personalhub-task.lock"
 DEFAULT_TTL_SECONDS = 12 * 60 * 60
+DEFAULT_ROADMAP_REPOSITORY = "gernalix/codex-roadmap"
+DEFAULT_ROADMAP_BRANCH = "main"
 
 
 def _now() -> int:
@@ -47,7 +54,79 @@ def _describe(lock: dict[str, object]) -> str:
     )
 
 
-def acquire(path: Path, prompt_id: str, ttl_seconds: int) -> int:
+def _gh_json(*args: str) -> dict[str, Any] | None:
+    try:
+        proc = subprocess.run(
+            ["gh", *args],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return None
+    if proc.returncode:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _remote_prompt_status(
+    prompt_id: str,
+    repository: str = DEFAULT_ROADMAP_REPOSITORY,
+    branch: str = DEFAULT_ROADMAP_BRANCH,
+) -> str | None:
+    """Best-effort authoritative roadmap status lookup.
+
+    Failure to query the remote is deliberately conservative: callers keep the
+    lease instead of guessing that the owner is dead.
+    """
+    if not prompt_id:
+        return None
+    payload = _gh_json(
+        "api",
+        f"repos/{repository}/contents/roadmap.sqlite?ref={branch}",
+    )
+    if not payload:
+        return None
+    try:
+        raw = base64.b64decode(str(payload["content"]).replace("\n", ""), validate=True)
+    except (KeyError, ValueError):
+        return None
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".sqlite") as handle:
+            handle.write(raw)
+            handle.flush()
+            conn = sqlite3.connect(f"file:{handle.name}?mode=ro", uri=True)
+            try:
+                row = conn.execute(
+                    "SELECT status FROM prompts WHERE prompt_id=?",
+                    (prompt_id,),
+                ).fetchone()
+            finally:
+                conn.close()
+    except sqlite3.DatabaseError:
+        return None
+    return str(row[0]) if row else None
+
+
+def _archive_stale_lock(path: Path, reason: str) -> None:
+    stale_path = path.with_suffix(path.suffix + f".stale.{_now()}")
+    path.rename(stale_path)
+    print(f"RECOVERED: {_describe(_read_lock(stale_path) or {})} reason={reason}")
+
+
+def acquire(
+    path: Path,
+    prompt_id: str,
+    ttl_seconds: int,
+    *,
+    roadmap_repository: str = DEFAULT_ROADMAP_REPOSITORY,
+    roadmap_branch: str = DEFAULT_ROADMAP_BRANCH,
+) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "prompt_id": prompt_id,
@@ -60,11 +139,38 @@ def acquire(path: Path, prompt_id: str, ttl_seconds: int) -> int:
         fd = os.open(path, flags, 0o600)
     except FileExistsError:
         current = _read_lock(path)
+        if current is not None and str(current.get("prompt_id") or "") == prompt_id:
+            print(f"ALREADY_ACQUIRED: {_describe(current)}")
+            return 0
         if current is not None and _is_stale(current, ttl_seconds):
-            stale_path = path.with_suffix(path.suffix + f".stale.{_now()}")
-            path.rename(stale_path)
-            return acquire(path, prompt_id, ttl_seconds)
-        print(f"BLOCKED: PersonalHub task lock is held: {_describe(current or {})}", file=sys.stderr)
+            _archive_stale_lock(path, "ttl-expired")
+            return acquire(
+                path,
+                prompt_id,
+                ttl_seconds,
+                roadmap_repository=roadmap_repository,
+                roadmap_branch=roadmap_branch,
+            )
+        owner_prompt_id = str((current or {}).get("prompt_id") or "")
+        owner_status = _remote_prompt_status(
+            owner_prompt_id,
+            repository=roadmap_repository,
+            branch=roadmap_branch,
+        )
+        if current is not None and owner_status is not None and owner_status != "running":
+            _archive_stale_lock(path, f"owner-roadmap-status:{owner_status}")
+            return acquire(
+                path,
+                prompt_id,
+                ttl_seconds,
+                roadmap_repository=roadmap_repository,
+                roadmap_branch=roadmap_branch,
+            )
+        suffix = f" roadmap_status={owner_status}" if owner_status else ""
+        print(
+            f"BLOCKED: PersonalHub task lock is held: {_describe(current or {})}{suffix}",
+            file=sys.stderr,
+        )
         return 75
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, sort_keys=True)
@@ -104,12 +210,20 @@ def main() -> int:
     parser.add_argument("--prompt-id", help="Current roadmap PROMPT_ID.")
     parser.add_argument("--lock-path", type=Path, default=DEFAULT_LOCK_PATH)
     parser.add_argument("--ttl-seconds", type=int, default=DEFAULT_TTL_SECONDS)
+    parser.add_argument("--roadmap-repository", default=DEFAULT_ROADMAP_REPOSITORY)
+    parser.add_argument("--roadmap-branch", default=DEFAULT_ROADMAP_BRANCH)
     args = parser.parse_args()
 
     if args.command == "acquire":
         if not args.prompt_id:
             parser.error("--prompt-id is required for acquire")
-        return acquire(args.lock_path, args.prompt_id, args.ttl_seconds)
+        return acquire(
+            args.lock_path,
+            args.prompt_id,
+            args.ttl_seconds,
+            roadmap_repository=args.roadmap_repository,
+            roadmap_branch=args.roadmap_branch,
+        )
     if args.command == "release":
         return release(args.lock_path, args.prompt_id)
     return status(args.lock_path, args.ttl_seconds)
