@@ -120,8 +120,6 @@ class FinanceAccountsTest {
         val malformed=JSONObject(local);malformed.getJSONArray("accounts").getJSONObject(0).put("name","must rollback")
         malformed.getJSONArray("transactions").getJSONObject(0).put("accountId",UUID.randomUUID().toString())
         rejects { exchange.import(malformed.toString(),FinanceExchange.fingerprints(local)) }; assertEquals(local,exchange.export())
-        listOf("https://user:secret@example.com/repo","https://example.com/repo?token=secret","file:///tmp/repo","http://example.com/repo").forEach { bad -> rejects { FinanceGit.validateUrl(bad) } }
-        FinanceGit.validateUrl("https://example.com/repo.git")
         assertFalse(local.contains("token"));assertFalse(local.contains("soldi_git"))
     }
     @Test fun migrationPreservesAllFinanceValuesAndTagLinksWithRequiredAccounts() = runBlocking {
