@@ -79,7 +79,10 @@
     <string name="call_overlay_open_contact">Open contact</string>
     <string name="call_overlay_permission_title">Allow call overlay</string>
     <string name="call_overlay_permission_body">SuperContacts needs Display over other apps to show contact details above the Android call screen.</string>
-    <string name="call_overlay_permission_open_settings">Open settings</string>
+    <string name="call_overlay_permission_open_settings">Open display setting</string>
+    <string name="call_overlay_permission_restricted_title">Allow restricted settings first</string>
+    <string name="call_overlay_permission_restricted_body">Android blocks Display over other apps for APK-installed builds until you approve restricted settings. In App info, tap ⋮ &gt; Allow restricted settings, confirm, then return to PersonalHub.</string>
+    <string name="call_overlay_permission_open_app_info">Open app info</string>
     <string name="saved_searches">Saved searches</string>
     <string name="saved_searches_entry">🔖 Saved searches</string>
     <string name="saved_searches_count">%1$d saved</string>
