@@ -57,7 +57,7 @@ fun parseAlertMessageSegments(message: String): List<AlertMessageSegment> {
 }
 
 fun isAllowedAlertLink(url: String): Boolean =
-    AlertLinkPolicy.linkOnlyUriOrNull(url) != null
+    AlertLinkPolicy.isLinkOnlyUri(url)
 
 private data class ParsedLink(
     val label: String,
