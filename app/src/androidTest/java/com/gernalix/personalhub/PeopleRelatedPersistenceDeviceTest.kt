@@ -5,7 +5,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.database.PhotoCapsule
-import com.supercontacts.app.data.backup.SuperContactsBackupManager
 import com.supercontacts.app.data.repository.ContactInput
 import com.supercontacts.app.data.repository.ContactsRepository
 import com.supercontacts.app.data.repository.InitiativeType
@@ -25,7 +24,7 @@ class PeopleRelatedPersistenceDeviceTest {
         val name = "qa914263-photo-${UUID.randomUUID()}.db"
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
-            val repo = ContactsRepository(owner, SuperContactsBackupManager(context, {}, {}))
+            val repo = ContactsRepository(owner)
             val firstBytes = byteArrayOf(1, 2, 3, 4)
             val firstRef = PhotoCapsule.stage(firstBytes)
             val contactId = repo.createContact(ContactInput(name = "QA914263Photo", photoPath = firstRef))
@@ -50,8 +49,7 @@ class PeopleRelatedPersistenceDeviceTest {
         val name = "qa914263-people-${UUID.randomUUID()}.db"
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
-            val backup = SuperContactsBackupManager(context, {}, {})
-            val repo = ContactsRepository(owner, backup)
+            val repo = ContactsRepository(owner)
             val marker = "QA914263Person${UUID.randomUUID()}"
             val contactId = repo.createContact(ContactInput(name = marker, phone = "+4512345678"))
             val dao = owner.contactsDao()

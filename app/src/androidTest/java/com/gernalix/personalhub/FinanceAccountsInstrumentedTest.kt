@@ -39,8 +39,6 @@ class FinanceAccountsInstrumentedTest {
         finance.saveProduct(product,"QA renamed product")
         assertEquals(product,db.financeDao().transaction(transaction)!!.productId)
         val exchange=FinanceExchange(db); val text=exchange.export()
-        val git=FinanceGit(context);git.configure("http://127.0.0.1:8765/finance.git")
-        git.push();git.pull();git.pull()
         assertEquals(text,exchange.export());assertEquals(3,scalar("SELECT count(*) FROM finance_transactions"))
         assertEquals(3,scalar("SELECT count(*) FROM hub_sync_pending WHERE table_name='finance_transactions'"))
         val reopened=PersonalHubDatabase.openTemporary(context,PersonalHubDatabase.DATABASE_NAME)
