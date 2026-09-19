@@ -50,7 +50,7 @@
     <string name="module_wordpulse">WordPulse</string>
     <string name="module_wordpulse_subtitle">Words, sessions, corrections</string>
     <string name="database_title">Database and backup</string>
-    <string name="database_description">One file contains all modules and contact photos. Import replaces the current data after validation and keeps a recovery copy.</string>
+    <string name="database_description">The active personalhub.db is the single source of truth for every writable module. SAF export creates backup copies only; Import explicitly replaces the active database after validation and keeps a recovery copy.</string>
     <string name="database_import">Import personalhub.db</string>
     <string name="database_folder">Choose automatic export folder</string>
     <string name="database_folder_missing">Choose a folder to enable automatic export.</string>
@@ -96,7 +96,7 @@
     <string name="home_autoexport_no_error">None</string>
     <string name="home_autoexport_close">Close</string>
     <string name="git_data_sync_title">Git data sync</string>
-    <string name="git_data_sync_description">Optional. When enabled, PersonalHub stores deterministic data snapshots in the configured private GitHub repository, pulls verified patches and migration instructions, and can restore a selected Git revision. No Git requests are made while disabled.</string>
+    <string name="git_data_sync_description">Optional versioned history. Background sync publishes local snapshots/history and checks verified remote control metadata. It never silently replaces personalhub.db; full inbound replacement requires the explicit Restore action. No Git requests are made while disabled.</string>
     <string name="git_data_sync_configure">Configure Git repository</string>
     <string name="git_data_sync_repository">Private GitHub repository URL (HTTPS)</string>
     <string name="git_data_sync_token">GitHub access token</string>
@@ -116,7 +116,7 @@
     <string name="git_data_sync_error">Git data sync failed. Check the repository, token, compatibility, and network connection.</string>
     <string name="datasette_sync_title">Datasette sync</string>
     <string name="datasette_enable">Enable sync</string>
-    <string name="datasette_description">When enabled, all current data and subsequent changes are sent. Local changes remain saved while offline. Disabling waits for any current request to finish.</string>
+    <string name="datasette_description">Optional outbound replica. When enabled, all current local data and later changes are sent to Datasette for remote browsing/analysis. Datasette never writes back into PersonalHub. Local changes remain saved while offline.</string>
     <string name="datasette_connection">Connection settings</string>
     <string name="datasette_url">Base URL (HTTPS)</string>
     <string name="datasette_database">Database name</string>
@@ -255,4 +255,39 @@
     <string name="git_history_known_bad">Known bad date (YYYY-MM-DD)</string>
     <string name="git_history_bisect_action">Find suspect edits</string>
     <string name="git_history_semantic_truncated">Diff reached the safety limit; narrow the revisions or inspect individual tables for the remaining changes.</string>
+
+    <string name="settings_data_model_summary">Your active profile on this phone holds the data used by every module. Backups and online services keep copies; they do not change what the app opens.</string>
+    <string name="settings_guided_data_setup">Guided data setup</string>
+    <string name="data_setup_intro">Start with the data on this phone, then choose any optional copies you want to keep.</string>
+    <string name="data_setup_local_title">Data on this phone</string>
+    <string name="data_setup_authoritative">LIVE DATA — used by every module</string>
+    <string name="data_setup_local_body">Every module reads and saves to the active profile shown below. Switching profiles changes all modules together.</string>
+    <string name="data_setup_active_profile">Active profile: %1$s</string>
+    <string name="data_setup_saf_title">Backup folder</string>
+    <string name="data_setup_backup_role">BACKUP — phone → folder automatically</string>
+    <string name="data_setup_saf_body">Choose a folder to keep checked copies after changes. Selecting a folder does not load its data. To use a backup, choose Import and review it first.</string>
+    <string name="data_setup_datasette_title">Datasette</string>
+    <string name="data_setup_replica_role">ONLINE COPY — phone → Datasette</string>
+    <string name="data_setup_datasette_body">Use this optional service to browse a copy online. It never loads data into the app. To enable uploads, enter the service address and its upload key.</string>
+    <string name="data_setup_git_title">Git data history</string>
+    <string name="data_setup_history_role">VERSION HISTORY — phone → Git</string>
+    <string name="data_setup_git_body">Use this optional service to keep past versions. Normal sync never replaces your phone data. Restore and applying a patch each require a separate action.</string>
+    <string name="data_setup_security">Connection keys stay encrypted on this phone. They are not included in your data or backups.</string>
+    <string name="data_setup_open_database">Open database &amp; backup</string>
+    <string name="data_setup_configure">Configure</string>
+    <string name="data_setup_configured">Configured (optional service is off)</string>
+    <string name="data_setup_not_configured">Not configured — this is fine</string>
+    <string name="data_setup_enabled">Enabled</string>
+    <string name="datasette_direction_notice">PersonalHub sends a copy to Datasette. It never loads data from Datasette.</string>
+    <string name="datasette_connection_help">Enter your Datasette service address and the destination for uploaded data. These settings do not change which phone data the app uses.</string>
+    <string name="datasette_token_help">The upload key lets this phone send data to Datasette. It stays encrypted on this phone and is not included in backups.</string>
+    <string name="git_data_sync_direction_notice">Normal sync sends history to Git. Only the separate Restore action below can replace phone data.</string>
+    <string name="git_data_sync_token_help">Enter the address of your private Git data repository and a key that lets this phone access it. The key stays encrypted on this phone and is not included in backups or commits.</string>
+
+
+    <string name="settings_local_data_section">Local data</string>
+    <string name="settings_optional_services_section">Optional remote services</string>
+    <string name="git_data_sync_enable">Enable automatic Git history sync</string>
+    <string name="git_data_sync_enable_after_configure">Save a valid repository connection first. Git remains optional and off until you enable it.</string>
+
 </resources>

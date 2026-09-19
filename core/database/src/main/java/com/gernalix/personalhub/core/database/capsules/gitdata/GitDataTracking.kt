@@ -21,6 +21,10 @@ data class GitEditEvent(
 object GitDataTracking {
     const val TABLE = "hub_git_pending"
     @Volatile private var active = false
+    fun resumeInstalled(db: SupportSQLiteDatabase) {
+        db.execSQL("DELETE FROM $CONTEXT_TABLE")
+        active = true
+    }
     const val EVENTS_TABLE = "hub_git_events"
     const val CONTEXT_TABLE = "hub_git_edit_context"
     const val APPLIED_PATCHES_TABLE = "hub_git_applied_patches"
@@ -124,13 +128,21 @@ object GitDataTracking {
                 "`id` TEXT NOT NULL PRIMARY KEY, `applied_at` INTEGER NOT NULL)",
         )
         db.execSQL("DELETE FROM $CONTEXT_TABLE")
+        val installed = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger'").use { cursor ->
+            buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
+        }
+        fun normalized(sql: String) = sql.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
         tables(db).forEach { table ->
             val columns = columns(db, table)
             val keys = SyncJournal.primaryKeys(db, table)
             check(keys.isNotEmpty()) { "Git sync requires a primary key: $table" }
             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                db.execSQL("DROP TRIGGER IF EXISTS `hub_git_dirty_${table}_$op`")
-                db.execSQL(trigger(table, columns, keys, op))
+                val name = "hub_git_dirty_${table}_$op"
+                val expected = trigger(table, columns, keys, op)
+                if (installed[name]?.let(::normalized) != normalized(expected)) {
+                    db.execSQL("DROP TRIGGER IF EXISTS `$name`")
+                    db.execSQL(expected)
+                }
             }
         }
         if (enqueueAll) enqueueAll(db)

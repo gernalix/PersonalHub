@@ -11,6 +11,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.security.MessageDigest
 
 @Database(entities = [
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount::class,
@@ -430,6 +431,19 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                             },
         ) + DeclarativeMigrations.load(context)
 
+        private fun schemaFingerprint(db: SupportSQLiteDatabase): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            db.query("SELECT type, name, sql FROM sqlite_master WHERE type IN ('table','index','trigger') ORDER BY type, name").use { cursor ->
+                while (cursor.moveToNext()) {
+                    for (index in 0..2) {
+                        digest.update((cursor.getString(index) ?: "").toByteArray(Charsets.UTF_8))
+                        digest.update(0)
+                    }
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+
         private fun build(context: Context, name: String): PersonalHubDatabase {
             DatabaseGate.configureAutoExport(context)
             return Room.databaseBuilder(context, PersonalHubDatabase::class.java, name)
@@ -438,9 +452,6 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
-                        db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
-                        val tables = SyncJournal.tables(db)
-                        SyncJournal.install(db)
                         val appVersion = runCatching {
                             androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
                                 context.packageManager.getPackageInfo(context.packageName, 0),
@@ -449,6 +460,20 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                         val gitHistoryEnabled = runCatching {
                             GitDataSettings.configuration(context).enabled
                         }.getOrDefault(false)
+                        val manifestPrefs = context.getSharedPreferences("hub_open_manifest", Context.MODE_PRIVATE)
+                        fun manifest() = "v1:$appVersion:$gitHistoryEnabled:${schemaFingerprint(db)}"
+                        if (gitHistoryEnabled && manifestPrefs.getString(name, null) == manifest()) {
+                            GitDataTracking.resumeInstalled(db)
+                            return
+                        }
+                        db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
+                        LEGACY_TIMER_SYNC_TABLES.forEach { table ->
+                            listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
+                                db.execSQL("DROP TRIGGER IF EXISTS `hub_dirty_${table}_$op`")
+                            }
+                        }
+                        val tables = SyncJournal.tables(db)
+                        SyncJournal.install(db)
                         if (gitHistoryEnabled) {
                             HubActivityCapture.uninstall(db)
                             GitHistoryStore.install(db)
@@ -460,11 +485,21 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                             GitDataTracking.uninstall(db)
                             HubActivityCapture.install(db, appVersion)
                         }
+                        val installedDirty = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'hub_dirty_%'").use { cursor ->
+                            buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
+                        }
+                        fun normalized(sql: String) = sql.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
                         tables.forEach { table ->
                             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                                db.execSQL("CREATE TRIGGER IF NOT EXISTS `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END")
+                                val name = "hub_dirty_${table}_$op"
+                                val expected = "CREATE TRIGGER `$name` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
+                                if (installedDirty[name]?.let(::normalized) != expected) {
+                                    db.execSQL("DROP TRIGGER IF EXISTS `$name`")
+                                    db.execSQL(expected)
+                                }
                             }
                         }
+                        if (gitHistoryEnabled) manifestPrefs.edit().putString(name, manifest()).apply()
                     }
                 }).build()
         }

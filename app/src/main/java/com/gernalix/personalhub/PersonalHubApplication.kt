@@ -88,6 +88,7 @@ private object PostFirstFrameStartup {
             override fun onActivityResumed(activity: Activity) {
                 if (!started.compareAndSet(false, true)) return
                 app.unregisterActivityLifecycleCallbacks(this)
+                val timerOpening = activity is com.example.multitimetracker.MainActivity
                 // A Choreographer callback runs at the start of a frame. Waiting for a second
                 // callback guarantees that the first resumed Activity has had one frame to draw
                 // before maintenance work starts. The worker itself runs at Android background
@@ -95,6 +96,7 @@ private object PostFirstFrameStartup {
                 Choreographer.getInstance().postFrameCallback {
                     Choreographer.getInstance().postFrameCallback {
                         executor.execute {
+                            if (timerOpening && !TimerStartupApi.awaitFirstUsableScreen()) return@execute
                             runStep("profile runtime restore", "PH.bg.profileRuntime") {
                                 runBlocking { ProfileRuntimeCoordinator.restoreActiveProfile(app) }
                             }

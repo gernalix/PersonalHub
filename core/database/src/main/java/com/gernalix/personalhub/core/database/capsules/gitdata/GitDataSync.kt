@@ -19,6 +19,13 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
+/**
+ * Versioned Git history/backup around the authoritative local personalhub.db.
+ *
+ * Background sync exports local state and reads only verified control metadata. It never silently
+ * hydrates the live database from Git. Whole-database inbound replacement is restricted to the
+ * explicit restoreRevision() path; declarative patches also require an explicit apply action.
+ */
 object GitDataSync {
     internal const val WORK = "personalhub-git-data-sync"
     internal const val RECOVERY_WORK = "personalhub-git-data-recovery"

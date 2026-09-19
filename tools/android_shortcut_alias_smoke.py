@@ -58,12 +58,15 @@ def discover_aliases(repo_root: Path) -> list[tuple[str, str]]:
     return aliases
 
 
-def launched_activity(output: str) -> str | None:
+def launched_activity(output: str, package: str) -> str | None:
     for line in output.splitlines():
         line = line.strip()
         if line.startswith("Activity: "):
             component = line.removeprefix("Activity: ").strip()
-            return component.split("/", 1)[1] if "/" in component else component
+            if "/" in component:
+                component_package, activity = component.split("/", 1)
+                return qualify(activity, component_package)
+            return qualify(component, package)
     return None
 
 
@@ -107,7 +110,7 @@ def main() -> int:
         )
         if proc.returncode or "Error:" in proc.stdout or "Activity class" in proc.stdout:
             raise SmokeError(f"launch failed for {alias}:\n{proc.stdout.strip()}")
-        actual = launched_activity(proc.stdout)
+        actual = launched_activity(proc.stdout, args.package)
         if actual != expected_target:
             raise SmokeError(
                 f"alias target mismatch for {alias}: expected {expected_target}, got {actual or 'unknown'}\n"

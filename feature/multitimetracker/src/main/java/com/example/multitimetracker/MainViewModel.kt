@@ -812,9 +812,12 @@ private var initialized = false
      * Must be called once at app start (MainActivity does this).
      * Restores persisted snapshot and AUTO-RESUMES any running tasks after process death.
      */
-    fun initialize(context: Context) {
+    fun initialize(context: Context, fastHomeAlreadyApplied: Boolean = false) {
         appContext = context.applicationContext
-        recoveryCoordinator.initialize(context)
+        recoveryCoordinator.initialize(
+            context = context,
+            fastHomeAlreadyApplied = fastHomeAlreadyApplied,
+        )
         notifyCapsuleRuntimeChanged(context, CapsuleRuntimeChange.SNAPSHOT_RELOAD)
     }
 

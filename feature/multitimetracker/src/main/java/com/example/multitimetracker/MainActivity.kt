@@ -123,11 +123,16 @@ private fun MultiTimeTrackerApp(
         val app = context.applicationContext
         withContext(Dispatchers.IO) {
             SnapshotSqlite.ensureStartupSessionSchema(app)
-            vm.loadStartupHomeFromSessionTables(app)
-            vm.initialize(app)
+            val fastHomeApplied = vm.loadStartupHomeFromSessionTables(app)
+            vm.initialize(app, fastHomeAlreadyApplied = fastHomeApplied)
             SnapshotSqlite.ensureStartupQuickEventSchema(app)
         }
         StartupPerfTrace.firstFrame()
+        android.view.Choreographer.getInstance().postFrameCallback {
+            android.view.Choreographer.getInstance().postFrameCallback {
+                com.example.multitimetracker.api.TimerStartupApi.signalFirstUsableScreen()
+            }
+        }
         if (Build.VERSION.SDK_INT >= 33 && !notificationPermissionGranted.value) {
             showNotificationPermissionRationale.value = true
         }

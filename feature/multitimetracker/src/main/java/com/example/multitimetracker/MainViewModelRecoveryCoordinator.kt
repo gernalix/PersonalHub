@@ -23,13 +23,20 @@ internal class MainViewModelRecoveryCoordinator(
     private val applyBackgroundUsageDelta: (Long) -> Unit,
 ) {
 
-    fun initialize(context: Context) {
+    fun initialize(context: Context, fastHomeAlreadyApplied: Boolean = false) {
         if (isInitialized()) return
         snapshotCoordinator.markPersistenceLoading()
 
         StartupPerfTrace.mark("initialize_start")
-        val fastHomeApplied = StartupPerfTrace.section("startup_home_fast_path") {
-            snapshotCoordinator.loadStartupHomeFromSessionTables(context)
+        // MainActivity may already have applied this exact fast path before calling initialize().
+        // Never repeat the same database read on the startup critical path.
+        val fastHomeApplied = if (fastHomeAlreadyApplied) {
+            StartupPerfTrace.mark("startup_home_fast_path_reused")
+            true
+        } else {
+            StartupPerfTrace.section("startup_home_fast_path") {
+                snapshotCoordinator.loadStartupHomeFromSessionTables(context)
+            }
         }
         if (!fastHomeApplied) setHomeLoadState(HomeLoadState.Loading)
         val gate = StartupPerfTrace.section("integrity_gate") {

@@ -4,7 +4,12 @@ import android.content.Context
 import androidx.work.*
 import java.util.concurrent.TimeUnit
 
-/** Durable generation tracking, coalesced WorkManager jobs, and process/reboot recovery. */
+/**
+ * Durable SAF backup/export only.
+ *
+ * personalhub.db remains authoritative. This component never imports from the selected SAF folder;
+ * inbound replacement is possible only through the explicit validated database-import flow.
+ */
 object HubAutoExport {
     private var started = false
     internal const val AUTO_EXPORT_WORK = "personalhub-autoexport"

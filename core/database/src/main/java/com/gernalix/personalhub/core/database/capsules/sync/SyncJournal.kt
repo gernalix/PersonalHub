@@ -62,12 +62,20 @@ object SyncJournal {
     }
 
     fun install(db: SupportSQLiteDatabase) {
+        val installed = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger'").use { cursor ->
+            buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
+        }
+        fun normalized(sql: String) = sql.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
         tables(db).forEach { table ->
             val keys = primaryKeys(db, table)
             check(keys.isNotEmpty()) { "Sync requires a primary key" }
             listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                db.execSQL("DROP TRIGGER IF EXISTS `hub_sync_${table}_$op`")
-                db.execSQL(trigger(table, keys, op))
+                val name = "hub_sync_${table}_$op"
+                val expected = trigger(table, keys, op)
+                if (installed[name]?.let(::normalized) != normalized(expected)) {
+                    db.execSQL("DROP TRIGGER IF EXISTS `$name`")
+                    db.execSQL(expected)
+                }
             }
         }
     }

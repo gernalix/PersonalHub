@@ -3,6 +3,7 @@ package com.gernalix.personalhub.core.database.capsules.sync
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,4 +119,64 @@ class SyncJournalTest {
             }
         } finally { owner.close(); context.deleteDatabase("sync-trigger-replace-test.db") }
     }
+    @Test fun datasetteAndGitTrackingCoexistAndGitRemovalKeepsDatasetteJournal() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val owner = PersonalHubDatabase.openTemporary(context, "sync-git-coexist-test.db")
+        try {
+            val db = owner.openHelper.writableDatabase
+            db.execSQL("PRAGMA foreign_keys=OFF")
+            SyncJournal.install(db)
+            GitDataTracking.install(db, enqueueAll = false)
+
+            fun triggerExists(name: String): Boolean =
+                db.query(
+                    "SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=? LIMIT 1",
+                    arrayOf(name),
+                ).use { it.moveToFirst() }
+
+            assertTrue(triggerExists("hub_sync_place_events_INSERT"))
+            assertTrue(triggerExists("hub_git_dirty_place_events_INSERT"))
+
+            db.execSQL(
+                "INSERT INTO place_events(id,event_uuid,session_uuid,place_id,event_type,timestamp,lat,lon,accuracy_m,source,notes) " +
+                    "VALUES (1,'event-coexist','event-coexist','place-1','CHECK_IN',1000,NULL,NULL,NULL,'test',NULL)",
+            )
+            db.query("SELECT count(*) FROM hub_sync_pending WHERE table_name='place_events'").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(1, it.getInt(0))
+            }
+            db.query("SELECT count(*) FROM hub_git_pending WHERE table_name='place_events'").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(1, it.getInt(0))
+            }
+
+            GitDataTracking.uninstall(db)
+            assertFalse(triggerExists("hub_git_dirty_place_events_INSERT"))
+            assertTrue(triggerExists("hub_sync_place_events_INSERT"))
+        } finally {
+            owner.close()
+            context.deleteDatabase("sync-git-coexist-test.db")
+        }
+    }
+
+    @Test fun reopeningWithMatchingJournalsDoesNotRebuildTriggers() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val owner = PersonalHubDatabase.openTemporary(context, "sync-git-idempotent-test.db")
+        try {
+            val db = owner.openHelper.writableDatabase
+            GitDataTracking.install(db, enqueueAll = false)
+            val before = db.query("PRAGMA schema_version").use { it.moveToFirst(); it.getInt(0) }
+            SyncJournal.install(db)
+            GitDataTracking.install(db, enqueueAll = false)
+            val after = db.query("PRAGMA schema_version").use { it.moveToFirst(); it.getInt(0) }
+            assertEquals(before, after)
+            assertTrue(db.query("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='hub_sync_places_INSERT'").use { it.moveToFirst() })
+            assertTrue(db.query("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='hub_git_dirty_places_INSERT'").use { it.moveToFirst() })
+        } finally {
+            owner.close()
+            context.deleteDatabase("sync-git-idempotent-test.db")
+        }
+    }
+
+
 }
