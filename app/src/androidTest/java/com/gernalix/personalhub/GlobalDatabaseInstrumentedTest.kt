@@ -34,6 +34,16 @@ class GlobalDatabaseInstrumentedTest {
         override fun create(name: String): DatabaseVault.ExportFile = MemoryExportFile(name, this).also { files[name] = it }
         override fun open(identity: String): DatabaseVault.ExportFile? = files[identity]
         override fun find(name: String): DatabaseVault.ExportFile? = files[name]
+        override fun list(): List<DatabaseVault.ExportFile> = files.values.toList()
+        override fun rename(source: DatabaseVault.ExportFile, newName: String): DatabaseVault.ExportFile {
+            val current = source as MemoryExportFile
+            val bytes = current.bytes
+            files.remove(requireNotNull(current.name))
+            return MemoryExportFile(newName, this).also {
+                it.bytes = bytes
+                files[newName] = it
+            }
+        }
         override fun writeFrom(source: File, target: DatabaseVault.ExportFile) {
             (target as MemoryExportFile).bytes = source.readBytes()
         }
@@ -88,12 +98,14 @@ class GlobalDatabaseInstrumentedTest {
             assertTrue(DatabaseVault.exportNow(context))
             assertEquals(roomGeneration, DatabaseVault.exportedGeneration(context))
             assertTrue(publisher.files.getValue(PersonalHubDatabase.DB_NAME).bytes.isNotEmpty())
+            assertEquals(setOf(PersonalHubDatabase.DB_NAME), publisher.files.keys)
 
             val beforeTimerExportRequests = scheduler.export.get()
             DatabasePreferences(context, "qa_timer_export_trigger").edit().putInt("value", 1).commit()
             assertTrue(scheduler.export.get() > beforeTimerExportRequests)
             assertTrue(DatabaseVault.exportNow(context))
             assertEquals(generation(), DatabaseVault.exportedGeneration(context))
+            assertEquals(setOf(PersonalHubDatabase.DB_NAME), publisher.files.keys)
         } finally {
             if (contactId != 0L) db.execSQL("DELETE FROM contacts WHERE id=?", arrayOf(contactId))
             db.execSQL("DELETE FROM hub_preferences WHERE namespace='qa_timer_export_trigger'")
@@ -106,6 +118,55 @@ class GlobalDatabaseInstrumentedTest {
             HubAutoExport.resetSchedulerForTests()
         }
     }
+    @Test fun autoExportRetiresLegacyBackupAndKeepsOnlyCanonicalFile() {
+        requireEmulatorOnly()
+        val publisher = MemoryExportPublisher()
+        DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
+        val prefs = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
+        val previousFolder = DatabaseVault.folder(context)
+        val previousBackupIdentity = prefs.getString("backup_document_uri", null)
+        try {
+            prefs.edit()
+                .putString("tree_uri", "content://personalhub.test/export")
+                .putString("backup_document_uri", "personalhub.db.bak")
+                .commit()
+            publisher.create("personalhub.db.bak")
+            assertTrue(DatabaseVault.exportNow(context))
+            assertEquals(setOf(PersonalHubDatabase.DB_NAME), publisher.files.keys)
+            assertNull(prefs.getString("backup_document_uri", null))
+        } finally {
+            prefs.edit().apply {
+                if (previousFolder == null) remove("tree_uri") else putString("tree_uri", previousFolder)
+                if (previousBackupIdentity == null) remove("backup_document_uri")
+                else putString("backup_document_uri", previousBackupIdentity)
+            }.commit()
+            DatabaseVault.setExportPublisherFactoryForTests(null)
+        }
+    }
+
+    @Test fun backupCurrentUsesOneTransientFileAndCleansLegacyCopies() {
+        requireEmulatorOnly()
+        val databaseDir = context.getDatabasePath(PersonalHubDatabase.DB_NAME).parentFile!!
+        val legacyA = File(databaseDir, "personalhub-backup-legacy-a.db").apply { writeText("legacy") }
+        val legacyB = File(databaseDir, "personalhub-backup-legacy-b.db").apply { writeText("legacy") }
+        val first = DatabaseVault.backupCurrent(context)
+        val second = DatabaseVault.backupCurrent(context)
+        try {
+            assertEquals(first.canonicalPath, second.canonicalPath)
+            assertEquals(context.cacheDir.canonicalPath, second.parentFile!!.canonicalPath)
+            assertTrue(second.isFile)
+            assertFalse(legacyA.exists())
+            assertFalse(legacyB.exists())
+            assertTrue(
+                databaseDir.listFiles().orEmpty().none {
+                    it.name.startsWith("personalhub-backup-") && it.name.endsWith(".db")
+                },
+            )
+        } finally {
+            second.delete()
+        }
+    }
+
     @Test fun cleanIdleStartupHasRecoveryButNoDirtyPollingThread() {
         val scheduler = CountingExportScheduler()
         HubAutoExport.setSchedulerForTests(scheduler)
