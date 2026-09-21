@@ -46,11 +46,12 @@ internal fun TransactionEditorV2(
     val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            val mimeType = context.contentResolver.getType(uri)
             pendingAttachments = pendingAttachments + AttachmentDraft(
-                kind = "URI",
+                kind = if (mimeType?.startsWith("image/", ignoreCase = true) == true) "PHOTO_URI" else "URI",
                 uri = uri.toString(),
                 title = uri.lastPathSegment.orEmpty(),
-                mimeType = context.contentResolver.getType(uri),
+                mimeType = mimeType,
             )
         }
     }
@@ -172,7 +173,7 @@ internal fun TransactionEditorV2(
                     {
                         val link = linkText.trim()
                         if (link.isNotEmpty()) {
-                            pendingAttachments = pendingAttachments + AttachmentDraft("URL", link, link)
+                            pendingAttachments = pendingAttachments + AttachmentDraft("PHOTO_URL", link, link)
                             linkText = ""
                         }
                     },
@@ -220,7 +221,13 @@ internal fun TransferEditorV2(
     val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            pendingAttachments = pendingAttachments + AttachmentDraft("URI", uri.toString(), uri.lastPathSegment.orEmpty(), context.contentResolver.getType(uri))
+            val mimeType = context.contentResolver.getType(uri)
+            pendingAttachments = pendingAttachments + AttachmentDraft(
+                if (mimeType?.startsWith("image/", ignoreCase = true) == true) "PHOTO_URI" else "URI",
+                uri.toString(),
+                uri.lastPathSegment.orEmpty(),
+                mimeType,
+            )
         }
     }
 
@@ -375,7 +382,7 @@ internal fun TransferEditorV2(
                     { documentLauncher.launch(arrayOf("image/*", "application/pdf")) },
                     {
                         val link = linkText.trim()
-                        if (link.isNotEmpty()) { pendingAttachments = pendingAttachments + AttachmentDraft("URL", link, link); linkText = "" }
+                        if (link.isNotEmpty()) { pendingAttachments = pendingAttachments + AttachmentDraft("PHOTO_URL", link, link); linkText = "" }
                     },
                     onDeleteAttachment,
                     { index -> pendingAttachments = pendingAttachments.toMutableList().also { it.removeAt(index) } },
@@ -490,22 +497,43 @@ private fun AttachmentEditor(
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Allegati", fontWeight = FontWeight.SemiBold)
-            Text("SQLite conserva solo URI/link e metadati, non i file binari. Così database e autoexport restano compatti; lo scontrino OCR continua a essere un flusso separato.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Foto e allegati", fontWeight = FontWeight.SemiBold)
+            Text(
+                "La foto originale resta fuori da SQLite (SAF o URL remoto). Soldi salva solo il riferimento; le anteprime sono quadrate, ridimensionate e messe in cache localmente senza ritagliare l'originale.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             TextButton(onClick = onPickFile) { Text("Aggiungi foto o PDF") }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(linkText, onLinkText, label = { Text("Link Imgur / Telegram / web") }, modifier = Modifier.weight(1f), singleLine = true)
+                OutlinedTextField(linkText, onLinkText, label = { Text("URL foto remota") }, modifier = Modifier.weight(1f), singleLine = true)
                 TextButton(onClick = onAddLink) { Text("+") }
             }
-            existing.forEach { attachment -> AttachmentRow(attachment.title.ifBlank { attachment.uri }, attachment.uri) { onDeleteExisting(attachment) } }
-            pending.forEachIndexed { index, attachment -> AttachmentRow(attachment.title.ifBlank { attachment.uri }, attachment.uri) { onDeletePending(index) } }
+            existing.forEach { attachment ->
+                AttachmentRow(
+                    title = attachment.title.ifBlank { attachment.uri },
+                    uri = attachment.uri,
+                    isPhoto = attachment.isDisplayPhoto(),
+                ) { onDeleteExisting(attachment) }
+            }
+            pending.forEachIndexed { index, attachment ->
+                AttachmentRow(
+                    title = attachment.title.ifBlank { attachment.uri },
+                    uri = attachment.uri,
+                    isPhoto = attachment.kind.startsWith("PHOTO_") ||
+                        attachment.mimeType?.startsWith("image/", ignoreCase = true) == true,
+                ) { onDeletePending(index) }
+            }
         }
     }
 }
 
 @Composable
-private fun AttachmentRow(title: String, uri: String, onDelete: () -> Unit) {
+private fun AttachmentRow(title: String, uri: String, isPhoto: Boolean, onDelete: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (isPhoto) {
+            FinancePhotoThumbnail(uri = uri, title = title, size = 46.dp)
+            Spacer(Modifier.width(10.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(uri, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
