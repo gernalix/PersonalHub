@@ -61,6 +61,7 @@ internal fun TransactionsScreenV2(
     transfers: List<FinanceTransfer>,
     macros: List<FinanceMacro>,
     tagsByTransaction: Map<Long, List<String>>,
+    photoByTransaction: Map<Long, FinanceAttachment>,
     options: ViewOptions,
     onEdit: (TransactionView) -> Unit,
     onEditTransfer: (FinanceTransfer, TransactionView, TransactionView) -> Unit,
@@ -102,6 +103,7 @@ internal fun TransactionsScreenV2(
                             allRows = rows,
                             accountMap = accountMap,
                             tagsByTransaction = tagsByTransaction,
+                            photoByTransaction = photoByTransaction,
                             showBalance = options.dailyBalance,
                             expanded = expanded,
                             onEdit = onEdit,
@@ -119,6 +121,7 @@ internal fun TransactionsScreenV2(
                             entry = entry,
                             accountMap = accountMap,
                             tagsByTransaction = tagsByTransaction,
+                            photoByTransaction = photoByTransaction,
                             expanded = expanded,
                             onEdit = onEdit,
                             onEditTransfer = onEditTransfer,
@@ -207,6 +210,7 @@ private fun DayGroupCardV2(
     allRows: List<TransactionView>,
     accountMap: Map<String, FinanceAccount>,
     tagsByTransaction: Map<Long, List<String>>,
+    photoByTransaction: Map<Long, FinanceAttachment>,
     showBalance: Boolean,
     expanded: MutableMap<String, Boolean>,
     onEdit: (TransactionView) -> Unit,
@@ -252,7 +256,7 @@ private fun DayGroupCardV2(
             }
             HorizontalDivider()
             entries.forEach { entry ->
-                LedgerEntryContent(entry, accountMap, tagsByTransaction, expanded, onEdit, onEditTransfer)
+                LedgerEntryContent(entry, accountMap, tagsByTransaction, photoByTransaction, expanded, onEdit, onEditTransfer)
             }
         }
     }
@@ -263,6 +267,7 @@ private fun LedgerEntryContent(
     entry: LedgerEntry,
     accountMap: Map<String, FinanceAccount>,
     tagsByTransaction: Map<Long, List<String>>,
+    photoByTransaction: Map<Long, FinanceAttachment>,
     expanded: MutableMap<String, Boolean>,
     onEdit: (TransactionView) -> Unit,
     onEditTransfer: (FinanceTransfer, TransactionView, TransactionView) -> Unit,
@@ -283,6 +288,7 @@ private fun LedgerEntryContent(
                 amount = money(BigDecimal(row.value.amount), row.value.currency),
                 amountValue = BigDecimal(row.value.amount),
                 leading = if (BigDecimal(row.value.amount).signum() < 0) "−" else "+",
+                photo = photoByTransaction[row.value.id],
                 onClick = { onEdit(row) },
             )
         }
@@ -324,7 +330,11 @@ private fun LedgerEntryContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("└", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(4.dp))
+                        photoByTransaction[child.value.id]?.let { photo ->
+                            FinancePhotoThumbnail(photo, size = 36.dp)
+                            Spacer(Modifier.width(8.dp))
+                        }
                         Column(Modifier.weight(1f)) {
                             Text(child.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val detail = listOfNotNull(
@@ -349,14 +359,19 @@ private fun TransactionLineV2(
     amountValue: BigDecimal,
     leading: String,
     neutralAmount: Boolean = false,
+    photo: FinanceAttachment? = null,
     onClick: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(34.dp)) {
-            Box(contentAlignment = Alignment.Center) { Text(leading, fontWeight = FontWeight.Bold) }
+        if (photo != null) {
+            FinancePhotoThumbnail(photo, size = 48.dp)
+        } else {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(34.dp)) {
+                Box(contentAlignment = Alignment.Center) { Text(leading, fontWeight = FontWeight.Bold) }
+            }
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
