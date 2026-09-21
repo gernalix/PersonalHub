@@ -25,6 +25,8 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:hub-context"))
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
