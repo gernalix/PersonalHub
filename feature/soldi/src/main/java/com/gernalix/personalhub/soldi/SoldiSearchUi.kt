@@ -265,6 +265,7 @@ private fun SoldiPhotoOnlyGrid(
     onBack: () -> Unit,
     onOpenTransaction: (TransactionView) -> Unit,
 ) {
+    val backColor = MaterialTheme.colorScheme.onSurface
     Column(Modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -277,14 +278,14 @@ private fun SoldiPhotoOnlyGrid(
             Canvas(Modifier.width(20.dp).height(20.dp)) {
                 val stroke = 2.dp.toPx()
                 drawLine(
-                    color = androidx.compose.ui.graphics.Color.Unspecified,
+                    color = backColor,
                     start = androidx.compose.ui.geometry.Offset(size.width * 0.72f, size.height * 0.12f),
                     end = androidx.compose.ui.geometry.Offset(size.width * 0.28f, size.height * 0.5f),
                     strokeWidth = stroke,
                     cap = StrokeCap.Round,
                 )
                 drawLine(
-                    color = androidx.compose.ui.graphics.Color.Unspecified,
+                    color = backColor,
                     start = androidx.compose.ui.geometry.Offset(size.width * 0.28f, size.height * 0.5f),
                     end = androidx.compose.ui.geometry.Offset(size.width * 0.72f, size.height * 0.88f),
                     strokeWidth = stroke,
