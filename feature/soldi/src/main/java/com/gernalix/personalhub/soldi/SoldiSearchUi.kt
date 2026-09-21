@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAttachment
@@ -244,7 +246,7 @@ private fun SoldiSearchResultRow(
                 )
             }
             Text(
-                searchableDate(row.value.occurredAt),
+                formatDateTime(row.value.occurredAt),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -264,11 +266,31 @@ private fun SoldiPhotoOnlyGrid(
     onOpenTransaction: (TransactionView) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            Modifier
+                .padding(4.dp)
+                .width(48.dp)
+                .height(48.dp)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
         ) {
-            TextButton(onClick = onBack) { Text("‹") }
+            Canvas(Modifier.width(20.dp).height(20.dp)) {
+                val stroke = 2.dp.toPx()
+                drawLine(
+                    color = androidx.compose.ui.graphics.Color.Unspecified,
+                    start = androidx.compose.ui.geometry.Offset(size.width * 0.72f, size.height * 0.12f),
+                    end = androidx.compose.ui.geometry.Offset(size.width * 0.28f, size.height * 0.5f),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+                drawLine(
+                    color = androidx.compose.ui.graphics.Color.Unspecified,
+                    start = androidx.compose.ui.geometry.Offset(size.width * 0.28f, size.height * 0.5f),
+                    end = androidx.compose.ui.geometry.Offset(size.width * 0.72f, size.height * 0.88f),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+            }
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 96.dp),
