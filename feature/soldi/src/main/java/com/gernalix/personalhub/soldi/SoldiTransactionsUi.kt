@@ -54,8 +54,6 @@ private data class MacroEntry(
 internal fun TransactionsScreenV2(
     month: YearMonth,
     onMonth: (YearMonth) -> Unit,
-    search: String,
-    onSearch: (String) -> Unit,
     accounts: List<FinanceAccount>,
     rows: List<TransactionView>,
     transfers: List<FinanceTransfer>,
@@ -69,21 +67,14 @@ internal fun TransactionsScreenV2(
     onNewIncome: () -> Unit,
     onNewTransfer: () -> Unit,
 ) {
-    val logicalEntries = remember(month, search, rows, transfers, macros, tagsByTransaction, options.hideFuture) {
-        buildLedgerEntries(month, search, rows, transfers, macros, tagsByTransaction, options.hideFuture)
+    val logicalEntries = remember(month, rows, transfers, macros, options.hideFuture) {
+        buildLedgerEntries(month, rows, transfers, macros, options.hideFuture)
     }
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
     val accountMap = remember(accounts) { accounts.associateBy { it.id } }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         MonthHeader(month, onMonth)
-        OutlinedTextField(
-            value = search,
-            onValueChange = onSearch,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Cerca") },
-        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             AssistChip(onClick = onNewExpense, label = { Text("Spesa") })
             AssistChip(onClick = onNewIncome, label = { Text("Entrata") })
@@ -136,11 +127,9 @@ internal fun TransactionsScreenV2(
 
 private fun buildLedgerEntries(
     month: YearMonth,
-    search: String,
     rows: List<TransactionView>,
     transfers: List<FinanceTransfer>,
     macros: List<FinanceMacro>,
-    tagsByTransaction: Map<Long, List<String>>,
     hideFuture: Boolean,
 ): List<LedgerEntry> {
     val now = Instant.now()
@@ -156,17 +145,6 @@ private fun buildLedgerEntries(
         }
     }
     val macroMap = macros.associateBy { it.id }
-    val query = search.trim()
-
-    fun matches(row: TransactionView): Boolean = query.isBlank() || listOf(
-        row.title,
-        row.chain,
-        row.place,
-        row.person,
-        row.value.notes,
-        row.value.category,
-        tagsByTransaction[row.value.id]?.joinToString(" "),
-    ).any { it?.contains(query, ignoreCase = true) == true }
 
     val result = mutableListOf<LedgerEntry>()
     val handledTransfers = mutableSetOf<String>()
@@ -177,8 +155,7 @@ private fun buildLedgerEntries(
             if (macroId !in handledMacros) {
                 val allChildren = monthRows.filter { it.value.macroId == macroId }
                 val macro = macroMap[macroId]
-                val include = query.isBlank() || macro?.title?.contains(query, true) == true || allChildren.any(::matches)
-                if (macro != null && include) result += MacroEntry(macro, allChildren)
+                if (macro != null) result += MacroEntry(macro, allChildren)
                 handledMacros += macroId
             }
             return@forEach
@@ -190,15 +167,14 @@ private fun buildLedgerEntries(
                 val source = rowMap[transfer.sourceTransactionId]
                 val target = rowMap[transfer.targetTransactionId]
                 if (source != null && target != null) {
-                    val include = query.isBlank() || matches(source) || matches(target) || "trasferimento cambio valuta".contains(query, true)
-                    if (include && YearMonth.from(localDate(source.value.occurredAt)) == month) result += TransferEntry(transfer, source, target)
+                    if (YearMonth.from(localDate(source.value.occurredAt)) == month) result += TransferEntry(transfer, source, target)
                 }
                 handledTransfers += transfer.id
             }
             return@forEach
         }
 
-        if (matches(row)) result += RowEntry(row)
+        result += RowEntry(row)
     }
     return result.sortedWith(compareByDescending<LedgerEntry> { it.date }.thenByDescending { it.key })
 }
