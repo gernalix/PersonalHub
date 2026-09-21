@@ -9,6 +9,7 @@ archCore = "2.2.0"
 composeBom = "2026.06.01"
 coreKtx = "1.17.0"
 coroutines = "1.10.2"
+coil = "3.6.3"
 documentfile = "1.1.0"
 healthConnect = "1.1.0"
 espresso = "3.7.0"
@@ -60,6 +61,8 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 androidx-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "work" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version.ref = "startup" }
 errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version.ref = "errorProneAnnotations" }
 google-places = { module = "com.google.android.libraries.places:places", version.ref = "places" }
