@@ -150,6 +150,7 @@ interface FinanceDao {
     @Query("SELECT * FROM finance_recurrence_overrides WHERE recurrenceId=:recurrenceId ORDER BY occurrenceDate") suspend fun recurrenceOverrides(recurrenceId: String): List<FinanceRecurrenceOverride>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(value: FinanceRecurrenceOverride)
 
+    @Query("SELECT * FROM finance_attachments ORDER BY transactionId,createdAt,id") fun allAttachments(): Flow<List<FinanceAttachment>>
     @Query("SELECT * FROM finance_attachments WHERE transactionId=:transactionId ORDER BY createdAt,id") fun attachments(transactionId: Long): Flow<List<FinanceAttachment>>
     @Query("SELECT * FROM finance_attachments WHERE transactionId=:transactionId ORDER BY createdAt,id") suspend fun attachmentsOnce(transactionId: Long): List<FinanceAttachment>
     @Insert suspend fun add(value: FinanceAttachment)
