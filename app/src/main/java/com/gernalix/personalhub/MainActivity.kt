@@ -51,24 +51,37 @@ import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
 import com.gernalix.personalhub.core.hubcontext.HubContextComposerScreen
 
 class MainActivity : ComponentActivity() {
+    private var launcherGeneration by mutableStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PersonalHubTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    PersonalHubApp()
+                    PersonalHubApp(launcherGeneration = launcherGeneration)
                 }
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.isPersonalHubLauncherIntent()) {
+            launcherGeneration += 1
+        }
+    }
 }
 
+internal fun Intent.isPersonalHubLauncherIntent(): Boolean =
+    action == Intent.ACTION_MAIN && hasCategory(Intent.CATEGORY_LAUNCHER)
+
 @Composable
-fun PersonalHubApp() {
+fun PersonalHubApp(launcherGeneration: Int = 0) {
     val context = LocalContext.current
-    var showSettings by rememberSaveable { mutableStateOf(false) }
-    var topDestination by rememberSaveable { mutableStateOf<String?>(null) }
+    var showSettings by rememberSaveable(launcherGeneration) { mutableStateOf(false) }
+    var topDestination by rememberSaveable(launcherGeneration) { mutableStateOf<String?>(null) }
     BackHandler(enabled = topDestination != null) { topDestination = null }
     if (topDestination == "composer") {
         HubContextComposerScreen(onBack = { topDestination = null })
