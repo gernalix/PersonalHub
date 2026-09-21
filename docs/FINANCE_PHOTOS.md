@@ -12,6 +12,10 @@ Soldi uses Coil for image loading. Ledger rows request only the displayed previe
 
 Transaction rows render the first photo attachment as a square preview. `ContentScale.Crop` is presentation-only: it center-crops inside the square while leaving the original image untouched. Manual preprocessing in Google Photos is not required. Non-photo transactions retain the existing symbolic leading icon.
 
+Soldi Home exposes a 🔍 global search surface. Its filter is live, is not restricted to the currently selected month, and searches every persisted transaction field plus the resolved product/title, merchant, place, person, account, tags and attachment metadata. Search results open the canonical transaction editor.
+
+Inside Search, 📷 opens a photos-only gallery. The gallery contains only square image previews, with no transaction captions or metadata mixed into the grid. Every stored photo is represented independently; tapping any preview opens the transaction that owns that attachment. The gallery reuses the same cached/downsampled image loader as the ledger rather than decoding full-resolution originals while scrolling.
+
 Legacy local attachments whose MIME type is `image/*` remain recognized as photos. New image picks are tagged `PHOTO_URI`; explicitly supplied remote photo URLs are tagged `PHOTO_URL`.
 
 ## Visual retrieval contract
