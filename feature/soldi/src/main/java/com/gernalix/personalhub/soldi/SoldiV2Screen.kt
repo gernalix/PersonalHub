@@ -49,7 +49,6 @@ internal fun SoldiV2Screen(
     var tab by rememberSaveable { mutableStateOf(SoldiTab.TRANSACTIONS) }
     var bottom by rememberSaveable { mutableStateOf(BottomDestination.HOME) }
     var month by rememberSaveable { mutableStateOf(YearMonth.now()) }
-    var search by rememberSaveable { mutableStateOf("") }
     var viewOptions by remember { mutableStateOf(prefs.load()) }
     var showViewOptions by remember { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
@@ -399,8 +398,6 @@ internal fun SoldiV2Screen(
                     SoldiTab.TRANSACTIONS -> TransactionsScreenV2(
                         month,
                         { month = it },
-                        search,
-                        { search = it },
                         accounts,
                         transactions,
                         transfers,
