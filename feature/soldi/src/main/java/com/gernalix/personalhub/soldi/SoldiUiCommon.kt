@@ -31,6 +31,7 @@ internal fun SoldiTopBar(
     tab: SoldiTab,
     onTab: (SoldiTab) -> Unit,
     onClose: () -> Unit,
+    onSearch: () -> Unit,
     onViewOptions: () -> Unit,
     onMore: () -> Unit,
 ) {
@@ -41,6 +42,7 @@ internal fun SoldiTopBar(
         ) {
             TextButton(onClick = onClose) { Text("‹", fontSize = 24.sp) }
             Text("Soldi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            TextButton(onClick = onSearch) { Text("🔍") }
             TextButton(onClick = onViewOptions) { Text("◉") }
             TextButton(onClick = onMore) { Text("⋮", fontSize = 20.sp) }
         }
