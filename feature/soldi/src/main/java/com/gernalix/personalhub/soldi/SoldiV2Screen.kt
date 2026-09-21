@@ -32,6 +32,7 @@ internal fun SoldiV2Screen(
 ) {
     val accounts by capsule.accounts.collectAsState(emptyList())
     val transactions by capsule.transactions.collectAsState(emptyList())
+    val allAttachments by capsule.allAttachments.collectAsState(emptyList())
     val transfers by capsule.transfers.collectAsState(emptyList())
     val macros by capsule.macros.collectAsState(emptyList())
     val recurrences by capsule.recurrences.collectAsState(emptyList())
@@ -60,6 +61,15 @@ internal fun SoldiV2Screen(
     var tagsByTransaction by remember { mutableStateOf<Map<Long, List<String>>>(emptyMap()) }
     var projected by remember { mutableStateOf<List<ProjectedOccurrence>>(emptyList()) }
     var handledUuid by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val photoByTransaction = remember(allAttachments) {
+        allAttachments
+            .groupBy { it.transactionId }
+            .mapNotNull { (transactionId, attachments) ->
+                preferredTransactionPhoto(attachments)?.let { transactionId to it }
+            }
+            .toMap()
+    }
 
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     fun requestNotifications() {
@@ -353,6 +363,7 @@ internal fun SoldiV2Screen(
                         transfers,
                         macros,
                         tagsByTransaction,
+                        photoByTransaction,
                         viewOptions,
                         { row -> editor = SoldiEditor.Transaction(row.toDraft(tagsByTransaction[row.value.id].orEmpty()), if (BigDecimal(row.value.amount).signum() < 0) EntryKind.EXPENSE else EntryKind.INCOME) },
                         { transfer, source, target -> editor = SoldiEditor.Transfer(transferState(transfer, source, target, tagsByTransaction[source.value.id].orEmpty())) },
