@@ -28,6 +28,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
     val transfers = dao.transfers()
     val macros = dao.macros()
     val recurrences = dao.recurrences()
+    val allAttachments = dao.allAttachments()
 
     suspend fun tags(id: Long) = dao.tags(id)
     suspend fun recurrenceTags(id: String) = dao.recurrenceTags(id)
