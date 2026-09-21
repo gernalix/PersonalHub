@@ -232,7 +232,7 @@ private fun SoldiSearchResultRow(
                 row.place?.takeIf(String::isNotBlank),
                 account?.name?.takeIf(String::isNotBlank),
                 row.value.category.takeIf(String::isNotBlank),
-                tags.takeIf(List<String>::isNotEmpty)?.joinToString(" · "),
+                tags.takeIf { it.isNotEmpty() }?.joinToString(" · "),
             ).joinToString(" · ")
             if (metadata.isNotBlank()) {
                 Text(
