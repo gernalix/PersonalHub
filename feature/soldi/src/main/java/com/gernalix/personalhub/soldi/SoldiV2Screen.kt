@@ -53,6 +53,9 @@ internal fun SoldiV2Screen(
     var viewOptions by remember { mutableStateOf(prefs.load()) }
     var showViewOptions by remember { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var globalSearchQuery by rememberSaveable { mutableStateOf("") }
+    var globalSearchMode by rememberSaveable { mutableStateOf(SoldiSearchMode.SEARCH) }
     var editor by remember { mutableStateOf<SoldiEditor?>(null) }
     var recurrenceEditor by remember { mutableStateOf<RecurrenceDraft?>(null) }
     var accountEditor by remember { mutableStateOf<FinanceAccount?>(null) }
@@ -122,16 +125,23 @@ internal fun SoldiV2Screen(
     }
 
     val rowMap = remember(transactions) { transactions.associateBy { it.value.id } }
-    LaunchedEffect(hubTransactionUuid, transactions, transfers, tagsByTransaction) {
-        val uuid = hubTransactionUuid ?: return@LaunchedEffect
-        if (handledUuid == uuid) return@LaunchedEffect
-        val row = transactions.firstOrNull { it.value.uuid == uuid } ?: return@LaunchedEffect
-        val transfer = transfers.firstOrNull { it.sourceTransactionId == row.value.id || it.targetTransactionId == row.value.id }
+
+    fun openTransaction(row: TransactionView) {
+        val transfer = transfers.firstOrNull {
+            it.sourceTransactionId == row.value.id || it.targetTransactionId == row.value.id
+        }
         if (transfer != null) {
             val source = rowMap[transfer.sourceTransactionId]
             val target = rowMap[transfer.targetTransactionId]
             if (source != null && target != null) {
-                editor = SoldiEditor.Transfer(transferState(transfer, source, target, tagsByTransaction[source.value.id].orEmpty()))
+                editor = SoldiEditor.Transfer(
+                    transferState(
+                        transfer,
+                        source,
+                        target,
+                        tagsByTransaction[source.value.id].orEmpty(),
+                    ),
+                )
             }
         } else {
             editor = SoldiEditor.Transaction(
@@ -139,6 +149,13 @@ internal fun SoldiV2Screen(
                 if (BigDecimal(row.value.amount).signum() < 0) EntryKind.EXPENSE else EntryKind.INCOME,
             )
         }
+    }
+
+    LaunchedEffect(hubTransactionUuid, transactions, transfers, tagsByTransaction) {
+        val uuid = hubTransactionUuid ?: return@LaunchedEffect
+        if (handledUuid == uuid) return@LaunchedEffect
+        val row = transactions.firstOrNull { it.value.uuid == uuid } ?: return@LaunchedEffect
+        openTransaction(row)
         handledUuid = uuid
     }
 
@@ -152,12 +169,16 @@ internal fun SoldiV2Screen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            if (editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null) {
+            if (editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null && !searchOpen) {
                 if (bottom == BottomDestination.HOME) {
                     SoldiTopBar(
                         tab = tab,
                         onTab = { tab = it },
                         onClose = finish,
+                        onSearch = {
+                            globalSearchMode = SoldiSearchMode.SEARCH
+                            searchOpen = true
+                        },
                         onViewOptions = { showViewOptions = true },
                         onMore = { showMore = true },
                     )
@@ -176,14 +197,14 @@ internal fun SoldiV2Screen(
             }
         },
         bottomBar = {
-            if (editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null) {
+            if (editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null && !searchOpen) {
                 SoldiBottomBar(bottom) { destination ->
                     if (destination == BottomDestination.MORE) showMore = true else bottom = destination
                 }
             }
         },
         floatingActionButton = {
-            if (!busy && editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null) {
+            if (!busy && editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null && !searchOpen) {
                 when (bottom) {
                     BottomDestination.HOME -> if (tab == SoldiTab.TRANSACTIONS) FloatingActionButton(onClick = { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.EXPENSE) }) { Text("+") }
                     BottomDestination.ACCOUNTS -> FloatingActionButton(onClick = { accountEditor = FinanceAccount(name = "", currency = accounts.firstOrNull()?.currency ?: "DKK", openedAt = System.currentTimeMillis()) }) { Text("+") }
@@ -268,6 +289,28 @@ internal fun SoldiV2Screen(
                                 editor = null
                             }
                         },
+                    )
+                }
+
+                searchOpen -> {
+                    SoldiSearchScreen(
+                        mode = globalSearchMode,
+                        query = globalSearchQuery,
+                        onQueryChange = { globalSearchQuery = it },
+                        rows = transactions,
+                        accounts = accounts,
+                        tagsByTransaction = tagsByTransaction,
+                        attachments = allAttachments,
+                        onBack = {
+                            if (globalSearchMode == SoldiSearchMode.PHOTOS) {
+                                globalSearchMode = SoldiSearchMode.SEARCH
+                            } else {
+                                searchOpen = false
+                            }
+                        },
+                        onPhotos = { globalSearchMode = SoldiSearchMode.PHOTOS },
+                        onSearchMode = { globalSearchMode = SoldiSearchMode.SEARCH },
+                        onOpenTransaction = ::openTransaction,
                     )
                 }
 
@@ -365,7 +408,7 @@ internal fun SoldiV2Screen(
                         tagsByTransaction,
                         photoByTransaction,
                         viewOptions,
-                        { row -> editor = SoldiEditor.Transaction(row.toDraft(tagsByTransaction[row.value.id].orEmpty()), if (BigDecimal(row.value.amount).signum() < 0) EntryKind.EXPENSE else EntryKind.INCOME) },
+                        ::openTransaction,
                         { transfer, source, target -> editor = SoldiEditor.Transfer(transferState(transfer, source, target, tagsByTransaction[source.value.id].orEmpty())) },
                         { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.EXPENSE) },
                         { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.INCOME) },
