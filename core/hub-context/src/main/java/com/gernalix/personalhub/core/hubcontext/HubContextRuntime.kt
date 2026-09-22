@@ -48,6 +48,11 @@ object HubContextRuntime {
 
     fun temporalProviders(): List<HubTemporalProvider> = adapters().filterIsInstance<HubTemporalProvider>()
 
+    private fun searchEngine() = HubSearchEngine { requireRegistry().all() }
+
+    suspend fun search(query: HubSearchQuery): HubSearchPage =
+        searchEngine().search(query)
+
     suspend fun summaries(refs: Collection<HubEntityRef>): Map<HubEntityRef, HubEntitySummary> {
         val distinctRefs = refs.distinct()
         if (distinctRefs.isEmpty()) return emptyMap()
