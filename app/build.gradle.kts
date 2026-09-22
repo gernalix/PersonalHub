@@ -186,6 +186,7 @@ dependencies {
     implementation(project(":contracts:database"))
     implementation(project(":core:database"))
     implementation(project(":core:hub-context"))
+    implementation(project(":core:ui"))
     implementation(project(":feature:luoghi"))
     implementation(project(":feature:multitimetracker"))
     implementation(project(":feature:sostanze"))
