@@ -176,6 +176,20 @@ for owner, files in source_files.items():
                     )
 
 
+# Feature code must not hand-build PersonalHub routing URIs. Keeping the scheme/authority
+# contract centralized prevents one module from silently drifting to a different link shape.
+for owner, files in source_files.items():
+    if not owner.startswith("feature:"):
+        continue
+    for kotlin in files:
+        text = kotlin.read_text()
+        if "personalhub://module/" in text or '.scheme("personalhub")' in text or ".scheme(HubDeepLinkContract.SCHEME)" in text:
+            errors.append(
+                f"{kotlin.relative_to(ROOT)} constructs PersonalHub routing URI manually; "
+                "use HubDeepLinkContract.moduleUri/featureUri"
+            )
+
+
 # String-based component routing must not smuggle implementation class names around import checks.
 # Public Android entrypoints are stable host aliases owned by feature manifests.
 for kotlin in source_files.get("app", []):
