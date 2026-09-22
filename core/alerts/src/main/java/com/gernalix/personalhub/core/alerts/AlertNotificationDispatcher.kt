@@ -1,13 +1,9 @@
-@file:android.annotation.SuppressLint("MissingPermission")
-
 package com.gernalix.personalhub.core.alerts
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 
 object AlertNotificationDispatcher {
@@ -35,8 +31,7 @@ object AlertNotificationDispatcher {
         title: String,
         message: String,
     ): Boolean {
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
-        ensureChannel(context, manager)
+        ensureChannel(context)
         val contentIntent = contentPendingIntent(
             context = context,
             notificationId = notificationId,
@@ -56,10 +51,7 @@ object AlertNotificationDispatcher {
             .setContentIntent(contentIntent)
             .build()
 
-        return runCatching {
-            manager.notify(notificationId, notification)
-            true
-        }.getOrDefault(false)
+        return HubNotificationPlatform.post(context, notificationId, notification)
     }
 
     /**
@@ -78,9 +70,12 @@ object AlertNotificationDispatcher {
             ?: fallbackIntent
             ?: launchAppIntent(context)
 
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        return PendingIntent.getActivity(context, notificationId, chosen, flags)
+        return PendingIntent.getActivity(
+            context,
+            notificationId,
+            chosen,
+            HubNotificationPlatform.pendingIntentFlags(),
+        )
     }
 
     fun directLinkIntentOrNull(context: Context, message: String): Intent? {
@@ -109,20 +104,18 @@ object AlertNotificationDispatcher {
 
     private const val WORKFLOWY_PACKAGE = "com.workflowy.android"
 
-    private fun ensureChannel(context: Context, manager: NotificationManager) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || manager.getNotificationChannel(CHANNEL_ID) != null) return
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                "PersonalHub alerts",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Timer and Places alerts"
-                enableVibration(true)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                setShowBadge(true)
-            }
-        )
+    private fun ensureChannel(context: Context) {
+        HubNotificationPlatform.ensureChannel(
+            context = context,
+            id = CHANNEL_ID,
+            name = "PersonalHub alerts",
+            importance = NotificationManager.IMPORTANCE_HIGH,
+            description = "Timer and Places alerts",
+        ) {
+            enableVibration(true)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            setShowBadge(true)
+        }
     }
 }
 
