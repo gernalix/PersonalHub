@@ -105,6 +105,35 @@ class HubActivityRegisterTest {
     }
 
     @Test
+    fun tagMaintenanceCreatesReversibleAuditRows() = runBlocking {
+        withDatabase { database ->
+            val db = database.openHelper.writableDatabase
+            val tagId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            db.execSQL(
+                "INSERT INTO hub_tags(id,namespace,kind,name,normalized_name,description,icon,color,created_at,updated_at,archived,pinned,is_global,last_used_at,usage_count,metadata_json) " +
+                    "VALUES(?, 'people', 'FREE', 'Family', 'family', NULL, NULL, NULL, ?, ?, 0, 0, 0, NULL, 0, NULL)",
+                arrayOf(tagId, now, now),
+            )
+            db.execSQL("UPDATE hub_tags SET name='Relatives', normalized_name='relatives', updated_at=? WHERE id=?", arrayOf(now + 1, tagId))
+
+            val update = database.activityDao().page("tags", 1, null, null, 20)
+                .first { it.action == "tag_updated" && it.entityId == tagId }
+            assertTrue(update.reversible)
+            assertEquals("Relatives", update.entityLabel)
+            assertTrue(HubActivityUndoEngine.undo(database, update.id) is HubActivityUndoResult.Success)
+            assertEquals("Family", scalarText(db, "SELECT name FROM hub_tags WHERE id=?", arrayOf(tagId)))
+
+            db.execSQL("DELETE FROM hub_tags WHERE id=?", arrayOf(tagId))
+            val actions = database.activityDao().page("tags", 1, null, null, 20)
+                .filter { it.entityId == tagId }
+                .map { it.action }
+            assertTrue("tag_created" in actions)
+            assertTrue("tag_deleted" in actions)
+        }
+    }
+
+    @Test
     fun peopleAuditBecomesReadableActivityAndCreateUndoSoftDeletesContact() = runBlocking {
         withDatabase { database ->
             val db = database.openHelper.writableDatabase

@@ -136,6 +136,11 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item { HomeUtilityButton(R.string.home_context, R.string.home_context_help) { topDestination = "composer" } }
+                item {
+                    OutlinedButton(onClick = { context.startActivity(Intent(context, HubTagsActivity::class.java)) }) {
+                        Text("Tags")
+                    }
+                }
                 item { HomeUtilityButton(R.string.home_search, R.string.home_search_help) { topDestination = "search" } }
                 item { HomeUtilityButton(R.string.home_activity_register, R.string.home_activity_help) { topDestination = "activity" } }
                 item {

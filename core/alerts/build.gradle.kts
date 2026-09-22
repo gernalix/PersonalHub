@@ -15,6 +15,7 @@ android {
 dependencies {
     implementation(project(":contracts:database"))
     implementation(project(":core:database"))
+    implementation(project(":core:hub-context"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)

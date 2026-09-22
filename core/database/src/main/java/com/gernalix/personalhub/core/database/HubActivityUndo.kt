@@ -39,7 +39,7 @@ sealed interface HubActivityUndoResult {
  * fail closed.
  */
 object HubActivityUndoEngine {
-    private val reversibleRowTables = setOf("places", "finance_accounts", "health_import_batches", "health_events", "health_samples", "health_examinations", "health_measurements", "health_journal_entries", "health_ai_snapshots")
+    private val reversibleRowTables = setOf("places", "finance_accounts", "hub_tags", "health_import_batches", "health_events", "health_samples", "health_examinations", "health_measurements", "health_journal_entries", "health_ai_snapshots")
 
     suspend fun undo(database: PersonalHubDatabase, activityId: String): HubActivityUndoResult =
         database.withTransaction {

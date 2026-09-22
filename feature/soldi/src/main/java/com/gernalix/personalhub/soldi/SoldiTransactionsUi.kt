@@ -252,7 +252,7 @@ private fun LedgerEntryContent(
         is RowEntry -> {
             val row = entry.row
             val details = listOfNotNull(
-                row.value.category.takeIf(String::isNotBlank),
+                row.category.takeIf(String::isNotBlank),
                 row.chain,
                 row.place,
                 row.person,
@@ -314,7 +314,7 @@ private fun LedgerEntryContent(
                         Column(Modifier.weight(1f)) {
                             Text(child.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val detail = listOfNotNull(
-                                child.value.category.takeIf(String::isNotBlank),
+                                child.category.takeIf(String::isNotBlank),
                                 tagsByTransaction[child.value.id]?.takeIf { it.isNotEmpty() }?.joinToString(" · "),
                             ).joinToString(" · ")
                             if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

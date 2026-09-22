@@ -1,6 +1,7 @@
 package com.example.multitimetracker.capsules.system
 
 import com.example.multitimetracker.capsules.sincewhen.state.SinceWhenHostState
+import com.example.multitimetracker.model.LifePeriod
 
 /**
  * SINCE_WHEN capsule access contract.
@@ -12,4 +13,5 @@ interface SinceWhenCapsuleAccess {
     fun touchNow()
     fun persist()
     fun scheduleAutoBackup()
+    fun syncSharedTagAssignments(periods: List<LifePeriod>)
 }

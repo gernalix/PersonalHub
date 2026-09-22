@@ -2,6 +2,8 @@ package com.gernalix.personalhub.core.alerts
 
 import android.content.Context
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 
 /**
  * Battery-friendly Places alert engine.
@@ -29,11 +31,11 @@ class PlaceAlertEngine(
         if (rules.isEmpty()) return 0
 
         val place = database.placeDao().getPlace(placeUuid) ?: return 0
-        val actualTags = database.placeDao().tagsForPlace(placeUuid)
-        val actualTagIds = actualTags.mapTo(linkedSetOf()) { it.id.toString() }
+        val actualTags = SharedTagEngine(database).tags(HubEntityRef("places", "place", placeUuid))
+        val actualTagIds = actualTags.mapTo(linkedSetOf()) { it.id }
         val tagTargets = alertDao.placeTagTargets(rules.map { it.id })
             .groupBy { it.ruleId }
-            .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.placeTagId.toString() } }
+            .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.placeTagId } }
         val event = AlertEventSpec(
             domain = AlertDomain.PLACE,
             trigger = eventTrigger,

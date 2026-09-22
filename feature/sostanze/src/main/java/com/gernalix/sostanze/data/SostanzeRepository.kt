@@ -1,6 +1,9 @@
 package com.gernalix.sostanze.data
 
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 
 import androidx.room.withTransaction
 import com.gernalix.sostanze.domain.InteractionEnforcementMode
@@ -28,6 +31,9 @@ data class SostanzeSnapshot(
 
 class SostanzeRepository(private val db: PersonalHubDatabase) {
     private val dao = db.dao()
+    private val sharedTags = SharedTagEngine(db)
+    val tags = sharedTags.observe(HubTagNamespaces.SUBSTANCES)
+    val tagAssignments = sharedTags.observeAssignments(HubTagNamespaces.SUBSTANCES)
 
     val homeSnapshot: Flow<SostanzeSnapshot> = combine(
         dao.observeSubstances(),
@@ -78,6 +84,16 @@ class SostanzeRepository(private val db: PersonalHubDatabase) {
     suspend fun initialize() = Unit
 
     suspend fun substanceById(substanceId: Long): SubstanceEntity? = dao.substanceById(substanceId)
+
+    suspend fun tagsForSubstance(substanceId: Long) =
+        sharedTags.tags(HubEntityRef("substances", "substance", substanceId.toString()))
+
+    suspend fun setSubstanceTags(substanceId: Long, names: Collection<String>) =
+        sharedTags.replaceByNames(
+            HubEntityRef("substances", "substance", substanceId.toString()),
+            HubTagNamespaces.SUBSTANCES,
+            names,
+        )
 
     suspend fun saveSubstance(substance: SubstanceEntity): SubstanceSaveOutcome = db.withTransaction {
         val canonical = canonicalName(substance.name)

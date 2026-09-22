@@ -179,7 +179,7 @@ interface ContactInitiativeOwner {
 interface ContactSuggestionOwner {
     val state: StateFlow<ContactSuggestionState>
     fun addTagToContact(contactId: Long, tagName: String)
-    fun removeTagFromContact(contactId: Long, tagId: Long)
+    fun removeTagFromContact(contactId: Long, tagId: String)
     fun searchTagSuggestions(prefix: String)
     fun clearTagSuggestions()
     fun searchAddressSuggestions(query: String)
@@ -203,4 +203,3 @@ interface ContactDuplicateOwner {
     )
     fun clearDuplicateCandidates()
 }
-

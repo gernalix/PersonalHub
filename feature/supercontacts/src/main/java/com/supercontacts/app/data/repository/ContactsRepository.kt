@@ -9,15 +9,16 @@ import com.supercontacts.app.data.local.ContactHomeMetricRow
 import com.supercontacts.app.data.local.ContactInitiativeEntity
 import com.supercontacts.app.data.local.ContactInitiativeWithContactName
 import com.supercontacts.app.data.local.ContactMessagingLinkEntity
-import com.supercontacts.app.data.local.ContactTagCrossRef
 import com.supercontacts.app.data.local.ContactWithFieldsAndTags
 import com.supercontacts.app.data.local.ContactsDao
 import com.supercontacts.app.data.local.HistoryCalendarDayRow
 import com.supercontacts.app.data.local.InitiativeCalendarDayRow
-import com.supercontacts.app.data.local.SavedSearchEntity
-import com.supercontacts.app.data.local.SavedSearchTagCrossRef
-import com.supercontacts.app.data.local.SavedSearchWithTags
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.HubSavedTagFilter
+import com.gernalix.personalhub.contracts.database.HubTagEntity
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 import com.supercontacts.app.data.local.TagEntity
 import java.time.Instant
 import java.time.LocalDate
@@ -28,19 +29,22 @@ import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ContactsRepository(
     private val database: PersonalHubDatabase,
 ) {
     private val dao: ContactsDao = database.contactsDao()
+    private val sharedTags = SharedTagEngine(database)
 
     fun listContacts(sort: ContactHomeSortState = ContactHomeSortState()): Flow<List<ContactSummary>> =
-        contactsWithHomeMetrics(dao.listContacts(), sort)
+        withSharedTags(contactsWithHomeMetrics(dao.listContacts(), sort))
 
     fun searchContacts(query: String, sort: ContactHomeSortState = ContactHomeSortState()): Flow<List<ContactSummary>> {
         val trimmedQuery = query.trim()
         val normalizedQuery = PhoneNormalizer.normalize(trimmedQuery)
-        return contactsWithHomeMetrics(
+        return withSharedTags(contactsWithHomeMetrics(
             contacts = dao.searchContacts(
                 query = trimmedQuery,
                 normalizedQuery = normalizedQuery,
@@ -48,12 +52,12 @@ class ContactsRepository(
             sort = sort,
             searchQuery = trimmedQuery,
             normalizedSearchQuery = normalizedQuery,
-        )
+        ))
     }
 
     fun filterContacts(
         query: String,
-        tagIds: List<Long>,
+        tagIds: List<String>,
         sort: ContactHomeSortState = ContactHomeSortState(),
     ): Flow<List<ContactSummary>> {
         val distinctTagIds = tagIds.distinct()
@@ -62,24 +66,30 @@ class ContactsRepository(
         }
         val trimmedQuery = query.trim()
         val normalizedQuery = PhoneNormalizer.normalize(trimmedQuery)
-        return contactsWithHomeMetrics(
-            contacts = dao.searchContactsByTags(
+        return withSharedTags(contactsWithHomeMetrics(
+            contacts = dao.searchContacts(
                 query = trimmedQuery,
                 normalizedQuery = normalizedQuery,
-                tagIds = distinctTagIds,
-                tagCount = distinctTagIds.size,
             ),
             sort = sort,
             searchQuery = trimmedQuery,
             normalizedSearchQuery = normalizedQuery,
-        )
+        )).map { contacts -> contacts.filter { contact -> contact.tags.mapTo(mutableSetOf()) { it.id }.containsAll(distinctTagIds) } }
     }
 
-    fun getContactsByTag(tagId: Long, sort: ContactHomeSortState = ContactHomeSortState()): Flow<List<ContactSummary>> =
-        contactsWithHomeMetrics(dao.getContactsByTag(tagId), sort)
+    fun getContactsByTag(tagId: String, sort: ContactHomeSortState = ContactHomeSortState()): Flow<List<ContactSummary>> =
+        filterContacts("", listOf(tagId), sort)
 
     fun getContactById(contactId: Long): Flow<ContactDetail?> =
-        dao.observeContactById(contactId).map { it?.toDetail() }
+        combine(
+            dao.observeContactById(contactId).map { it?.toDetail() },
+            sharedTags.observe(HubTagNamespaces.PEOPLE),
+            sharedTags.observeAssignments(HubTagNamespaces.PEOPLE),
+        ) { detail, tags, assignments ->
+            detail?.copy(tags = assignments.filter { it.moduleId == "people" && it.entityKind == "person" && it.canonicalId == detail.publicId }
+                .mapNotNull { assignment -> tags.firstOrNull { it.id == assignment.tagId }?.let { ContactTag(it.id, it.name) } }
+                .sortedBy { it.name.lowercase() })
+        }
 
     suspend fun findContactIdByPublicId(publicId: String): Long? =
         dao.getContactByPublicId(publicId.trim())?.contact?.id
@@ -234,107 +244,74 @@ class ContactsRepository(
     suspend fun addTagToContact(contactId: Long, tagName: String): ContactTag {
         val cleanedName = tagName.trim()
         require(cleanedName.isNotBlank()) { "Tag name is required." }
-        var changed = false
-        val result = database.withTransaction {
-            val now = System.currentTimeMillis()
-            val tag = getOrCreateTag(cleanedName, now)
-            if (addTagToContactInternal(contactId, tag, now)) {
-                changed = true
-            }
-            tag.toModel()
-        }
-        if (changed) {
-        }
-        return result
+        val contact = requireNotNull(dao.getContactEntity(contactId))
+        val tag = sharedTags.getOrCreate(HubTagNamespaces.PEOPLE, cleanedName)
+        sharedTags.assign(HubEntityRef("people", "person", requireNotNull(contact.publicId)), listOf(tag.id))
+        val now = System.currentTimeMillis()
+        touchContact(contactId, now)
+        appendEvent(contactId, EventEntityType.Tag, EventActionType.Added, fieldType = ContactFieldType.Tag, newValue = tag.name, occurredAt = now)
+        return ContactTag(tag.id, tag.name)
     }
 
     suspend fun addTagToContacts(contactIds: List<Long>, tagName: String): Int {
         val cleanedName = tagName.trim()
         require(cleanedName.isNotBlank()) { "Tag name is required." }
-        val distinctContactIds = contactIds.distinct()
         var changedCount = 0
-        database.withTransaction {
-            val now = System.currentTimeMillis()
-            val tag = getOrCreateTag(cleanedName, now)
-            distinctContactIds.forEach { contactId ->
-                if (addTagToContactInternal(contactId, tag, now)) {
-                    changedCount += 1
-                }
+        contactIds.distinct().forEach { contactId ->
+            if (dao.getContactEntity(contactId)?.deletedAt == null) {
+                addTagToContact(contactId, cleanedName)
+                changedCount += 1
             }
-        }
-        if (changedCount > 0) {
         }
         return changedCount
     }
 
-    suspend fun removeTagFromContact(contactId: Long, tagId: Long) {
-        var changed = false
-        database.withTransaction {
-            val tag = dao.getTagById(tagId) ?: return@withTransaction
-            val removedRows = dao.removeTagFromContact(contactId, tagId)
-            if (removedRows > 0) {
-                changed = true
-                touchContact(contactId, System.currentTimeMillis())
-                appendEvent(
-                    contactId = contactId,
-                    entityType = EventEntityType.Tag,
-                    actionType = EventActionType.Deleted,
-                    fieldType = ContactFieldType.Tag,
-                    oldValue = tag.name,
-                )
-            }
-        }
-        if (changed) {
-        }
+    suspend fun removeTagFromContact(contactId: Long, tagId: String) {
+        val contact = dao.getContactEntity(contactId) ?: return
+        val tag = database.hubTagDao().tag(tagId) ?: return
+        sharedTags.remove(HubEntityRef("people", "person", requireNotNull(contact.publicId)), listOf(tagId))
+        touchContact(contactId, System.currentTimeMillis())
+        appendEvent(contactId, EventEntityType.Tag, EventActionType.Deleted, fieldType = ContactFieldType.Tag, oldValue = tag.name)
     }
 
     suspend fun getTagsForContact(contactId: Long): List<ContactTag> =
-        dao.getTagsForContact(contactId).map { it.toModel() }
+        dao.getContactEntity(contactId)?.publicId?.let { publicId ->
+            sharedTags.tags(HubEntityRef("people", "person", publicId)).map { ContactTag(it.id, it.name) }
+        }.orEmpty()
 
     suspend fun searchTags(prefix: String, limit: Int = 8): List<ContactTag> {
-        val normalizedPrefix = normalizeTagName(prefix)
-        if (normalizedPrefix.isBlank()) return emptyList()
-        return dao.searchTags(normalizedPrefix, limit.coerceIn(1, 10)).map { it.toModel() }
+        if (prefix.isBlank()) return emptyList()
+        return sharedTags.search(HubTagNamespaces.PEOPLE, prefix, limit.coerceIn(1, 10)).map { ContactTag(it.id, it.name) }
     }
 
     fun observeHomeTags(): Flow<List<ContactTag>> =
-        dao.observeHomeTags().map { it.toModels() }
+        sharedTags.observe(HubTagNamespaces.PEOPLE).map { tags -> tags.filterNot { it.archived }.map { ContactTag(it.id, it.name) } }
 
-    fun observeSavedSearches(): Flow<List<SavedSearch>> =
-        dao.observeSavedSearches().map { searches -> searches.map { it.toModel() } }
+    fun observeSavedSearches(): Flow<List<SavedSearch>> = combine(
+        sharedTags.observeFilters(HubTagNamespaces.PEOPLE),
+        sharedTags.observe(HubTagNamespaces.PEOPLE),
+    ) { filters, tags -> filters.map { it.toSavedSearch(tags) } }
 
-    suspend fun saveSearch(title: String, query: String, tagIds: List<Long>): Long {
+    suspend fun saveSearch(title: String, query: String, tagIds: List<String>): String {
         val cleanedTitle = title.trim()
         require(cleanedTitle.isNotBlank()) { "Saved search title is required." }
-        val distinctTagIds = tagIds.distinct()
         val now = System.currentTimeMillis()
-        val savedSearchId = database.withTransaction {
-            val id = dao.insertSavedSearch(
-                SavedSearchEntity(
-                    publicId = newSavedSearchPublicId(),
-                    title = cleanedTitle,
-                    query = query.trim(),
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-            distinctTagIds.forEach { tagId ->
-                dao.insertSavedSearchTag(SavedSearchTagCrossRef(savedSearchId = id, tagId = tagId))
-            }
-            id
-        }
-        return savedSearchId
+        val publicId = newSavedSearchPublicId()
+        val id = "people:$publicId"
+        val payload = JSONObject()
+            .put("text", query.trim())
+            .put("include", JSONArray(tagIds.distinct()))
+            .put("exclude", JSONArray())
+            .put("mode", "AND")
+            .put("no_tags", false)
+        sharedTags.saveFilter(HubSavedTagFilter(id, HubTagNamespaces.PEOPLE, cleanedTitle, payload.toString(), now, now))
+        return id
     }
 
     suspend fun findSavedSearchByPublicId(publicId: String): SavedSearch? =
-        dao.getSavedSearchByPublicId(publicId.trim())?.toModel()
+        database.hubTagDao().filter("people:${publicId.trim()}")?.toSavedSearch(database.hubTagDao().allTags())
 
-    suspend fun deleteSavedSearch(savedSearchId: Long): Boolean {
-        val deleted = dao.deleteSavedSearchById(savedSearchId) > 0
-        if (deleted) {
-        }
-        return deleted
-    }
+    suspend fun deleteSavedSearch(savedSearchId: String): Boolean = sharedTags.deleteFilter(savedSearchId)
 
     suspend fun searchFieldValueSuggestions(
         fieldType: String,
@@ -387,45 +364,6 @@ class ContactsRepository(
                 metadataJson = metadataJson,
             ),
         )
-
-    private suspend fun getOrCreateTag(cleanedName: String, now: Long): TagEntity {
-        val normalizedName = normalizeTagName(cleanedName)
-        return dao.getTagByNormalizedName(normalizedName)
-            ?: run {
-                dao.insertTag(
-                    TagEntity(
-                        name = cleanedName,
-                        normalizedName = normalizedName,
-                        createdAt = now,
-                    ),
-                )
-                dao.getTagByNormalizedName(normalizedName)
-                    ?: error("Tag could not be created.")
-            }
-    }
-
-    private suspend fun addTagToContactInternal(contactId: Long, tag: TagEntity, now: Long): Boolean {
-        val contact = dao.getContactEntity(contactId) ?: return false
-        if (contact.deletedAt != null) return false
-        val contactTagId = dao.insertContactTag(
-            ContactTagCrossRef(
-                contactId = contactId,
-                tagId = tag.id,
-                addedAt = now,
-            ),
-        )
-        if (contactTagId == -1L) return false
-        touchContact(contactId, now)
-        appendEvent(
-            contactId = contactId,
-            entityType = EventEntityType.Tag,
-            actionType = EventActionType.Added,
-            fieldType = ContactFieldType.Tag,
-            newValue = tag.name,
-            occurredAt = now,
-        )
-        return true
-    }
 
     suspend fun recordContactOpen(contactId: Long) {
         appendEvent(
@@ -770,6 +708,7 @@ class ContactsRepository(
         }
         if (changed) {
             deletedPublicId?.let {
+                sharedTags.clear(HubEntityRef("people", "person", it))
                 com.gernalix.personalhub.core.hubcontext.HubContextRuntime.canonicalDeletedIfInitialized(
                     com.gernalix.personalhub.contracts.database.HubEntityRef("people", "person", it),
                 )
@@ -782,14 +721,12 @@ class ContactsRepository(
         var changedCount = 0
         database.withTransaction {
             val now = System.currentTimeMillis()
-            val archiveTag = getOrCreateTag(ARCHIVE_TAG_NAME, now)
             distinctContactIds.forEach { contactId ->
                 val archivedRows = dao.archiveContact(
                     contactId = contactId,
                     updatedAt = now,
                     archivedAt = now,
                 )
-                addTagToContactInternal(contactId, archiveTag, now)
                 if (archivedRows > 0) {
                     changedCount += 1
                     appendEvent(
@@ -802,6 +739,7 @@ class ContactsRepository(
                 }
             }
         }
+        distinctContactIds.forEach { contactId -> if (dao.getContactEntity(contactId)?.archivedAt != null) addTagToContact(contactId, ARCHIVE_TAG_NAME) }
         if (changedCount > 0) {
         }
         return changedCount
@@ -1294,6 +1232,22 @@ class ContactsRepository(
         dao.updateContact(contact.copy(updatedAt = updatedAt))
     }
 
+    private fun withSharedTags(source: Flow<List<ContactSummary>>): Flow<List<ContactSummary>> = combine(
+        source,
+        sharedTags.observe(HubTagNamespaces.PEOPLE),
+        sharedTags.observeAssignments(HubTagNamespaces.PEOPLE),
+    ) { contacts, tags, assignments ->
+        val tagsById = tags.associateBy(HubTagEntity::id)
+        val byContact = assignments.asSequence()
+            .filter { it.moduleId == "people" && it.entityKind == "person" }
+            .groupBy { it.canonicalId }
+        contacts.map { contact ->
+            contact.copy(tags = byContact[contact.publicId].orEmpty().mapNotNull { assignment ->
+                tagsById[assignment.tagId]?.let { ContactTag(it.id, it.name) }
+            }.sortedBy { it.name.lowercase() })
+        }
+    }
+
     private fun contactsWithHomeMetrics(
         contacts: Flow<List<ContactWithFieldsAndTags>>,
         sort: ContactHomeSortState,
@@ -1493,25 +1447,26 @@ class ContactsRepository(
         )
     }
 
-    private fun List<TagEntity>.toModels(): List<ContactTag> =
-        sortedBy { it.normalizedName }.map { it.toModel() }
-
-    private fun TagEntity.toModel(): ContactTag =
-        ContactTag(
+    private fun HubSavedTagFilter.toSavedSearch(allTags: List<HubTagEntity>): SavedSearch {
+        val payload = JSONObject(queryJson)
+        val tagById = allTags.associateBy(HubTagEntity::id)
+        val include = payload.optJSONArray("include") ?: JSONArray()
+        val tags = buildList {
+            for (index in 0 until include.length()) tagById[include.optString(index)]?.let { add(ContactTag(it.id, it.name)) }
+        }
+        return SavedSearch(
             id = id,
-            name = name,
+            publicId = id.removePrefix("people:"),
+            title = name,
+            query = payload.optString("text"),
+            tags = tags,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
         )
+    }
 
-    private fun SavedSearchWithTags.toModel(): SavedSearch =
-        SavedSearch(
-            id = savedSearch.id,
-            publicId = savedSearch.publicId,
-            title = savedSearch.title,
-            query = savedSearch.query,
-            tags = tags.toModels(),
-            createdAt = savedSearch.createdAt,
-            updatedAt = savedSearch.updatedAt,
-        )
+    private fun List<TagEntity>.toModels(): List<ContactTag> =
+        sortedBy { it.normalizedName }.map { ContactTag("people:${it.id}", it.name) }
 
     private fun ContactFieldEntity.toDescriptor(): ContactFieldDescriptor =
         ContactFieldDescriptor(

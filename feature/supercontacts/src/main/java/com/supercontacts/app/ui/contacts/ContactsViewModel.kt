@@ -252,7 +252,7 @@ class ContactsViewModel(
 
     fun addTagToContact(contactId: Long, tagName: String) =
         suggestionOwner.addTagToContact(contactId, tagName)
-    fun removeTagFromContact(contactId: Long, tagId: Long) =
+    fun removeTagFromContact(contactId: Long, tagId: String) =
         suggestionOwner.removeTagFromContact(contactId, tagId)
     fun searchTagSuggestions(prefix: String) = suggestionOwner.searchTagSuggestions(prefix)
     fun clearTagSuggestions() = suggestionOwner.clearTagSuggestions()

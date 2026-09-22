@@ -46,7 +46,7 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(18, db.version)
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
             assertEquals(1767225600123L, scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='a'"))
             assertEquals(1767312123456L, scalar(db, "SELECT occurredAt FROM finance_transactions WHERE id=1"))
             assertEquals(1L, scalar(db, "SELECT count(*) FROM finance_transactions WHERE reminderAt IS NULL"))
@@ -98,7 +98,7 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(18, db.version)
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
             assertEquals(java.time.Instant.parse(original).toEpochMilli(),
                 scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='precision'"))
             val saved = JSONArray(scalarText(db, "SELECT json FROM hub_preferences " +
@@ -132,8 +132,8 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(18, db.version)
-            assertEquals(77L, scalar(db, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
+            assertEquals(78L, scalar(db, "SELECT generation FROM hub_generation WHERE id=1"))
             db.execSQL("INSERT INTO health_import_batches(id,received_at_ms,imported_at_ms,source_system,author) VALUES('batch',1000,2000,'MinSP','chatgpt')")
             db.execSQL("INSERT INTO health_events(id,import_batch_id,event_kind,occurred_at_ms,time_precision,title_it,source_system,created_at_ms,updated_at_ms) VALUES('event','batch','sample',1000,'datetime','Prelievo','MinSP',2000,2000)")
             db.execSQL("INSERT INTO health_samples(id,event_id,sample_kind) VALUES('sample','event','blood')")

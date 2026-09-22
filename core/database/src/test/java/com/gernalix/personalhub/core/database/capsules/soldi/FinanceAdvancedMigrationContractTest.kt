@@ -52,10 +52,10 @@ class FinanceAdvancedMigrationContractTest {
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM finance_transactions"))
             assertEquals("Coffee", scalarText(sqlite, "SELECT name FROM finance_titles WHERE id=1"))
             assertEquals("-3.50", scalarText(sqlite, "SELECT amount FROM finance_transactions WHERE id=1"))
-            assertEquals("", scalarText(sqlite, "SELECT category FROM finance_transactions WHERE id=1"))
-            assertFalse(columnNullable(sqlite, "finance_transactions", "category"))
+            assertFalse(columnExists(sqlite, "finance_transactions", "category"))
+            assertEquals(0L, scalarLong(sqlite, "SELECT count(*) FROM hub_tag_assignments a JOIN hub_tags t ON t.id=a.tag_id WHERE t.namespace='soldi.category'"))
             assertEquals(1L, scalarLong(sqlite, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='finance_transfers'"))
-            assertEquals(106L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(107L, scalarLong(sqlite, "SELECT generation FROM hub_generation WHERE id=1"))
         } finally {
             database.close()
             context.deleteDatabase(name)
@@ -76,8 +76,9 @@ class FinanceAdvancedMigrationContractTest {
 
     private fun scalarLong(db: androidx.sqlite.db.SupportSQLiteDatabase, sql: String) = db.query(sql).use { it.moveToFirst(); it.getLong(0) }
     private fun scalarText(db: androidx.sqlite.db.SupportSQLiteDatabase, sql: String) = db.query(sql).use { it.moveToFirst(); it.getString(0) }
-    private fun columnNullable(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String, column: String) = db.query("PRAGMA table_info(`$table`)").use { cursor ->
-        while (cursor.moveToNext()) if (cursor.getString(1) == column) return@use cursor.getInt(3) == 0
-        error("Missing column $table.$column")
-    }
+    private fun columnExists(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String, column: String) =
+        db.query("PRAGMA table_info(`$table`)").use { cursor ->
+            while (cursor.moveToNext()) if (cursor.getString(1) == column) return@use true
+            false
+        }
 }

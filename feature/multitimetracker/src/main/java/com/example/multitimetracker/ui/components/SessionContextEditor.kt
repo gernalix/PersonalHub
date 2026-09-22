@@ -9,10 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.multitimetracker.R
-import com.gernalix.personalhub.contracts.database.HubCreateRequest
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
-import kotlinx.coroutines.launch
+import com.gernalix.personalhub.core.hubcontext.HubFacetChips
+import com.gernalix.personalhub.core.hubcontext.HubFacetPickerDialog
 
 class SessionContextEditorState internal constructor(
     people: Set<String>,
@@ -27,6 +28,7 @@ class SessionContextEditorState internal constructor(
     var placeDraft by mutableStateOf(placeDraft)
     var peopleOptions by mutableStateOf<List<HubEntitySummary>>(emptyList())
     var placeOptions by mutableStateOf<List<HubEntitySummary>>(emptyList())
+    var selectedFacets by mutableStateOf<List<HubEntitySummary>>(emptyList())
 
     suspend fun initialize(sessionId: Long) {
         if (!selectionInitialized) {
@@ -35,38 +37,26 @@ class SessionContextEditorState internal constructor(
             placeId = selection.second
             selectionInitialized = true
         }
-        refreshOptions()
+        selectedFacets = HubContextRuntime.timerFacets(sessionId)
     }
 
-    suspend fun refreshOptions() {
-        peopleOptions = HubContextRuntime.adapter("people", "person").search("", 8)
-        placeOptions = HubContextRuntime.adapter("places", "place").search("", 8)
+    fun select(values: List<HubEntitySummary>) {
+        val onePlace = values.filter { it.ref.moduleId == "places" }.takeLast(1)
+        selectedFacets = (values.filterNot { it.ref.moduleId == "places" } + onePlace).distinctBy { it.ref }
+        peopleIds = selectedFacets.filter { it.ref.moduleId == "people" }.mapTo(linkedSetOf()) { it.ref.canonicalId }
+        placeId = selectedFacets.firstOrNull { it.ref.moduleId == "places" }?.ref?.canonicalId
     }
 
-    suspend fun createPerson() {
-        HubContextRuntime.adapter("people", "person").create(HubCreateRequest(personDraft))?.let {
-            peopleIds = peopleIds + it.ref.canonicalId
-            personDraft = ""
-            refreshOptions()
-        }
-    }
-
-    suspend fun createPlace() {
-        HubContextRuntime.adapter("places", "place").create(HubCreateRequest(placeDraft))?.let {
-            placeId = it.ref.canonicalId
-            placeDraft = ""
-            refreshOptions()
-        }
-    }
-
-    suspend fun save(sessionId: Long) = HubContextRuntime.saveTimerLinks(sessionId, peopleIds, placeId)
+    suspend fun save(sessionId: Long) = HubContextRuntime.saveTimerLinks(
+        sessionId, peopleIds, placeId, selectedFacets.map(HubEntitySummary::ref),
+    )
 
     companion object {
         val Saver = Saver<SessionContextEditorState, List<Any?>>(
             save = { listOf(it.peopleIds.toList(), it.placeId, it.personDraft, it.placeDraft) },
             restore = {
                 @Suppress("UNCHECKED_CAST")
-                SessionContextEditorState((it[0] as List<String>).toSet(), it[1] as String?, it[2] as String, it[3] as String, selectionInitialized = true)
+                SessionContextEditorState((it[0] as List<String>).toSet(), it[1] as String?, it[2] as String, it[3] as String, selectionInitialized = false)
             },
         )
     }
@@ -89,37 +79,22 @@ fun rememberSessionContextEditorState(sessionId: Long): SessionContextEditorStat
 
 @Composable
 fun SessionContextEditor(state: SessionContextEditorState, readOnly: Boolean) {
-    val scope = rememberCoroutineScope()
+    var pickerOpen by remember { mutableStateOf(false) }
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.hub_context_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(stringResource(R.string.hub_context_people), style = MaterialTheme.typography.labelMedium)
-            state.peopleOptions.forEach { option ->
-                FilterChip(
-                    selected = option.ref.canonicalId in state.peopleIds,
-                    onClick = { state.peopleIds = if (option.ref.canonicalId in state.peopleIds) state.peopleIds - option.ref.canonicalId else state.peopleIds + option.ref.canonicalId },
-                    label = { Text(option.label) },
-                    enabled = !readOnly,
-                )
+            HubFacetChips(state.selectedFacets, onClick = { if (!readOnly) pickerOpen = true })
+            OutlinedButton(onClick = { pickerOpen = true }, enabled = !readOnly) {
+                Text("People, places, substances…")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(state.personDraft, { state.personDraft = it }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_context_new_person_name)) }, singleLine = true, enabled = !readOnly)
-                Button(onClick = { scope.launch { state.createPerson() } }, enabled = !readOnly && state.personDraft.isNotBlank()) { Text(stringResource(R.string.hub_context_new_person)) }
-            }
-            Text(stringResource(R.string.hub_context_place), style = MaterialTheme.typography.labelMedium)
-            state.placeOptions.forEach { option ->
-                FilterChip(
-                    selected = option.ref.canonicalId == state.placeId,
-                    onClick = { state.placeId = if (state.placeId == option.ref.canonicalId) null else option.ref.canonicalId },
-                    label = { Text(option.label) },
-                    enabled = !readOnly,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(state.placeDraft, { state.placeDraft = it }, Modifier.weight(1f), label = { Text(stringResource(R.string.hub_context_new_place_name)) }, singleLine = true, enabled = !readOnly)
-                Button(onClick = { scope.launch { state.createPlace() } }, enabled = !readOnly && state.placeDraft.isNotBlank()) { Text(stringResource(R.string.hub_context_new_place)) }
-            }
-            Text(stringResource(R.string.hub_context_place_radius_hint), style = MaterialTheme.typography.bodySmall)
         }
     }
+    if (pickerOpen) HubFacetPickerDialog(
+        namespace = HubTagNamespaces.TIMER_NOW,
+        selected = state.selectedFacets,
+        onSelectedChange = state::select,
+        onDismiss = { pickerOpen = false },
+        allowedModules = setOf("people", "places", "substances"),
+        allowTags = false,
+    )
 }

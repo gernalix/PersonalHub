@@ -30,7 +30,7 @@ import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
 import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
 import com.gernalix.luoghi.data.PlaceEventEntity
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
-import com.gernalix.luoghi.data.PlaceTagEntity
+import com.gernalix.personalhub.contracts.database.HubTagEntity
 import com.gernalix.personalhub.alerts.AlertRuleEntity
 import com.gernalix.personalhub.core.alerts.PlaceAlertDraft
 import kotlinx.coroutines.CancellationException
@@ -169,9 +169,11 @@ data class HomeUiState(
     val geofenceConfigs: Map<String, PlaceGeofenceConfigEntity> = emptyMap(),
     val geofenceMessage: GeofenceMessage? = null,
     val placeDeleteMessage: PlaceDeleteMessage? = null,
-    val placeTags: List<PlaceTagEntity> = emptyList(),
+    val placeTags: List<HubTagEntity> = emptyList(),
+    val placeTagIds: Map<String, Set<String>> = emptyMap(),
+    val selectedPlaceTagIds: Set<String> = emptySet(),
     val placeAlertRules: List<AlertRuleEntity> = emptyList(),
-    val placeAlertTagTargets: Map<String, Set<Long>> = emptyMap(),
+    val placeAlertTagTargets: Map<String, Set<String>> = emptyMap(),
 )
 
 class LuoghiHomeViewModel(
@@ -197,18 +199,24 @@ class LuoghiHomeViewModel(
     }
 
     val state: StateFlow<HomeUiState> = combine(
-        container.places.places,
+        combine(container.places.places, container.places.tagAssignments, container.places.tags) { places, assignments, tags -> Triple(places, assignments, tags) },
         combine(container.checkIns.events, container.geofences.configs, container.checkIns.recentAttempts) { events, geofenceConfigs, attempts ->
             Triple(events, geofenceConfigs, attempts)
         },
         container.stats.globalStatsState,
         mutableState,
         HubContextRuntime.contextChanges(),
-    ) { places, eventAndGeofenceConfigs, globalStatsState, state, _ ->
+    ) { placeData, eventAndGeofenceConfigs, globalStatsState, state, _ ->
+        val (places, tagAssignments, tags) = placeData
         val (events, geofenceConfigs, attempts) = eventAndGeofenceConfigs
         val nowMs = maxOf(state.nowMs, System.currentTimeMillis())
         val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
         val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
+        val placeTagIds = tagAssignments.filter { it.moduleId == "places" && it.entityKind == "place" }
+            .groupBy({ it.canonicalId }, { it.tagId }).mapValues { it.value.toSet() }
+        val visiblePlaces = if (state.selectedPlaceTagIds.isEmpty()) places else places.filter { place ->
+            placeTagIds[place.uuid].orEmpty().containsAll(state.selectedPlaceTagIds)
+        }
         state.copy(
             dataLoaded = true,
             places = places,
@@ -219,12 +227,14 @@ class LuoghiHomeViewModel(
             stats = stats,
             routeDistances = state.routeDistances,
             placeItems = PlaceListUiMapper.map(
-                places = places,
+                places = visiblePlaces,
                 stats = stats.places,
                 visits = visits,
                 sort = state.placeSort,
                 currentLocation = state.currentListLocation,
             ),
+            placeTagIds = placeTagIds,
+            placeTags = tags,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -235,6 +245,12 @@ class LuoghiHomeViewModel(
     init {
         observeHistoryActions()
         viewModelScope.launch { container.checkIns.recoverInterruptedAttempts() }
+    }
+
+    fun togglePlaceTagFilter(tagId: String) {
+        mutableState.update { current ->
+            current.copy(selectedPlaceTagIds = if (tagId in current.selectedPlaceTagIds) current.selectedPlaceTagIds - tagId else current.selectedPlaceTagIds + tagId)
+        }
     }
 
     private fun observeHistoryActions() {

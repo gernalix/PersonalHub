@@ -46,8 +46,8 @@ internal fun AccountsScreenV2(
 
 @Composable
 internal fun CategoriesScreenV2(rows: List<TransactionView>) {
-    val categories = rows.filter { it.value.category.isNotBlank() }
-        .groupBy { it.value.category }
+    val categories = rows.filter { it.category.isNotBlank() }
+        .groupBy { it.category }
         .toSortedMap(String.CASE_INSENSITIVE_ORDER)
     var selected by remember { mutableStateOf<String?>(null) }
 

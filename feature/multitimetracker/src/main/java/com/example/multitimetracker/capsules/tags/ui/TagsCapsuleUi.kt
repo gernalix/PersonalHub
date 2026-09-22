@@ -5,6 +5,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,11 +35,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -113,6 +116,29 @@ fun TagsCapsuleUi(
     showSeconds: Boolean,
     hideHoursIfZero: Boolean
 ) {
+    var namespaceTab by rememberSaveable { mutableStateOf("now") }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        FilterChip(namespaceTab == "now", { namespaceTab = "now" }, label = { Text("Now") })
+        FilterChip(namespaceTab == "events", { namespaceTab = "events" }, label = { Text("Events") })
+        FilterChip(namespaceTab == "since", { namespaceTab = "since" }, label = { Text("Since when") })
+    }
+    if (namespaceTab != "now") {
+        val namespaceTags = if (namespaceTab == "events") state.eventTags else state.sinceWhenTags
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(namespaceTags.filterNot { it.isDeleted }, key = { it.id }) { tag ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(tag.name, style = MaterialTheme.typography.titleMedium)
+                        Text(if (tag.isArchived) "Archived" else if (namespaceTab == "events") "timer.events" else "timer.since_when")
+                    }
+                }
+            }
+        }
+        return
+    }
     val effectiveTime = remember(state.nowMs) { state.effectiveTimeContext() }
     val listState = rememberLazyListState()
 

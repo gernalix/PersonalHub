@@ -28,7 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gernalix.luoghi.R
-import com.gernalix.luoghi.data.PlaceTagEntity
+import com.gernalix.personalhub.contracts.database.HubTagEntity
 import com.gernalix.personalhub.alerts.AlertRuleEntity
 import com.gernalix.personalhub.core.alerts.AlertMatchMode
 import com.gernalix.personalhub.core.alerts.AlertScope
@@ -41,9 +41,9 @@ import com.gernalix.personalhub.core.alerts.PlaceAlertDraft
 fun PlaceAlertsDialog(
     placeId: String,
     placeName: String,
-    tags: List<PlaceTagEntity>,
+    tags: List<HubTagEntity>,
     rules: List<AlertRuleEntity>,
-    tagTargets: Map<String, Set<Long>>,
+    tagTargets: Map<String, Set<String>>,
     onCreate: (PlaceAlertDraft) -> Unit,
     onUpdate: (String, PlaceAlertDraft) -> Unit,
     onDelete: (String) -> Unit,
@@ -53,7 +53,7 @@ fun PlaceAlertsDialog(
     var message by remember { mutableStateOf("") }
     var trigger by remember { mutableStateOf(AlertTrigger.PLACE_CHECK_IN) }
     var targetKind by remember { mutableStateOf(AlertTargetKind.ENTITY) }
-    var selectedTagIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var selectedTagIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var matchMode by remember { mutableStateOf(AlertMatchMode.ALL) }
     var scope by remember { mutableStateOf(AlertScope.ALWAYS) }
     var editingRuleId by remember { mutableStateOf<String?>(null) }
@@ -253,8 +253,8 @@ fun PlaceAlertsDialog(
 @Composable
 private fun PlaceAlertRuleCard(
     rule: AlertRuleEntity,
-    tags: List<PlaceTagEntity>,
-    tagIds: Set<Long>,
+    tags: List<HubTagEntity>,
+    tagIds: Set<String>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSetEnabled: (Boolean) -> Unit,

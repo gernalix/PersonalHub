@@ -56,6 +56,7 @@ internal class HubComposerState(
     restoredResourcePermission: Boolean = false,
     private var initialized: Boolean = false,
     private val initialScope: List<HubEntityRef> = listOfNotNull(anchor),
+    private val tagNamespace: String = HubTagNamespaces.GLOBAL,
 ) {
     var members by mutableStateOf(restoredMembers)
     var title by mutableStateOf(restoredTitle)
@@ -118,16 +119,20 @@ internal class HubComposerState(
             }?.summary?.ref?.canonicalId
             rankingMembersKey = membersKey
         }
-        val adapter = selectedAdapter() ?: run { results = emptyList(); return }
-        val candidates = HubContextRuntime.search(
-            HubSearchQuery(
-                text = query,
-                modules = setOf(adapter.moduleId),
-                entityKinds = setOf(adapter.entityKind),
-                perAdapterLimit = 50,
-                limit = 50,
-            )
-        ).results.map(HubSearchResult::summary)
+        val adapter = selectedAdapter()
+        val candidates = if (adapter == null) {
+            HubContextRuntime.searchFacets(query, tagNamespace, 50).map(HubFacetSuggestion::summary)
+        } else {
+            HubContextRuntime.search(
+                HubSearchQuery(
+                    text = query,
+                    modules = setOf(adapter.moduleId),
+                    entityKinds = setOf(adapter.entityKind),
+                    perAdapterLimit = 50,
+                    limit = 50,
+                )
+            ).results.map(HubSearchResult::summary)
+        }
         results = rankComposerCandidates(candidates, rankingCounts, rankingPlaceId).take(5)
     }
 
@@ -176,6 +181,27 @@ internal class HubComposerState(
         }
     }
 
+    suspend fun createInlineTag() {
+        val name = createDraft.removePrefix("#").trim().ifBlank { query.removePrefix("#").trim() }
+        if (name.isBlank()) return
+        val outcome = HubContextRuntime.tags().create(tagNamespace, name)
+        val tag = outcome.tag ?: outcome.exactDuplicate ?: run {
+            error = "duplicate"
+            return
+        }
+        add(
+            HubEntitySummary(
+                HubEntityRef("tags", "tag", tag.id),
+                tag.name,
+                tag.namespace,
+                attributes = mapOf("icon" to (tag.icon ?: "🏷"), "facet_type" to "tag"),
+            ),
+        )
+        query = ""
+        createDraft = ""
+        refresh()
+    }
+
     fun selectedResource() = selectedKind == key("hub", "resource")
 
     suspend fun save(): String {
@@ -217,6 +243,7 @@ internal class HubComposerState(
                     state.members.map { encodeRef(it.summary.ref) + listOf(it.summary.label, it.summary.description, it.summary.lifecycle, it.role, it.automatic.toString()) },
                     state.title, state.typeId, state.query, state.createDraft, state.selectedKind,
                     state.resourceKind, state.resourceValue, state.resourcePermission,
+                    state.tagNamespace,
                 )
             },
             restore = { saved ->
@@ -228,6 +255,7 @@ internal class HubComposerState(
                     },
                     saved[3] as String, saved[4] as String?, saved[5] as String, saved[6] as String, saved[7] as String?,
                     saved[8] as String, saved[9] as String, saved[10] as Boolean, initialized = true,
+                    tagNamespace = saved.getOrNull(11) as? String ?: HubTagNamespaces.GLOBAL,
                 )
             },
         )
@@ -251,9 +279,12 @@ fun HubContextComposerScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit = onBack,
     editingContextId: String? = null,
+    tagNamespace: String = HubTagNamespaces.GLOBAL,
 ) {
     val androidContext = LocalContext.current
-    val state = rememberSaveable(editingContextId, saver = HubComposerState.Saver) { HubComposerState(null, editingContextId) }
+    val state = rememberSaveable(editingContextId, tagNamespace, saver = HubComposerState.Saver) {
+        HubComposerState(null, editingContextId, tagNamespace = tagNamespace)
+    }
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var fromText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() - 60 * 60 * 1000L)) }
@@ -305,15 +336,17 @@ fun HubContextComposerScreen(
             }
             item {
                 Text(stringResource(R.string.hub_composer_add_kind), style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { HubContextRuntime.adapters().forEach { adapter ->
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    HubContextRuntime.adapters().filterNot { it.moduleId == "tags" }.forEach { adapter ->
                     FilterChip(state.selectedKind == key(adapter.moduleId, adapter.entityKind), {
                         searchJob?.cancel()
                         state.chooseKind(adapter)
                         searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
                     }, label = { Text(adapter.entityKind.replace('_', ' ').replaceFirstChar(Char::uppercase)) })
-                } }
+                    }
+                }
             }
-            if (state.selectedKind != null) item {
+            item {
                 OutlinedTextField(state.query, { value ->
                     state.query = value
                     searchJob?.cancel()
@@ -321,18 +354,39 @@ fun HubContextComposerScreen(
                         delay(250)
                         runCatching { state.refresh() }.onFailure { state.error = it.message }
                     }
-                }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.hub_search)) })
+                }, Modifier.fillMaxWidth(), label = { Text("Search people, places, substances, tags…") })
                 state.results.filter { result -> state.members.none { it.summary.ref == result.ref } }.forEach { result ->
                     TextButton({
                         state.add(result)
                         searchJob?.cancel()
                         searchJob = scope.launch { runCatching { state.refresh() }.onFailure { state.error = it.message } }
-                    }, Modifier.fillMaxWidth()) { Text(result.label) }
+                    }, Modifier.fillMaxWidth()) {
+                        Text("${result.attributes["icon"] ?: facetIcon(result.ref)}  ${result.label} · ${result.ref.entityKind.replace('_', ' ')}")
+                    }
+                }
+                if (state.query.startsWith("#") && state.query.removePrefix("#").isNotBlank()) {
+                    TextButton(
+                        onClick = {
+                            state.createDraft = state.query
+                            scope.launch { runCatching { state.createInlineTag() }.onFailure { state.error = it.message } }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("🏷 Create ${state.query.removePrefix("#").trim()}") }
                 }
             }
             state.error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
         }
     }
+}
+
+private fun facetIcon(ref: HubEntityRef): String = when (ref.moduleId) {
+    "people" -> "👤"
+    "places" -> "📍"
+    "substances" -> "💊"
+    "tags" -> "🏷"
+    "soldi" -> "💰"
+    "timer" -> "⏱"
+    else -> "•"
 }
 
 @Composable
@@ -378,7 +432,7 @@ internal fun HubContextComposerDialog(anchor: HubEntityRef, editingContextId: St
                 item {
                     Text(stringResource(R.string.hub_composer_add_kind), style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        HubContextRuntime.adapters().forEach { adapter ->
+                        HubContextRuntime.adapters().filterNot { it.moduleId == "tags" }.forEach { adapter ->
                             FilterChip(
                                 selected = state.selectedKind == key(adapter.moduleId, adapter.entityKind),
                                 onClick = {

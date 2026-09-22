@@ -23,6 +23,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -76,6 +78,7 @@ fun HomeScreen(
     onDeletePlace: (PlaceListUiModel) -> Unit,
     onSortPlaces: (PlaceSortCriterion, PlaceSortDirection) -> Unit,
     onRefreshLocation: () -> Unit,
+    onToggleTagFilter: (String) -> Unit,
     onGlobalMap: () -> Unit,
     onGlobalStats: () -> Unit,
     onOpenHistory: (String?) -> Unit,
@@ -155,6 +158,17 @@ fun HomeScreen(
                     onSortPlaces = onSortPlaces,
                     onRefreshLocation = onRefreshLocation,
                 )
+            }
+            if (state.placeTags.isNotEmpty()) item(key = "places-tag-filters") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    state.placeTags.filterNot { it.archived }.forEach { tag ->
+                        FilterChip(
+                            selected = tag.id in state.selectedPlaceTagIds,
+                            onClick = { onToggleTagFilter(tag.id) },
+                            label = { Text(tag.name) },
+                        )
+                    }
+                }
             }
             if (state.placeItems.isEmpty()) {
                 item(key = "places-empty") {

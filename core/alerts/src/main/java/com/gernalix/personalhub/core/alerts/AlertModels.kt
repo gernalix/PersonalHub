@@ -47,7 +47,7 @@ data class PlaceAlertDraft(
     val trigger: AlertTrigger,
     val targetKind: AlertTargetKind,
     val placeId: String? = null,
-    val placeTagIds: Set<Long> = emptySet(),
+    val placeTagIds: Set<String> = emptySet(),
     val matchMode: AlertMatchMode = AlertMatchMode.ALL,
     val scope: AlertScope = AlertScope.ALWAYS,
     val cooldownMs: Long = 0L,
