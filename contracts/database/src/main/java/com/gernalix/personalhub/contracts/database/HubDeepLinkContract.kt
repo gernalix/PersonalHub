@@ -103,6 +103,27 @@ object HubDeepLinkContract {
             uri.pathSegments == listOf(normalizedModuleId)
     }
 
+    /**
+     * Opaque feature-scoped URI for stable PendingIntent/receiver identity.
+     *
+     * This is deliberately not parsed by [parse]; canonical user-facing permalinks use the
+     * versioned entity/context/event/search endpoints above.
+     */
+    fun featureUri(featureId: String, vararg pathSegments: String): Uri {
+        val normalizedFeatureId = featureId.trim()
+        require(normalizedFeatureId.isNotEmpty())
+        return Uri.Builder()
+            .scheme(SCHEME)
+            .authority(normalizedFeatureId)
+            .apply {
+                pathSegments.forEach { segment ->
+                    require(segment.isNotBlank())
+                    appendPath(segment)
+                }
+            }
+            .build()
+    }
+
     fun searchUri(
         fromIso: String? = null,
         toIso: String? = null,
