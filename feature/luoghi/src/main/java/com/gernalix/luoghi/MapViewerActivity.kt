@@ -1,7 +1,6 @@
 package com.gernalix.luoghi
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,6 +32,7 @@ import com.gernalix.luoghi.capsules.mapviewer.MapMarkerMode
 import com.gernalix.luoghi.capsules.mapviewer.MapOverlayMarker
 import com.gernalix.luoghi.capsules.mapviewer.MapViewerModel
 import com.gernalix.luoghi.capsules.mapviewer.MapViewerRepository
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -228,7 +228,7 @@ private fun MapView.markerFor(markerModel: MapOverlayMarker, markerMode: MapMark
             markerModel.uuid?.let { uuid ->
                 context.startActivity(
                     Intent(context, MainActivity::class.java).apply {
-                        data = Uri.parse("personalhub://module/places?placeId=$uuid")
+                        data = HubDeepLinkContract.moduleUri("places", "placeId" to uuid)
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     }
                 )
