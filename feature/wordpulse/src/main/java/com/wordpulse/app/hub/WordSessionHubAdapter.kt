@@ -22,7 +22,7 @@ class WordSessionHubAdapter(private val context: Context) : HubEntityAdapter, Hu
     override suspend fun summaries(canonicalIds: Set<String>) = if (canonicalIds.isEmpty()) emptyMap() else
         dao.getSessionsByIds(canonicalIds.toList()).associate { it.id to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchSessions(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/wordpulse?sessionId=${android.net.Uri.encode(canonicalId)}", "com.wordpulse.app.MainActivity")
+    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("wordpulse", "sessionId" to canonicalId).toString(), "com.wordpulse.app.MainActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val cursor = decodeHubTemporalCursor(query.cursor)
