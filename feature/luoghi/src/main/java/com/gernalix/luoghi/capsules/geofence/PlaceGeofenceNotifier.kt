@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -14,6 +13,7 @@ import androidx.core.content.ContextCompat
 import com.gernalix.luoghi.MainActivity
 import com.gernalix.luoghi.R
 import com.gernalix.luoghi.data.PlaceEntity
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import kotlin.math.absoluteValue
 
 @SuppressLint("MissingPermission")
@@ -31,7 +31,7 @@ object PlaceGeofenceNotifier {
             else -> context.safeString(R.string.geofence_notification_exit_format, "Left %s.", title)
         }
         val contentIntent = Intent(context, MainActivity::class.java).apply {
-            data = Uri.parse("personalhub://module/places?placeId=${place.uuid}")
+            data = HubDeepLinkContract.moduleUri("places", "placeId" to place.uuid)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
