@@ -27,7 +27,7 @@ class PlacesHubAdapter(private val context: Context) : HubEntityAdapter, HubTemp
         if (canonicalIds.isEmpty()) emptyMap() else dao.placesByUuids(canonicalIds.toList()).associate { it.uuid to it.summary() }
     override suspend fun search(query: String, limit: Int) =
         dao.searchForHub(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/places?placeId=${android.net.Uri.encode(canonicalId)}", "com.gernalix.luoghi.MainActivity")
+    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("places", "placeId" to canonicalId).toString(), "com.gernalix.luoghi.MainActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val cursor = decodeHubTemporalCursor(query.cursor)
