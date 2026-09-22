@@ -25,7 +25,7 @@ class SubstanceHubAdapter(private val context: Context) : HubEntityAdapter {
     override suspend fun summaries(canonicalIds: Set<String>) = if (canonicalIds.isEmpty()) emptyMap() else
         dao.substancesByIds(canonicalIds.mapNotNull(String::toLongOrNull)).associate { it.id.toString() to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchSubstances(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/substances?substanceId=$canonicalId", "com.gernalix.sostanze.MainActivity")
+    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("substances", "substanceId" to canonicalId).toString(), "com.gernalix.sostanze.MainActivity")
 
     private fun SubstanceEntity.summary() = HubEntitySummary(
         HubEntityRef(moduleId, entityKind, id.toString()), name,
@@ -45,7 +45,7 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
     override suspend fun summaries(canonicalIds: Set<String>) = dao.intakeHubViews(canonicalIds.mapNotNull(String::toLongOrNull)).associate { it.intake.id.toString() to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchIntakeHubViews(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/substances", "com.gernalix.sostanze.MainActivity")
+    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("substances").toString(), "com.gernalix.sostanze.MainActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val decoded = decodeHubTemporalCursor(query.cursor)
