@@ -6,11 +6,9 @@ import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.persistence.SnapshotStore
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.hubcontext.*
+import com.gernalix.personalhub.core.ui.HubTimeFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, HubTemporalProvider {
     override val moduleId = "timer"
@@ -18,7 +16,6 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     override val capabilities = setOf("time_interval", "activity")
     private val sessions = DefaultSessionCore(context.applicationContext)
     private val appContext = context.applicationContext
-    private val fallbackFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     private val fallbackStringId by lazy(LazyThreadSafetyMode.NONE) {
         appContext.resources.getIdentifier("hub_session_time_fallback", "string", appContext.packageName)
     }
@@ -100,7 +97,7 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     private fun SnapshotStore.Snapshot?.orEmptyTags() = this?.tags.orEmpty()
 
     private fun SessionUi.formatSessionStart(): String =
-        Instant.ofEpochMilli(startMs).atZone(ZoneId.systemDefault()).format(fallbackFormatter)
+        HubTimeFormat.pattern(startMs, "yyyy-MM-dd HH:mm")
 
     private fun mergedFallbackString(value: String): String =
         if (fallbackStringId != 0) appContext.getString(fallbackStringId, value) else "Session on $value"
