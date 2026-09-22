@@ -38,7 +38,7 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
         return sessions.searchSessions(query, limit.coerceIn(1, 100)).map { it.summary(tagNamesById) }
     }
 
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/timer?sessionId=$canonicalId", "com.example.multitimetracker.MainActivity")
+    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("timer", "sessionId" to canonicalId).toString(), "com.example.multitimetracker.MainActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val tagNamesById = loadTagNamesById()
