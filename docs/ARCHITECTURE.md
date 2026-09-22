@@ -52,6 +52,10 @@ The existing encrypted GitHub credential and transport boundary in `:core:databa
 
 `personalhub.db` remains the sole PersonalHub-owned writable database. The cached `salute.db` is reproducible external source material and is excluded from PersonalHub import/export, Git History, Datasette sync, Activity undo and Android backup. UI reads stable producer views such as `v_health_timeline`, `v_health_measurement_history`, `v_health_journal_detail` and `v_test_turnaround`. See `docs/HEALTH_MODULE.md`.
 
+## Shared tags, facets and cross-module linking target
+
+The target architecture for reusable tags, facet-style semantic selection and bidirectional cross-module links is specified in `docs/TAGS_FACETS_LINKS.md`. It builds on the existing Hub Context Graph rather than introducing a second relationship graph. The specification keeps canonical entities/events distinct from tags, uses namespaced tag vocabularies with optional explicit global tags, and requires independent Timer tag scopes for Now, Events and Since When.
+
 ## Hub Context Graph foundation
 
 The neutral Hub layer stores stable bindings to canonical module records and N-ary Context membership; it never copies canonical labels or domain records. A Context has at least two members and may contain any number of members, including multiple records of one kind. The `(context, entity, role)` key prevents accidental duplicates while permitting the same record in distinct semantic roles. Optional Context Types and their ordered fields are user data with module/kind or capability constraints and bounded or unbounded cardinality; an ad-hoc Context has no type.
