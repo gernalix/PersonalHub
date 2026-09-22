@@ -13,6 +13,7 @@ data class PlaceMutation(
     val lon: Double?,
     val radiusM: Double?,
     val notes: String?,
+    val photoUri: String? = null,
     val sourceApp: String = "Luoghi",
     val tagNames: Set<String> = emptySet(),
 )
@@ -33,6 +34,7 @@ class PlacesCapsule(private val repository: PlaceRepository) {
             lon = mutation.lon,
             radiusM = mutation.radiusM,
             notes = mutation.notes,
+            photoUri = mutation.photoUri,
             sourceApp = mutation.sourceApp,
         )
         repository.setPlaceTags(uuid, mutation.tagNames)

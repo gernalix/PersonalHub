@@ -3,8 +3,8 @@ package com.gernalix.personalhub
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.gernalix.personalhub.core.database.HubPhotoMediaStore
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
-import com.gernalix.personalhub.core.database.PhotoCapsule
 import com.supercontacts.app.data.repository.ContactInput
 import com.supercontacts.app.data.repository.ContactsRepository
 import com.supercontacts.app.data.repository.InitiativeType
@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class PeopleRelatedPersistenceDeviceTest {
     @TableProbe("people_photos")
-    @Test fun croppedPhotoBlobPersistsWithContactTransaction() = runBlocking {
+    @Test fun sharedOriginalPhotoPersistsWithContactTransaction() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         check(context.packageName == "com.gernalix.personalhub.qa")
         val name = "qa914263-photo-${UUID.randomUUID()}.db"
@@ -26,13 +26,13 @@ class PeopleRelatedPersistenceDeviceTest {
         try {
             val repo = ContactsRepository(owner)
             val firstBytes = byteArrayOf(1, 2, 3, 4)
-            val firstRef = PhotoCapsule.stage(firstBytes)
+            val firstRef = HubPhotoMediaStore.stageOriginal(firstBytes, "image/jpeg").reference
             val contactId = repo.createContact(ContactInput(name = "QA914263Photo", photoPath = firstRef))
             val stored = requireNotNull(owner.photoDao().find(firstRef))
             assertEquals(contactId, stored.contactId)
             assertTrue(stored.bytes.contentEquals(firstBytes))
             val secondBytes = byteArrayOf(5, 6, 7, 8)
-            val secondRef = PhotoCapsule.stage(secondBytes)
+            val secondRef = HubPhotoMediaStore.stageOriginal(secondBytes, "image/jpeg").reference
             repo.updateContactPhoto(contactId, secondRef)
             assertTrue(requireNotNull(owner.photoDao().find(secondRef)).bytes.contentEquals(secondBytes))
             assertEquals(null, owner.photoDao().find(firstRef))

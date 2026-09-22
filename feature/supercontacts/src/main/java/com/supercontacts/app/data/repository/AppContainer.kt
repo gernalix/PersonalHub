@@ -9,8 +9,6 @@ object AppContainer {
     @Volatile
     private var addressAutocompleteRepository: AddressAutocompleteRepository? = null
     @Volatile
-    private var contactPhotoStore: ContactPhotoStore? = null
-    @Volatile
     private var homePreferencesStore: HomePreferencesStore? = null
 
 
@@ -25,14 +23,6 @@ object AppContainer {
                 context.applicationContext,
             ).also { addressAutocompleteRepository = it }
         }
-
-    fun contactPhotoStore(context: Context): ContactPhotoStore =
-        contactPhotoStore ?: synchronized(this) {
-            contactPhotoStore ?: ContactPhotoStore(
-                context.applicationContext,
-            ).also { contactPhotoStore = it }
-        }
-
 
     fun homePreferencesStore(context: Context): HomePreferencesStore =
         homePreferencesStore ?: synchronized(this) {

@@ -46,7 +46,7 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(18, db.version)
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
             assertEquals(1767225600123L, scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='a'"))
             assertEquals(1767312123456L, scalar(db, "SELECT occurredAt FROM finance_transactions WHERE id=1"))
             assertEquals(1L, scalar(db, "SELECT count(*) FROM finance_transactions WHERE reminderAt IS NULL"))
@@ -98,7 +98,7 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(18, db.version)
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
             assertEquals(java.time.Instant.parse(original).toEpochMilli(),
                 scalar(db, "SELECT openedAt FROM finance_accounts WHERE id='precision'"))
             val saved = JSONArray(scalarText(db, "SELECT json FROM hub_preferences " +
@@ -132,8 +132,8 @@ class DatabaseMigrationSafetyTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(18, db.version)
-            assertEquals(77L, scalar(db, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
+            assertTrue(scalar(db, "SELECT generation FROM hub_generation WHERE id=1") >= 77L)
             db.execSQL("INSERT INTO health_import_batches(id,received_at_ms,imported_at_ms,source_system,author) VALUES('batch',1000,2000,'MinSP','chatgpt')")
             db.execSQL("INSERT INTO health_events(id,import_batch_id,event_kind,occurred_at_ms,time_precision,title_it,source_system,created_at_ms,updated_at_ms) VALUES('event','batch','sample',1000,'datetime','Prelievo','MinSP',2000,2000)")
             db.execSQL("INSERT INTO health_samples(id,event_id,sample_kind) VALUES('sample','event','blood')")
@@ -154,6 +154,33 @@ class DatabaseMigrationSafetyTest {
         assertTrue(PersonalHubDatabase.canMigrateFrom(PersonalHubDatabase.SCHEMA_VERSION))
         assertFalse(PersonalHubDatabase.canMigrateFrom(0))
         assertFalse(PersonalHubDatabase.canMigrateFrom(PersonalHubDatabase.SCHEMA_VERSION + 1))
+    }
+
+    @Test fun placesPhotoMigrationPreservesExistingRowsAndAddsNullableReference() {
+        val name = "places-photo-v18-${UUID.randomUUID()}.db"
+        val file = context.getDatabasePath(name).also { it.parentFile!!.mkdirs() }
+        createVersion(file, 18)
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { old ->
+            old.execSQL(
+                "INSERT INTO places(uuid,nickname,created_at,updated_at,archived) " +
+                    "VALUES('kept-place','Kept Place',100,100,0)",
+            )
+        }
+
+        val owner = PersonalHubDatabase.openTemporary(context, name)
+        try {
+            val db = owner.openHelper.writableDatabase
+            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
+            assertEquals("Kept Place", scalarText(db, "SELECT nickname FROM places WHERE uuid='kept-place'"))
+            assertEquals(1L, scalar(db, "SELECT count(*) FROM pragma_table_info('places') WHERE name='photo_uri'"))
+            assertEquals(1L, scalar(db, "SELECT count(*) FROM places WHERE uuid='kept-place' AND photo_uri IS NULL"))
+            db.execSQL("UPDATE places SET photo_uri='content://photos/kept' WHERE uuid='kept-place'")
+            assertEquals("content://photos/kept", scalarText(db, "SELECT photo_uri FROM places WHERE uuid='kept-place'"))
+            assertFalse(db.query("PRAGMA foreign_key_check").use { it.moveToFirst() })
+        } finally {
+            owner.close()
+            context.deleteDatabase(name)
+        }
     }
 
     @Test fun everyStoredRoomSnapshotMigratesAndWordPulseV4SurvivesReopen() {

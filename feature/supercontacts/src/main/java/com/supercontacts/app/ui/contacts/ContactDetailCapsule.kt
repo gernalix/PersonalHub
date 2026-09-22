@@ -1,11 +1,10 @@
 package com.supercontacts.app.ui.contacts
 
-import android.graphics.Bitmap
+import android.content.ContentResolver
 import android.net.Uri
 import com.supercontacts.app.data.repository.ContactDetail
 import com.supercontacts.app.data.repository.ContactInput
-import com.supercontacts.app.data.repository.ContactPhotoCropSpec
-import com.supercontacts.app.data.repository.ContactPhotoStore
+import com.supercontacts.app.data.repository.PeoplePhotoBinding
 import com.supercontacts.app.data.repository.ContactStats
 import com.supercontacts.app.data.repository.ContactsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +21,7 @@ data class ContactDetailState(
 
 class ContactDetailCapsule(
     private val repository: ContactsRepository,
-    private val contactPhotoStore: ContactPhotoStore,
+    private val contentResolver: ContentResolver,
     private val status: ContactOperationStatusCapsule,
     private val scope: CoroutineScope,
 ) : ContactDetailOwner {
@@ -84,23 +83,22 @@ class ContactDetailCapsule(
                 val contactId = repository.createContact(input)
                 onCreated(contactId)
             }.onFailure { error ->
-                input.photoPath.takeIf { it.isNotBlank() }?.let { contactPhotoStore.deletePhoto(it) }
+                input.photoPath.takeIf { it.isNotBlank() }?.let(PeoplePhotoBinding::discard)
                 status.setError(error.message ?: "Operation failed.")
             }
             status.setSaving(false)
         }
     }
 
-    override fun saveCroppedContactPhoto(
+    override fun saveContactPhoto(
         sourceUri: Uri,
-        cropSpec: ContactPhotoCropSpec,
         onSaved: (String) -> Unit,
     ) {
         scope.launch {
             status.setSaving(true)
             status.setError(null)
             runCatching {
-                contactPhotoStore.saveCroppedPhoto(sourceUri, cropSpec)
+                PeoplePhotoBinding.importOriginal(contentResolver, sourceUri)
             }.onSuccess { path ->
                 onSaved(path)
             }.onFailure { error ->
@@ -110,47 +108,29 @@ class ContactDetailCapsule(
         }
     }
 
-    override fun saveCroppedContactPhotoForContact(
+    override fun saveContactPhotoForContact(
         contactId: Long,
         sourceUri: Uri,
-        cropSpec: ContactPhotoCropSpec,
         onSaved: (String) -> Unit,
     ) {
         scope.launch {
             status.setSaving(true)
             status.setError(null)
             runCatching {
-                contactPhotoStore.saveCroppedPhoto(
-                    sourceUri = sourceUri,
-                    cropSpec = cropSpec,
-                    contactId = contactId,
-                )
+                PeoplePhotoBinding.importOriginal(contentResolver, sourceUri)
             }.onSuccess { path ->
                 onSaved(path)
             }.onFailure { error ->
                 status.setError(error.message ?: "Photo could not be saved.")
             }
             status.setSaving(false)
-        }
-    }
-
-    override fun loadContactPhotoPreview(sourceUri: Uri, onLoaded: (Bitmap?) -> Unit) {
-        scope.launch {
-            runCatching {
-                contactPhotoStore.loadPreviewBitmap(sourceUri)
-            }.onSuccess { bitmap ->
-                onLoaded(bitmap)
-            }.onFailure { error ->
-                status.setError(error.message ?: "Photo could not be opened.")
-                onLoaded(null)
-            }
         }
     }
 
     override fun deleteUnusedContactPhoto(path: String) {
         scope.launch {
             runCatching {
-                contactPhotoStore.deletePhoto(path)
+                PeoplePhotoBinding.discard(path)
             }
         }
     }
@@ -161,13 +141,13 @@ class ContactDetailCapsule(
             status.setError(null)
             runCatching {
                 val cleanup = repository.updateContact(contactId, input)
-                cleanup.oldPhotoPath?.let { contactPhotoStore.deletePhoto(it) }
+                cleanup.oldPhotoPath?.let(PeoplePhotoBinding::discard)
                 onUpdated()
             }.onFailure { error ->
                 val stagedPhotoPath = input.photoPath.takeIf {
                     it.isNotBlank() && it != mutableState.value.detail?.photoPath
                 }
-                stagedPhotoPath?.let { contactPhotoStore.deletePhoto(it) }
+                stagedPhotoPath?.let(PeoplePhotoBinding::discard)
                 status.setError(error.message ?: "Operation failed.")
             }
             status.setSaving(false)
@@ -180,10 +160,10 @@ class ContactDetailCapsule(
             status.setError(null)
             runCatching {
                 val cleanup = repository.updateContactPhoto(contactId, photoPath)
-                cleanup.oldPhotoPath?.let { contactPhotoStore.deletePhoto(it) }
+                cleanup.oldPhotoPath?.let(PeoplePhotoBinding::discard)
                 onUpdated()
             }.onFailure { error ->
-                contactPhotoStore.deletePhoto(photoPath)
+                PeoplePhotoBinding.discard(photoPath)
                 status.setError(error.message ?: "Operation failed.")
             }
             status.setSaving(false)

@@ -1,6 +1,6 @@
 package com.supercontacts.app.ui.contacts
 
-import android.graphics.Bitmap
+import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,8 +12,6 @@ import com.supercontacts.app.data.repository.ContactEvent
 import com.supercontacts.app.data.repository.ContactHomeSort
 import com.supercontacts.app.data.repository.ContactHomeSortState
 import com.supercontacts.app.data.repository.ContactInput
-import com.supercontacts.app.data.repository.ContactPhotoCropSpec
-import com.supercontacts.app.data.repository.ContactPhotoStore
 import com.supercontacts.app.data.repository.ContactTag
 import com.supercontacts.app.data.repository.ContactsRepository
 import com.supercontacts.app.data.repository.HomePreferencesStore
@@ -33,12 +31,12 @@ class ContactsViewModel(
     repository: ContactsRepository,
     homePreferencesStore: HomePreferencesStore,
     addressAutocompleteRepository: AddressAutocompleteRepository,
-    contactPhotoStore: ContactPhotoStore,
+    contentResolver: ContentResolver,
 ) : ViewModel() {
     private val statusOwner = ContactOperationStatusCapsule()
     private val detailOwner = ContactDetailCapsule(
         repository = repository,
-        contactPhotoStore = contactPhotoStore,
+        contentResolver = contentResolver,
         status = statusOwner,
         scope = viewModelScope,
     )
@@ -182,16 +180,13 @@ class ContactsViewModel(
         detailOwner.ensureFieldDescriptionTargets(contactId, onReady)
     fun updateFieldDescription(fieldId: Long, description: String) =
         detailOwner.updateFieldDescription(fieldId, description)
-    fun saveCroppedContactPhoto(sourceUri: Uri, cropSpec: ContactPhotoCropSpec, onSaved: (String) -> Unit) =
-        detailOwner.saveCroppedContactPhoto(sourceUri, cropSpec, onSaved)
-    fun saveCroppedContactPhotoForContact(
+    fun saveContactPhoto(sourceUri: Uri, onSaved: (String) -> Unit) =
+        detailOwner.saveContactPhoto(sourceUri, onSaved)
+    fun saveContactPhotoForContact(
         contactId: Long,
         sourceUri: Uri,
-        cropSpec: ContactPhotoCropSpec,
         onSaved: (String) -> Unit,
-    ) = detailOwner.saveCroppedContactPhotoForContact(contactId, sourceUri, cropSpec, onSaved)
-    fun loadContactPhotoPreview(sourceUri: Uri, onLoaded: (Bitmap?) -> Unit) =
-        detailOwner.loadContactPhotoPreview(sourceUri, onLoaded)
+    ) = detailOwner.saveContactPhotoForContact(contactId, sourceUri, onSaved)
     fun deleteUnusedContactPhoto(path: String) = detailOwner.deleteUnusedContactPhoto(path)
     fun updateContactPhoto(contactId: Long, photoPath: String, onUpdated: () -> Unit = {}) =
         detailOwner.updateContactPhoto(contactId, photoPath, onUpdated)
@@ -280,7 +275,7 @@ class ContactsViewModel(
         private val repository: ContactsRepository,
         private val homePreferencesStore: HomePreferencesStore,
         private val addressAutocompleteRepository: AddressAutocompleteRepository,
-        private val contactPhotoStore: ContactPhotoStore,
+        private val contentResolver: ContentResolver,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -289,7 +284,7 @@ class ContactsViewModel(
                     repository = repository,
                     homePreferencesStore = homePreferencesStore,
                     addressAutocompleteRepository = addressAutocompleteRepository,
-                    contactPhotoStore = contactPhotoStore,
+                    contentResolver = contentResolver,
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

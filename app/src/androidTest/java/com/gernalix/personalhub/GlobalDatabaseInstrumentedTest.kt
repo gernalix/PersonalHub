@@ -11,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ExistingWorkPolicy
 import com.gernalix.personalhub.core.database.*
+import com.supercontacts.app.data.repository.PeoplePhotoBinding
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -244,7 +245,7 @@ class GlobalDatabaseInstrumentedTest {
                     val rows = db.rawQuery("SELECT * FROM `$table`", null).use { c -> buildList {
                         while(c.moveToNext()) add((0 until c.columnCount).joinToString("|") { index -> when(c.getType(index)) {
                             android.database.Cursor.FIELD_TYPE_NULL -> "NULL"
-                            android.database.Cursor.FIELD_TYPE_BLOB -> PhotoCapsule.sha256(c.getBlob(index))
+                            android.database.Cursor.FIELD_TYPE_BLOB -> HubPhotoMediaStore.sha256(c.getBlob(index))
                             else -> c.getString(index)
                         } })
                     } }
@@ -340,7 +341,7 @@ class GlobalDatabaseInstrumentedTest {
         val owner = PersonalHubDatabase.get(context)
         val db = owner.openHelper.writableDatabase
         val photoBytes = db.query("SELECT bytes FROM people_photos LIMIT 2").use { c -> buildList { while(c.moveToNext()) add(c.getBlob(0)) } }
-        val references = photoBytes.map(PhotoCapsule::stage)
+        val references = photoBytes.map { HubPhotoMediaStore.stageOriginal(it, "image/*").reference }
         var contactId = 0L
         try {
             owner.withTransaction {
@@ -348,18 +349,18 @@ class GlobalDatabaseInstrumentedTest {
                 references.forEachIndexed { index, reference ->
                     owner.contactsDao().insertField(com.supercontacts.app.data.local.ContactFieldEntity(contactId = contactId, fieldType = "photo", value = reference, addedAt = 1, position = index))
                 }
-                PhotoCapsule.attach(owner, contactId)
+                PeoplePhotoBinding.attach(owner, contactId)
             }
-            references.forEach(PhotoCapsule::discard)
-            references.forEachIndexed { index, reference -> assertNull(PhotoCapsule.preview(reference)); assertArrayEquals(photoBytes[index], owner.photoDao().find(reference)!!.bytes) }
+            references.forEach(HubPhotoMediaStore::discard)
+            references.forEachIndexed { index, reference -> assertNull(HubPhotoMediaStore.staged(reference)); assertArrayEquals(photoBytes[index], owner.photoDao().find(reference)!!.bytes) }
             waitForExport(generation(), "two photo BLOBs committed with one person")
             assertEquals(2L, scalar("SELECT COUNT(*) FROM people_photos WHERE contact_id=$contactId"))
-            val replacement = PhotoCapsule.stage(photoBytes[1])
+            val replacement = HubPhotoMediaStore.stageOriginal(photoBytes[1], "image/*").reference
             owner.withTransaction {
                 db.execSQL("UPDATE contact_fields SET value=? WHERE contact_id=? AND position=0", arrayOf(replacement, contactId))
-                PhotoCapsule.attach(owner, contactId)
+                PeoplePhotoBinding.attach(owner, contactId)
             }
-            PhotoCapsule.discard(replacement)
+            HubPhotoMediaStore.discard(replacement)
             assertArrayEquals(photoBytes[1], owner.photoDao().find(replacement)!!.bytes)
             waitForExport(generation(), "photo BLOB replacement")
             db.execSQL("DELETE FROM contacts WHERE id=?", arrayOf(contactId))
@@ -367,7 +368,7 @@ class GlobalDatabaseInstrumentedTest {
             waitForExport(generation(), "person deletion cascades photos")
         } finally {
             if (contactId != 0L) db.execSQL("DELETE FROM contacts WHERE id=?", arrayOf(contactId))
-            references.forEach(PhotoCapsule::discard)
+            references.forEach(HubPhotoMediaStore::discard)
         }
     }
     @Test fun photoBlobsAndRelationshipsRemainValidAfterOpeningAllDaos() {

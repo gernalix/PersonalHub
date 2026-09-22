@@ -56,6 +56,7 @@ data class PlaceFormState(
     val lon: Double? = null,
     val radiusM: String = CheckInPolicy.DEFAULT_RADIUS_M.toInt().toString(),
     val notes: String = "",
+    val photoUri: String = "",
     val tagsText: String = "",
     val sourceApp: String = "Luoghi",
 ) {
@@ -68,6 +69,7 @@ data class PlaceFormState(
             lon = place.lon,
             radiusM = place.radiusM?.toString() ?: CheckInPolicy.DEFAULT_RADIUS_M.toInt().toString(),
             notes = place.notes.orEmpty(),
+            photoUri = place.photoUri.orEmpty(),
             sourceApp = place.sourceApp.orEmpty().ifBlank { "Luoghi" },
         )
     }
@@ -319,6 +321,10 @@ class LuoghiHomeViewModel(
         mutableState.update { it.copy(form = it.form.copy(notes = value)) }
     }
 
+    fun updatePhotoUri(value: String) {
+        mutableState.update { it.copy(form = it.form.copy(photoUri = value)) }
+    }
+
     fun updatePlaceTags(value: String) {
         mutableState.update { it.copy(form = it.form.copy(tagsText = value)) }
     }
@@ -499,6 +505,7 @@ class LuoghiHomeViewModel(
                 lon = form.lon,
                 radiusM = form.radiusM.toDoubleOrNull()?.coerceAtLeast(MIN_RADIUS_M),
                 notes = form.notes,
+                photoUri = form.photoUri.ifBlank { null },
                 tagNames = parsePlaceTagText(form.tagsText),
                 sourceApp = form.sourceApp,
             )

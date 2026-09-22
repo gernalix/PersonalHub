@@ -1,6 +1,5 @@
 package com.supercontacts.app.ui.contacts
 
-import android.graphics.Bitmap
 import android.net.Uri
 import com.supercontacts.app.data.repository.AddressSuggestion
 import com.supercontacts.app.data.repository.ContactDetail
@@ -9,7 +8,6 @@ import com.supercontacts.app.data.repository.ContactEvent
 import com.supercontacts.app.data.repository.ContactFieldSuggestion
 import com.supercontacts.app.data.repository.ContactHomeSortState
 import com.supercontacts.app.data.repository.ContactInitiative
-import com.supercontacts.app.data.repository.ContactPhotoCropSpec
 import com.supercontacts.app.data.repository.ContactStats
 import com.supercontacts.app.data.repository.ContactSummary
 import com.supercontacts.app.data.repository.ContactTag
@@ -119,14 +117,12 @@ interface ContactDetailOwner {
     fun recordFieldOpen(contactId: Long, fieldType: String)
     fun ensureFieldDescriptionTargets(contactId: Long, onReady: () -> Unit)
     fun updateFieldDescription(fieldId: Long, description: String)
-    fun saveCroppedContactPhoto(sourceUri: Uri, cropSpec: ContactPhotoCropSpec, onSaved: (String) -> Unit)
-    fun saveCroppedContactPhotoForContact(
+    fun saveContactPhoto(sourceUri: Uri, onSaved: (String) -> Unit)
+    fun saveContactPhotoForContact(
         contactId: Long,
         sourceUri: Uri,
-        cropSpec: ContactPhotoCropSpec,
         onSaved: (String) -> Unit,
     )
-    fun loadContactPhotoPreview(sourceUri: Uri, onLoaded: (Bitmap?) -> Unit)
     fun deleteUnusedContactPhoto(path: String)
     fun updateContactPhoto(contactId: Long, photoPath: String, onUpdated: () -> Unit = {})
 }
@@ -203,4 +199,3 @@ interface ContactDuplicateOwner {
     )
     fun clearDuplicateCandidates()
 }
-
