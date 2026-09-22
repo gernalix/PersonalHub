@@ -5,7 +5,7 @@ plugins {
 android {
     namespace = "com.gernalix.personalhub.core.location"
     compileSdk = 37
-    defaultConfig { minSdk = 29 }
+    defaultConfig { minSdk = 26 }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
