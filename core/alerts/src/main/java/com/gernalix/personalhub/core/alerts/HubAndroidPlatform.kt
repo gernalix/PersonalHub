@@ -1,3 +1,5 @@
+@file:android.annotation.SuppressLint("MissingPermission")
+
 package com.gernalix.personalhub.core.alerts
 
 import android.Manifest
