@@ -8,7 +8,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationListener
@@ -17,17 +16,14 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Looper
 import android.widget.Toast
-import android.util.LruCache
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import com.supercontacts.app.CallOverlayPermission
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,16 +98,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -127,7 +118,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -154,8 +144,7 @@ import com.supercontacts.app.data.repository.ContactHomeSortState
 import com.supercontacts.app.data.repository.ContactInitiative
 import com.supercontacts.app.data.repository.ContactInput
 import com.supercontacts.app.data.repository.ContactMessagingLink
-import com.supercontacts.app.data.repository.ContactPhotoCropSpec
-import com.supercontacts.app.data.repository.ContactPhotoStore
+import com.gernalix.personalhub.core.ui.photo.rememberHubPhotoPicker
 import com.supercontacts.app.data.repository.ContactSearchMatch
 import com.supercontacts.app.data.repository.ContactStats
 import com.supercontacts.app.data.repository.ContactSummary
@@ -186,8 +175,6 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.util.Locale
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
@@ -216,7 +203,7 @@ fun SuperContactsApp(
             repository = AppContainer.contactsRepository(context),
             homePreferencesStore = AppContainer.homePreferencesStore(context),
             addressAutocompleteRepository = AppContainer.addressAutocompleteRepository(context),
-            contactPhotoStore = AppContainer.contactPhotoStore(context),
+            contentResolver = context.contentResolver,
         ),
     )
     val uiState by viewModel.uiState.collectAsState()
@@ -249,7 +236,6 @@ fun SuperContactsApp(
     var isViewingContactInitiatives by rememberSaveable { mutableStateOf(false) }
     var isViewingGlobalInitiatives by rememberSaveable { mutableStateOf(false) }
     var timestampEditEvent by remember { mutableStateOf<ContactEvent?>(null) }
-    var detailPhotoSourceUri by rememberSaveable { mutableStateOf<String?>(null) }
     var handledDeepLink by rememberSaveable { mutableStateOf<String?>(null) }
 
     val openContact: (Long) -> Unit = { contactId ->
@@ -351,11 +337,10 @@ fun SuperContactsApp(
         )
     }
 
-    val detailPhotoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri ->
-        if (uri != null) {
-            detailPhotoSourceUri = uri.toString()
+    val pickDetailPhoto = rememberHubPhotoPicker { selected ->
+        val contactId = selectedContactId ?: return@rememberHubPhotoPicker
+        viewModel.saveContactPhotoForContact(contactId, Uri.parse(selected.reference)) { path ->
+            viewModel.updateContactPhoto(contactId, path)
         }
     }
 
@@ -550,8 +535,7 @@ fun SuperContactsApp(
                 viewModel.clearDuplicateCandidates()
                 openContact(contactId)
             },
-            onLoadPhotoPreview = viewModel::loadContactPhotoPreview,
-            onSaveCroppedPhoto = viewModel::saveCroppedContactPhoto,
+            onSavePhoto = viewModel::saveContactPhoto,
             onDeleteUnusedPhoto = viewModel::deleteUnusedContactPhoto,
             onFieldDescriptionChange = viewModel::updateFieldDescription,
             onSave = { input ->
@@ -601,8 +585,7 @@ fun SuperContactsApp(
                         viewModel.clearDuplicateCandidates()
                         openContact(contactId)
                     },
-                    onLoadPhotoPreview = viewModel::loadContactPhotoPreview,
-                    onSaveCroppedPhoto = viewModel::saveCroppedContactPhoto,
+                    onSavePhoto = viewModel::saveContactPhoto,
                     onDeleteUnusedPhoto = viewModel::deleteUnusedContactPhoto,
                     onFieldDescriptionChange = viewModel::updateFieldDescription,
                     onSave = { input ->
@@ -683,7 +666,7 @@ fun SuperContactsApp(
                     isViewingContactInitiatives = false
                 }
             },
-            onChangePhoto = { detailPhotoPickerLauncher.launch("image/*") },
+            onChangePhoto = pickDetailPhoto,
             onCopyDeepLink = { detail ->
                 copyContactDeepLink(context, detail)
             },
@@ -791,26 +774,6 @@ fun SuperContactsApp(
         )
     }
 
-    detailPhotoSourceUri?.let { source ->
-        ContactPhotoCropDialog(
-            sourceUri = Uri.parse(source),
-            isSaving = uiState.isSaving,
-            onLoadPreview = viewModel::loadContactPhotoPreview,
-            onDismiss = { detailPhotoSourceUri = null },
-            onConfirm = { uri, cropSpec ->
-                val contactId = selectedContactId
-                if (contactId == null) {
-                    detailPhotoSourceUri = null
-                } else {
-                    viewModel.saveCroppedContactPhotoForContact(contactId, uri, cropSpec) { path ->
-                        viewModel.updateContactPhoto(contactId, path) {
-                            detailPhotoSourceUri = null
-                        }
-                    }
-                }
-            },
-        )
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1915,6 +1878,7 @@ private fun ContactRow(
                 )
                 ContactAvatar(
                     photoPath = contact.photoPath,
+                    ownerId = contact.publicId,
                     displayName = contact.displayName,
                     size = 56.dp,
                     circular = false,
@@ -2319,6 +2283,7 @@ private fun ContactDetailScreen(
                 ) {
                     ContactAvatar(
                         photoPath = detail.photoPath,
+                        ownerId = detail.publicId,
                         displayName = detail.displayName,
                         size = 96.dp,
                         circular = true,
@@ -3554,8 +3519,7 @@ private fun ContactEditScreen(
     onClearDuplicateCandidates: () -> Unit,
     onStrongDuplicateCheck: (ContactInput, (ContactDuplicateCandidate?) -> Unit) -> Unit,
     onDuplicateCandidateClick: (Long) -> Unit,
-    onLoadPhotoPreview: (Uri, (Bitmap?) -> Unit) -> Unit,
-    onSaveCroppedPhoto: (Uri, ContactPhotoCropSpec, (String) -> Unit) -> Unit,
+    onSavePhoto: (Uri, (String) -> Unit) -> Unit,
     onDeleteUnusedPhoto: (String) -> Unit,
     onFieldDescriptionChange: (Long, String) -> Unit,
     onSave: (ContactInput) -> Unit,
@@ -3582,7 +3546,6 @@ private fun ContactEditScreen(
     var instagramUsername by rememberSaveable(initialInput) { mutableStateOf(initialInput.instagramUsername) }
     var facebookUserId by rememberSaveable(initialInput) { mutableStateOf(initialInput.facebookUserId) }
     var photoPath by rememberSaveable(initialInput) { mutableStateOf(initialInput.photoPath) }
-    var cropSourceUri by rememberSaveable { mutableStateOf<String?>(null) }
     val formScrollState = rememberScrollState()
     val countryOptions = rememberCountryOptions()
 
@@ -3620,11 +3583,12 @@ private fun ContactEditScreen(
         facebookUserId = facebookUserId,
         photoPath = photoPath,
     )
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri ->
-        if (uri != null) {
-            cropSourceUri = uri.toString()
+    val pickPhoto = rememberHubPhotoPicker { selected ->
+        onSavePhoto(Uri.parse(selected.reference)) { path ->
+            if (photoPath.isNotBlank() && photoPath != initialInput.photoPath) {
+                onDeleteUnusedPhoto(photoPath)
+            }
+            photoPath = path
         }
     }
 
@@ -3722,7 +3686,7 @@ private fun ContactEditScreen(
             ErrorMessage(errorMessage, onErrorDismiss)
             ContactPhotoEditor(
                 photoPath = photoPath,
-                onPickPhoto = { imagePickerLauncher.launch("image/*") },
+                onPickPhoto = pickPhoto,
                 onRemovePhoto = {
                     if (photoPath.isNotBlank() && photoPath != initialInput.photoPath) {
                         onDeleteUnusedPhoto(photoPath)
@@ -3955,24 +3919,6 @@ private fun ContactEditScreen(
             )
             Spacer(modifier = Modifier.height(240.dp))
         }
-    }
-
-    cropSourceUri?.let { source ->
-        ContactPhotoCropDialog(
-            sourceUri = Uri.parse(source),
-            isSaving = isSaving,
-            onLoadPreview = onLoadPhotoPreview,
-            onDismiss = { cropSourceUri = null },
-            onConfirm = { uri, cropSpec ->
-                onSaveCroppedPhoto(uri, cropSpec) { path ->
-                    if (photoPath.isNotBlank() && photoPath != initialInput.photoPath) {
-                        onDeleteUnusedPhoto(photoPath)
-                    }
-                    photoPath = path
-                    cropSourceUri = null
-                }
-            },
-        )
     }
 
     val warningCandidate = strongDuplicateWarning
@@ -4751,6 +4697,7 @@ private fun ContactPhotoEditor(
     ) {
         ContactAvatar(
             photoPath = photoPath,
+            ownerId = "people-draft",
             displayName = stringResource(R.string.contact_photo),
             size = 72.dp,
             circular = false,
@@ -4773,161 +4720,9 @@ private fun ContactPhotoEditor(
 }
 
 @Composable
-internal fun ContactPhotoCropDialog(
-    sourceUri: Uri,
-    isSaving: Boolean,
-    onLoadPreview: (Uri, (Bitmap?) -> Unit) -> Unit,
-    onDismiss: () -> Unit,
-    onConfirm: (Uri, ContactPhotoCropSpec) -> Unit,
-) {
-    var preview by remember(sourceUri) { mutableStateOf<Bitmap?>(null) }
-    var loadFinished by remember(sourceUri) { mutableStateOf(false) }
-    var cropSpec by remember(sourceUri) { mutableStateOf<ContactPhotoCropSpec?>(null) }
-
-    LaunchedEffect(sourceUri) {
-        loadFinished = false
-        preview = null
-        onLoadPreview(sourceUri) { bitmap ->
-            preview = bitmap
-            cropSpec = bitmap?.centerSquareCropSpec()
-            loadFinished = true
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.crop_photo)) },
-        text = {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                val bitmap = preview
-                when {
-                    bitmap != null -> ContactPhotoCropViewport(
-                        bitmap = bitmap,
-                        onCropChanged = { cropSpec = it },
-                    )
-
-                    !loadFinished -> CircularProgressIndicator()
-                    else -> Text(stringResource(R.string.photo_load_failed))
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { cropSpec?.let { onConfirm(sourceUri, it) } },
-                enabled = preview != null && cropSpec != null && !isSaving,
-            ) {
-                Text(stringResource(R.string.use_crop))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving,
-            ) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun ContactPhotoCropViewport(
-    bitmap: Bitmap,
-    onCropChanged: (ContactPhotoCropSpec) -> Unit,
-) {
-    val density = LocalDensity.current
-    var viewportSizePx by remember { mutableStateOf(1) }
-    var scale by remember(bitmap) { mutableStateOf(1f) }
-    var offset by remember(bitmap) { mutableStateOf(Offset.Zero) }
-    val baseScale = max(
-        viewportSizePx.toFloat() / bitmap.width.toFloat(),
-        viewportSizePx.toFloat() / bitmap.height.toFloat(),
-    )
-    val totalScale = baseScale * scale
-    val drawnWidthPx = bitmap.width * totalScale
-    val drawnHeightPx = bitmap.height * totalScale
-    val maxPanX = max(0f, (drawnWidthPx - viewportSizePx) / 2f)
-    val maxPanY = max(0f, (drawnHeightPx - viewportSizePx) / 2f)
-    val boundedOffset = Offset(
-        x = offset.x.coerceIn(-maxPanX, maxPanX),
-        y = offset.y.coerceIn(-maxPanY, maxPanY),
-    )
-
-    LaunchedEffect(viewportSizePx, scale, boundedOffset, bitmap) {
-        val imageLeft = (viewportSizePx - drawnWidthPx) / 2f + boundedOffset.x
-        val imageTop = (viewportSizePx - drawnHeightPx) / 2f + boundedOffset.y
-        val cropLeft = (-imageLeft / totalScale).coerceIn(0f, bitmap.width.toFloat())
-        val cropTop = (-imageTop / totalScale).coerceIn(0f, bitmap.height.toFloat())
-        val cropWidth = (viewportSizePx / totalScale).coerceAtMost(bitmap.width - cropLeft)
-        val cropHeight = (viewportSizePx / totalScale).coerceAtMost(bitmap.height - cropTop)
-        onCropChanged(
-            ContactPhotoCropSpec(
-                leftFraction = cropLeft / bitmap.width,
-                topFraction = cropTop / bitmap.height,
-                widthFraction = cropWidth / bitmap.width,
-                heightFraction = cropHeight / bitmap.height,
-            ),
-        )
-    }
-
-    Box(
-        modifier = Modifier
-            .size(280.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(Color.Black)
-            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
-            .testTag("contact-photo-crop-viewport")
-            .onSizeChanged { viewportSizePx = it.width.coerceAtLeast(1) }
-            .pointerInput(bitmap) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, 5f)
-                    val newTotalScale = baseScale * newScale
-                    val newMaxPanX = max(0f, (bitmap.width * newTotalScale - viewportSizePx) / 2f)
-                    val newMaxPanY = max(0f, (bitmap.height * newTotalScale - viewportSizePx) / 2f)
-                    scale = newScale
-                    offset = Offset(
-                        x = (boundedOffset.x + pan.x).coerceIn(-newMaxPanX, newMaxPanX),
-                        y = (boundedOffset.y + pan.y).coerceIn(-newMaxPanY, newMaxPanY),
-                    )
-                }
-            },
-    ) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(
-                    width = with(density) { drawnWidthPx.toDp() },
-                    height = with(density) { drawnHeightPx.toDp() },
-                )
-                .offset {
-                    IntOffset(
-                        x = boundedOffset.x.roundToInt(),
-                        y = boundedOffset.y.roundToInt(),
-                    )
-                },
-        )
-    }
-}
-
-private fun Bitmap.centerSquareCropSpec(): ContactPhotoCropSpec {
-    val side = min(width, height).toFloat().coerceAtLeast(1f)
-    return ContactPhotoCropSpec(
-        leftFraction = ((width - side) / 2f) / width,
-        topFraction = ((height - side) / 2f) / height,
-        widthFraction = side / width,
-        heightFraction = side / height,
-    )
-}
-
-@Composable
 private fun ContactAvatar(
     photoPath: String,
+    ownerId: String,
     displayName: String,
     size: Dp,
     circular: Boolean,
@@ -4936,18 +4731,19 @@ private fun ContactAvatar(
     onClick: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current.applicationContext
-    val density = LocalDensity.current
-    val targetSizePx = with(density) { size.roundToPx() }
-    val bitmap by produceState<Bitmap?>(
+    val bytes by produceState<ByteArray?>(
         initialValue = null,
         key1 = photoPath,
-        key2 = targetSizePx,
     ) {
         value = if (photoPath.isBlank()) {
             null
         } else {
             withContext(Dispatchers.IO) {
-                ContactPhotoBitmapCache.load(context, photoPath, targetSizePx)
+                com.gernalix.personalhub.core.database.PersonalHubDatabase
+                    .get(context)
+                    .photoDao()
+                    .find(photoPath)
+                    ?.bytes
             }
         }
     }
@@ -4975,12 +4771,16 @@ private fun ContactAvatar(
             .then(clickableModifier),
         contentAlignment = Alignment.Center,
     ) {
-        val image = bitmap
-        if (image != null) {
-            Image(
-                bitmap = image.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+        val imageBytes = bytes
+        if (imageBytes != null) {
+            com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail(
+                photo = com.gernalix.personalhub.core.ui.photo.HubPhoto(
+                    id = photoPath,
+                    ownerId = ownerId,
+                    reference = photoPath,
+                    contentDescription = contentDescription ?: displayName,
+                    loaderData = imageBytes,
+                ),
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -6594,20 +6394,6 @@ private fun parentFieldValueFromMetadata(metadataJson: String?): String? {
         index += 1
     }
     return builder.toString()
-}
-
-private object ContactPhotoBitmapCache {
-    private val cache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 16 / 1024).toInt()) {
-        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
-    }
-
-    fun load(context: Context, reference: String, targetSizePx: Int): Bitmap? {
-        val key = "$reference:$targetSizePx"
-        cache.get(key)?.let { return it }
-        val bitmap = ContactPhotoStore(context).loadPhotoBitmap(reference, targetSizePx) ?: return null
-        cache.put(key, bitmap)
-        return bitmap
-    }
 }
 
 private fun String.initials(): String {

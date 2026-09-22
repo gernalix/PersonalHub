@@ -1,6 +1,5 @@
 package com.gernalix.personalhub.soldi
 
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -14,6 +13,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.capsules.soldi.*
+import com.gernalix.personalhub.core.ui.photo.HubPhoto
+import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
+import com.gernalix.personalhub.core.ui.photo.rememberHubPhotoPicker
 import com.gernalix.personalhub.soldi.receipt.ReceiptOcrProcessor
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -43,17 +45,13 @@ internal fun TransactionEditorV2(
     var recurrenceDay by remember(draftKey) { mutableStateOf(localDate(state.draft.occurredAt).dayOfMonth) }
     var recurrenceReminderDays by remember(draftKey) { mutableStateOf<Int?>(null) }
 
-    val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            val mimeType = context.contentResolver.getType(uri)
-            pendingAttachments = pendingAttachments + AttachmentDraft(
-                kind = if (mimeType?.startsWith("image/", ignoreCase = true) == true) "PHOTO_URI" else "URI",
-                uri = uri.toString(),
-                title = uri.lastPathSegment.orEmpty(),
-                mimeType = mimeType,
-            )
-        }
+    val pickDocument = rememberHubPhotoPicker(arrayOf("image/*", "application/pdf")) { selected ->
+        pendingAttachments = pendingAttachments + AttachmentDraft(
+            kind = if (selected.mimeType?.startsWith("image/", ignoreCase = true) == true) "PHOTO_URI" else "URI",
+            uri = selected.reference,
+            title = selected.displayName,
+            mimeType = selected.mimeType,
+        )
     }
 
     fun recurrenceDraft(): RecurrenceDraft? {
@@ -169,7 +167,7 @@ internal fun TransactionEditorV2(
                     pendingAttachments,
                     linkText,
                     { linkText = it },
-                    { documentLauncher.launch(arrayOf("image/*", "application/pdf")) },
+                    pickDocument,
                     {
                         val link = linkText.trim()
                         if (link.isNotEmpty()) {
@@ -218,17 +216,13 @@ internal fun TransferEditorV2(
     var recurrenceDay by remember(stateKey) { mutableStateOf(localDate(state.occurredAt).dayOfMonth) }
     var recurrenceReminderDays by remember(stateKey) { mutableStateOf<Int?>(null) }
 
-    val documentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            val mimeType = context.contentResolver.getType(uri)
-            pendingAttachments = pendingAttachments + AttachmentDraft(
-                if (mimeType?.startsWith("image/", ignoreCase = true) == true) "PHOTO_URI" else "URI",
-                uri.toString(),
-                uri.lastPathSegment.orEmpty(),
-                mimeType,
-            )
-        }
+    val pickDocument = rememberHubPhotoPicker(arrayOf("image/*", "application/pdf")) { selected ->
+        pendingAttachments = pendingAttachments + AttachmentDraft(
+            if (selected.mimeType?.startsWith("image/", ignoreCase = true) == true) "PHOTO_URI" else "URI",
+            selected.reference,
+            selected.displayName,
+            selected.mimeType,
+        )
     }
 
     val screenshotLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -379,7 +373,7 @@ internal fun TransferEditorV2(
                     pendingAttachments,
                     linkText,
                     { linkText = it },
-                    { documentLauncher.launch(arrayOf("image/*", "application/pdf")) },
+                    pickDocument,
                     {
                         val link = linkText.trim()
                         if (link.isNotEmpty()) { pendingAttachments = pendingAttachments + AttachmentDraft("PHOTO_URL", link, link); linkText = "" }
@@ -531,7 +525,7 @@ private fun AttachmentEditor(
 private fun AttachmentRow(title: String, uri: String, isPhoto: Boolean, onDelete: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         if (isPhoto) {
-            FinancePhotoThumbnail(uri = uri, title = title, size = 46.dp)
+            HubSquarePhotoThumbnail(HubPhoto(uri, uri, uri, title.ifBlank { "Foto transazione" }), size = 46.dp)
             Spacer(Modifier.width(10.dp))
         }
         Column(Modifier.weight(1f)) {

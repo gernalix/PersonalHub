@@ -535,11 +535,11 @@ class ContactsRepository(
                 occurredAt = now,
             )
             insertInitialFields(contactId, input, now)
-            com.gernalix.personalhub.core.database.PhotoCapsule.attach(database, contactId)
+            PeoplePhotoBinding.attach(database, contactId)
             synchronizeMessagingLinksForContact(contactId, now)
             contactId
         }
-        com.gernalix.personalhub.core.database.PhotoCapsule.discard(input.photoPath)
+        PeoplePhotoBinding.discard(input.photoPath)
         return contactId
     }
 
@@ -581,7 +581,7 @@ class ContactsRepository(
             changed = upsertFieldInternal(contactId, ContactFieldType.InstagramUsername, input.instagramUsername, 13) || changed
             changed = upsertFieldInternal(contactId, ContactFieldType.FacebookUserId, input.facebookUserId, 14) || changed
             changed = upsertFieldInternal(contactId, ContactFieldType.Photo, input.photoPath, 15) || changed
-            com.gernalix.personalhub.core.database.PhotoCapsule.attach(database, contactId)
+            PeoplePhotoBinding.attach(database, contactId)
             if (phoneChanged) {
                 synchronizeMessagingLinksForContact(contactId, System.currentTimeMillis())
             }
@@ -596,7 +596,7 @@ class ContactsRepository(
                 }
             }
         }
-        com.gernalix.personalhub.core.database.PhotoCapsule.discard(input.photoPath)
+        PeoplePhotoBinding.discard(input.photoPath)
         if (changed) {
         }
         return ContactPhotoCleanupResult(oldPhotoPath = deletableOldPhotoPath, changed = changed)
@@ -608,7 +608,7 @@ class ContactsRepository(
         database.withTransaction {
             val oldPhotoPath = dao.getFieldForContact(contactId, ContactFieldType.Photo)?.value.orEmpty()
             changed = upsertFieldInternal(contactId, ContactFieldType.Photo, photoPath, 14)
-            com.gernalix.personalhub.core.database.PhotoCapsule.attach(database, contactId)
+            PeoplePhotoBinding.attach(database, contactId)
             if (changed) {
                 touchContact(contactId, System.currentTimeMillis())
                 if (
@@ -620,7 +620,7 @@ class ContactsRepository(
                 }
             }
         }
-        com.gernalix.personalhub.core.database.PhotoCapsule.discard(photoPath)
+        PeoplePhotoBinding.discard(photoPath)
         if (changed) {
         }
         return ContactPhotoCleanupResult(oldPhotoPath = deletableOldPhotoPath, changed = changed)

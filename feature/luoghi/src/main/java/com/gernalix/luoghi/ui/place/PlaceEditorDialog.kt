@@ -36,6 +36,7 @@ import com.gernalix.luoghi.PlaceFormState
 import com.gernalix.luoghi.R
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressSuggestion
 import androidx.compose.ui.platform.testTag
+import com.gernalix.personalhub.core.ui.photo.rememberHubPhotoPicker
 
 @Composable
 fun PlaceEditorDialog(
@@ -46,10 +47,12 @@ fun PlaceEditorDialog(
     onNicknameChange: (String) -> Unit,
     onRadiusChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
+    onPhotoChange: (String) -> Unit = {},
     onSave: () -> Unit,
     onDismiss: () -> Unit,
     onTagsChange: (String) -> Unit = {},
 ) {
+    val pickPhoto = rememberHubPhotoPicker { onPhotoChange(it.reference) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -69,6 +72,8 @@ fun PlaceEditorDialog(
                     onNicknameChange = onNicknameChange,
                     onRadiusChange = onRadiusChange,
                     onNotesChange = onNotesChange,
+                    onPickPhoto = pickPhoto,
+                    onRemovePhoto = { onPhotoChange("") },
                     onTagsChange = onTagsChange,
                 )
             }
@@ -93,6 +98,8 @@ private fun PlaceEditor(
     onNicknameChange: (String) -> Unit,
     onRadiusChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
+    onPickPhoto: () -> Unit,
+    onRemovePhoto: () -> Unit,
     onTagsChange: (String) -> Unit = {},
 ) {
     Column {
@@ -120,6 +127,12 @@ private fun PlaceEditor(
             label = { Text(stringResource(R.string.notes)) },
             modifier = Modifier.fillMaxWidth(),
         )
+        TextButton(onClick = onPickPhoto) {
+            Text(stringResource(if (form.photoUri.isBlank()) R.string.place_photo_add else R.string.place_photo_replace))
+        }
+        if (form.photoUri.isNotBlank()) {
+            TextButton(onClick = onRemovePhoto) { Text(stringResource(R.string.place_photo_remove)) }
+        }
         OutlinedTextField(
             value = form.tagsText,
             onValueChange = onTagsChange,

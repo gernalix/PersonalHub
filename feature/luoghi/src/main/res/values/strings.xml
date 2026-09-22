@@ -235,6 +235,9 @@
     <string name="stat_global_share">Share of global lifetime</string>
     <string name="stat_place_lifetime_share">Share of place lifetime</string>
     <string name="notes_empty">No notes</string>
+    <string name="place_photo_add">Add photo</string>
+    <string name="place_photo_replace">Replace photo</string>
+    <string name="place_photo_remove">Remove photo</string>
     <string name="distance_kilometers_format">%1$s km</string>
     <string name="distance_meters_format">%1$s m</string>
 
