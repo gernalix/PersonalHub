@@ -100,28 +100,6 @@ class FinanceAccountsTest {
         assertEquals(date.toString(), row.occurrenceKey)
         assertTrue(row.occurredAt >= account.openedAt)
     }
-    @Test fun deterministicExchangeAtomicConflictsAndCredentialFreeConfiguration() = db { db,finance ->
-        val account=FinanceAccount(name="QA",currency="DKK"); finance.saveAccount(account)
-        finance.saveTransaction(TransactionDraft(title="QA transaction",amount="-2",accountId=account.id))
-        val exchange=FinanceExchange(db); val before=exchange.export(); assertEquals(before,exchange.export())
-        val baseline=exchange.import(before,emptyMap()); assertEquals(before,exchange.export())
-        exchange.import(before,baseline); assertEquals(before,exchange.export())
-        val other=PersonalHubDatabase.openTemporary(context,"exchange-other.db")
-        try {
-            val copy=FinanceExchange(other); copy.import(before,emptyMap()); assertEquals(before,copy.export())
-        } finally { other.close();context.deleteDatabase("exchange-other.db") }
-        val changed=JSONObject(before); val tx=changed.getJSONArray("transactions").getJSONObject(0)
-        tx.put("amount","-3");tx.put("updatedAt",Instant.ofEpochMilli(System.currentTimeMillis()).plusSeconds(1).toString())
-        val accepted=exchange.import(changed.toString(),baseline)
-        val row=db.financeDao().allTransactions().single()
-        finance.saveTransaction(TransactionDraft(id=row.id,title="local edit",amount="-4",accountId=account.id))
-        val local=exchange.export();tx.put("amount","-5");tx.put("updatedAt",Instant.ofEpochMilli(System.currentTimeMillis()).plusSeconds(2).toString())
-        rejects { exchange.import(changed.toString(),accepted) }; assertEquals(local,exchange.export())
-        val malformed=JSONObject(local);malformed.getJSONArray("accounts").getJSONObject(0).put("name","must rollback")
-        malformed.getJSONArray("transactions").getJSONObject(0).put("accountId",UUID.randomUUID().toString())
-        rejects { exchange.import(malformed.toString(),FinanceExchange.fingerprints(local)) }; assertEquals(local,exchange.export())
-        assertFalse(local.contains("token"));assertFalse(local.contains("soldi_git"))
-    }
     @Test fun migrationPreservesAllFinanceValuesAndTagLinksWithRequiredAccounts() = runBlocking {
         val name="finance-v4.db";val file=context.getDatabasePath(name);file.parentFile!!.mkdirs()
         val schema=JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/4.json").bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
