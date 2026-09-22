@@ -1,16 +1,14 @@
 package com.gernalix.personalhub.soldi
 
-import android.Manifest
-import android.app.AlarmManager
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
+import com.gernalix.personalhub.core.alerts.HubAlarmPlatform
+import com.gernalix.personalhub.core.alerts.HubAlarmPrecision
+import com.gernalix.personalhub.core.alerts.HubNotificationPlatform
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceCapsule
 import kotlinx.coroutines.CoroutineScope
@@ -71,15 +69,21 @@ internal object FinanceReminderScheduler {
 
     private fun cancelPreviouslyScheduled(context: Context) {
         val keys = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(PREF_KEYS, emptySet()).orEmpty()
-        val alarm = context.getSystemService(AlarmManager::class.java)
-        keys.forEach { key -> alarm.cancel(reminderIntent(context, key, "")) }
+        keys.forEach { key ->
+            HubAlarmPlatform.cancel(
+                context = context,
+                operation = reminderIntent(context, key, ""),
+                cancelPendingIntent = false,
+            )
+        }
     }
 
     private fun schedule(context: Context, key: String, title: String, at: Instant) {
-        context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            at.toEpochMilli(),
-            reminderIntent(context, key, title),
+        HubAlarmPlatform.schedule(
+            context = context,
+            triggerAtMs = at.toEpochMilli(),
+            operation = reminderIntent(context, key, title),
+            precision = HubAlarmPrecision.ALLOW_WHILE_IDLE,
         )
     }
 
@@ -91,23 +95,30 @@ internal object FinanceReminderScheduler {
                 .setAction(ACTION)
                 .putExtra(EXTRA_KEY, key)
                 .putExtra(EXTRA_TITLE, title),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            HubNotificationPlatform.pendingIntentFlags(),
         )
 
     fun ensureChannel(context: Context) {
-        context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Soldi reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Upcoming finance transactions and recurring payments"
-            },
+        HubNotificationPlatform.ensureChannel(
+            context = context,
+            id = CHANNEL_ID,
+            name = "Soldi reminders",
+            importance = NotificationManager.IMPORTANCE_DEFAULT,
+            description = "Upcoming finance transactions and recurring payments",
         )
     }
 
     fun post(context: Context, title: String, key: String) {
         ensureChannel(context)
-        if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        if (!HubNotificationPlatform.canPost(context)) return
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val content = launch?.let {
-            PendingIntent.getActivity(context, key.hashCode(), it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            PendingIntent.getActivity(
+                context,
+                key.hashCode(),
+                it,
+                HubNotificationPlatform.pendingIntentFlags(),
+            )
         }
         val notification = Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -116,7 +127,7 @@ internal object FinanceReminderScheduler {
             .setAutoCancel(true)
             .setContentIntent(content)
             .build()
-        context.getSystemService(NotificationManager::class.java).notify(key.hashCode(), notification)
+        HubNotificationPlatform.post(context, key.hashCode(), notification)
     }
 }
 
