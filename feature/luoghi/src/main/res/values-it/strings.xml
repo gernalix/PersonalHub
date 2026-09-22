@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="place_photo_add">Aggiungi foto</string>
-    <string name="place_photo_replace">Sostituisci foto</string>
-    <string name="place_photo_remove">Rimuovi foto</string>
-</resources>
