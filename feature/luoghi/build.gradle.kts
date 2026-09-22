@@ -130,7 +130,7 @@ dependencies {
     implementation(project(":contracts:database"))
     implementation(project(":core:database"))
     implementation(project(":core:hub-context"))
-    implementation(project(":core:alerts"))
+    implementation(project(":core:alerts"))\n    implementation(project(":core:location"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.extended)
