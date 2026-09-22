@@ -10,13 +10,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.gernalix.luoghi.R
+import com.gernalix.personalhub.core.ui.HubTimeFormat
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.util.Locale
-import java.text.NumberFormat
 import kotlinx.coroutines.delay
 
 @Composable
@@ -34,7 +33,8 @@ fun rememberMinuteNow(enabled: Boolean): Long {
 }
 
 @Composable
-fun localizedTime(timestamp: Long): String = localizedDateTime(timestamp, FormatStyle.SHORT, dateOnly = false)
+fun localizedTime(timestamp: Long): String =
+    localizedDateTime(timestamp, FormatStyle.SHORT, dateOnly = false)
 
 @Composable
 fun localizedFullDate(timestamp: Long): String {
@@ -42,10 +42,12 @@ fun localizedFullDate(timestamp: Long): String {
     val locale = configuration.locales[0]
     val zone = ZoneId.systemDefault()
     return remember(timestamp, locale, zone) {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
-            .withLocale(locale)
-            .format(Instant.ofEpochMilli(timestamp).atZone(zone))
-            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+        HubTimeFormat.date(
+            epochMs = timestamp,
+            zoneId = zone,
+            locale = locale,
+            style = FormatStyle.LONG,
+        ).replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
     }
 }
 
@@ -128,7 +130,8 @@ fun lastVisitLabel(timestamp: Long?): String? {
 }
 
 @Composable
-fun localizedDateTime(timestamp: Long): String = localizedDateTime(timestamp, FormatStyle.SHORT, dateOnly = null)
+fun localizedDateTime(timestamp: Long): String =
+    localizedDateTime(timestamp, FormatStyle.SHORT, dateOnly = null)
 
 @Composable
 private fun localizedDateTime(timestamp: Long, style: FormatStyle, dateOnly: Boolean?): String {
@@ -136,11 +139,10 @@ private fun localizedDateTime(timestamp: Long, style: FormatStyle, dateOnly: Boo
     val locale = configuration.locales[0]
     val zone = ZoneId.systemDefault()
     return remember(timestamp, locale, zone, style, dateOnly) {
-        val formatter = when (dateOnly) {
-            true -> DateTimeFormatter.ofLocalizedDate(style)
-            false -> DateTimeFormatter.ofLocalizedTime(style)
-            null -> DateTimeFormatter.ofLocalizedDateTime(style)
+        when (dateOnly) {
+            true -> HubTimeFormat.date(timestamp, zone, locale, style)
+            false -> HubTimeFormat.time(timestamp, zone, locale, style)
+            null -> HubTimeFormat.dateTime(timestamp, zone, locale, style)
         }
-        formatter.withLocale(locale).format(Instant.ofEpochMilli(timestamp).atZone(zone))
     }
 }
