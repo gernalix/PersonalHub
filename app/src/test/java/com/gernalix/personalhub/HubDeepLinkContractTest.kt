@@ -4,6 +4,7 @@ import android.net.Uri
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,6 +46,19 @@ class HubDeepLinkContractTest {
         assertEquals("2026-09-11T11:15:00+02:00", target.fromIso)
         assertEquals("2026-09-11T11:49:00+02:00", target.toIso)
         assertEquals(listOf("people", "places"), target.modules)
+    }
+
+    @Test
+    fun moduleUriKeepsLegacyShapeAndCentralizesMatching() {
+        val uri = HubDeepLinkContract.moduleUri(
+            "timer",
+            "quickEventTemplateId" to "42",
+            "optional" to null,
+        )
+        assertEquals("personalhub://module/timer?quickEventTemplateId=42", uri.toString())
+        assertTrue(HubDeepLinkContract.isModuleUri(uri, "timer"))
+        assertFalse(HubDeepLinkContract.isModuleUri(uri, "places"))
+        assertFalse(HubDeepLinkContract.isModuleUri(Uri.parse("https://module/timer"), "timer"))
     }
 
     @Test
