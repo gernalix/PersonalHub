@@ -1,10 +1,7 @@
-@file:android.annotation.SuppressLint("MissingPermission")
-
 package com.example.multitimetracker
 
-import android.app.PendingIntent
-import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -17,6 +14,7 @@ import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import com.example.multitimetracker.model.TimedTagNotificationType
 import com.gernalix.personalhub.core.alerts.AlertNotificationDispatcher
+import com.gernalix.personalhub.core.alerts.HubNotificationPlatform
 import com.gernalix.personalhub.core.database.DatabaseProfiles
 
 object TimeFenceNotifier {
@@ -52,8 +50,7 @@ object TimeFenceNotifier {
     }
 
     fun cancelNotification(context: Context, notificationId: Int) {
-        val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        nm.cancel(notificationId)
+        HubNotificationPlatform.cancel(context, notificationId)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(VibratorManager::class.java)?.defaultVibrator?.cancel()
         } else {
@@ -67,9 +64,6 @@ object TimeFenceNotifier {
     }
 
     fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val nm = context.getSystemService(NotificationManager::class.java) ?: return
-
         val alarmSound: Uri = android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI
         val notificationSound: Uri = android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
         val alarmAttrs = AudioAttributes.Builder()
@@ -81,52 +75,46 @@ object TimeFenceNotifier {
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
 
-        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                context.getString(R.string.time_fence_critical_channel_name),
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = context.getString(R.string.time_fence_critical_channel_description)
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 250, 120, 250, 120, 450)
-                enableLights(true)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                setShowBadge(true)
-                setSound(alarmSound, alarmAttrs)
-            }
-            nm.createNotificationChannel(channel)
+        HubNotificationPlatform.ensureChannel(
+            context = context,
+            id = CHANNEL_ID,
+            name = context.getString(R.string.time_fence_critical_channel_name),
+            importance = NotificationManager.IMPORTANCE_HIGH,
+            description = context.getString(R.string.time_fence_critical_channel_description),
+        ) {
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 250, 120, 250, 120, 450)
+            enableLights(true)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            setShowBadge(true)
+            setSound(alarmSound, alarmAttrs)
         }
-        if (nm.getNotificationChannel(TIMED_SESSION_NORMAL_CHANNEL_ID) == null) {
-            nm.createNotificationChannel(
-                NotificationChannel(
-                    TIMED_SESSION_NORMAL_CHANNEL_ID,
-                    context.getString(R.string.timed_session_channel_name),
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = context.getString(R.string.timed_session_channel_description)
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 250, 120, 250)
-                    enableLights(true)
-                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                    setShowBadge(true)
-                    setSound(notificationSound, notificationAttrs)
-                }
-            )
+
+        HubNotificationPlatform.ensureChannel(
+            context = context,
+            id = TIMED_SESSION_NORMAL_CHANNEL_ID,
+            name = context.getString(R.string.timed_session_channel_name),
+            importance = NotificationManager.IMPORTANCE_HIGH,
+            description = context.getString(R.string.timed_session_channel_description),
+        ) {
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 250, 120, 250)
+            enableLights(true)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            setShowBadge(true)
+            setSound(notificationSound, notificationAttrs)
         }
-        if (nm.getNotificationChannel(TIMED_SESSION_ALARM_CHANNEL_ID) == null) {
-            nm.createNotificationChannel(
-                NotificationChannel(
-                    TIMED_SESSION_ALARM_CHANNEL_ID,
-                    context.getString(R.string.timed_session_alarm_channel_name),
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = context.getString(R.string.timed_session_alarm_channel_description)
-                    enableVibration(true)
-                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                    setSound(alarmSound, alarmAttrs)
-                }
-            )
+
+        HubNotificationPlatform.ensureChannel(
+            context = context,
+            id = TIMED_SESSION_ALARM_CHANNEL_ID,
+            name = context.getString(R.string.timed_session_alarm_channel_name),
+            importance = NotificationManager.IMPORTANCE_HIGH,
+            description = context.getString(R.string.timed_session_alarm_channel_description),
+        ) {
+            enableVibration(true)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            setSound(alarmSound, alarmAttrs)
         }
     }
 
@@ -138,6 +126,7 @@ object TimeFenceNotifier {
         notificationType: TimedTagNotificationType,
     ) {
         ensureChannel(context)
+        if (!HubNotificationPlatform.canPost(context)) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         if (shouldSkipTimedSessionNotification(notificationId)) return
         if (hasActiveTimedSessionNotification(nm, notificationId)) return
@@ -151,8 +140,7 @@ object TimeFenceNotifier {
             putExtra(TimeFenceFullScreenActivity.EXTRA_NOTIFICATION_ID, notificationId)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
-        val piFlags = PendingIntent.FLAG_UPDATE_CURRENT or
-            (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
+        val piFlags = HubNotificationPlatform.pendingIntentFlags()
         val fullScreenPi = PendingIntent.getActivity(context, notificationId, fullIntent, piFlags)
         val contentPi = AlertNotificationDispatcher.contentPendingIntent(
             context = context,
@@ -188,7 +176,7 @@ object TimeFenceNotifier {
             .addAction(0, context.getString(R.string.ok), acknowledgePi)
             .build()
 
-        nm.notify(notificationId, notification)
+        HubNotificationPlatform.post(context, notificationId, notification)
     }
 
     @Synchronized
@@ -216,5 +204,4 @@ object TimeFenceNotifier {
             }
         }.getOrDefault(false)
     }
-
 }
