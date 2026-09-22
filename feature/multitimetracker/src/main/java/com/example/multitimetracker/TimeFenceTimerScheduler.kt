@@ -1,6 +1,5 @@
 package com.example.multitimetracker
 
-import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -8,15 +7,14 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import androidx.core.app.AlarmManagerCompat
+import com.gernalix.personalhub.core.alerts.HubAlarmPlatform
+import com.gernalix.personalhub.core.alerts.HubAlarmPrecision
+import com.gernalix.personalhub.core.alerts.HubNotificationPlatform
 import com.gernalix.personalhub.core.database.DatabaseProfiles
 
 object TimeFenceTimerScheduler {
-    fun canScheduleExactAlarms(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
-        return am.canScheduleExactAlarms()
-    }
+    fun canScheduleExactAlarms(context: Context): Boolean =
+        HubAlarmPlatform.canScheduleExact(context)
 
     fun openExactAlarmSettings(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
@@ -44,7 +42,6 @@ object TimeFenceTimerScheduler {
         fireAtMs: Long,
         alarmStyle: Boolean = false,
     ) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         cancelTimedSession(context, sessionId)
         val pi = timedSessionPendingIntent(
             context = context,
@@ -56,13 +53,12 @@ object TimeFenceTimerScheduler {
             requestCode = sessionId.toInt(),
             data = Uri.parse("mtt://timed-session/$sessionId/show"),
         )
-        setExact(am, fireAtMs, pi, showPi, alarmStyle)
+        scheduleExact(context, fireAtMs, pi, showPi, alarmStyle)
     }
 
     fun cancelTimedSession(context: Context, sessionId: Long) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        cancelPendingIntent(am, timedSessionPendingIntent(context, sessionId, legacyIdentity = false))
-        cancelPendingIntent(am, timedSessionPendingIntent(context, sessionId, legacyIdentity = true))
+        cancelPendingIntent(context, timedSessionPendingIntent(context, sessionId, legacyIdentity = false))
+        cancelPendingIntent(context, timedSessionPendingIntent(context, sessionId, legacyIdentity = true))
     }
 
     fun scheduleRandomAlert(
@@ -73,19 +69,17 @@ object TimeFenceTimerScheduler {
         message: String,
     ) {
         if (fireAtMs <= System.currentTimeMillis()) return
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val pi = randomAlertPendingIntent(context, identity, fireAtMs, title, message)
         val showPi = alarmClockShowIntent(
             context = context,
             requestCode = (identity.hashCode() xor fireAtMs.hashCode()),
             data = Uri.parse("mtt://random-alert/$identity/$fireAtMs/show"),
         )
-        setExact(am, fireAtMs, pi, showPi, alarmStyle = false)
+        scheduleExact(context, fireAtMs, pi, showPi, alarmStyle = false)
     }
 
     fun cancelRandomAlert(context: Context, identity: String, fireAtMs: Long) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        cancelPendingIntent(am, randomAlertPendingIntent(context, identity, fireAtMs, "", ""))
+        cancelPendingIntent(context, randomAlertPendingIntent(context, identity, fireAtMs, "", ""))
     }
 
     fun cancelLegacyTimerAlert(
@@ -94,9 +88,8 @@ object TimeFenceTimerScheduler {
         sessionId: Long,
         expectedSessionStartAtMs: Long,
     ) {
-        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         cancelPendingIntent(
-            am,
+            context,
             legacyTimerAlertPendingIntent(
                 context = context,
                 ruleId = ruleId,
@@ -106,7 +99,7 @@ object TimeFenceTimerScheduler {
             )
         )
         cancelPendingIntent(
-            am,
+            context,
             legacyTimerAlertPendingIntent(
                 context = context,
                 ruleId = ruleId,
@@ -117,13 +110,11 @@ object TimeFenceTimerScheduler {
         )
     }
 
-    private fun immutableFlags(base: Int): Int {
-        return base or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
-    }
+    private fun immutableFlags(base: Int): Int =
+        HubNotificationPlatform.pendingIntentFlags(base)
 
-    private fun cancelPendingIntent(am: AlarmManager, pi: PendingIntent) {
-        am.cancel(pi)
-        pi.cancel()
+    private fun cancelPendingIntent(context: Context, pi: PendingIntent) {
+        HubAlarmPlatform.cancel(context, pi)
     }
 
     private fun alarmClockShowIntent(
@@ -217,32 +208,23 @@ object TimeFenceTimerScheduler {
         )
     }
 
-    private fun setExact(
-        am: AlarmManager,
+    private fun scheduleExact(
+        context: Context,
         fireAtMs: Long,
         pi: PendingIntent,
         showPi: PendingIntent,
         alarmStyle: Boolean = false,
     ) {
-        val exactDenied = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()
-        try {
-            if (alarmStyle || exactDenied) {
-                AlarmManagerCompat.setAlarmClock(am, fireAtMs, showPi, pi)
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, fireAtMs, pi)
-            } else {
-                am.setExact(AlarmManager.RTC_WAKEUP, fireAtMs, pi)
-            }
-        } catch (se: SecurityException) {
-            if (!alarmStyle) {
-                runCatching { AlarmManagerCompat.setAlarmClock(am, fireAtMs, showPi, pi) }
-                    .onSuccess { return }
-            }
-            Log.w("MTT_TIMER", "Exact alarm denied; falling back to setWindow fireAtMs=$fireAtMs", se)
-            val windowMs = 30_000L
-            am.setWindow(AlarmManager.RTC_WAKEUP, fireAtMs, windowMs, pi)
-        } catch (error: RuntimeException) {
-            Log.e("MTT_TIMER", "Unable to schedule timed session fireAtMs=$fireAtMs", error)
+        val scheduled = HubAlarmPlatform.schedule(
+            context = context,
+            triggerAtMs = fireAtMs,
+            operation = pi,
+            precision = HubAlarmPrecision.EXACT,
+            showIntent = showPi,
+            alarmStyle = alarmStyle,
+        )
+        if (!scheduled) {
+            Log.e("MTT_TIMER", "Unable to schedule timed session fireAtMs=$fireAtMs")
         }
     }
 
