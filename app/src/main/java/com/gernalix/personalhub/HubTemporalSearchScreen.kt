@@ -25,6 +25,7 @@ import com.gernalix.personalhub.core.hubcontext.*
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem
+import com.gernalix.personalhub.core.ui.HubTimeFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -33,7 +34,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 internal data class TemporalEntry(
@@ -47,10 +47,8 @@ internal data class TemporalEntry(
     val selectable: Boolean = true,
 )
 
-private val temporalInputFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
-
 private fun formatTemporalInput(epochMs: Long): String =
-    Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).format(temporalInputFormatter)
+    HubTimeFormat.pattern(epochMs, "uuuu-MM-dd HH:mm")
 
 internal data class SavedEpisodeEntry(
     val contextId: String,
