@@ -25,7 +25,7 @@ class SoldiTransactionHubAdapter(private val context: Context) : HubEntityAdapte
     override suspend fun summaries(canonicalIds: Set<String>) = if (canonicalIds.isEmpty()) emptyMap() else
         dao.transactionViewsByUuid(canonicalIds.toList()).associate { it.value.uuid to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchTransactionViews(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/soldi?transactionUuid=${android.net.Uri.encode(canonicalId)}", "com.gernalix.personalhub.soldi.SoldiActivity")
+    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("soldi", "transactionUuid" to canonicalId).toString(), "com.gernalix.personalhub.soldi.SoldiActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val cursor = decodeFinanceCursor(query.cursor)
