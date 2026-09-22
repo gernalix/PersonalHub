@@ -40,6 +40,31 @@ Places tags are first-class canonical rows in `place_tags` with a many-to-many `
 
 If an alert message consists only of one supported `http://`, `https://` or Workflowy URI, the notification content intent opens that URI directly. Other text keeps the normal PersonalHub destination. Unsafe schemes such as `intent:`, `file:` and `content:` are not auto-opened. The optional Tasker bridge sends `com.gernalix.personalhub.ALERT_FIRED` explicitly to Tasker's package, so no generic broadcast leaks alert contents to unrelated apps.
 
+## Shared cross-feature platform services
+
+Cross-module mechanics that would otherwise drift between feature capsules are owned once:
+
+- `:core:alerts` owns Android notification/alarm plumbing through `HubNotificationPlatform` and
+  `HubAlarmPlatform`: notification permission checks, channel creation, immutable
+  `PendingIntent` flags, posting/cancellation and common alarm scheduling/fallbacks. Feature
+  modules still own *when* an alert/reminder should fire, its domain text and any genuinely
+  specialized behavior such as Timer full-screen alarms.
+- `:core:location` owns the location-suggestion abstraction and the concrete canonical-Places
+  and Google Places providers. People and Places keep thin compatibility adapters/UI policy; they
+  do not implement separate address engines or mirror the Places contract through a private
+  ContentProvider API.
+- `:core:hub-context` owns `HubSearchQuery`, `HubSearchEngine` and the canonical saved-search
+  store. Feature `HubEntityAdapter.search` methods remain bounded domain providers; cross-module
+  filtering, ranking and saved-query representation are shared.
+- `:core:ui` owns only genuinely generic presentation primitives and user-facing time
+  conversion/formatting. Persistence/UTC codecs remain with the data contract that defines their
+  semantics.
+- `HubDeepLinkContract` is the sole constructor for `personalhub://` module/feature routing
+  URIs. Feature code must not hand-build scheme/authority/path strings.
+
+These cores are infrastructure seams, not feature owners. They must never contain module-specific
+business rules merely to reduce line count.
+
 ## Android feature runtime ownership
 
 Each feature owns its Android runtime declaration in its own library manifest: Activities, receivers, providers, services, feature-specific permissions and its stable `com.gernalix.personalhub.shortcut.*` public alias. The host manifest declares only host/core components and therefore does not need to know feature implementation class names. Home navigation, pinned shortcuts and static shortcuts all target the same stable aliases. `checkArchitectureBoundaries` rejects host-manifest feature components, private feature class names embedded in host Kotlin and host imports outside the direct `.api`/`.hub` surfaces.
