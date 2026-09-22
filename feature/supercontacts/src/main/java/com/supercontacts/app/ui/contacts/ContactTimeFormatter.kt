@@ -1,34 +1,31 @@
 package com.supercontacts.app.ui.contacts
 
-import java.time.Instant
+import com.gernalix.personalhub.core.ui.HubTimeFormat
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
 object ContactTimeFormatter {
-    private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-yy HH:mm")
-    private val dateFormatter = DateTimeFormatter.ofPattern("dd-MM-yy")
-    private val monthFormatter = DateTimeFormatter.ofPattern("LLLL yyyy")
-
     fun formatDateTime(
         timestampUtcMillis: Long,
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): String =
-        dateTimeFormatter
-            .withZone(zoneId)
-            .format(Instant.ofEpochMilli(timestampUtcMillis))
+        HubTimeFormat.pattern(
+            epochMs = timestampUtcMillis,
+            pattern = "dd-MM-yy HH:mm",
+            zoneId = zoneId,
+        )
 
     fun formatMonth(
         month: YearMonth,
         locale: Locale = Locale.getDefault(),
     ): String =
-        month.format(monthFormatter.withLocale(locale))
+        HubTimeFormat.yearMonth(month, "LLLL yyyy", locale)
 
     fun formatDate(date: LocalDate): String =
-        date.format(dateFormatter)
+        HubTimeFormat.localDate(date, "dd-MM-yy")
 
     fun weekdayHeaders(
         locale: Locale = Locale.getDefault(),
