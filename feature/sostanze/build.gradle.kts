@@ -32,7 +32,8 @@ android {
 dependencies {
     implementation(project(":contracts:database"))
     implementation(project(":core:database"))
-    implementation(project(":core:hub-context"))\n    implementation(project(":core:alerts"))
+    implementation(project(":core:hub-context"))
+    implementation(project(":core:alerts"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
