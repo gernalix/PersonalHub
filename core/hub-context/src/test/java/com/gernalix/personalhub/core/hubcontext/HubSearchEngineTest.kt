@@ -19,7 +19,7 @@ class HubSearchEngineTest {
             capabilities = setOf("person"),
             rows = listOf(
                 HubEntitySummary(HubEntityRef("people", "person", "1"), "Alice"),
-                HubEntitySummary(HubEntityRef("people", "person", "2"), "Malice"),
+                HubEntitySummary(HubEntityRef("people", "person", "2"), "Bob"),
                 HubEntitySummary(HubEntityRef("people", "person", "3"), "Archived Alice", lifecycle = HubEntityLifecycle.ARCHIVED),
             ),
         )
