@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -45,6 +44,8 @@ import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.HubContextView
+import com.gernalix.personalhub.core.ui.HubLoadingPane
+import com.gernalix.personalhub.core.ui.HubMessagePane
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -226,28 +227,17 @@ private suspend fun resolveEntityIntent(
 
 @Composable
 private fun LoadingScreen() {
-    Column(
-        Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) { CircularProgressIndicator() }
+    HubLoadingPane()
 }
 
 @Composable
 private fun DeepLinkErrorScreen(messageRes: Int, onBack: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(stringResource(messageRes), style = MaterialTheme.typography.bodyLarge)
-        OutlinedButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
-            Text(stringResource(R.string.deep_link_back))
-        }
-    }
+    HubMessagePane(
+        message = stringResource(messageRes),
+        actionLabel = stringResource(R.string.deep_link_back),
+        onAction = onBack,
+        modifier = Modifier.windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing),
+    )
 }
 
 private fun copyText(context: Context, label: String, value: String) {
