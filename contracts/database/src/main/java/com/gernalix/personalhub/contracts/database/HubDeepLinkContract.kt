@@ -2,7 +2,7 @@ package com.gernalix.personalhub.contracts.database
 
 import android.net.Uri
 
-/** Stable public permalink contract for canonical PersonalHub data. */
+/** Stable public permalink contract for canonical PersonalHub data and stable module launch URIs. */
 object HubDeepLinkContract {
     const val SCHEME = "personalhub"
     const val VERSION = "v1"
@@ -15,6 +15,7 @@ object HubDeepLinkContract {
     private const val CONTEXT = "context"
     private const val EVENT = "event"
     private const val SEARCH = "search"
+    private const val MODULE = "module"
     private const val PARAM_ACTION = "action"
     private const val PARAM_FROM = "from"
     private const val PARAM_TO = "to"
@@ -67,6 +68,40 @@ object HubDeepLinkContract {
 
     fun contextUri(contextId: String): Uri = simpleUri(CONTEXT, contextId)
     fun eventUri(eventId: String): Uri = simpleUri(EVENT, eventId)
+
+    /**
+     * Stable compatibility URI for feature-module launchers/shortcuts/widgets.
+     *
+     * Feature code must use this builder instead of constructing personalhub://module/... manually,
+     * so scheme/authority/path semantics stay centralized while existing public links remain valid.
+     */
+    fun moduleUri(
+        moduleId: String,
+        vararg queryParameters: Pair<String, String?>,
+    ): Uri {
+        val normalizedModuleId = moduleId.trim()
+        require(normalizedModuleId.isNotEmpty())
+        return Uri.Builder()
+            .scheme(SCHEME)
+            .authority(MODULE)
+            .appendPath(normalizedModuleId)
+            .apply {
+                queryParameters.forEach { (name, value) ->
+                    val normalizedName = name.trim()
+                    require(normalizedName.isNotEmpty())
+                    value?.let { appendQueryParameter(normalizedName, it) }
+                }
+            }
+            .build()
+    }
+
+    fun isModuleUri(uri: Uri?, moduleId: String): Boolean {
+        val normalizedModuleId = moduleId.trim()
+        if (uri == null || normalizedModuleId.isEmpty()) return false
+        return uri.scheme.equals(SCHEME, ignoreCase = true) &&
+            uri.host.equals(MODULE, ignoreCase = true) &&
+            uri.pathSegments == listOf(normalizedModuleId)
+    }
 
     fun searchUri(
         fromIso: String? = null,
