@@ -119,7 +119,15 @@ internal class HubComposerState(
             rankingMembersKey = membersKey
         }
         val adapter = selectedAdapter() ?: run { results = emptyList(); return }
-        val candidates = withContext(Dispatchers.IO) { adapter.search(query, 50) }
+        val candidates = HubContextRuntime.search(
+            HubSearchQuery(
+                text = query,
+                modules = setOf(adapter.moduleId),
+                entityKinds = setOf(adapter.entityKind),
+                perAdapterLimit = 50,
+                limit = 50,
+            )
+        ).results.map(HubSearchResult::summary)
         results = rankComposerCandidates(candidates, rankingCounts, rankingPlaceId).take(5)
     }
 
