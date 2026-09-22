@@ -41,7 +41,7 @@ class HealthHubAdapter(private val context: Context, override val entityKind: St
             buildList { while(c.moveToNext()) add(HubEntitySummary(HubEntityRef(moduleId,entityKind,c.getString(0)),c.getString(1))) }
         }
     }
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget("personalhub://module/salute", "com.gernalix.personalhub.salute.SaluteActivity")
+    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("salute").toString(), "com.gernalix.personalhub.salute.SaluteActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = run {
         if (entityKind != "event") return@run HubTemporalPage(emptyList())
