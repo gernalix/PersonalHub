@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 21,
-    "identityHash": "a279846960232516918ce4b149c31919",
+    "identityHash": "7b21745c7c548b03282ae48e9542b756",
     "entities": [
       {
         "tableName": "finance_accounts",
@@ -233,7 +233,7 @@
       },
       {
         "tableName": "finance_transactions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `accountId` TEXT NOT NULL, `uuid` TEXT NOT NULL, `titleId` INTEGER, `productId` INTEGER, `amount` TEXT NOT NULL, `currency` TEXT NOT NULL, `chainId` INTEGER, `placeId` TEXT, `fromReceipt` INTEGER NOT NULL, `notes` TEXT NOT NULL, `occurredAt` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `personId` INTEGER DEFAULT NULL, `macroId` TEXT DEFAULT NULL, `recurrenceId` TEXT DEFAULT NULL, `occurrenceKey` TEXT DEFAULT NULL, `reminderAt` INTEGER DEFAULT NULL, `category` TEXT NOT NULL DEFAULT '', FOREIGN KEY(`accountId`) REFERENCES `finance_accounts`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`titleId`) REFERENCES `finance_titles`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`productId`) REFERENCES `finance_products`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`chainId`) REFERENCES `finance_chains`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`placeId`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `accountId` TEXT NOT NULL, `uuid` TEXT NOT NULL, `titleId` INTEGER, `productId` INTEGER, `amount` TEXT NOT NULL, `currency` TEXT NOT NULL, `chainId` INTEGER, `placeId` TEXT, `fromReceipt` INTEGER NOT NULL, `notes` TEXT NOT NULL, `occurredAt` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `personId` INTEGER DEFAULT NULL, `macroId` TEXT DEFAULT NULL, `recurrenceId` TEXT DEFAULT NULL, `occurrenceKey` TEXT DEFAULT NULL, `reminderAt` INTEGER DEFAULT NULL, FOREIGN KEY(`accountId`) REFERENCES `finance_accounts`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`titleId`) REFERENCES `finance_titles`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`productId`) REFERENCES `finance_products`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`chainId`) REFERENCES `finance_chains`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`placeId`) REFERENCES `places`(`uuid`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
@@ -344,13 +344,6 @@
             "columnName": "reminderAt",
             "affinity": "INTEGER",
             "defaultValue": "NULL"
-          },
-          {
-            "fieldPath": "category",
-            "columnName": "category",
-            "affinity": "TEXT",
-            "notNull": true,
-            "defaultValue": "''"
           }
         ],
         "primaryKey": {
@@ -468,15 +461,6 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_finance_transactions_reminderAt` ON `${TABLE_NAME}` (`reminderAt`)"
-          },
-          {
-            "name": "index_finance_transactions_category",
-            "unique": false,
-            "columnNames": [
-              "category"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_finance_transactions_category` ON `${TABLE_NAME}` (`category`)"
           }
         ],
         "foreignKeys": [
@@ -816,7 +800,7 @@
       },
       {
         "tableName": "finance_recurrences",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `amount` TEXT NOT NULL, `currency` TEXT NOT NULL, `accountId` TEXT NOT NULL, `personId` INTEGER, `chain` TEXT NOT NULL, `placeId` TEXT, `notes` TEXT NOT NULL, `dayOfMonth` INTEGER, `lastBusinessDay` INTEGER NOT NULL, `startDate` TEXT NOT NULL, `endDate` TEXT, `reminderDaysBefore` INTEGER, `enabled` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `kind` TEXT NOT NULL, `targetAccountId` TEXT, `targetAmount` TEXT, `quotedRate` TEXT, `feeAmount` TEXT, `feeCurrency` TEXT, `category` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`accountId`) REFERENCES `finance_accounts`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `amount` TEXT NOT NULL, `currency` TEXT NOT NULL, `accountId` TEXT NOT NULL, `personId` INTEGER, `chain` TEXT NOT NULL, `placeId` TEXT, `notes` TEXT NOT NULL, `dayOfMonth` INTEGER, `lastBusinessDay` INTEGER NOT NULL, `startDate` TEXT NOT NULL, `endDate` TEXT, `reminderDaysBefore` INTEGER, `enabled` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `kind` TEXT NOT NULL, `targetAccountId` TEXT, `targetAmount` TEXT, `quotedRate` TEXT, `feeAmount` TEXT, `feeCurrency` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`accountId`) REFERENCES `finance_accounts`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "id",
@@ -945,12 +929,6 @@
             "fieldPath": "feeCurrency",
             "columnName": "feeCurrency",
             "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "category",
-            "columnName": "category",
-            "affinity": "TEXT",
-            "notNull": true
           }
         ],
         "primaryKey": {
@@ -995,15 +973,6 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_finance_recurrences_startDate` ON `${TABLE_NAME}` (`startDate`)"
-          },
-          {
-            "name": "index_finance_recurrences_category",
-            "unique": false,
-            "columnNames": [
-              "category"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_finance_recurrences_category` ON `${TABLE_NAME}` (`category`)"
           }
         ],
         "foreignKeys": [
@@ -3706,7 +3675,7 @@
       },
       {
         "tableName": "alert_place_tag_targets",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rule_id` TEXT NOT NULL, `place_tag_id` INTEGER NOT NULL, PRIMARY KEY(`rule_id`, `place_tag_id`), FOREIGN KEY(`rule_id`) REFERENCES `alert_rules`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`place_tag_id`) REFERENCES `place_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rule_id` TEXT NOT NULL, `place_tag_id` TEXT NOT NULL, PRIMARY KEY(`rule_id`, `place_tag_id`), FOREIGN KEY(`rule_id`) REFERENCES `alert_rules`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`place_tag_id`) REFERENCES `hub_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "ruleId",
@@ -3717,7 +3686,7 @@
           {
             "fieldPath": "placeTagId",
             "columnName": "place_tag_id",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           }
         ],
@@ -3761,7 +3730,7 @@
             ]
           },
           {
-            "table": "place_tags",
+            "table": "hub_tags",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
@@ -7066,6 +7035,465 @@
         ]
       },
       {
+        "tableName": "hub_tags",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `namespace` TEXT NOT NULL, `kind` TEXT NOT NULL, `name` TEXT NOT NULL, `normalized_name` TEXT NOT NULL, `description` TEXT, `icon` TEXT, `color` TEXT, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `archived` INTEGER NOT NULL, `pinned` INTEGER NOT NULL, `is_global` INTEGER NOT NULL, `last_used_at` INTEGER, `usage_count` INTEGER NOT NULL, `metadata_json` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespace",
+            "columnName": "namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedName",
+            "columnName": "normalized_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "icon",
+            "columnName": "icon",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archived",
+            "columnName": "archived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pinned",
+            "columnName": "pinned",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isGlobal",
+            "columnName": "is_global",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUsedAt",
+            "columnName": "last_used_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "usageCount",
+            "columnName": "usage_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metadataJson",
+            "columnName": "metadata_json",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_hub_tags_namespace_normalized_name",
+            "unique": true,
+            "columnNames": [
+              "namespace",
+              "normalized_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_hub_tags_namespace_normalized_name` ON `${TABLE_NAME}` (`namespace`, `normalized_name`)"
+          },
+          {
+            "name": "index_hub_tags_namespace",
+            "unique": false,
+            "columnNames": [
+              "namespace"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tags_namespace` ON `${TABLE_NAME}` (`namespace`)"
+          },
+          {
+            "name": "index_hub_tags_archived",
+            "unique": false,
+            "columnNames": [
+              "archived"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tags_archived` ON `${TABLE_NAME}` (`archived`)"
+          },
+          {
+            "name": "index_hub_tags_pinned",
+            "unique": false,
+            "columnNames": [
+              "pinned"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tags_pinned` ON `${TABLE_NAME}` (`pinned`)"
+          },
+          {
+            "name": "index_hub_tags_last_used_at",
+            "unique": false,
+            "columnNames": [
+              "last_used_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tags_last_used_at` ON `${TABLE_NAME}` (`last_used_at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "hub_tag_aliases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tag_id` TEXT NOT NULL, `namespace` TEXT NOT NULL, `alias` TEXT NOT NULL, `normalized_alias` TEXT NOT NULL, PRIMARY KEY(`tag_id`, `normalized_alias`), FOREIGN KEY(`tag_id`) REFERENCES `hub_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "tagId",
+            "columnName": "tag_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespace",
+            "columnName": "namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedAlias",
+            "columnName": "normalized_alias",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tag_id",
+            "normalized_alias"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_hub_tag_aliases_tag_id",
+            "unique": false,
+            "columnNames": [
+              "tag_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tag_aliases_tag_id` ON `${TABLE_NAME}` (`tag_id`)"
+          },
+          {
+            "name": "index_hub_tag_aliases_namespace_normalized_alias",
+            "unique": true,
+            "columnNames": [
+              "namespace",
+              "normalized_alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_hub_tag_aliases_namespace_normalized_alias` ON `${TABLE_NAME}` (`namespace`, `normalized_alias`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "hub_tags",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "tag_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "hub_tag_assignments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`target_binding_id` TEXT NOT NULL, `tag_id` TEXT NOT NULL, `assigned_at` INTEGER NOT NULL, `provenance` TEXT NOT NULL, PRIMARY KEY(`target_binding_id`, `tag_id`), FOREIGN KEY(`target_binding_id`) REFERENCES `hub_entity_bindings`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`tag_id`) REFERENCES `hub_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "targetBindingId",
+            "columnName": "target_binding_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagId",
+            "columnName": "tag_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assignedAt",
+            "columnName": "assigned_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provenance",
+            "columnName": "provenance",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "target_binding_id",
+            "tag_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_hub_tag_assignments_target_binding_id",
+            "unique": false,
+            "columnNames": [
+              "target_binding_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tag_assignments_target_binding_id` ON `${TABLE_NAME}` (`target_binding_id`)"
+          },
+          {
+            "name": "index_hub_tag_assignments_tag_id",
+            "unique": false,
+            "columnNames": [
+              "tag_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tag_assignments_tag_id` ON `${TABLE_NAME}` (`tag_id`)"
+          },
+          {
+            "name": "index_hub_tag_assignments_assigned_at",
+            "unique": false,
+            "columnNames": [
+              "assigned_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tag_assignments_assigned_at` ON `${TABLE_NAME}` (`assigned_at`)"
+          },
+          {
+            "name": "index_hub_tag_assignments_provenance",
+            "unique": false,
+            "columnNames": [
+              "provenance"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tag_assignments_provenance` ON `${TABLE_NAME}` (`provenance`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "hub_entity_bindings",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "target_binding_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "hub_tags",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "tag_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "hub_tag_parents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`child_tag_id` TEXT NOT NULL, `parent_tag_id` TEXT NOT NULL, PRIMARY KEY(`child_tag_id`, `parent_tag_id`), FOREIGN KEY(`child_tag_id`) REFERENCES `hub_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`parent_tag_id`) REFERENCES `hub_tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "childTagId",
+            "columnName": "child_tag_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentTagId",
+            "columnName": "parent_tag_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "child_tag_id",
+            "parent_tag_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_hub_tag_parents_child_tag_id",
+            "unique": false,
+            "columnNames": [
+              "child_tag_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tag_parents_child_tag_id` ON `${TABLE_NAME}` (`child_tag_id`)"
+          },
+          {
+            "name": "index_hub_tag_parents_parent_tag_id",
+            "unique": false,
+            "columnNames": [
+              "parent_tag_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_tag_parents_parent_tag_id` ON `${TABLE_NAME}` (`parent_tag_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "hub_tags",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "child_tag_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "hub_tags",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "parent_tag_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "hub_saved_tag_filters",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `namespace` TEXT NOT NULL, `name` TEXT NOT NULL, `query_json` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespace",
+            "columnName": "namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queryJson",
+            "columnName": "query_json",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_hub_saved_tag_filters_namespace_name",
+            "unique": true,
+            "columnNames": [
+              "namespace",
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_hub_saved_tag_filters_namespace_name` ON `${TABLE_NAME}` (`namespace`, `name`)"
+          },
+          {
+            "name": "index_hub_saved_tag_filters_updated_at",
+            "unique": false,
+            "columnNames": [
+              "updated_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_hub_saved_tag_filters_updated_at` ON `${TABLE_NAME}` (`updated_at`)"
+          }
+        ]
+      },
+      {
         "tableName": "hub_resources",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `kind` TEXT NOT NULL, `title` TEXT, `value` TEXT NOT NULL, `persistedPermission` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
@@ -7326,7 +7754,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a279846960232516918ce4b149c31919')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7b21745c7c548b03282ae48e9542b756')"
     ]
   }
 }

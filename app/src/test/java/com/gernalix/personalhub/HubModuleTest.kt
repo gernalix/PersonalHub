@@ -7,8 +7,8 @@ import org.junit.Test
 
 class HubModuleTest {
     @Test
-    fun hubContainsExactlyTheSevenFeatureAliases() {
-        assertEquals(7, HubModule.entries.size)
+    fun hubContainsExactlyTheSixFeatureAliases() {
+        assertEquals(6, HubModule.entries.size)
         assertEquals(
             setOf("people", "timer", "places", "substances", "wordpulse", "soldi"),
             HubModule.entries.map { it.shortcutPath }.toSet(),
@@ -23,7 +23,7 @@ class HubModuleTest {
     @Test
     fun everyShortcutHasItsOwnAliasComponent() {
         val aliases = HubModule.entries.map { it.shortcutActivityAliasName }
-        assertEquals(7, aliases.size)
+        assertEquals(6, aliases.size)
         assertEquals(aliases.size, aliases.toSet().size)
         assertTrue(aliases.none { it == "com.gernalix.personalhub.MainActivity" })
     }
@@ -31,7 +31,7 @@ class HubModuleTest {
     @Test
     fun everyPinnedShortcutHasItsOwnStableIdAndIcon() {
         val pinnedIds = HubModule.entries.map { it.pinnedShortcutId }
-        assertEquals(7, pinnedIds.size)
+        assertEquals(6, pinnedIds.size)
         assertEquals(pinnedIds.size, pinnedIds.toSet().size)
         assertTrue(HubModule.entries.all { it.shortcutIconRes != 0 })
     }
