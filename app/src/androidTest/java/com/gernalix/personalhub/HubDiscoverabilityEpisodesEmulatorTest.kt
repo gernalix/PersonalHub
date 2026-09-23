@@ -3,11 +3,13 @@ package com.gernalix.personalhub
 import android.content.Context
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.gernalix.personalhub.contracts.database.HubCreateRequest
@@ -69,9 +71,13 @@ class HubDiscoverabilityEpisodesEmulatorTest {
         composeRule.onNodeWithText(context.getString(R.string.home_context_help)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.home_search)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.home_search_help)).assertIsDisplayed()
+        composeRule.onNodeWithTag("home-utilities")
+            .performScrollToNode(hasText(context.getString(R.string.home_activity_register)))
         composeRule.onNodeWithText(context.getString(R.string.home_activity_register)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.home_activity_help)).assertIsDisplayed()
 
+        composeRule.onNodeWithTag("home-utilities")
+            .performScrollToNode(hasText(context.getString(R.string.home_search)))
         composeRule.onNodeWithText(context.getString(R.string.home_search)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.temporal_saved_episodes)).assertIsDisplayed()
         composeRule.onNodeWithText(episodeTitle).assertIsDisplayed()

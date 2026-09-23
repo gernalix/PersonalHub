@@ -51,7 +51,7 @@ class SharedTagsMigrationTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             val db = owner.openHelper.writableDatabase
-            assertEquals(19, db.version)
+            assertEquals(20, db.version)
             assertEquals(1L, scalar(db, "SELECT count(*) FROM hub_tag_assignments a JOIN hub_entity_bindings b ON b.id=a.target_binding_id WHERE a.tag_id='people:1' AND b.canonical_id='person-a'"))
             assertEquals(1L, scalar(db, "SELECT count(*) FROM hub_tag_assignments a JOIN hub_entity_bindings b ON b.id=a.target_binding_id WHERE a.tag_id='places:1' AND b.canonical_id='place-p'"))
             assertEquals(2L, scalar(db, "SELECT count(*) FROM hub_tag_assignments WHERE tag_id='soldi:1'"))

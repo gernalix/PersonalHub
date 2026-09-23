@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -132,7 +133,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             LazyRow(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("home-utilities"),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item { HomeUtilityButton(R.string.home_context, R.string.home_context_help) { topDestination = "composer" } }
