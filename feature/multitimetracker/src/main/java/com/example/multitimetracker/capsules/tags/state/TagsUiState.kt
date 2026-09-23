@@ -23,6 +23,8 @@ data class TagsUiState(
     val nowMs: Long,
     val effectiveNowMs: Long,
     val isReadOnly: Boolean,
+    val eventTags: List<Tag> = emptyList(),
+    val sinceWhenTags: List<Tag> = emptyList(),
 ) {
     fun effectiveTimeContext() = EffectiveTimeContext(nowMs)
 }
@@ -31,4 +33,6 @@ data class TagsHostState(
     val nowMs: Long,
     val effectiveNowMs: Long,
     val isReadOnly: Boolean,
+    val eventTags: List<Tag> = emptyList(),
+    val sinceWhenTags: List<Tag> = emptyList(),
 )

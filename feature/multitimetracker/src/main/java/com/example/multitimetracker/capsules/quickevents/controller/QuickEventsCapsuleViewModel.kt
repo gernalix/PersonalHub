@@ -500,6 +500,7 @@ class QuickEventsCapsuleViewModel(
             access.quickEventCore(ctx).readSnapshot()
         }
         liveSnapshot.value = snapshot.toCapsuleSnapshot()
+        access.syncSharedTagAssignments(liveSnapshot.value)
     }
 
     private fun buildUiState(host: QuickEventsHostState, snapshot: QuickEventsSnapshot): QuickEventsUiState {

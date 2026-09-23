@@ -198,8 +198,9 @@ private fun LuoghiNavigation(
             onDeletePlace = { pendingDeletePlaceId = it.place.uuid },
             onSortPlaces = vm::updatePlaceSort,
             onRefreshLocation = vm::refreshListLocation,
+            onToggleTagFilter = vm::togglePlaceTagFilter,
             onGlobalMap = {
-                context.startActivity(MapViewerCapsule.globalMapIntent(context, state.places))
+                context.startActivity(MapViewerCapsule.globalMapIntent(context, state.placeItems.map { it.place }))
             },
             onGlobalStats = {
                 globalStatsOpen = true

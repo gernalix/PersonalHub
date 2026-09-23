@@ -35,8 +35,8 @@ class FinanceCapsuleTest {
         assertEquals(1, scalar(db, "SELECT count(*) FROM finance_products"))
         assertEquals(1, scalar(db, "SELECT count(*) FROM finance_chains"))
         assertEquals(1, scalar(db, "SELECT count(*) FROM places"))
-        assertEquals(2, scalar(db, "SELECT count(*) FROM finance_tags"))
-        assertEquals(4, scalar(db, "SELECT count(*) FROM finance_transaction_tags"))
+        assertEquals(2, scalar(db, "SELECT count(*) FROM hub_tags WHERE namespace='soldi'"))
+        assertEquals(4, scalar(db, "SELECT count(*) FROM hub_tag_assignments WHERE target_binding_id IN (SELECT id FROM hub_entity_bindings WHERE module_id='soldi' AND entity_kind='transaction')"))
         val created = db.financeDao().transaction(first)!!.createdAt
         finance.saveTransaction(d.copy(id = first, amount = "-15", tags = "weekly"))
         assertEquals(created, db.financeDao().transaction(first)!!.createdAt)
@@ -89,7 +89,7 @@ class FinanceCapsuleTest {
         val owner = PersonalHubDatabase.openTemporary(context, name)
         try {
             assertEquals(PersonalHubDatabase.SCHEMA_VERSION, owner.openHelper.writableDatabase.version)
-            assertEquals(56, scalar(owner, "SELECT generation FROM hub_generation"))
+            assertEquals(57, scalar(owner, "SELECT generation FROM hub_generation"))
             owner.openHelper.writableDatabase.query("SELECT title,start_ms,end_ms FROM sessions").use { assertTrue(it.moveToFirst()); assertEquals("keep exactly", it.getString(0)); assertEquals(1000, it.getInt(1)); assertEquals(2000, it.getInt(2)) }
             owner.openHelper.writableDatabase.query("SELECT json FROM hub_preferences").use { assertTrue(it.moveToFirst()); assertEquals("{\"preserve\":true}", it.getString(0)) }
             val names = owner.openHelper.writableDatabase.query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'finance_%'").use { c -> buildList { while(c.moveToNext()) add(c.getString(0)) } }
@@ -97,7 +97,7 @@ class FinanceCapsuleTest {
             names.forEach { assertEquals(0, scalar(owner, "SELECT count(*) FROM $it")) }
             owner.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
             owner.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
-            assertEquals(56, DatabaseVault.validate(context, file))
+            assertEquals(57, DatabaseVault.validate(context, file))
         } finally { owner.close(); context.deleteDatabase(name) }
     }
 }

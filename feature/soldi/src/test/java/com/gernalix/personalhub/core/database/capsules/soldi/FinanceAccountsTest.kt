@@ -121,7 +121,7 @@ class FinanceAccountsTest {
         try {
             val row=db.financeDao().transaction(5)!!;assertEquals("-3.5",row.amount);assertEquals(7L,row.productId);assertTrue(row.fromReceipt);assertEquals("keep",row.notes)
             assertEquals("DKK",db.financeDao().account(row.accountId)!!.currency)
-            assertEquals(listOf("food"),db.financeDao().tags(5))
+            assertEquals(listOf("food"),FinanceCapsule(db).tags(5))
             assertEquals(1,db.financeDao().allTransactions().size)
             db.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         } finally { db.close();context.deleteDatabase(name) }

@@ -88,8 +88,18 @@ class HubContextRepository(
     }
 
     suspend fun replaceContextForAnchor(anchor: HubEntityRef, typeId: String, companions: List<HubEntityRef>): String? {
+        return replaceContextForAnchorWithRoles(anchor, typeId, companions.map { it to "participant" })
+    }
+
+    suspend fun replaceContextForAnchorWithRoles(
+        anchor: HubEntityRef,
+        typeId: String,
+        companions: List<Pair<HubEntityRef, String>>,
+    ): String? {
         val anchorBinding = bind(anchor)
-        val companionBindings = companions.distinct().map { bind(it) }
+        val companionBindings = companions.distinct().map { (ref, role) ->
+            bind(ref) to role.trim().also { require(it.isNotEmpty()) }
+        }
         return database.withTransaction {
             dao.contextsForEntityAndType(anchorBinding.id, typeId).forEach { dao.deleteContext(it.id) }
             if (companionBindings.isEmpty()) return@withTransaction null
@@ -98,7 +108,7 @@ class HubContextRepository(
             dao.insertContext(HubContext(id, typeId, null, timestamp, timestamp))
             dao.insertMembers(
                 listOf(HubContextMember(id, anchorBinding.id, "anchor", 0)) +
-                    companionBindings.mapIndexed { index, binding -> HubContextMember(id, binding.id, "participant", index + 1) },
+                    companionBindings.mapIndexed { index, (binding, role) -> HubContextMember(id, binding.id, role, index + 1) },
             )
             id
         }

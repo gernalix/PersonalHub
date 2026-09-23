@@ -586,6 +586,8 @@ class TagsCapsuleViewModel(
             nowMs = host.nowMs,
             effectiveNowMs = host.effectiveNowMs,
             isReadOnly = host.isReadOnly,
+            eventTags = host.eventTags,
+            sinceWhenTags = host.sinceWhenTags,
         )
     }
 

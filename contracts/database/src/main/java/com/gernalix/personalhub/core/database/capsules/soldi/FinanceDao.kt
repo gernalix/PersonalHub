@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface FinanceDao {
     @Query("""
-        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain, l.nickname AS place, pf.value AS person
+        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain,
+          COALESCE(l.nickname,(SELECT pl.nickname FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN places pl ON pl.uuid=cb.canonical_id WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='places' AND cb.entity_kind='place' LIMIT 1)) AS place,
+          COALESCE(pf.value,(SELECT cf.value FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN contacts pc ON pc.public_id=cb.canonical_id JOIN contact_fields cf ON cf.id=(SELECT id FROM contact_fields WHERE contact_id=pc.id AND field_type='name' ORDER BY is_primary DESC,position,id LIMIT 1) WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='people' AND cb.entity_kind='person' LIMIT 1)) AS person,
+          COALESCE((SELECT ht.name FROM hub_entity_bindings hb JOIN hub_tag_assignments ha ON ha.target_binding_id=hb.id JOIN hub_tags ht ON ht.id=ha.tag_id WHERE hb.module_id='soldi' AND hb.entity_kind='transaction' AND hb.canonical_id=t.uuid AND ht.namespace='soldi.category' LIMIT 1),'') AS category
         FROM finance_transactions t
         LEFT JOIN finance_products p ON p.id=t.productId
         LEFT JOIN finance_titles n ON n.id=t.titleId
@@ -34,7 +37,10 @@ interface FinanceDao {
     @Query("SELECT * FROM finance_transactions WHERE uuid=:uuid") suspend fun transactionByUuid(uuid: String): FinanceTransaction?
 
     @Query("""
-        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain, l.nickname AS place, pf.value AS person
+        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain,
+          COALESCE(l.nickname,(SELECT pl.nickname FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN places pl ON pl.uuid=cb.canonical_id WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='places' AND cb.entity_kind='place' LIMIT 1)) AS place,
+          COALESCE(pf.value,(SELECT cf.value FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN contacts pc ON pc.public_id=cb.canonical_id JOIN contact_fields cf ON cf.id=(SELECT id FROM contact_fields WHERE contact_id=pc.id AND field_type='name' ORDER BY is_primary DESC,position,id LIMIT 1) WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='people' AND cb.entity_kind='person' LIMIT 1)) AS person,
+          COALESCE((SELECT ht.name FROM hub_entity_bindings hb JOIN hub_tag_assignments ha ON ha.target_binding_id=hb.id JOIN hub_tags ht ON ht.id=ha.tag_id WHERE hb.module_id='soldi' AND hb.entity_kind='transaction' AND hb.canonical_id=t.uuid AND ht.namespace='soldi.category' LIMIT 1),'') AS category
         FROM finance_transactions t
         LEFT JOIN finance_products p ON p.id=t.productId
         LEFT JOIN finance_titles n ON n.id=t.titleId
@@ -47,7 +53,10 @@ interface FinanceDao {
     suspend fun transactionViewsByUuid(uuids: List<String>): List<TransactionView>
 
     @Query("""
-        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain, l.nickname AS place, pf.value AS person
+        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain,
+          COALESCE(l.nickname,(SELECT pl.nickname FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN places pl ON pl.uuid=cb.canonical_id WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='places' AND cb.entity_kind='place' LIMIT 1)) AS place,
+          COALESCE(pf.value,(SELECT cf.value FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN contacts pc ON pc.public_id=cb.canonical_id JOIN contact_fields cf ON cf.id=(SELECT id FROM contact_fields WHERE contact_id=pc.id AND field_type='name' ORDER BY is_primary DESC,position,id LIMIT 1) WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='people' AND cb.entity_kind='person' LIMIT 1)) AS person,
+          COALESCE((SELECT ht.name FROM hub_entity_bindings hb JOIN hub_tag_assignments ha ON ha.target_binding_id=hb.id JOIN hub_tags ht ON ht.id=ha.tag_id WHERE hb.module_id='soldi' AND hb.entity_kind='transaction' AND hb.canonical_id=t.uuid AND ht.namespace='soldi.category' LIMIT 1),'') AS category
         FROM finance_transactions t
         LEFT JOIN finance_products p ON p.id=t.productId
         LEFT JOIN finance_titles n ON n.id=t.titleId
@@ -56,14 +65,17 @@ interface FinanceDao {
         LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=t.personId AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
         WHERE COALESCE(p.name,n.name,'') LIKE '%' || :query || '%'
            OR t.notes LIKE '%' || :query || '%'
-           OR t.category LIKE '%' || :query || '%'
+           OR EXISTS (SELECT 1 FROM hub_entity_bindings hb JOIN hub_tag_assignments ha ON ha.target_binding_id=hb.id JOIN hub_tags ht ON ht.id=ha.tag_id WHERE hb.module_id='soldi' AND hb.entity_kind='transaction' AND hb.canonical_id=t.uuid AND ht.name LIKE '%' || :query || '%')
            OR COALESCE(pf.value,'') LIKE '%' || :query || '%'
         ORDER BY t.occurredAt DESC,t.id DESC LIMIT :limit
     """)
     suspend fun searchTransactionViews(query: String, limit: Int): List<TransactionView>
 
     @Query("""
-        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain, l.nickname AS place, pf.value AS person
+        SELECT t.*, COALESCE(p.name,n.name,'') AS title, c.name AS chain,
+          COALESCE(l.nickname,(SELECT pl.nickname FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN places pl ON pl.uuid=cb.canonical_id WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='places' AND cb.entity_kind='place' LIMIT 1)) AS place,
+          COALESCE(pf.value,(SELECT cf.value FROM hub_contexts hc JOIN hub_context_members am ON am.context_id=hc.id JOIN hub_entity_bindings ab ON ab.id=am.entity_id JOIN hub_context_members cm ON cm.context_id=hc.id JOIN hub_entity_bindings cb ON cb.id=cm.entity_id JOIN contacts pc ON pc.public_id=cb.canonical_id JOIN contact_fields cf ON cf.id=(SELECT id FROM contact_fields WHERE contact_id=pc.id AND field_type='name' ORDER BY is_primary DESC,position,id LIMIT 1) WHERE hc.context_type_id='finance_transaction_context' AND ab.module_id='soldi' AND ab.entity_kind='transaction' AND ab.canonical_id=t.uuid AND cb.module_id='people' AND cb.entity_kind='person' LIMIT 1)) AS person,
+          COALESCE((SELECT ht.name FROM hub_entity_bindings hb JOIN hub_tag_assignments ha ON ha.target_binding_id=hb.id JOIN hub_tags ht ON ht.id=ha.tag_id WHERE hb.module_id='soldi' AND hb.entity_kind='transaction' AND hb.canonical_id=t.uuid AND ht.namespace='soldi.category' LIMIT 1),'') AS category
         FROM finance_transactions t
         LEFT JOIN finance_products p ON p.id=t.productId
         LEFT JOIN finance_titles n ON n.id=t.titleId
@@ -79,8 +91,6 @@ interface FinanceDao {
     @Query("SELECT name FROM finance_chains WHERE id=:id") suspend fun chainName(id: Long): String?
     @Insert suspend fun add(value: FinanceAccount)
     @Update suspend fun update(value: FinanceAccount)
-    @Query("SELECT name FROM finance_tags ORDER BY name") fun tagNames(): Flow<List<String>>
-    @Query("SELECT DISTINCT category FROM finance_transactions WHERE trim(category) != '' ORDER BY category COLLATE NOCASE") fun categories(): Flow<List<String>>
     @Query("SELECT * FROM finance_products ORDER BY name") fun products(): Flow<List<FinanceProduct>>
     @Query("SELECT uuid AS id, nickname AS name FROM places WHERE archived=0 ORDER BY nickname") fun places(): Flow<List<PlaceChoice>>
 
@@ -103,23 +113,18 @@ interface FinanceDao {
     @Query("SELECT * FROM finance_stores WHERE placeId=:id") suspend fun store(id: String): FinanceStore?
     @Query("SELECT COUNT(*) FROM finance_transactions WHERE placeId=:id") suspend fun transactionCountForPlace(id: String): Int
     @Query("SELECT COUNT(*) FROM finance_stores WHERE placeId=:id") suspend fun storeCountForPlace(id: String): Int
-    @Query("SELECT name FROM finance_tags JOIN finance_transaction_tags ON id=tagId WHERE transactionId=:id ORDER BY name") suspend fun tags(id: Long): List<String>
     @Query("SELECT id FROM finance_products WHERE name=:name") suspend fun productId(name: String): Long?
     @Query("SELECT id FROM finance_titles WHERE name=:name") suspend fun titleId(name: String): Long?
     @Query("SELECT id FROM finance_chains WHERE name=:name") suspend fun chainId(name: String): Long?
-    @Query("SELECT id FROM finance_tags WHERE name=:name") suspend fun tagId(name: String): Long?
 
     @Insert suspend fun add(value: FinanceProduct): Long
     @Insert suspend fun add(value: FinanceTitle): Long
     @Insert suspend fun add(value: FinanceChain): Long
     @Insert suspend fun add(value: FinanceStore)
     @Insert suspend fun add(value: FinanceTransaction): Long
-    @Insert suspend fun add(value: FinanceTag): Long
-    @Insert suspend fun add(value: FinanceTransactionTag)
     @Update suspend fun update(value: FinanceTransaction)
     @Update suspend fun update(value: FinanceProduct)
     @Query("DELETE FROM finance_transactions WHERE id=:id") suspend fun deleteTransaction(id: Long)
-    @Query("DELETE FROM finance_transaction_tags WHERE transactionId=:id") suspend fun deleteTags(id: Long)
     @Query("DELETE FROM finance_products WHERE id=:id") suspend fun deleteProduct(id: Long)
 
     @Query("SELECT * FROM finance_transfers ORDER BY createdAt DESC") fun transfers(): Flow<List<FinanceTransfer>>
@@ -136,15 +141,15 @@ interface FinanceDao {
     @Query("DELETE FROM finance_macros WHERE id=:id") suspend fun deleteMacro(id: String)
 
     @Query("SELECT * FROM finance_recurrences ORDER BY enabled DESC,startDate,title") fun recurrences(): Flow<List<FinanceRecurrence>>
+    @Query("""
+        SELECT r.*,COALESCE((SELECT ht.name FROM hub_entity_bindings hb JOIN hub_tag_assignments ha ON ha.target_binding_id=hb.id JOIN hub_tags ht ON ht.id=ha.tag_id WHERE hb.module_id='soldi' AND hb.entity_kind='recurrence' AND hb.canonical_id=r.id AND ht.namespace='soldi.category' LIMIT 1),'') AS category
+        FROM finance_recurrences r ORDER BY r.enabled DESC,r.startDate,r.title
+    """) fun recurrenceViews(): Flow<List<FinanceRecurrenceView>>
     @Query("SELECT * FROM finance_recurrences WHERE id=:id") suspend fun recurrence(id: String): FinanceRecurrence?
     @Query("SELECT * FROM finance_recurrences WHERE enabled=1") suspend fun enabledRecurrences(): List<FinanceRecurrence>
     @Insert suspend fun add(value: FinanceRecurrence)
     @Update suspend fun update(value: FinanceRecurrence)
     @Query("DELETE FROM finance_recurrences WHERE id=:id") suspend fun deleteRecurrence(id: String)
-    @Query("SELECT name FROM finance_tags JOIN finance_recurrence_tags ON id=tagId WHERE recurrenceId=:id ORDER BY name") suspend fun recurrenceTags(id: String): List<String>
-    @Query("SELECT tagId FROM finance_recurrence_tags WHERE recurrenceId=:id") suspend fun recurrenceTagIds(id: String): List<Long>
-    @Query("DELETE FROM finance_recurrence_tags WHERE recurrenceId=:id") suspend fun deleteRecurrenceTags(id: String)
-    @Insert suspend fun add(value: FinanceRecurrenceTag)
 
     @Query("SELECT * FROM finance_recurrence_overrides WHERE recurrenceId=:recurrenceId AND occurrenceDate=:occurrenceDate") suspend fun recurrenceOverride(recurrenceId: String, occurrenceDate: String): FinanceRecurrenceOverride?
     @Query("SELECT * FROM finance_recurrence_overrides WHERE recurrenceId=:recurrenceId ORDER BY occurrenceDate") suspend fun recurrenceOverrides(recurrenceId: String): List<FinanceRecurrenceOverride>

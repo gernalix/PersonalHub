@@ -109,4 +109,5 @@
     <string name="random_alerts_count">How many</string>
     <string name="random_alerts_per_hour">per hour</string>
     <string name="random_alerts_per_day">per day</string>
+    <string name="context_tags">Context tags</string>
 </resources>

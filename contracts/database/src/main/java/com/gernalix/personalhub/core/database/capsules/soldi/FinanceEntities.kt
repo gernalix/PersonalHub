@@ -5,6 +5,7 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.gernalix.luoghi.data.PlaceEntity
 
@@ -37,7 +38,7 @@ data class FinanceStore(@PrimaryKey val placeId: String, val chainId: Long?)
         Index("accountId"), Index(value = ["uuid"], unique = true), Index("titleId"), Index("productId"),
         Index("chainId"), Index("placeId"), Index("occurredAt"), Index("personId"), Index("macroId"),
         Index("recurrenceId"), Index(value = ["recurrenceId", "occurrenceKey"], unique = false),
-        Index("reminderAt"), Index("category"),
+        Index("reminderAt"),
     ],
     foreignKeys = [
         ForeignKey(entity = FinanceAccount::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.RESTRICT),
@@ -67,7 +68,6 @@ data class FinanceTransaction(
     @ColumnInfo(defaultValue = "NULL") val recurrenceId: String? = null,
     @ColumnInfo(defaultValue = "NULL") val occurrenceKey: String? = null,
     @ColumnInfo(defaultValue = "NULL") val reminderAt: Long? = null,
-    @ColumnInfo(defaultValue = "''") val category: String = "",
 )
 
 @Entity(tableName = "finance_tags", indices = [Index(value = ["name"], unique = true)])
@@ -119,7 +119,7 @@ data class FinanceMacro(
 
 @Entity(
     tableName = "finance_recurrences",
-    indices = [Index("accountId"), Index("targetAccountId"), Index("enabled"), Index("startDate"), Index("category")],
+    indices = [Index("accountId"), Index("targetAccountId"), Index("enabled"), Index("startDate")],
     foreignKeys = [ForeignKey(entity = FinanceAccount::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.RESTRICT)],
 )
 data class FinanceRecurrence(
@@ -146,8 +146,9 @@ data class FinanceRecurrence(
     val quotedRate: String? = null,
     val feeAmount: String? = null,
     val feeCurrency: String? = null,
-    val category: String = "",
-)
+) {
+    @Ignore var category: String = ""
+}
 
 @Entity(
     tableName = "finance_recurrence_tags",
@@ -200,6 +201,12 @@ data class TransactionView(
     val chain: String?,
     val place: String?,
     val person: String? = null,
+    val category: String = "",
+)
+
+data class FinanceRecurrenceView(
+    @Embedded val value: FinanceRecurrence,
+    val category: String = "",
 )
 
 data class PlaceChoice(val id: String, val name: String)

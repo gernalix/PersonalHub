@@ -40,6 +40,7 @@ internal data class TransferUiState(
     val personId: Long? = null,
     val occurredAt: String = Instant.now().toString(),
     val reminderAt: String? = null,
+    val contextRefs: Set<com.gernalix.personalhub.contracts.database.HubEntityRef> = emptySet(),
 )
 
 internal data class ViewOptions(
@@ -104,6 +105,7 @@ internal fun defaultRecurrence(accounts: List<FinanceAccount>): RecurrenceDraft?
 
 internal fun TransactionView.toDraft(tags: List<String>) = TransactionDraft(
     id = value.id,
+    transactionUuid = value.uuid,
     title = title,
     isProduct = value.productId != null,
     amount = value.amount,
@@ -121,10 +123,10 @@ internal fun TransactionView.toDraft(tags: List<String>) = TransactionDraft(
     recurrenceId = value.recurrenceId,
     occurrenceKey = value.occurrenceKey,
     reminderAt = value.reminderAt?.let { Instant.ofEpochMilli(it).toString() },
-    category = value.category,
+    category = category,
 )
 
-internal fun FinanceRecurrence.toDraft(tags: List<String>) = RecurrenceDraft(
+internal fun FinanceRecurrence.toDraft(tags: List<String>, contextRefs: Set<com.gernalix.personalhub.contracts.database.HubEntityRef> = emptySet()) = RecurrenceDraft(
     id = id,
     title = title,
     amount = amount,
@@ -148,6 +150,7 @@ internal fun FinanceRecurrence.toDraft(tags: List<String>) = RecurrenceDraft(
     feeAmount = feeAmount,
     feeCurrency = feeCurrency,
     category = category,
+    contextRefs = contextRefs,
 )
 
 internal fun transferState(
@@ -155,6 +158,7 @@ internal fun transferState(
     source: TransactionView,
     target: TransactionView,
     tags: List<String>,
+    contextRefs: Set<com.gernalix.personalhub.contracts.database.HubEntityRef> = emptySet(),
 ): TransferUiState = TransferUiState(
     transferId = transfer.id,
     sourceTransactionId = source.value.id,
@@ -168,11 +172,12 @@ internal fun transferState(
     feeAmount = transfer.feeAmount.orEmpty(),
     feeCurrency = transfer.feeCurrency.orEmpty(),
     notes = source.value.notes,
-    category = source.value.category,
+    category = source.category,
     tags = tags.joinToString(", "),
     personId = source.value.personId,
     occurredAt = Instant.ofEpochMilli(source.value.occurredAt).toString(),
     reminderAt = source.value.reminderAt?.let { Instant.ofEpochMilli(it).toString() },
+    contextRefs = contextRefs,
 )
 
 internal fun signedAmount(value: String, kind: EntryKind): String {

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.contracts.database.HubTagEntity
 import com.gernalix.sostanze.data.IntakeUndoToken
 import com.gernalix.sostanze.data.IntakeOutcome
 import com.gernalix.sostanze.data.IntakeEditOutcome
@@ -80,6 +81,8 @@ data class SostanzeUiState(
     val interactionRules: List<InteractionRuleEntity> = emptyList(),
     val interactionTargets: List<InteractionTargetEntity> = emptyList(),
     val notificationPlans: List<NotificationPlan> = emptyList(),
+    val tagsBySubstance: Map<Long, List<HubTagEntity>> = emptyMap(),
+    val tags: List<HubTagEntity> = emptyList(),
     val nowMs: Long = System.currentTimeMillis(),
 )
 
@@ -96,7 +99,7 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         if (enabled) repository.snapshot else repository.homeSnapshot
     }
 
-    val uiState = combine(snapshot, nowMs) { snapshot, now ->
+    val uiState = combine(snapshot, nowMs, repository.tags, repository.tagAssignments) { snapshot, now, tags, assignments ->
         val substances = snapshot.substances
         val plans = substances.map { it.toPlan() }
         val intakes = snapshot.intakes.map { it.toRecord() }
@@ -113,6 +116,13 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
             .map { entity -> StockUi(entity, SostanzeEngine.stockCoverage(entity.toPlan())) }
             .sortedBy { it.coverage.daysCovered ?: Double.MAX_VALUE }
         val nameById = substances.associateBy({ it.id }, { it.name })
+        val tagsById = tags.associateBy(HubTagEntity::id)
+        val tagsBySubstance = assignments.asSequence()
+            .filter { it.moduleId == "substances" && it.entityKind == "substance" }
+            .groupBy { it.canonicalId.toLongOrNull() }
+            .filterKeys { it != null }
+            .mapKeys { requireNotNull(it.key) }
+            .mapValues { (_, rows) -> rows.mapNotNull { tagsById[it.tagId] }.sortedBy { it.name.lowercase() } }
         val substanceById = substances.associateBy { it.id }
         val prescriptions = snapshot.prescriptionDetails.map { detail ->
             val prescription = detail.prescription
@@ -169,6 +179,8 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
                 SostanzeEngine.missedDoseNotifications(doseStates, now) +
                 refillPlans,
             nowMs = now,
+            tagsBySubstance = tagsBySubstance,
+            tags = tags,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SostanzeUiState())
 
@@ -287,9 +299,10 @@ class SostanzeViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun saveSubstance(entity: SubstanceEntity, onResult: (SubstanceSaveOutcome) -> Unit = {}) {
+    fun saveSubstance(entity: SubstanceEntity, tags: String = "", onResult: (SubstanceSaveOutcome) -> Unit = {}) {
         viewModelScope.launch {
             val result = repository.saveSubstance(entity)
+            if (result is SubstanceSaveOutcome.Saved) repository.setSubstanceTags(result.id, tags.split(','))
             onResult(result)
         }
     }
