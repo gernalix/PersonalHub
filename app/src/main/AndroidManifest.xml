@@ -91,6 +91,9 @@
             android:taskAffinity="com.gernalix.personalhub.restart" />
 
         <activity
+            android:name=".HubTagsActivity"
+            android:exported="false" />
+        <activity
             android:name=".DatabaseActivity"
             android:exported="false" />
 

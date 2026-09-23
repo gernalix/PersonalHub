@@ -85,6 +85,7 @@ class SinceWhenCapsuleViewModel(
         refreshUiState()
         access.persist()
         access.scheduleAutoBackup()
+        access.syncSharedTagAssignments(liveLifePeriods.value)
     }
 
     fun updateLifePeriod(
@@ -121,6 +122,7 @@ class SinceWhenCapsuleViewModel(
         refreshUiState()
         access.persist()
         access.scheduleAutoBackup()
+        access.syncSharedTagAssignments(liveLifePeriods.value)
     }
 
     fun deleteLifePeriod(periodId: Long) {
@@ -132,6 +134,7 @@ class SinceWhenCapsuleViewModel(
         refreshUiState()
         access.persist()
         access.scheduleAutoBackup()
+        access.syncSharedTagAssignments(liveLifePeriods.value)
     }
 
     fun endSelectedNow(periodIds: Set<Long>, endMs: Long): Boolean {
@@ -153,6 +156,7 @@ class SinceWhenCapsuleViewModel(
         refreshUiState()
         access.persist()
         access.scheduleAutoBackup()
+        access.syncSharedTagAssignments(liveLifePeriods.value)
         return true
     }
 

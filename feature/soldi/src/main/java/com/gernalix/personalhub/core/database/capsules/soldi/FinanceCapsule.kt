@@ -3,6 +3,11 @@ package com.gernalix.personalhub.core.database.capsules.soldi
 import android.content.Context
 import androidx.room.withTransaction
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
+import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
+import kotlinx.coroutines.flow.map
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.DayOfWeek
@@ -18,20 +23,75 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
     constructor(context: Context) : this(PersonalHubDatabase.get(context))
 
     private val dao = db.financeDao()
+    private val sharedTags = SharedTagEngine(db)
     val accounts = dao.accounts()
     val transactions = dao.transactions()
     val products = dao.products()
     val places = dao.places()
     val people = dao.people()
-    val tagNames = dao.tagNames()
-    val categories = dao.categories()
+    val tagNames = sharedTags.observe(HubTagNamespaces.SOLDI).map { values -> values.filterNot { it.archived }.map { it.name } }
     val transfers = dao.transfers()
     val macros = dao.macros()
-    val recurrences = dao.recurrences()
+    val recurrences = dao.recurrenceViews().map { values -> values.map { view -> view.value.apply { category = view.category } } }
     val allAttachments = dao.allAttachments()
 
-    suspend fun tags(id: Long) = dao.tags(id)
-    suspend fun recurrenceTags(id: String) = dao.recurrenceTags(id)
+    suspend fun tags(id: Long) = dao.transaction(id)?.let { value ->
+        sharedTags.tags(HubEntityRef("soldi", "transaction", value.uuid))
+            .filter { it.namespace == HubTagNamespaces.SOLDI }
+            .map { it.name }
+    }.orEmpty()
+    suspend fun recurrenceTags(id: String) = sharedTags.tags(HubEntityRef("soldi", "recurrence", id))
+        .filter { it.namespace == HubTagNamespaces.SOLDI }
+        .map { it.name }
+    suspend fun contextRefs(entityKind: String, canonicalId: String): Set<HubEntityRef> =
+        HubContextRuntime.linked(HubEntityRef("soldi", entityKind, canonicalId))
+            .map { it.ref }
+            .filterNot { it.moduleId == "tags" }
+            .toSet()
+    suspend fun category(ref: HubEntityRef): String = sharedTags.tags(ref)
+        .firstOrNull { it.namespace == HubTagNamespaces.SOLDI_CATEGORY }?.name.orEmpty()
+
+    suspend fun spendingByTag(fromMs: Long, toMs: Long): List<FinanceTagSpend> {
+        require(fromMs <= toMs)
+        val totals = linkedMapOf<Triple<String, String, String>, BigDecimal>()
+        dao.allTransactions()
+            .asSequence()
+            .filter { it.occurredAt in fromMs until toMs }
+            .forEach { transaction ->
+                val amount = BigDecimal(transaction.amount)
+                if (amount.signum() >= 0) return@forEach
+                sharedTags.tags(HubEntityRef("soldi", "transaction", transaction.uuid))
+                    .filter { it.namespace == HubTagNamespaces.SOLDI || it.namespace == HubTagNamespaces.SOLDI_CATEGORY }
+                    .distinctBy { it.id }
+                    .forEach { tag ->
+                        val key = Triple(tag.namespace, tag.name, transaction.currency)
+                        totals[key] = (totals[key] ?: BigDecimal.ZERO) + amount.abs()
+                    }
+            }
+        return totals.map { (key, total) ->
+            FinanceTagSpend(key.first, key.second, key.third, total.stripTrailingZeros().toPlainString())
+        }.sortedWith(compareByDescending<FinanceTagSpend> { BigDecimal(it.amount) }.thenBy { it.tagName })
+    }
+
+    private suspend fun replaceCategory(ref: HubEntityRef, name: String) {
+        val cleaned = name.trim()
+        if (cleaned.isEmpty()) {
+            val current = sharedTags.tags(ref).filter { it.namespace == HubTagNamespaces.SOLDI_CATEGORY }
+            sharedTags.remove(ref, current.map { it.id })
+            return
+        }
+        val tag = sharedTags.search(HubTagNamespaces.SOLDI_CATEGORY, cleaned).firstOrNull {
+            SharedTagEngine.normalize(it.name) == SharedTagEngine.normalize(cleaned)
+        } ?: requireNotNull(
+            sharedTags.create(
+                HubTagNamespaces.SOLDI_CATEGORY,
+                cleaned,
+                kind = com.gernalix.personalhub.contracts.database.HubTagKinds.CATEGORY,
+                acceptNearDuplicate = true,
+            ).tag,
+        )
+        sharedTags.replace(ref, HubTagNamespaces.SOLDI_CATEGORY, listOf(tag.id))
+    }
     fun attachments(transactionId: Long) = dao.attachments(transactionId)
 
     suspend fun reuseLatestTitle(draft: TransactionDraft, title: String): TransactionDraft = db.withTransaction {
@@ -48,9 +108,9 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             chain = previous.chainId?.let { dao.chainName(it) }.orEmpty(),
             placeId = previous.placeId,
             personId = previous.personId,
-            category = previous.category,
+            category = category(HubEntityRef("soldi", "transaction", previous.uuid)),
             notes = previous.notes,
-            tags = dao.tags(previous.id).joinToString(", "),
+            tags = tags(previous.id).joinToString(", "),
             fromReceipt = previous.fromReceipt,
         )
     }
@@ -78,14 +138,6 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
         else require(existing.chainId == chainId) { "Store chain differs" }
     }
 
-    private suspend fun setTransactionTags(id: Long, csv: String) {
-        dao.deleteTags(id)
-        csv.split(',').map(String::trim).filter(String::isNotEmpty).distinctBy { it.lowercase() }.forEach { name ->
-            val tag = dao.tagId(name) ?: dao.add(FinanceTag(name = name))
-            dao.add(FinanceTransactionTag(id, tag))
-        }
-    }
-
     suspend fun saveTransaction(draft: TransactionDraft): Long = db.withTransaction {
         val old = draft.id?.let { requireNotNull(dao.transaction(it)) }
         val now = System.currentTimeMillis()
@@ -98,30 +150,40 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
         val value = FinanceTransaction(
             id = old?.id ?: 0,
             accountId = account.id,
-            uuid = old?.uuid ?: java.util.UUID.randomUUID().toString(),
+            uuid = old?.uuid ?: draft.transactionUuid ?: java.util.UUID.randomUUID().toString(),
             titleId = if (draft.isProduct || selectedProduct != null) null else title(draft.title),
             productId = selectedProduct?.id ?: if (draft.isProduct) product(draft.title) else null,
             amount = decimal(draft.amount),
             currency = currency(draft.currency),
             chainId = chainId,
-            placeId = draft.placeId,
+            placeId = null,
             fromReceipt = draft.fromReceipt,
             notes = draft.notes,
             occurredAt = epoch(draft.occurredAt),
             createdAt = old?.createdAt ?: now,
             updatedAt = now,
-            personId = draft.personId,
+            personId = null,
             macroId = draft.macroId,
             recurrenceId = draft.recurrenceId,
             occurrenceKey = draft.occurrenceKey,
             reminderAt = draft.reminderAt?.takeIf(String::isNotBlank)?.let(::epoch),
-            category = draft.category.trim(),
         )
         val id = if (old == null) dao.add(value) else {
             dao.update(value)
             old.id
         }
-        setTransactionTags(id, draft.tags)
+        sharedTags.replaceByNames(
+            HubEntityRef("soldi", "transaction", value.uuid),
+            HubTagNamespaces.SOLDI,
+            draft.tags.split(','),
+        )
+        replaceCategory(HubEntityRef("soldi", "transaction", value.uuid), draft.category)
+        HubContextRuntime.saveFinanceTransactionLinksIfInitialized(
+            transactionUuid = value.uuid,
+            personPublicId = draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
+            placeId = draft.placeId,
+            contextualRefs = draft.contextRefs,
+        )
         id
     }
 
@@ -149,6 +211,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                 reminderAt = draft.reminderAt,
                 recurrenceId = draft.recurrenceId,
                 occurrenceKey = draft.occurrenceKey,
+                contextRefs = draft.contextRefs,
             ),
         )
         val targetId = saveTransaction(
@@ -165,6 +228,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                 occurredAt = draft.occurredAt,
                 recurrenceId = draft.recurrenceId,
                 occurrenceKey = draft.occurrenceKey,
+                contextRefs = draft.contextRefs,
             ),
         )
         val value = FinanceTransfer(
@@ -222,6 +286,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             val transfer = dao.transferForTransaction(id)
             val ids = if (transfer == null) listOf(id) else listOf(transfer.sourceTransactionId, transfer.targetTransactionId)
             val uuids = ids.mapNotNull { dao.transaction(it)?.uuid }
+            uuids.forEach { sharedTags.clear(HubEntityRef("soldi", "transaction", it)) }
             transfer?.let { dao.deleteTransfer(it.id) }
             ids.distinct().forEach { dao.deleteTransaction(it) }
             uuids
@@ -335,9 +400,9 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             amount = normalizedAmount,
             currency = account.currency,
             accountId = account.id,
-            personId = draft.personId,
+            personId = null,
             chain = draft.chain.trim(),
-            placeId = draft.placeId,
+            placeId = null,
             notes = draft.notes,
             dayOfMonth = draft.dayOfMonth,
             lastBusinessDay = draft.lastBusinessDay,
@@ -353,14 +418,20 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             quotedRate = draft.quotedRate?.takeIf(String::isNotBlank)?.let(::decimal),
             feeAmount = draft.feeAmount?.takeIf(String::isNotBlank)?.let(::decimal),
             feeCurrency = draft.feeCurrency?.takeIf(String::isNotBlank)?.let(::currency),
-            category = draft.category.trim(),
         )
         if (old == null) dao.add(value) else dao.update(value)
-        dao.deleteRecurrenceTags(value.id)
-        draft.tags.split(',').map(String::trim).filter(String::isNotEmpty).distinctBy { it.lowercase() }.forEach { name ->
-            val tagId = dao.tagId(name) ?: dao.add(FinanceTag(name = name))
-            dao.add(FinanceRecurrenceTag(value.id, tagId))
-        }
+        sharedTags.replaceByNames(
+            HubEntityRef("soldi", "recurrence", value.id),
+            HubTagNamespaces.SOLDI,
+            draft.tags.split(','),
+        )
+        replaceCategory(HubEntityRef("soldi", "recurrence", value.id), draft.category)
+        HubContextRuntime.saveFinanceRecurrenceLinksIfInitialized(
+            value.id,
+            draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
+            draft.placeId,
+            draft.contextRefs,
+        )
         value.id
     }
 
@@ -369,7 +440,10 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
         dao.update(row.copy(enabled = enabled, updatedAt = System.currentTimeMillis()))
     }
 
-    suspend fun deleteRecurrence(id: String) = db.withTransaction { dao.deleteRecurrence(id) }
+    suspend fun deleteRecurrence(id: String) = db.withTransaction {
+        sharedTags.clear(HubEntityRef("soldi", "recurrence", id))
+        dao.deleteRecurrence(id)
+    }
 
     suspend fun editRecurrenceAmount(
         id: String,
@@ -409,7 +483,10 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                             updatedAt = System.currentTimeMillis(),
                         ),
                     )
-                    dao.recurrenceTagIds(id).forEach { dao.add(FinanceRecurrenceTag(newId, it)) }
+                    sharedTags.copy(
+                        HubEntityRef("soldi", "recurrence", id),
+                        HubEntityRef("soldi", "recurrence", newId),
+                    )
                     newId
                 }
             }
@@ -434,6 +511,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
     suspend fun materializeDueRecurrences(today: LocalDate = LocalDate.now()): List<Long> = db.withTransaction {
         val created = mutableListOf<Long>()
         for (rule in dao.enabledRecurrences()) {
+            val ruleCategory = category(HubEntityRef("soldi", "recurrence", rule.id))
             val start = LocalDate.parse(rule.startDate)
             val end = rule.endDate?.let(LocalDate::parse)?.let { minOf(it, today) } ?: today
             if (end.isBefore(start)) continue
@@ -455,9 +533,9 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                             feeAmount = rule.feeAmount,
                             feeCurrency = rule.feeCurrency,
                             notes = rule.notes,
-                            tags = dao.recurrenceTags(rule.id).joinToString(", "),
+                            tags = recurrenceTags(rule.id).joinToString(", "),
                             personId = rule.personId,
-                            category = rule.category,
+                            category = ruleCategory,
                             occurredAt = occurredAt,
                             recurrenceId = rule.id,
                             occurrenceKey = key,
@@ -476,9 +554,9 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
                             chain = rule.chain,
                             placeId = rule.placeId,
                             personId = rule.personId,
-                            category = rule.category,
+                            category = ruleCategory,
                             notes = rule.notes,
-                            tags = dao.recurrenceTags(rule.id).joinToString(", "),
+                            tags = recurrenceTags(rule.id).joinToString(", "),
                             occurredAt = occurredAt,
                             recurrenceId = rule.id,
                             occurrenceKey = key,
@@ -591,6 +669,7 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
 data class TransactionDraft(
     val id: Long? = null,
+    val transactionUuid: String? = null,
     val title: String = "",
     val isProduct: Boolean = false,
     val amount: String = "",
@@ -609,6 +688,7 @@ data class TransactionDraft(
     val occurrenceKey: String? = null,
     val reminderAt: String? = null,
     val category: String = "",
+    val contextRefs: Set<HubEntityRef> = emptySet(),
 )
 
 data class TransferDraft(
@@ -629,6 +709,7 @@ data class TransferDraft(
     val reminderAt: String? = null,
     val recurrenceId: String? = null,
     val occurrenceKey: String? = null,
+    val contextRefs: Set<HubEntityRef> = emptySet(),
 )
 
 data class RecurrenceDraft(
@@ -655,6 +736,7 @@ data class RecurrenceDraft(
     val feeAmount: String? = null,
     val feeCurrency: String? = null,
     val category: String = "",
+    val contextRefs: Set<HubEntityRef> = emptySet(),
 )
 
 enum class RecurrenceEditScope { ONLY_THIS, THIS_AND_FOLLOWING }
@@ -671,6 +753,8 @@ data class ProjectedOccurrence(
 )
 
 data class AttachmentDraft(val kind: String, val uri: String, val title: String = "", val mimeType: String? = null)
+
+data class FinanceTagSpend(val namespace: String, val tagName: String, val currency: String, val amount: String)
 
 data class FinanceReceiptImport(
     val merchant: String,

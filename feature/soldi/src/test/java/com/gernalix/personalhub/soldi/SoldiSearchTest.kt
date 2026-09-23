@@ -29,12 +29,12 @@ class SoldiSearchTest {
             recurrenceId = null,
             occurrenceKey = null,
             reminderAt = null,
-            category = "Clothing",
         ),
         title = "Black jacket",
         chain = "Outdoor Shop",
         place = "Copenhagen",
         person = "Daniele",
+        category = "Clothing",
     )
 
     private val account = FinanceAccount(
@@ -74,5 +74,13 @@ class SoldiSearchTest {
     @Test
     fun blankQueryReturnsAllTransactionsForLiveFiltering() {
         assertTrue(financeTransactionMatches("", row, emptyList(), account, emptyList()))
+    }
+
+    @Test fun supportsTagAndOrNotAndUntaggedFilters() {
+        assertTrue(financeTransactionMatches("#wardrobe", row, listOf("wardrobe", "winter"), account, listOf(photo)))
+        assertTrue(financeTransactionMatches("#missing OR #winter", row, listOf("wardrobe", "winter"), account, listOf(photo)))
+        assertFalse(financeTransactionMatches("#wardrobe -#winter", row, listOf("wardrobe", "winter"), account, listOf(photo)))
+        assertTrue(financeTransactionMatches("no:tags", row, emptyList(), account, listOf(photo)))
+        assertFalse(financeTransactionMatches("no:tags", row, listOf("wardrobe"), account, listOf(photo)))
     }
 }

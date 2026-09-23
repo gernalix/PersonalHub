@@ -52,6 +52,8 @@ import com.example.multitimetracker.persistence.UiPrefsStore
 import com.example.multitimetracker.persistence.DataIntegrityGate
 import com.example.multitimetracker.persistence.PersistentSaveOrigin
 import com.example.multitimetracker.ui.util.UiEventLogger
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -191,6 +193,21 @@ private fun logAppVersionIfNeeded(context: Context) {
 
 
     private var appContext: Context? = null
+    private var timerSharedTagBridge: TimerSharedTagBridge? = null
+    private val timerEventTags = MutableStateFlow<List<Tag>>(emptyList())
+    private val timerSinceWhenTags = MutableStateFlow<List<Tag>>(emptyList())
+
+    private fun bindTimerSharedTags(context: Context) {
+        if (timerSharedTagBridge != null) return
+        val bridge = TimerSharedTagBridge(PersonalHubDatabase.get(context.applicationContext))
+        timerSharedTagBridge = bridge
+        viewModelScope.launch {
+            bridge.observe(HubTagNamespaces.TIMER_EVENTS).collect { timerEventTags.value = it }
+        }
+        viewModelScope.launch {
+            bridge.observe(HubTagNamespaces.TIMER_SINCE_WHEN).collect { timerSinceWhenTags.value = it }
+        }
+    }
 
     // --- Capsule Gateway (architectural lock)
     private val capsuleGateway by lazy {
@@ -391,7 +408,12 @@ private fun logAppVersionIfNeeded(context: Context) {
                 }
             }
             override fun addTag(name: String) {
-                tagsCapsule.addTag(name)
+                val bridge = timerSharedTagBridge ?: return
+                viewModelScope.launch(Dispatchers.IO) { bridge.add(HubTagNamespaces.TIMER_EVENTS, name) }
+            }
+            override fun syncSharedTagAssignments(snapshot: QuickEventsSnapshot) {
+                val bridge = timerSharedTagBridge ?: return
+                viewModelScope.launch(Dispatchers.IO) { bridge.syncEvents(snapshot) }
             }
         },
         sessionOwnerAccess = object : com.example.multitimetracker.capsules.system.SessionOwnerCapsuleAccess {
@@ -463,6 +485,10 @@ private fun logAppVersionIfNeeded(context: Context) {
             }
             override fun persist() = this@MainViewModel.persist()
             override fun scheduleAutoBackup() = this@MainViewModel.scheduleAutoBackup()
+            override fun syncSharedTagAssignments(periods: List<com.example.multitimetracker.model.LifePeriod>) {
+                val bridge = timerSharedTagBridge ?: return
+                viewModelScope.launch(Dispatchers.IO) { bridge.syncSinceWhen(periods) }
+            }
         }
 
     )
@@ -514,6 +540,7 @@ private var initialized = false
         if (appContext == null) {
             appContext = context.applicationContext
         }
+        bindTimerSharedTags(context)
     }
 
     private val _persistenceFailureReport = MutableStateFlow<String?>(null)
@@ -531,11 +558,13 @@ private var initialized = false
     )
     val state: StateFlow<UiState> = _state
 
-    private val tagsHostState: StateFlow<TagsHostState> = state.map { source ->
+    private val tagsHostState: StateFlow<TagsHostState> = combine(state, timerEventTags, timerSinceWhenTags) { source, eventTags, sinceTags ->
         TagsHostState(
             nowMs = source.nowMs,
             effectiveNowMs = source.nowMs,
             isReadOnly = source.isReadOnly,
+            eventTags = eventTags,
+            sinceWhenTags = sinceTags,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TagsHostState(
         nowMs = _state.value.nowMs,
@@ -569,9 +598,9 @@ private var initialized = false
         homeLoadState = HomeLoadState.Loading,
     ))
 
-    private val quickEventsHostState: StateFlow<QuickEventsHostState> = state.map { source ->
+    private val quickEventsHostState: StateFlow<QuickEventsHostState> = combine(state, timerEventTags) { source, eventTags ->
         QuickEventsHostState(
-            tags = tagsCapsule.tags(),
+            tags = eventTags,
             tagLastUsedMsByTagId = sessionOwnerCapsule.runtimeStateValue().tagLastUsedMsByTagId,
             nowMs = source.nowMs,
             isReadOnly = source.isReadOnly,
@@ -605,9 +634,9 @@ private var initialized = false
         isReadOnly = false,
     ))
 
-    private val sinceWhenHostState: StateFlow<SinceWhenHostState> = state.map { source ->
+    private val sinceWhenHostState: StateFlow<SinceWhenHostState> = combine(state, timerSinceWhenTags) { source, sinceTags ->
         SinceWhenHostState(
-            tags = tagsCapsule.tags(),
+            tags = sinceTags,
             nowMs = source.nowMs,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SinceWhenHostState(
@@ -793,6 +822,7 @@ private var initialized = false
      */
     fun initialize(context: Context, fastHomeAlreadyApplied: Boolean = false) {
         appContext = context.applicationContext
+        bindTimerSharedTags(context)
         recoveryCoordinator.initialize(
             context = context,
             fastHomeAlreadyApplied = fastHomeAlreadyApplied,
@@ -828,7 +858,10 @@ fun reloadFromSnapshot(context: Context) {
         return runCatching { SnapshotSqlite.hasSnapshot(context) }.getOrDefault(false)
     }
 
-    private fun persist() = snapshotCoordinator.persist()
+    private fun persist() {
+        snapshotCoordinator.persist()
+        syncTimerNowTags()
+    }
 
     private fun persistOrThrow(showFailureUi: Boolean) = snapshotCoordinator.persistOrThrow(showFailureUi)
 
@@ -839,6 +872,11 @@ fun reloadFromSnapshot(context: Context) {
     private fun rememberCurrentStateAsPersisted() = snapshotCoordinator.rememberCurrentStateAsPersisted()
 
     private fun scheduleAutoBackup() = snapshotCoordinator.scheduleAutoBackup()
+    private fun syncTimerNowTags() {
+        val bridge = timerSharedTagBridge ?: return
+        val sessions = sessionOwnerCapsule.runtimeStateValue().let { it.chronologySessions + it.runningSessions }
+        viewModelScope.launch(Dispatchers.IO) { bridge.syncNow(tagsCapsule.tags(), sessions) }
+    }
     private fun scheduleSessionsRefresh(context: Context, nowMs: Long) {
         snapshotCoordinator.scheduleSessionsRefresh(context, nowMs)
     }

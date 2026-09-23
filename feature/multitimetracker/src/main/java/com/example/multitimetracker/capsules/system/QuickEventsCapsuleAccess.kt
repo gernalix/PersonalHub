@@ -6,6 +6,7 @@ import com.example.multitimetracker.core.quickevent.QuickEventCore
 import com.example.multitimetracker.model.QuickEventFieldDefinition
 import com.example.multitimetracker.model.QuickEventFieldValue
 import com.example.multitimetracker.model.QuickEventMacroAction
+import com.example.multitimetracker.capsules.quickevents.public.QuickEventsSnapshot
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
 
@@ -22,4 +23,5 @@ interface QuickEventsCapsuleAccess {
     fun showDeleteFailed(context: Context)
     fun showTargetRecorded(context: Context, title: String)
     fun addTag(name: String)
+    fun syncSharedTagAssignments(snapshot: QuickEventsSnapshot)
 }

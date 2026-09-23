@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -124,6 +125,8 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
         )
     }
     var homeQuery by rememberSaveable { mutableStateOf("") }
+    var homeTagIds by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    var homeNoTags by rememberSaveable { mutableStateOf(false) }
     var stockQuery by rememberSaveable { mutableStateOf("") }
     var historyQuery by rememberSaveable { mutableStateOf("") }
     var editingSubstance by remember { mutableStateOf<SubstanceEntity?>(null) }
@@ -205,10 +208,20 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (tab) {
                 AppTab.Home -> HomeScreen(
-                    states = state.doseStates.filter { it.substance.name.contains(homeQuery, true) },
+                    states = state.doseStates.filter { dose ->
+                        val assigned = state.tagsBySubstance[dose.substance.id].orEmpty().mapTo(mutableSetOf()) { it.id }
+                        dose.substance.name.contains(homeQuery, true) &&
+                            (homeTagIds.isEmpty() || assigned.containsAll(homeTagIds)) &&
+                            (!homeNoTags || assigned.isEmpty())
+                    },
                     macros = state.macros,
                     query = homeQuery,
                     onQueryChange = { homeQuery = it },
+                    tags = state.tags,
+                    selectedTagIds = homeTagIds,
+                    noTags = homeNoTags,
+                    onToggleTag = { id -> homeTagIds = if (id in homeTagIds) homeTagIds - id else homeTagIds + id; homeNoTags = false },
+                    onToggleNoTags = { homeNoTags = !homeNoTags; if (homeNoTags) homeTagIds = emptySet() },
                     onRecord = { substance ->
                         val successMessage = successRecordedMessage(recordedMessage, substance.name)
                         viewModel.recordIntake(substance.id) { outcome, token ->
@@ -284,10 +297,11 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     editingSubstance?.let { draft ->
         SubstanceDialog(
             initial = draft,
+            initialTags = state.tagsBySubstance[draft.id].orEmpty().joinToString(", ") { it.name },
             onDismiss = { editingSubstance = null },
             onDelete = if (draft.id == 0L) null else ({ deleteSubstance = draft }),
-            onSave = {
-                viewModel.saveSubstance(it) { outcome ->
+            onSave = { substance, tags ->
+                viewModel.saveSubstance(substance, tags) { outcome ->
                     scope.launch {
                         when (outcome) {
                             is SubstanceSaveOutcome.Saved -> editingSubstance = null
@@ -397,6 +411,11 @@ private fun HomeScreen(
     macros: List<MacroUi>,
     query: String,
     onQueryChange: (String) -> Unit,
+    tags: List<com.gernalix.personalhub.contracts.database.HubTagEntity>,
+    selectedTagIds: Set<String>,
+    noTags: Boolean,
+    onToggleTag: (String) -> Unit,
+    onToggleNoTags: () -> Unit,
     onRecord: (SubstancePlan) -> Unit,
     onMacro: (MacroUi) -> Unit,
     onUndo: (Long) -> Unit,
@@ -423,6 +442,14 @@ private fun HomeScreen(
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             SearchBox(query = query, onQueryChange = onQueryChange)
+        }
+        if (tags.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = noTags, onClick = onToggleNoTags, label = { Text("No tags") })
+                tags.filterNot { it.archived }.forEach { tag ->
+                    FilterChip(selected = tag.id in selectedTagIds, onClick = { onToggleTag(tag.id) }, label = { Text(tag.name) })
+                }
+            }
         }
         if (macros.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -852,7 +879,7 @@ private fun SectionTitle(title: String, trailing: (@Composable () -> Unit)? = nu
 }
 
 @Composable
-private fun SubstanceDialog(initial: SubstanceEntity, onDismiss: () -> Unit, onDelete: (() -> Unit)?, onSave: (SubstanceEntity) -> Unit) {
+private fun SubstanceDialog(initial: SubstanceEntity, initialTags: String, onDismiss: () -> Unit, onDelete: (() -> Unit)?, onSave: (SubstanceEntity, String) -> Unit) {
     var name by remember(initial) { mutableStateOf(initial.name) }
     var type by remember(initial) { mutableStateOf(initial.type) }
     var stock by remember(initial) { mutableStateOf(initial.stockCurrent.clean()) }
@@ -860,6 +887,7 @@ private fun SubstanceDialog(initial: SubstanceEntity, onDismiss: () -> Unit, onD
     var frequency by remember(initial) { mutableStateOf(initial.dailyFrequency.toString()) }
     var prn by remember(initial) { mutableStateOf(initial.prn) }
     var forever by remember(initial) { mutableStateOf(initial.forever) }
+    var tags by remember(initial, initialTags) { mutableStateOf(initialTags) }
     AlertDialog(
         modifier = Modifier.semantics { if (initial.id != 0L) contentDescription = "hub-detail-substances/substance/${initial.id}" },
         onDismissRequest = onDismiss,
@@ -885,6 +913,7 @@ private fun SubstanceDialog(initial: SubstanceEntity, onDismiss: () -> Unit, onD
                     OutlinedTextField("mg", {}, modifier = Modifier.weight(1f), label = { Text(stringResource(R.string.dose_unit)) }, singleLine = true, enabled = false)
                 }
                 OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.daily_frequency)) }, singleLine = true)
+                OutlinedTextField(tags, { tags = it }, label = { Text(stringResource(R.string.context_tags)) }, singleLine = true)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.as_needed))
                     Switch(prn, { prn = it })
@@ -908,7 +937,8 @@ private fun SubstanceDialog(initial: SubstanceEntity, onDismiss: () -> Unit, onD
                         dailyFrequency = if (prn) 0 else frequency.toIntOrNull()?.coerceAtLeast(0) ?: 1,
                         prn = prn,
                         forever = forever,
-                    )
+                    ),
+                    tags,
                 )
             }) { Text(stringResource(R.string.save)) }
         },

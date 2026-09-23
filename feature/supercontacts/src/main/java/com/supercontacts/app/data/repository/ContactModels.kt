@@ -48,12 +48,12 @@ data class ContactPhotoReference(
 )
 
 data class ContactTag(
-    val id: Long,
+    val id: String,
     val name: String,
 )
 
 data class SavedSearch(
-    val id: Long,
+    val id: String,
     val publicId: String,
     val title: String,
     val query: String,

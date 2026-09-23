@@ -107,6 +107,7 @@ internal fun StatisticsScreenV2(
     month: YearMonth,
     rows: List<TransactionView>,
     transfers: List<FinanceTransfer>,
+    tagsByTransaction: Map<Long, List<String>>,
 ) {
     val transferIds = remember(transfers) { transfers.flatMap { listOf(it.sourceTransactionId, it.targetTransactionId) }.toSet() }
     val expenses = rows.filter {
@@ -118,8 +119,13 @@ internal fun StatisticsScreenV2(
     val currency = selectedCurrency ?: currencies.firstOrNull()
     val selected = if (currency == null) emptyList() else expenses.filter { it.value.currency == currency }
     val total = selected.fold(BigDecimal.ZERO) { sum, row -> sum + BigDecimal(row.value.amount).abs() }
-    val slices = selected.groupBy { it.value.category.ifBlank { "Senza categoria" } }
+    val slices = selected.groupBy { it.category.ifBlank { "Senza categoria" } }
         .map { (name, group) -> StatSlice(name, group.fold(BigDecimal.ZERO) { sum, row -> sum + BigDecimal(row.value.amount).abs() }) }
+        .sortedByDescending { it.amount }
+    val tagSlices = selected.flatMap { row ->
+        tagsByTransaction[row.value.id].orEmpty().distinct().map { tag -> tag to BigDecimal(row.value.amount).abs() }
+    }.groupBy({ it.first }, { it.second })
+        .map { (name, amounts) -> StatSlice(name, amounts.fold(BigDecimal.ZERO, BigDecimal::add)) }
         .sortedByDescending { it.amount }
 
     androidx.compose.foundation.lazy.LazyColumn(
@@ -156,6 +162,13 @@ internal fun StatisticsScreenV2(
                 }
             }
         }
+        if (tagSlices.isNotEmpty()) item { Text("Spesa per tag", style = MaterialTheme.typography.titleMedium) }
+        items(tagSlices, key = { "tag:${it.name}" }) { slice ->
+            ListItem(
+                headlineContent = { Text("#${slice.name}") },
+                trailingContent = { Text(money(slice.amount.negate(), currency ?: "DKK"), color = MaterialTheme.colorScheme.error) },
+            )
+        }
     }
 }
 
@@ -169,7 +182,7 @@ internal fun ChartsScreenV2(month: YearMonth, rows: List<TransactionView>, trans
     var selectedCurrency by remember(currencies) { mutableStateOf(currencies.firstOrNull()) }
     val currency = selectedCurrency ?: currencies.firstOrNull()
     val selected = if (currency == null) emptyList() else expenses.filter { it.value.currency == currency }
-    val slices = selected.groupBy { it.value.category.ifBlank { "Senza categoria" } }
+    val slices = selected.groupBy { it.category.ifBlank { "Senza categoria" } }
         .map { (name, group) -> StatSlice(name, group.fold(BigDecimal.ZERO) { sum, row -> sum + BigDecimal(row.value.amount).abs() }) }
         .sortedByDescending { it.amount }
         .take(8)

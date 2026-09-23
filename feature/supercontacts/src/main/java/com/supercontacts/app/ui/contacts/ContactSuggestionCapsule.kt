@@ -45,7 +45,7 @@ class ContactSuggestionCapsule(
         }
     }
 
-    override fun removeTagFromContact(contactId: Long, tagId: Long) {
+    override fun removeTagFromContact(contactId: Long, tagId: String) {
         scope.launch {
             status.save {
                 repository.removeTagFromContact(contactId, tagId)

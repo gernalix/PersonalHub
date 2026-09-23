@@ -4,7 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import com.gernalix.luoghi.data.PlaceTagEntity
+import com.gernalix.personalhub.contracts.database.HubTagEntity
 
 /**
  * Canonical alert-rule persistence for domains stored in personalhub.db.
@@ -53,7 +53,7 @@ data class AlertRuleEntity(
             onDelete = ForeignKey.CASCADE,
         ),
         ForeignKey(
-            entity = PlaceTagEntity::class,
+            entity = HubTagEntity::class,
             parentColumns = ["id"],
             childColumns = ["place_tag_id"],
             onDelete = ForeignKey.CASCADE,
@@ -63,5 +63,5 @@ data class AlertRuleEntity(
 )
 data class AlertPlaceTagTargetEntity(
     @ColumnInfo(name = "rule_id") val ruleId: String,
-    @ColumnInfo(name = "place_tag_id") val placeTagId: Long,
+    @ColumnInfo(name = "place_tag_id") val placeTagId: String,
 )

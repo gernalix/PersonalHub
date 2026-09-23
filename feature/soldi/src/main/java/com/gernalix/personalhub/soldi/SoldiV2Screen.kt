@@ -37,7 +37,7 @@ internal fun SoldiV2Screen(
     val macros by capsule.macros.collectAsState(emptyList())
     val recurrences by capsule.recurrences.collectAsState(emptyList())
     val people by capsule.people.collectAsState(emptyList())
-    val categories by capsule.categories.collectAsState(emptyList())
+    val places by capsule.places.collectAsState(emptyList())
     val tags by capsule.tagNames.collectAsState(emptyList())
     val products by capsule.products.collectAsState(emptyList())
 
@@ -133,14 +133,12 @@ internal fun SoldiV2Screen(
             val source = rowMap[transfer.sourceTransactionId]
             val target = rowMap[transfer.targetTransactionId]
             if (source != null && target != null) {
-                editor = SoldiEditor.Transfer(
-                    transferState(
-                        transfer,
-                        source,
-                        target,
-                        tagsByTransaction[source.value.id].orEmpty(),
-                    ),
-                )
+                runAction {
+                    editor = SoldiEditor.Transfer(transferState(
+                        transfer, source, target, tagsByTransaction[source.value.id].orEmpty(),
+                        capsule.contextRefs("transaction", source.value.uuid),
+                    ))
+                }
             }
         } else {
             editor = SoldiEditor.Transaction(
@@ -224,7 +222,7 @@ internal fun SoldiV2Screen(
                         state = current,
                         accounts = accounts,
                         people = people,
-                        categories = categories,
+                        places = places,
                         tags = tags,
                         existingAttachments = existingAttachments,
                         onBack = { if (!busy) editor = null },
@@ -252,7 +250,6 @@ internal fun SoldiV2Screen(
                         state = current,
                         accounts = accounts,
                         people = people,
-                        categories = categories,
                         tags = tags,
                         existingAttachments = existingAttachments,
                         onBack = { if (!busy) editor = null },
@@ -281,6 +278,7 @@ internal fun SoldiV2Screen(
                                         reminderAt = state.reminderAt,
                                         recurrenceId = recurrenceId,
                                         occurrenceKey = recurrenceId?.let { localDate(state.occurredAt).toString() },
+                                        contextRefs = state.contextRefs,
                                     ),
                                 )
                                 pendingAttachments.forEach { capsule.addAttachment(transfer.sourceTransactionId, it) }
@@ -318,7 +316,6 @@ internal fun SoldiV2Screen(
                         value = recurrenceEditor!!,
                         accounts = accounts,
                         people = people,
-                        categories = categories,
                         tags = tags,
                         onChange = { if (!busy) recurrenceEditor = it },
                         onBack = { if (!busy) recurrenceEditor = null },
@@ -384,7 +381,9 @@ internal fun SoldiV2Screen(
                 bottom == BottomDestination.RECURRENCES -> RecurrencesScreenV2(
                     recurrences = recurrences,
                     nextOccurrence = { capsule.nextOccurrence(it) },
-                    onEdit = { rule -> runAction { recurrenceEditor = rule.toDraft(capsule.recurrenceTags(rule.id)) } },
+                    onEdit = { rule -> runAction {
+                        recurrenceEditor = rule.toDraft(capsule.recurrenceTags(rule.id), capsule.contextRefs("recurrence", rule.id))
+                    } },
                     onToggle = { rule, enabled -> runAction {
                         capsule.setRecurrenceEnabled(rule.id, enabled)
                         FinanceReminderScheduler.reschedule(context.applicationContext)
@@ -406,13 +405,18 @@ internal fun SoldiV2Screen(
                         photoByTransaction,
                         viewOptions,
                         ::openTransaction,
-                        { transfer, source, target -> editor = SoldiEditor.Transfer(transferState(transfer, source, target, tagsByTransaction[source.value.id].orEmpty())) },
+                        { transfer, source, target -> runAction {
+                            editor = SoldiEditor.Transfer(transferState(
+                                transfer, source, target, tagsByTransaction[source.value.id].orEmpty(),
+                                capsule.contextRefs("transaction", source.value.uuid),
+                            ))
+                        } },
                         { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.EXPENSE) },
                         { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.INCOME) },
                         { editor = SoldiEditor.Transfer(defaultTransfer(accounts)) },
                     )
                     SoldiTab.OVERVIEW -> OverviewScreenV2(month, accounts, transactions.map { it.value }, projected, transfers, viewOptions.ignoreTransfers)
-                    SoldiTab.STATISTICS -> StatisticsScreenV2(month, transactions, transfers)
+                    SoldiTab.STATISTICS -> StatisticsScreenV2(month, transactions, transfers, tagsByTransaction)
                     SoldiTab.CHARTS -> ChartsScreenV2(month, transactions, transfers)
                     SoldiTab.CALENDAR -> CalendarScreenV2(month, { month = it }, accounts, transactions, projected, transfers)
                 }

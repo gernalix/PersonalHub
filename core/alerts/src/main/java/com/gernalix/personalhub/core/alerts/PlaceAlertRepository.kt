@@ -80,7 +80,7 @@ class PlaceAlertRepository(
     suspend fun delete(ruleId: String): Boolean =
         dao.softDelete(ruleId, System.currentTimeMillis()) > 0
 
-    suspend fun placeTagTargets(ruleIds: List<String>): Map<String, Set<Long>> {
+    suspend fun placeTagTargets(ruleIds: List<String>): Map<String, Set<String>> {
         if (ruleIds.isEmpty()) return emptyMap()
         return dao.placeTagTargets(ruleIds)
             .groupBy { it.ruleId }
