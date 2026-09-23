@@ -135,7 +135,7 @@ def _sha256(path: Path) -> str:
 
 
 def _resource_lock(resource: str, command: str) -> int:
-    return personalhub_task_lock.main.__wrapped__() if False else _run(
+    return _run(
         [
             sys.executable,
             str(ROOT / "tools/personalhub_task_lock.py"),
