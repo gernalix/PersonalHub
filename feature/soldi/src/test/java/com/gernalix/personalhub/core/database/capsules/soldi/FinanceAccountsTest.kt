@@ -100,30 +100,5 @@ class FinanceAccountsTest {
         assertEquals(date.toString(), row.occurrenceKey)
         assertTrue(row.occurredAt >= account.openedAt)
     }
-    @Test fun migrationPreservesAllFinanceValuesAndTagLinksWithRequiredAccounts() = runBlocking {
-        val name="finance-v4.db";val file=context.getDatabasePath(name);file.parentFile!!.mkdirs()
-        val schema=JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/4.json").bufferedReader().use { it.readText() }).getJSONObject("database").getJSONArray("entities")
-        SQLiteDatabase.openOrCreateDatabase(file,null).use { old ->
-            for(i in 0 until schema.length()) {
-                val e=schema.getJSONObject(i);val table=e.getString("tableName")
-                old.execSQL(e.getString("createSql").replace("\${TABLE_NAME}",table))
-                val indices=e.optJSONArray("indices") ?: continue
-                for(j in 0 until indices.length())old.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}",table))
-            }
-            old.execSQL("INSERT INTO hub_generation VALUES(1,9)")
-            old.execSQL("INSERT INTO finance_products VALUES(7,'Milk')")
-            old.execSQL("INSERT INTO finance_tags VALUES(3,'food')")
-            old.execSQL("INSERT INTO finance_transactions VALUES(5,NULL,7,'-3.5','DKK',NULL,NULL,1,'keep','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
-            old.execSQL("INSERT INTO finance_transaction_tags VALUES(5,3)")
-            old.version=4
-        }
-        val db=PersonalHubDatabase.openTemporary(context,name)
-        try {
-            val row=db.financeDao().transaction(5)!!;assertEquals("-3.5",row.amount);assertEquals(7L,row.productId);assertTrue(row.fromReceipt);assertEquals("keep",row.notes)
-            assertEquals("DKK",db.financeDao().account(row.accountId)!!.currency)
-            assertEquals(listOf("food"),FinanceCapsule(db).tags(5))
-            assertEquals(1,db.financeDao().allTransactions().size)
-            db.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
-        } finally { db.close();context.deleteDatabase(name) }
-    }
+
 }

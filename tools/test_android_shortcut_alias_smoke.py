@@ -5,9 +5,9 @@ from android_shortcut_alias_smoke import launched_activity
 
 class LaunchedActivityTest(unittest.TestCase):
     def test_android_abbreviated_activity_name(self):
-        output = "Activity: com.gernalix.personalhub/.salute.SaluteActivity\n"
+        output = "Activity: com.gernalix.personalhub/.soldi.SoldiActivity\n"
         self.assertEqual(
-            "com.gernalix.personalhub.salute.SaluteActivity",
+            "com.gernalix.personalhub.soldi.SoldiActivity",
             launched_activity(output, "com.gernalix.personalhub"),
         )
 

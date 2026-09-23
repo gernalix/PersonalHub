@@ -210,37 +210,5 @@ class SostanzeCampaignTest {
         assertTrue(SostanzeEngine.missedDoseNotifications(listOf(state), now).isEmpty())
     }
 
-    @Test fun versionFiveMigrationPreservesHistoricalDuplicateRowsAndChildren() {
-        val name = "substances-v5-${UUID.randomUUID()}.db"
-        val file = context.getDatabasePath(name)
-        file.parentFile!!.mkdirs()
-        val schema = org.json.JSONObject(
-            context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/5.json")
-                .bufferedReader().use { it.readText() }
-        ).getJSONObject("database")
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
-            val entities = schema.getJSONArray("entities")
-            for (i in 0 until entities.length()) {
-                val entity = entities.getJSONObject(i)
-                val table = entity.getString("tableName")
-                old.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
-                val indices = entity.optJSONArray("indices") ?: org.json.JSONArray()
-                for (j in 0 until indices.length()) old.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", table))
-            }
-            old.execSQL("INSERT INTO hub_generation VALUES(1,10)")
-            old.execSQL("INSERT INTO substances(id,name,type,stock_current,stock_unit,dose_per_intake,dose_unit,daily_frequency,start_epoch_day,end_epoch_day,forever,archived,prn) VALUES(1,'Same','farmaco',10,'mg',1,'mg',1,1,NULL,1,0,0)")
-            old.execSQL("INSERT INTO substances(id,name,type,stock_current,stock_unit,dose_per_intake,dose_unit,daily_frequency,start_epoch_day,end_epoch_day,forever,archived,prn) VALUES(2,' same ','farmaco',10,'mg',1,'mg',1,1,NULL,1,0,0)")
-            old.execSQL("INSERT INTO intake_events(id,substance_id,timestamp_ms,timestamp_utc,dose,dose_unit,tap_group_id) VALUES(1,2,1000,'1970-01-01T00:00:01Z',1,'mg','legacy')")
-            old.version = 5
-        }
-        val db = PersonalHubDatabase.openTemporary(context, name)
-        try {
-            runBlocking {
-                assertEquals(2, db.dao().substanceCount())
-                assertNotNull(db.dao().intakeById(1))
-                assertEquals(2, db.dao().substancesByCanonicalName("same").size)
-            }
-            db.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
-        } finally { db.close(); context.deleteDatabase(name) }
-    }
+
 }

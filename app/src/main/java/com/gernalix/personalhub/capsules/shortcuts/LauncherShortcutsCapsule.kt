@@ -88,13 +88,6 @@ enum class HubModule(
         shortcutPath = "soldi",
         shortcutIconRes = R.drawable.ic_shortcut_soldi,
     ),
-    SALUTE(
-        titleRes = R.string.module_salute,
-        subtitleRes = R.string.module_salute_subtitle,
-        shortcutActivityAliasName = "com.gernalix.personalhub.shortcut.SaluteShortcutActivity",
-        shortcutPath = "salute",
-        shortcutIconRes = R.drawable.ic_shortcut_salute,
-    ),
     ;
 
     val pinnedShortcutId: String

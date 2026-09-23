@@ -193,7 +193,6 @@ dependencies {
     implementation(project(":feature:supercontacts"))
     implementation(project(":feature:wordpulse"))
     implementation(project(":feature:soldi"))
-    implementation(project(":feature:salute"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.extended)

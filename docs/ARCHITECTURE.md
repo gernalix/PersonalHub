@@ -14,16 +14,16 @@ the application:
 - **Datasette — outbound replica.** The mobile app sends row-level state/tombstones for remote
   browsing and analysis. Datasette never hydrates or overwrites `personalhub.db`.
 - **Git data — outbound versioned history plus explicit recovery/control.** Background sync publishes
-  deterministic state/history and may read verified patch/migration metadata. It does not silently
+  deterministic state/history and may read verified patch metadata. It does not silently
   restore remote state. Full inbound replacement requires an explicit Restore from Git action;
   applying a data patch is also explicit.
 
 Credentials for Datasette and Git are device-local Android-Keystore-encrypted connection material,
 not application data. They must not enter SQLite, SAF exports, Git payloads, logs or saved UI state.
 
-See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch/migration and restore architecture.
+See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch and restore architecture.
 
-PersonalHub contains People, Timer, Places, Substances, WordPulse, Soldi and Salute. The application package is `com.gernalix.personalhub`.
+PersonalHub contains People, Timer, Places, Substances, WordPulse and Soldi. The application package is `com.gernalix.personalhub`.
 
 ## Database capsule
 
@@ -68,14 +68,6 @@ business rules merely to reduce line count.
 ## Android feature runtime ownership
 
 Each feature owns its Android runtime declaration in its own library manifest: Activities, receivers, providers, services, feature-specific permissions and its stable `com.gernalix.personalhub.shortcut.*` public alias. The host manifest declares only host/core components and therefore does not need to know feature implementation class names. Home navigation, pinned shortcuts and static shortcuts all target the same stable aliases. `checkArchitectureBoundaries` rejects host-manifest feature components, private feature class names embedded in host Kotlin and host imports outside the direct `.api`/`.hub` surfaces.
-
-## Salute external read-only capsule
-
-Salute is deliberately different from the writable feature capsules. `:feature:salute` consumes the private `gernalix/salute` repository and its canonical `salute.db` as an **external read-only artifact**. It does not add health tables to `personalhub.db`, does not use Room for health data, and has no create/edit/delete workflow.
-
-The existing encrypted GitHub credential and transport boundary in `:core:database` is reused through the narrow `GitReadOnlyArtifactClient`. The feature never receives the raw GitHub token and never invokes `GitDataSync` bidirectional state/history semantics for health data. Downloaded health bytes are staged in `noBackupFilesDir`, validated as SQLite, checked for FK/integrity and the supported consumer contract, then atomically replace the last known-good cache. Validation or network failure leaves the prior cache untouched.
-
-`personalhub.db` remains the sole PersonalHub-owned writable database. The cached `salute.db` is reproducible external source material and is excluded from PersonalHub import/export, Git History, Datasette sync, Activity undo and Android backup. UI reads stable producer views such as `v_health_timeline`, `v_health_measurement_history`, `v_health_journal_detail` and `v_test_turnaround`. See `docs/HEALTH_MODULE.md`.
 
 ## Shared tags, facets and cross-module linking target
 

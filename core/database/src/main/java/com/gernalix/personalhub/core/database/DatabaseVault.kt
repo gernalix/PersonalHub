@@ -217,7 +217,7 @@ object DatabaseVault {
         cleanupOrphanedPreImportBackups(context)
     }
 
-    /** Validates or safely upgrades the canonical database before feature code can write to it. */
+    /** Validates the canonical database before feature code can write to it. */
     fun ensureStartupReady(context: Context): Boolean = operations.withLock {
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
         val prefs = preferences(context)
@@ -256,73 +256,20 @@ object DatabaseVault {
         val sourceVersion = runCatching {
             SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
         }.getOrElse { return@withLock fail("Database is unreadable; existing data was preserved") }
-        if (!PersonalHubDatabase.canMigrateFrom(sourceVersion)) {
+        if (sourceVersion != PersonalHubDatabase.SCHEMA_VERSION) {
             return@withLock fail("Database version is unsupported; existing data was preserved")
         }
-        if (sourceVersion == PersonalHubDatabase.SCHEMA_VERSION) {
-            return@withLock runCatching {
-                validate(context, target)
-                pass().also { ready -> if (ready) cleanupCompletedStartupRollbacks(context) }
-            }.getOrElse { fail("Database validation failed; existing data was preserved") }
-        }
-
-        val snapshot = File(target.parentFile, "personalhub-startup-v$sourceVersion.db")
         return@withLock runCatching {
-            SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
-                db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { c ->
-                    require(c.moveToFirst() && c.getInt(0) == 0) { "Database is busy" }
-                }
-            }
-            syncCopy(target, snapshot)
-            PersonalHubDatabase.closeInstance()
-            if (!PersonalHubDatabase.hasProductionMigrationPath(context, sourceVersion)) {
-                val remoteStage = File(
-                    target.parentFile,
-                    "personalhub-remote-migration-${UUID.randomUUID()}.db",
-                )
-                try {
-                    syncCopy(target, remoteStage)
-                    require(
-                        GitDataSync.migrateStagingFromRemote(
-                            context = context,
-                            file = remoteStage,
-                            from = sourceVersion,
-                            to = PersonalHubDatabase.SCHEMA_VERSION,
-                        ),
-                    ) { "No packaged or remote migration path is available" }
-                    validate(context, remoteStage)
-                    sidecars(target)
-                    atomicMove(remoteStage, target)
-                } finally {
-                    remoteStage.delete()
-                    sidecars(remoteStage)
-                }
-            }
-            val temporary = PersonalHubDatabase.openTemporary(context, target.absolutePath)
-            try { temporary.openHelper.writableDatabase } finally { temporary.close() }
             validate(context, target)
-            pass().also { ready ->
-                if (ready) {
-                    sidecars(snapshot)
-                    snapshot.delete()
-                    syncDirectory(target.parentFile!!)
-                }
-            }
-        }.getOrElse {
-            PersonalHubDatabase.closeInstance()
-            if (snapshot.isFile) {
-                sidecars(target)
-                syncCopy(snapshot, target)
-            }
-            fail("Database upgrade failed and was rolled back; no writes were allowed")
-        }
+            pass().also { ready -> if (ready) cleanupCompletedStartupRollbacks(context) }
+        }.getOrElse { fail("Database validation failed; existing data was preserved") }
     }
 
     fun validate(context: Context, file: File): Long {
         require(file.isFile && file.length() >= 100) { "Invalid SQLite file" }
         file.inputStream().use { input -> val header = ByteArray(16); java.io.DataInputStream(input).readFully(header); require(header.contentEquals("SQLite format 3\u0000".toByteArray())) { "Invalid SQLite header" } }
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-            require(PersonalHubDatabase.canMigrateFrom(db.version)) { "Incompatible database version" }
+            require(db.version == PersonalHubDatabase.SCHEMA_VERSION) { "Incompatible database version" }
             val asset = "com.gernalix.personalhub.core.database.PersonalHubDatabase/${db.version}.json"
             val schema = JSONObject(context.assets.open(asset).bufferedReader().use { it.readText() }).getJSONObject("database")
             db.rawQuery("PRAGMA quick_check", null).use { c -> require(c.moveToFirst() && c.getString(0) == "ok" && !c.moveToNext()) { "SQLite integrity check failed" } }
@@ -363,12 +310,24 @@ object DatabaseVault {
                 }
             }
             // Room validates every table PersonalHub owns above. Extra tables are intentionally
-            // tolerated: real databases can retain inert legacy tables after migrations, and an
+            // tolerated: real databases can retain inert legacy tables, and an
             // extra table cannot affect app data unless it has a trigger. Every trigger is still
             // validated below, so this does not weaken the executable-schema boundary.
             val databaseTables = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { c ->
                 buildSet { while (c.moveToNext()) add(c.getString(0)) }
             }
+            require(databaseTables.none { it.startsWith("health_") }) { "PersonalHub database still contains Salute tables" }
+            fun requireNoSaluteRows(table: String, predicate: String) {
+                if (table !in databaseTables) return
+                db.rawQuery("SELECT 1 FROM `$table` WHERE $predicate LIMIT 1", null).use { rows ->
+                    require(!rows.moveToFirst()) { "PersonalHub database still contains Salute records" }
+                }
+            }
+            requireNoSaluteRows("hub_entity_bindings", "module_id='salute'")
+            requireNoSaluteRows("hub_activity_log", "module_id='salute' OR source_table LIKE 'health_%'")
+            requireNoSaluteRows("hub_sync_pending", "table_name LIKE 'health_%'")
+            requireNoSaluteRows("hub_sync_known", "table_name LIKE 'health_%'")
+            requireNoSaluteRows("hub_tags", "namespace='salute'")
             db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
                 while (c.moveToNext()) {
                     val name = c.getString(0); val table = c.getString(1)
@@ -701,12 +660,10 @@ object DatabaseVault {
         try {
             context.contentResolver.openInputStream(uri).use { input -> FileOutputStream(stage).use { out -> requireNotNull(input).copyTo(out); out.fd.sync() } }
             validate(context, stage)
-            // Room upgrades accepted v2 exports without changing the source file.
-            val importedVersion = SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
             val gitHistoryEnabled = runCatching {
                 GitDataSettings.configuration(context).enabled
             }.getOrDefault(false)
-            if (importedVersion < PersonalHubDatabase.SCHEMA_VERSION || gitHistoryEnabled) {
+            if (gitHistoryEnabled) {
                 PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
                     try { temporary.openHelper.writableDatabase } finally { temporary.close() }
                 }
@@ -833,16 +790,6 @@ object DatabaseVault {
                 val stage = File(target.parentFile, "personalhub-profile-${UUID.randomUUID()}.db")
                 try {
                     syncCopy(targetProfileFile, stage)
-                    val importedVersion = SQLiteDatabase.openDatabase(
-                        stage.path,
-                        null,
-                        SQLiteDatabase.OPEN_READONLY,
-                    ).use { it.version }
-                    if (importedVersion < PersonalHubDatabase.SCHEMA_VERSION) {
-                        PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
-                            try { temporary.openHelper.writableDatabase } finally { temporary.close() }
-                        }
-                    }
                     validate(context, stage)
                     DatabaseGate.replace {
                         val backup = File(

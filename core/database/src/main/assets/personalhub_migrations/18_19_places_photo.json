@@ -1,9 +1,0 @@
-{
-  "format_version": 1,
-  "from": 18,
-  "to": 19,
-  "statements": [
-    "ALTER TABLE places ADD COLUMN photo_uri TEXT",
-    "UPDATE hub_generation SET generation=generation+1 WHERE id=1"
-  ]
-}

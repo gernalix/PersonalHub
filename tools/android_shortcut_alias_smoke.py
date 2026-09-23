@@ -53,8 +53,8 @@ def discover_aliases(repo_root: Path) -> list[tuple[str, str]]:
                 aliases.append((alias, qualify(target, namespace)))
 
     names = [alias for alias, _ in aliases]
-    if len(aliases) != 7 or len(names) != len(set(names)):
-        raise SmokeError(f"expected exactly 7 unique public shortcut aliases, found {len(aliases)}: {names}")
+    if len(aliases) != 6 or len(names) != len(set(names)):
+        raise SmokeError(f"expected exactly 6 unique public shortcut aliases, found {len(aliases)}: {names}")
     return aliases
 
 

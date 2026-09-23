@@ -38,41 +38,6 @@ object HubActivityCapture {
      */
     private val rowSpecs = listOf(
         RowSpec(
-            table = "health_import_batches", moduleId = "salute", entityKind = "import",
-            entityIdNew = "NEW.`id`", labelNew = "NEW.`source_system`",
-            reversibleInsert = true, reversibleUpdate = true,
-        ),
-        RowSpec(
-            table = "health_events", moduleId = "salute", entityKind = "event",
-            entityIdNew = "NEW.`id`", labelNew = "COALESCE(NEW.`title_it`,NEW.`event_kind`)",
-            reversibleInsert = true, reversibleUpdate = true,
-        ),
-        RowSpec(
-            table = "health_samples", moduleId = "salute", entityKind = "sample",
-            entityIdNew = "NEW.`id`", labelNew = "COALESCE(NEW.`material_it`,NEW.`sample_kind`)",
-            reversibleInsert = true, reversibleUpdate = true,
-        ),
-        RowSpec(
-            table = "health_examinations", moduleId = "salute", entityKind = "examination",
-            entityIdNew = "NEW.`id`", labelNew = "NEW.`display_name_it`",
-            reversibleInsert = true, reversibleUpdate = true,
-        ),
-        RowSpec(
-            table = "health_measurements", moduleId = "salute", entityKind = "measurement",
-            entityIdNew = "NEW.`id`", labelNew = "NEW.`id`",
-            reversibleInsert = true, reversibleUpdate = true,
-        ),
-        RowSpec(
-            table = "health_journal_entries", moduleId = "salute", entityKind = "journal",
-            entityIdNew = "NEW.`id`", labelNew = "COALESCE(NEW.`title_it`,'Nota clinica')",
-            reversibleInsert = true, reversibleUpdate = true,
-        ),
-        RowSpec(
-            table = "health_ai_snapshots", moduleId = "salute", entityKind = "ai_snapshot",
-            entityIdNew = "NEW.`id`", labelNew = "NEW.`subject_kind`",
-            reversibleInsert = true, reversibleUpdate = true,
-        ),
-        RowSpec(
             table = "places",
             moduleId = "places",
             entityKind = "place",
