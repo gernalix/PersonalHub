@@ -57,7 +57,7 @@ class HubContextAllModulesTest {
         val resources = ResourceHubAdapter(context)
         HubContextRuntime.initialize(context, listOf(people, timer, places, soldi, substances, words, resources))
         assertEquals(
-            setOf("people/person", "timer/session", "places/place", "soldi/transaction", "substances/substance", "wordpulse/word_session", "hub/resource"),
+            setOf("people/person", "timer/session", "places/place", "soldi/transaction", "substances/substance", "wordpulse/word_session", "hub/resource", "tags/tag"),
             HubContextRuntime.adapters().map { "${it.moduleId}/${it.entityKind}" }.toSet(),
         )
 
