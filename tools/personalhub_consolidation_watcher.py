@@ -13,7 +13,6 @@ import sys
 from typing import Any
 
 import android_pixel_apk
-import personalhub_task_lock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -248,7 +247,8 @@ def _notify(target_sha: str, version: str, branch_count: int, state: dict[str, A
     env["TELEGRAM_PROJECT_ID"] = PROJECT_ID
     title = "✅ PersonalHub consolidato"
     body = (
-        f"Tutti i {branch_count} branch non-main sono inclusi in main.\n"
+        "Tutti i branch non-main risultano inclusi in main.\n"
+        f"Branch verificati: {branch_count}.\n"
         f"Pixel aggiornato a PH v{version}.\n"
         f"Main: {target_sha[:12]}"
     )
