@@ -23,7 +23,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for branch in             chatgpt/autoexport-single-db-618338             cleanup/zombie-feature-functions-v57             fix/android17-overlay-restricted-settings             fix/launcher-always-home             task/chatgpt-soldi-search-gallery-20260921             task/chatgpt-soldi-transaction-photos-20260921             task/522084             merge/522084-manual
+          for branch in             architecture/async-integrator-v2             chatgpt/autoexport-single-db-618338             cleanup/zombie-feature-functions-v57             fix/android17-overlay-restricted-settings             fix/launcher-always-home             task/chatgpt-soldi-search-gallery-20260921             task/chatgpt-soldi-transaction-photos-20260921             task/522084             merge/522084-manual
           do
             if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
               git push origin --delete "$branch"
