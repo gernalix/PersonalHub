@@ -91,6 +91,7 @@ import java.security.MessageDigest
     com.gernalix.personalhub.core.database.TimerSyncShadow::class,
     PeoplePhoto::class, HubGeneration::class, HubPreferences::class, HubSyncPending::class, HubSyncKnown::class,
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
+    HubTagEntity::class, HubTagAlias::class, HubTagAssignment::class, HubTagParent::class, HubSavedTagFilter::class,
     HubResource::class, HubActivityEntity::class,
     com.gernalix.personalhub.core.database.capsules.health.HealthImportBatches::class,
     com.gernalix.personalhub.core.database.capsules.health.HealthSourceMetadata::class,
@@ -102,7 +103,7 @@ import java.security.MessageDigest
     com.gernalix.personalhub.core.database.capsules.health.HealthAiSnapshots::class,
     com.gernalix.personalhub.core.database.capsules.health.HealthAiEvidence::class,
 
-], version = 19, exportSchema = true)
+], version = 20, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -112,6 +113,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun financeDao(): com.gernalix.personalhub.core.database.capsules.soldi.FinanceDao
     abstract fun photoDao(): PeoplePhotoDao
     abstract fun hubContextDao(): HubContextDao
+    abstract fun hubTagDao(): HubTagDao
     abstract fun hubResourceDao(): HubResourceDao
     abstract fun activityDao(): HubActivityDao
 
@@ -121,7 +123,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 19
+        const val SCHEMA_VERSION = 20
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -439,7 +441,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                     db.execSQL("UPDATE hub_generation SET generation=generation+1 WHERE id=1")
                                 }
                             },
-        ) + arrayOf(TimestampEpochMigration(context)) + DeclarativeMigrations.load(context)
+        ) + arrayOf(TimestampEpochMigration(context)) + DeclarativeMigrations.load(context) + arrayOf(SharedTagsMigration())
 
         private fun schemaFingerprint(db: SupportSQLiteDatabase): String {
             val digest = MessageDigest.getInstance("SHA-256")

@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Lossless consolidation of the legacy module tag stores into the Hub binding layer. */
-internal class SharedTagsMigration : Migration(18, 19) {
+internal class SharedTagsMigration : Migration(19, 20) {
     override fun migrate(db: SupportSQLiteDatabase) {
         createTables(db)
         migratePeople(db)
