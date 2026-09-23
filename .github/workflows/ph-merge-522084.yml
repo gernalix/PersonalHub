@@ -1,0 +1,224 @@
+name: One-shot merge task 522084
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ph-merge-522084.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GOOGLE_MAPS_API_KEY: CI_NOT_A_REAL_KEY
+      GOOGLE_ROUTES_API_KEY: CI_NOT_A_REAL_KEY
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Merge task 522084 and resolve schema collision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin task/522084
+
+          set +e
+          git merge --no-ff --no-commit origin/task/522084
+          merge_rc=$?
+          set -e
+          if [ "$merge_rc" -ne 0 ] && [ "$merge_rc" -ne 1 ]; then
+            exit "$merge_rc"
+          fi
+
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          allowed = {
+              "core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/19.json",
+              "core/database/src/main/java/com/gernalix/personalhub/core/database/PersonalHubDatabase.kt",
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/DatabaseMigrationSafetyTest.kt",
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/HubContextMigrationTest.kt",
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceAdvancedMigrationContractTest.kt",
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/sync/SyncJournalTest.kt",
+              "feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiEditorsUi.kt",
+              "feature/soldi/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceCapsuleTest.kt",
+          }
+          conflicts = set(filter(None, subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+          ).splitlines()))
+          unexpected = conflicts - allowed
+          if unexpected:
+              raise SystemExit("unexpected conflicts: " + ", ".join(sorted(unexpected)))
+
+          schema19 = "core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/19.json"
+          if schema19 in conflicts:
+              subprocess.check_call(["git", "checkout", "--ours", "--", schema19])
+              subprocess.check_call(["git", "add", schema19])
+
+          def resolve_markers(path: str, chooser):
+              p = Path(path)
+              text = p.read_text()
+              out = []
+              lines = text.splitlines(keepends=True)
+              i = 0
+              block_index = 0
+              while i < len(lines):
+                  if not lines[i].startswith("<<<<<<< "):
+                      out.append(lines[i]); i += 1; continue
+                  i += 1
+                  ours = []
+                  while i < len(lines) and not lines[i].startswith("======="):
+                      ours.append(lines[i]); i += 1
+                  if i >= len(lines): raise RuntimeError(f"unterminated conflict in {path}")
+                  i += 1
+                  theirs = []
+                  while i < len(lines) and not lines[i].startswith(">>>>>>> "):
+                      theirs.append(lines[i]); i += 1
+                  if i >= len(lines): raise RuntimeError(f"unterminated conflict in {path}")
+                  i += 1
+                  out.extend(chooser(block_index, ours, theirs))
+                  block_index += 1
+              p.write_text("".join(out))
+
+          def theirs(_idx, _ours, theirs_lines):
+              return theirs_lines
+
+          db = "core/database/src/main/java/com/gernalix/personalhub/core/database/PersonalHubDatabase.kt"
+          if db in conflicts:
+              resolve_markers(db, theirs)
+              p = Path(db)
+              s = p.read_text()
+              s = s.replace("], version = 19, exportSchema = true)", "], version = 20, exportSchema = true)")
+              s = s.replace("const val SCHEMA_VERSION = 19", "const val SCHEMA_VERSION = 20")
+              if "HubTagEntity::class" not in s or "abstract fun hubTagDao(): HubTagDao" not in s:
+                  raise SystemExit("tag entities/dao missing after DB merge resolution")
+              if "arrayOf(SharedTagsMigration())" not in s:
+                  s = s.replace(
+                      ") + arrayOf(TimestampEpochMigration(context)) + DeclarativeMigrations.load(context)",
+                      ") + arrayOf(TimestampEpochMigration(context)) + DeclarativeMigrations.load(context) + arrayOf(SharedTagsMigration())",
+                  )
+              p.write_text(s)
+              subprocess.check_call(["git", "add", db])
+
+          test_paths = [
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/DatabaseMigrationSafetyTest.kt",
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/HubContextMigrationTest.kt",
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceAdvancedMigrationContractTest.kt",
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/sync/SyncJournalTest.kt",
+              "feature/soldi/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceCapsuleTest.kt",
+          ]
+          for path in test_paths:
+              if path in conflicts:
+                  resolve_markers(path, theirs)
+
+          replacements = {
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/DatabaseMigrationSafetyTest.kt": [
+                  ("assertEquals(78L, scalar(db, \"SELECT generation FROM hub_generation WHERE id=1\"))",
+                   "assertEquals(79L, scalar(db, \"SELECT generation FROM hub_generation WHERE id=1\"))"),
+              ],
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/HubContextMigrationTest.kt": [
+                  ("assertEquals(53L, scalarLong(sqlite, \"SELECT generation FROM hub_generation WHERE id=1\"))",
+                   "assertEquals(54L, scalarLong(sqlite, \"SELECT generation FROM hub_generation WHERE id=1\"))"),
+                  ("assertEquals(18L, scalarLong(sqlite, \"SELECT generation FROM hub_generation WHERE id=1\"))",
+                   "assertEquals(19L, scalarLong(sqlite, \"SELECT generation FROM hub_generation WHERE id=1\"))"),
+              ],
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceAdvancedMigrationContractTest.kt": [
+                  ("assertEquals(107L, scalarLong(sqlite, \"SELECT generation FROM hub_generation WHERE id=1\"))",
+                   "assertEquals(108L, scalarLong(sqlite, \"SELECT generation FROM hub_generation WHERE id=1\"))"),
+              ],
+              "core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/sync/SyncJournalTest.kt": [
+                  ("assertEquals(56L, it.getLong(0))", "assertEquals(57L, it.getLong(0))"),
+              ],
+              "feature/soldi/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceCapsuleTest.kt": [
+                  ("assertEquals(56, scalar(owner, \"SELECT generation FROM hub_generation\"))",
+                   "assertEquals(57, scalar(owner, \"SELECT generation FROM hub_generation\"))"),
+                  ("assertEquals(56, DatabaseVault.validate(context, file))",
+                   "assertEquals(57, DatabaseVault.validate(context, file))"),
+              ],
+          }
+          for path, pairs in replacements.items():
+              p = Path(path)
+              if not p.exists(): continue
+              s = p.read_text()
+              for old, new in pairs:
+                  if old in s:
+                      s = s.replace(old, new)
+              p.write_text(s)
+              subprocess.check_call(["git", "add", path])
+
+          editor = "feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiEditorsUi.kt"
+          if editor in conflicts:
+              def editor_choice(_idx, ours, theirs_lines):
+                  o = "".join(ours)
+                  t = "".join(theirs_lines)
+                  if "import " in o and "import " in t:
+                      seen = set()
+                      merged = []
+                      for line in ours + theirs_lines:
+                          if line not in seen:
+                              seen.add(line); merged.append(line)
+                      return merged
+                  if "facetPickerOpen" in t and "rememberHubPhotoPicker" in o:
+                      prefix = t
+                      for marker in ("    val documentLauncher = ", "    val pickDocument = "):
+                          joined = "".join(prefix)
+                          pos = joined.find(marker)
+                          if pos >= 0:
+                              prefix = joined[:pos].splitlines(keepends=True)
+                              break
+                      joined_o = "".join(ours)
+                      pos = joined_o.find("    val pickDocument = ")
+                      if pos < 0:
+                          raise RuntimeError("expected shared photo picker in ours")
+                      return prefix + joined_o[pos:].splitlines(keepends=True)
+                  if "facetPickerOpen" in t:
+                      return theirs_lines
+                  return theirs_lines
+              resolve_markers(editor, editor_choice)
+              subprocess.check_call(["git", "add", editor])
+
+          remaining = subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+          ).strip()
+          if remaining:
+              raise SystemExit("unresolved conflicts remain: " + remaining)
+
+          mig = Path("core/database/src/main/java/com/gernalix/personalhub/core/database/SharedTagsMigration.kt")
+          s = mig.read_text()
+          s = s.replace("Migration(18, 19)", "Migration(19, 20)")
+          mig.write_text(s)
+          subprocess.check_call(["git", "add", str(mig)])
+          PY
+
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --console=plain :app:compileDebugKotlin
+
+          schema20='core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/20.json'
+          test -f "$schema20"
+          git add "$schema20"
+
+          ./gradlew --no-daemon --console=plain             :core:database:testDebugUnitTest             :feature:soldi:testDebugUnitTest             :feature:supercontacts:testDebugUnitTest
+
+          git rm .github/workflows/ph-merge-522084.yml
+          git add -A
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git commit -m "Merge task/522084: unify tags and facets across modules"
+          git push origin HEAD:main
+
+          for branch in             architecture/async-integrator-v2             chatgpt/autoexport-single-db-618338             cleanup/zombie-feature-functions-v57             fix/android17-overlay-restricted-settings             fix/launcher-always-home             task/chatgpt-soldi-search-gallery-20260921             task/chatgpt-soldi-transaction-photos-20260921             task/522084
+          do
+            git push origin --delete "$branch"
+          done
