@@ -667,7 +667,7 @@ private fun AttachmentEditor(
 private fun AttachmentRow(title: String, uri: String, isPhoto: Boolean, onDelete: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         if (isPhoto) {
-            FinancePhotoThumbnail(uri = uri, title = title, size = 46.dp)
+            HubSquarePhotoThumbnail(HubPhoto(uri, uri, uri, title.ifBlank { "Foto transazione" }), size = 46.dp)
             Spacer(Modifier.width(10.dp))
         }
         Column(Modifier.weight(1f)) {
