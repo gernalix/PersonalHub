@@ -239,46 +239,6 @@ object GitDataSync {
         checkForChanges(app)
     }
 
-    /**
-     * Startup fallback for an APK-supported schema whose one-shot transform lives in the optional
-     * data repository rather than permanent Kotlin. The caller owns the staging file and performs
-     * atomic replacement only after its normal validation succeeds.
-     */
-    internal fun migrateStagingFromRemote(
-        context: Context,
-        file: File,
-        from: Int,
-        to: Int,
-    ): Boolean = operations.withLock {
-        if (from == to) return@withLock true
-        val app = context.applicationContext
-        val config = runCatching { GitDataSettings.configuration(app) }.getOrNull()
-            ?: return@withLock false
-        if (!config.enabled || !config.configured) return@withLock false
-        val transport = transport(app, config)
-        val head = transport.remoteHead()
-        val bytes = transport.readFileOrNull(GIT_CONTROL_MANIFEST, head.commitSha)
-            ?: return@withLock false
-        val control = JSONObject(String(bytes, Charsets.UTF_8)).also(::validateControl)
-        require(control.optLong("minimum_app_version", 0L) <= appVersion(app)) {
-            "Remote Git control requires a newer PersonalHub app"
-        }
-        require(to <= PersonalHubDatabase.SCHEMA_VERSION) {
-            "Remote migration targets a schema unsupported by this APK"
-        }
-        if (!GitRemoteMigrationEngine.canMigrate(control, from, to)) return@withLock false
-        GitRemoteMigrationEngine.migrate(
-            context = app,
-            transport = transport,
-            ref = head.commitSha,
-            control = control,
-            file = file,
-            from = from,
-            to = to,
-        )
-        true
-    }
-
     fun pullNow(context: Context) = operations.withLock {
         val app = context.applicationContext
         val config = requireConfiguration(app)
@@ -400,17 +360,6 @@ object GitDataSync {
 
     private fun validateControl(control: JSONObject) {
         require(control.getInt("format_version") == 1) { "Unsupported Git control format" }
-        val migrations = control.optJSONArray("migrations") ?: JSONArray()
-        for (i in 0 until migrations.length()) {
-            val item = migrations.getJSONObject(i)
-            require(item.getInt("from") < item.getInt("to")) { "Invalid migration edge" }
-            require(item.getString("sha256").matches(Regex("[A-Fa-f0-9]{64}"))) {
-                "Invalid migration hash"
-            }
-            require(item.getString("path").startsWith("migrations/")) {
-                "Migration must live under migrations/"
-            }
-        }
         val patches = control.optJSONArray("patches") ?: JSONArray()
         for (i in 0 until patches.length()) {
             val item = patches.getJSONObject(i)
@@ -428,7 +377,6 @@ object GitDataSync {
             .put("format_version", 1)
             .put("minimum_app_version", 0)
             .put("target_schema_version", PersonalHubDatabase.SCHEMA_VERSION)
-            .put("migrations", JSONArray())
             .put("patches", JSONArray())
             .put("created_by", "PersonalHub")
             .put("created_at_ms", System.currentTimeMillis())

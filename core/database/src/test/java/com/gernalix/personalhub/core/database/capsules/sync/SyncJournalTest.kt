@@ -15,34 +15,6 @@ import org.robolectric.annotation.SQLiteMode
 @Config(sdk = [35])
 @SQLiteMode(SQLiteMode.Mode.NATIVE)
 class SyncJournalTest {
-    @Test fun versionTwoWithLegacyTimerIndicesMigratesWithoutChangingRows() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val file = context.getDatabasePath("sync-upgrade-test.db")
-        file.parentFile!!.mkdirs()
-        val schema = org.json.JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/2.json").bufferedReader().use { it.readText() }).getJSONObject("database")
-        android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
-            val entities = schema.getJSONArray("entities")
-            for (i in 0 until entities.length()) {
-                val entity = entities.getJSONObject(i)
-                old.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
-                val indices = entity.optJSONArray("indices") ?: continue
-                for (j in 0 until indices.length()) old.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
-            }
-            old.execSQL("INSERT INTO hub_generation VALUES (1,42)")
-            old.execSQL("INSERT INTO sessions VALUES (1,'preserved',1000,2000,NULL,1000,2000,NULL)")
-            old.execSQL("CREATE INDEX idx_sessions_updated ON sessions(updated_at_ms DESC,id DESC)")
-            old.version = 2
-        }
-        val owner = PersonalHubDatabase.openTemporary(context, file.absolutePath)
-        try {
-            val db = owner.openHelper.writableDatabase
-            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, db.version)
-            db.query("SELECT title,start_ms,end_ms FROM sessions").use { assertTrue(it.moveToFirst()); assertEquals("preserved", it.getString(0)); assertEquals(1000L, it.getLong(1)); assertEquals(2000L, it.getLong(2)) }
-            db.query("SELECT generation FROM hub_generation").use { it.moveToFirst(); assertEquals(57L, it.getLong(0)) }
-            db.execSQL("UPDATE sessions SET title='changed'")
-            db.query("SELECT count(*) FROM hub_sync_pending WHERE table_name='sessions'").use { it.moveToFirst(); assertEquals(1, it.getInt(0)) }
-        } finally { owner.close(); context.deleteDatabase("sync-upgrade-test.db") }
-    }
 
     @Test fun everySchemaTypeJournalsCreateUpdateDeleteAndRollbackAtomically() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -52,7 +24,7 @@ class SyncJournalTest {
             // Fixture values need not form a domain graph. This isolated DB is never uploaded.
             db.execSQL("PRAGMA foreign_keys=OFF")
             val tables = SyncJournal.tables(db)
-            assertEquals(95, tables.size)
+            assertEquals(86, tables.size)
             for (table in tables) {
                 db.execSQL("DELETE FROM `$table`")
                 db.execSQL("DELETE FROM hub_sync_pending")

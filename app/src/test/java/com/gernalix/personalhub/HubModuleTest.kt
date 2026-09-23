@@ -10,7 +10,7 @@ class HubModuleTest {
     fun hubContainsExactlyTheSevenFeatureAliases() {
         assertEquals(7, HubModule.entries.size)
         assertEquals(
-            setOf("people", "timer", "places", "substances", "wordpulse", "soldi", "salute"),
+            setOf("people", "timer", "places", "substances", "wordpulse", "soldi"),
             HubModule.entries.map { it.shortcutPath }.toSet(),
         )
         assertTrue(

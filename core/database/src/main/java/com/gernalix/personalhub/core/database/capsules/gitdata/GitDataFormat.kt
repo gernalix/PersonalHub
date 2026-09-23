@@ -746,7 +746,6 @@ internal object GitPatchEngine {
                 groupId = patchId,
             )
             for (i in 0 until operations.length()) applyOperation(db, operations.getJSONObject(i))
-            com.gernalix.personalhub.core.database.capsules.health.HealthPatchContract.validate(db, operations)
             db.query("PRAGMA foreign_key_check").use {
                 require(!it.moveToFirst()) { "Patch would break database relationships" }
             }
@@ -884,39 +883,13 @@ internal object GitStateRestorer {
         val manifest = JSONObject(String(manifestBytes, Charsets.UTF_8))
         require(manifest.getInt("format_version") in setOf(1, 2)) { "Unsupported state format" }
         val schemaVersion = manifest.getInt("schema_version")
-        require(schemaVersion in 1..PersonalHubDatabase.SCHEMA_VERSION) {
-            "The selected revision uses a newer unsupported schema"
+        require(schemaVersion == PersonalHubDatabase.SCHEMA_VERSION) {
+            "The selected revision uses an incompatible schema"
         }
         val stage = File(context.cacheDir, "personalhub-git-restore-${UUID.randomUUID()}.db")
         try {
             createDatabaseForSchema(context, stage, schemaVersion)
             populate(context, transport, revision, manifest, stage)
-            if (schemaVersion < PersonalHubDatabase.SCHEMA_VERSION) {
-                if (GitRemoteMigrationEngine.canMigrate(
-                        control,
-                        schemaVersion,
-                        PersonalHubDatabase.SCHEMA_VERSION,
-                    )
-                ) {
-                    GitRemoteMigrationEngine.migrate(
-                        context = context,
-                        transport = transport,
-                        ref = controlRef,
-                        control = requireNotNull(control),
-                        file = stage,
-                        from = schemaVersion,
-                        to = PersonalHubDatabase.SCHEMA_VERSION,
-                    )
-                } else {
-                    PersonalHubDatabase.openTemporary(context, stage.absolutePath).let { temporary ->
-                        try {
-                            temporary.openHelper.writableDatabase
-                        } finally {
-                            temporary.close()
-                        }
-                    }
-                }
-            }
             DatabaseVault.validate(context, stage)
             DatabaseVault.importDatabaseFile(context, stage)
         } finally {

@@ -207,7 +207,6 @@ SHORTCUT_ALIAS_PREFIX = "com.gernalix.personalhub.shortcut."
 PUBLIC_SHORTCUT_ALIASES = {
     "luoghi": f"{SHORTCUT_ALIAS_PREFIX}PlacesShortcutActivity",
     "multitimetracker": f"{SHORTCUT_ALIAS_PREFIX}TimerShortcutActivity",
-    "salute": f"{SHORTCUT_ALIAS_PREFIX}SaluteShortcutActivity",
     "soldi": f"{SHORTCUT_ALIAS_PREFIX}SoldiShortcutActivity",
     "sostanze": f"{SHORTCUT_ALIAS_PREFIX}SubstancesShortcutActivity",
     "supercontacts": f"{SHORTCUT_ALIAS_PREFIX}PeopleShortcutActivity",
