@@ -2177,7 +2177,7 @@ private fun ContactDetailScreen(
     onTagQueryChange: (String) -> Unit,
     onClearTagSuggestions: () -> Unit,
     onAddTag: (Long, String) -> Unit,
-    onRemoveTag: (Long, Long) -> Unit,
+    onRemoveTag: (Long, String) -> Unit,
     onTagClick: (ContactTag) -> Unit,
     onScanMessagingLinks: (Long) -> Unit,
     onConfirmMessagingLink: (Long) -> Unit,
@@ -3364,7 +3364,7 @@ private fun TagsSection(
     onTagQueryChange: (String) -> Unit,
     onClearSuggestions: () -> Unit,
     onAddTag: (Long, String) -> Unit,
-    onRemoveTag: (Long, Long) -> Unit,
+    onRemoveTag: (Long, String) -> Unit,
     onTagClick: (ContactTag) -> Unit,
 ) {
     var isAdding by rememberSaveable(contactId) { mutableStateOf(false) }

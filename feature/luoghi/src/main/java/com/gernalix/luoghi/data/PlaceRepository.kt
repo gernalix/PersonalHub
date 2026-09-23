@@ -2,6 +2,10 @@ package com.gernalix.luoghi.data
 
 import com.gernalix.personalhub.core.database.HubAutoExport
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.HubTagEntity
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 
 import android.content.Context
 import androidx.room.withTransaction
@@ -35,7 +39,9 @@ class PlaceRepository(
     private val placeReferences: PlaceReferenceReader = database,
 ) {
     val places: Flow<List<PlaceEntity>> = dao.observePlaces()
-    val placeTags: Flow<List<PlaceTagEntity>> = dao.observePlaceTags()
+    private val sharedTags = SharedTagEngine(database)
+    val placeTags: Flow<List<HubTagEntity>> = sharedTags.observe(HubTagNamespaces.PLACES)
+    val placeTagAssignments = sharedTags.observeAssignments(HubTagNamespaces.PLACES)
     val events: Flow<List<PlaceEventEntity>> = dao.observeEvents()
     val recentCheckInAttempts: Flow<List<CheckInAttemptDiagnostic>> = dao.observeRecentCheckInAttemptDiagnostics(8)
     val geofenceConfigs: Flow<List<PlaceGeofenceConfigEntity>> = dao.observeGeofenceConfigs()
@@ -43,42 +49,24 @@ class PlaceRepository(
     val latestUndoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestUndoableAction()
     val latestRedoableHistoryAction: Flow<HistoryActionEntity?> = dao.observeLatestRedoableAction()
 
-    suspend fun listPlaceTags(): List<PlaceTagEntity> = dao.listPlaceTags()
+    suspend fun listPlaceTags(): List<HubTagEntity> = sharedTags.search(HubTagNamespaces.PLACES, "", 500)
 
-    suspend fun tagsForPlace(placeUuid: String): List<PlaceTagEntity> = dao.tagsForPlace(placeUuid)
+    suspend fun tagsForPlace(placeUuid: String): List<HubTagEntity> = sharedTags.tags(HubEntityRef("places", "place", placeUuid))
 
     suspend fun setPlaceTags(placeUuid: String, names: Collection<String>) {
-        val normalizedNames = names
-            .asSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .distinctBy { it.lowercase(Locale.ROOT) }
-            .toList()
-
         DatabaseMutationCoordinator.mutex.withLock {
-            database.withTransaction {
-                val refs = normalizedNames.map { displayName ->
-                    val normalized = displayName.lowercase(Locale.ROOT)
-                    val existing = dao.getPlaceTagByNormalizedName(normalized)
-                    val tagId = existing?.id ?: run {
-                        val now = System.currentTimeMillis()
-                        val inserted = dao.insertPlaceTag(
-                            PlaceTagEntity(
-                                name = displayName,
-                                normalizedName = normalized,
-                                createdAt = now,
-                                updatedAt = now,
-                            )
-                        )
-                        if (inserted > 0L) inserted
-                        else requireNotNull(dao.getPlaceTagByNormalizedName(normalized)).id
-                    }
-                    PlaceTagCrossRef(placeUuid = placeUuid, tagId = tagId)
-                }
-                dao.clearPlaceTagCrossRefs(placeUuid)
-                if (refs.isNotEmpty()) dao.insertPlaceTagCrossRefs(refs)
-            }
+            sharedTags.replaceByNames(HubEntityRef("places", "place", placeUuid), HubTagNamespaces.PLACES, names)
         }
+        HubAutoExport.request(context)
+    }
+
+    suspend fun bulkAddPlaceTags(placeUuids: Collection<String>, tagIds: Collection<String>) {
+        sharedTags.bulkAdd(placeUuids.distinct().map { HubEntityRef("places", "place", it) }, tagIds.distinct())
+        HubAutoExport.request(context)
+    }
+
+    suspend fun bulkRemovePlaceTags(placeUuids: Collection<String>, tagIds: Collection<String>) {
+        sharedTags.bulkRemove(placeUuids.distinct().map { HubEntityRef("places", "place", it) }, tagIds.distinct())
         HubAutoExport.request(context)
     }
 

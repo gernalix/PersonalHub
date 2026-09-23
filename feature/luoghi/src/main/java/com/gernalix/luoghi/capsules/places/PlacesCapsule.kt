@@ -21,9 +21,12 @@ data class PlaceMutation(
 class PlacesCapsule(private val repository: PlaceRepository) {
     val places: Flow<List<PlaceEntity>> = repository.places
     val tags = repository.placeTags
+    val tagAssignments = repository.placeTagAssignments
 
     suspend fun tagsForPlace(placeUuid: String) = repository.tagsForPlace(placeUuid)
     suspend fun listTags() = repository.listPlaceTags()
+    suspend fun bulkAddTags(placeUuids: Collection<String>, tagIds: Collection<String>) = repository.bulkAddPlaceTags(placeUuids, tagIds)
+    suspend fun bulkRemoveTags(placeUuids: Collection<String>, tagIds: Collection<String>) = repository.bulkRemovePlaceTags(placeUuids, tagIds)
 
     suspend fun save(mutation: PlaceMutation): String {
         val uuid = repository.savePlace(

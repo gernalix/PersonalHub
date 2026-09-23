@@ -45,12 +45,8 @@ internal fun financeTransactionMatches(
     account: FinanceAccount?,
     attachments: List<FinanceAttachment>,
 ): Boolean {
-    val tokens = query
-        .trim()
-        .lowercase(Locale.ROOT)
-        .split(Regex("\\s+"))
-        .filter(String::isNotBlank)
-    if (tokens.isEmpty()) return true
+    val normalizedQuery = query.trim().lowercase(Locale.ROOT)
+    if (normalizedQuery.isEmpty()) return true
 
     val value = row.value
     val searchable = buildList {
@@ -83,7 +79,7 @@ internal fun financeTransactionMatches(
         add(value.recurrenceId.orEmpty())
         add(value.occurrenceKey.orEmpty())
         add(value.reminderAt?.toString().orEmpty())
-        add(value.category)
+        add(row.category)
 
         add(searchableDate(value.occurredAt))
         value.reminderAt?.let { add(searchableDate(it)) }
@@ -98,7 +94,18 @@ internal fun financeTransactionMatches(
         }
     }.joinToString("\n").lowercase(Locale.ROOT)
 
-    return tokens.all(searchable::contains)
+    val normalizedTags = tags.map { it.lowercase(Locale.ROOT) }
+    return normalizedQuery.split(Regex("\\s+or\\s+", RegexOption.IGNORE_CASE)).any { group ->
+        group.split(Regex("\\s+")).filter(String::isNotBlank).all { token ->
+            when {
+                token in setOf("untagged", "no:tags", "#none") -> normalizedTags.isEmpty()
+                token.startsWith("-#") -> normalizedTags.none { token.removePrefix("-#") in it }
+                token.startsWith("#") -> normalizedTags.any { token.removePrefix("#") in it }
+                token.startsWith("-") -> token.removePrefix("-").let { it.isNotEmpty() && it !in searchable }
+                else -> token in searchable
+            }
+        }
+    }
 }
 
 private fun searchableDate(epochMs: Long): String {
@@ -125,12 +132,22 @@ internal fun SoldiSearchScreen(
     val rowMap = remember(rows) { rows.associateBy { it.value.id } }
 
     if (mode == SoldiSearchMode.PHOTOS) {
-        val photoItems = remember(attachments, rows) {
+        val photoItems = remember(attachments, rows, query, tagsByTransaction, accounts) {
             attachments
                 .asSequence()
                 .filter(FinanceAttachment::isDisplayPhoto)
                 .mapNotNull { attachment ->
-                    rowMap[attachment.transactionId]?.let { attachment to it }
+                    rowMap[attachment.transactionId]
+                        ?.takeIf { row ->
+                            financeTransactionMatches(
+                                query,
+                                row,
+                                tagsByTransaction[row.value.id].orEmpty(),
+                                accountMap[row.value.accountId],
+                                attachmentMap[row.value.id].orEmpty(),
+                            )
+                        }
+                        ?.let { attachment to it }
                 }
                 .sortedWith(
                     compareByDescending<Pair<FinanceAttachment, TransactionView>> { it.second.value.occurredAt }
@@ -229,7 +246,7 @@ private fun SoldiSearchResultRow(
                 row.chain?.takeIf(String::isNotBlank),
                 row.place?.takeIf(String::isNotBlank),
                 account?.name?.takeIf(String::isNotBlank),
-                row.value.category.takeIf(String::isNotBlank),
+                row.category.takeIf(String::isNotBlank),
                 tags.takeIf { it.isNotEmpty() }?.joinToString(" · "),
             ).joinToString(" · ")
             if (metadata.isNotBlank()) {
