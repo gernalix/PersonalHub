@@ -13,9 +13,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.capsules.soldi.*
-import com.gernalix.personalhub.core.ui.photo.HubPhoto
-import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.HubEntitySummary
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
+import com.gernalix.personalhub.core.hubcontext.HubFacetPickerDialog
+import com.gernalix.personalhub.core.hubcontext.HubFacetChips
+import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 import com.gernalix.personalhub.core.ui.photo.rememberHubPhotoPicker
+import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
+import com.gernalix.personalhub.core.ui.photo.HubPhoto
 import com.gernalix.personalhub.soldi.receipt.ReceiptOcrProcessor
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -26,7 +33,7 @@ internal fun TransactionEditorV2(
     state: SoldiEditor.Transaction,
     accounts: List<FinanceAccount>,
     people: List<PersonChoice>,
-    categories: List<String>,
+    places: List<PlaceChoice>,
     tags: List<String>,
     existingAttachments: List<FinanceAttachment>,
     onBack: () -> Unit,
@@ -37,6 +44,7 @@ internal fun TransactionEditorV2(
     onSave: (TransactionDraft, RecurrenceDraft?, List<AttachmentDraft>, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val draftKey = state.draft.id?.toString() ?: state.draft.occurredAt
     var pendingAttachments by remember(draftKey) { mutableStateOf<List<AttachmentDraft>>(emptyList()) }
     var linkText by remember(draftKey) { mutableStateOf("") }
@@ -44,6 +52,26 @@ internal fun TransactionEditorV2(
     var lastBusinessDay by remember(draftKey) { mutableStateOf(false) }
     var recurrenceDay by remember(draftKey) { mutableStateOf(localDate(state.draft.occurredAt).dayOfMonth) }
     var recurrenceReminderDays by remember(draftKey) { mutableStateOf<Int?>(null) }
+    var facetPickerOpen by remember(draftKey) { mutableStateOf(false) }
+    var selectedFacets by remember(draftKey) { mutableStateOf<List<HubEntitySummary>>(emptyList()) }
+
+    LaunchedEffect(draftKey) {
+        val refs = buildSet {
+            addAll(state.draft.contextRefs)
+            state.draft.transactionUuid?.let { uuid ->
+                addAll(HubContextRuntime.linked(HubEntityRef("soldi", "transaction", uuid)).map { it.ref }.filter { it.moduleId != "tags" })
+            }
+            state.draft.personId?.let { id -> people.firstOrNull { it.id == id }?.publicId?.let { add(HubEntityRef("people", "person", it)) } }
+            state.draft.placeId?.let { add(HubEntityRef("places", "place", it)) }
+        }
+        val resolved = HubContextRuntime.summaries(refs).values.toMutableList()
+        state.draft.tags.split(',').map(String::trim).filter(String::isNotEmpty).forEach { name ->
+            HubContextRuntime.tags().search(HubTagNamespaces.SOLDI, name, 10)
+                .firstOrNull { it.name.equals(name, true) }
+                ?.let { tag -> resolved += HubEntitySummary(HubEntityRef("tags", "tag", tag.id), tag.name, tag.namespace, attributes = mapOf("icon" to (tag.icon ?: "🏷"))) }
+        }
+        selectedFacets = resolved.distinctBy { it.ref }
+    }
 
     val pickDocument = rememberHubPhotoPicker(arrayOf("image/*", "application/pdf")) { selected ->
         pendingAttachments = pendingAttachments + AttachmentDraft(
@@ -106,9 +134,16 @@ internal fun TransactionEditorV2(
             }
             item { DateTimeButton("Data", state.draft.occurredAt) { onChange(state.copy(draft = state.draft.copy(occurredAt = it))) } }
             item { AccountField(accounts, state.draft.accountId) { account -> onChange(state.copy(draft = state.draft.copy(accountId = account.id, currency = account.currency))) } }
-            item { SuggestionField("Categoria", state.draft.category, categories) { onChange(state.copy(draft = state.draft.copy(category = it))) } }
-            item { PersonAutocomplete(people, state.draft.personId) { onChange(state.copy(draft = state.draft.copy(personId = it))) } }
-            item { SuggestionField("Tag (multipli)", state.draft.tags, tags, multiple = true) { onChange(state.copy(draft = state.draft.copy(tags = it))) } }
+            item { CategoryTagPicker(state.draft.category) { onChange(state.copy(draft = state.draft.copy(category = it))) } }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Optional context", style = MaterialTheme.typography.labelLarge)
+                    HubFacetChips(selectedFacets, maxVisible = 3, onClick = { facetPickerOpen = true })
+                    OutlinedButton(onClick = { facetPickerOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Search people, places, substances, tags…")
+                    }
+                }
+            }
             item { OutlinedTextField(state.draft.chain, { onChange(state.copy(draft = state.draft.copy(chain = it))) }, label = { Text("Esercente / catena") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
             item { OutlinedTextField(state.draft.notes, { onChange(state.copy(draft = state.draft.copy(notes = it))) }, label = { Text("Nota") }, modifier = Modifier.fillMaxWidth(), minLines = 2) }
 
@@ -167,7 +202,7 @@ internal fun TransactionEditorV2(
                     pendingAttachments,
                     linkText,
                     { linkText = it },
-                    pickDocument,
+                    { pickDocument() },
                     {
                         val link = linkText.trim()
                         if (link.isNotEmpty()) {
@@ -187,6 +222,28 @@ internal fun TransactionEditorV2(
             Button(enabled = valid, onClick = { onSave(state.draft, recurrenceDraft(), pendingAttachments, false) }, modifier = Modifier.weight(1f)) { Text("Salva") }
         }
     }
+
+    if (facetPickerOpen) {
+        HubFacetPickerDialog(
+            namespace = HubTagNamespaces.SOLDI,
+            selected = selectedFacets,
+            allowedModules = setOf("people", "places", "substances"),
+            onSelectedChange = { values ->
+                selectedFacets = values
+                val personRefs = values.filter { it.ref.moduleId == "people" }.map { it.ref }
+                val placeRefs = values.filter { it.ref.moduleId == "places" }.map { it.ref }
+                val contextRefs = values.filterNot { it.ref.moduleId == "tags" }.map { it.ref }.toSet()
+                val selectedTagNames = values.filter { it.ref.moduleId == "tags" }.map { it.label }
+                onChange(state.copy(draft = state.draft.copy(
+                    personId = personRefs.firstOrNull()?.canonicalId?.let { publicId -> people.firstOrNull { it.publicId == publicId }?.id },
+                    placeId = placeRefs.firstOrNull()?.canonicalId?.takeIf { id -> places.any { it.id == id } },
+                    tags = selectedTagNames.joinToString(", "),
+                    contextRefs = contextRefs,
+                )))
+            },
+            onDismiss = { facetPickerOpen = false },
+        )
+    }
 }
 
 @Composable
@@ -194,7 +251,6 @@ internal fun TransferEditorV2(
     state: TransferUiState,
     accounts: List<FinanceAccount>,
     people: List<PersonChoice>,
-    categories: List<String>,
     tags: List<String>,
     existingAttachments: List<FinanceAttachment>,
     onBack: () -> Unit,
@@ -215,6 +271,25 @@ internal fun TransferEditorV2(
     var lastBusinessDay by remember(stateKey) { mutableStateOf(false) }
     var recurrenceDay by remember(stateKey) { mutableStateOf(localDate(state.occurredAt).dayOfMonth) }
     var recurrenceReminderDays by remember(stateKey) { mutableStateOf<Int?>(null) }
+    var facetPickerOpen by remember { mutableStateOf(false) }
+    var selectedFacets by remember(stateKey) { mutableStateOf<List<HubEntitySummary>>(emptyList()) }
+    LaunchedEffect(stateKey) {
+        val entities = HubContextRuntime.summaries(state.contextRefs).values
+        val tagValues = state.tags.split(',').map(String::trim).filter(String::isNotEmpty).mapNotNull { name ->
+            HubContextRuntime.tags().search(HubTagNamespaces.SOLDI, name).firstOrNull {
+                SharedTagEngine.normalize(it.name) == SharedTagEngine.normalize(name)
+            }?.let { tag -> HubEntitySummary(HubEntityRef("tags", "tag", tag.id), tag.name, tag.namespace, attributes = mapOf("icon" to (tag.icon ?: "🏷"))) }
+        }
+        selectedFacets = (entities + tagValues).distinctBy { it.ref }
+    }
+    fun applyTransferFacets(values: List<HubEntitySummary>) {
+        selectedFacets = values.distinctBy { it.ref }
+        onChange(state.copy(
+            personId = null,
+            contextRefs = selectedFacets.filterNot { it.ref.moduleId == "tags" }.mapTo(linkedSetOf()) { it.ref },
+            tags = selectedFacets.filter { it.ref.moduleId == "tags" }.joinToString(", ") { it.label },
+        ))
+    }
 
     val pickDocument = rememberHubPhotoPicker(arrayOf("image/*", "application/pdf")) { selected ->
         pendingAttachments = pendingAttachments + AttachmentDraft(
@@ -278,6 +353,7 @@ internal fun TransferEditorV2(
             feeAmount = state.feeAmount.trim().takeIf { it.isNotEmpty() },
             feeCurrency = state.feeCurrency.trim().takeIf { it.isNotEmpty() },
             category = state.category,
+            contextRefs = state.contextRefs,
         )
     }
 
@@ -334,9 +410,11 @@ internal fun TransferEditorV2(
                 effectiveRate?.let { rate -> item { Text("Tasso effettivo: $rate ${target?.currency.orEmpty()} per 1 ${source?.currency.orEmpty()} (calcolato dagli importi)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             }
 
-            item { SuggestionField("Categoria", state.category, categories) { onChange(state.copy(category = it)) } }
-            item { PersonAutocomplete(people, state.personId) { onChange(state.copy(personId = it)) } }
-            item { SuggestionField("Tag (multipli)", state.tags, tags, multiple = true) { onChange(state.copy(tags = it)) } }
+            item { CategoryTagPicker(state.category) { onChange(state.copy(category = it)) } }
+            item {
+                HubFacetChips(selectedFacets, onClick = { facetPickerOpen = true })
+                OutlinedButton(onClick = { facetPickerOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Contesto e tag") }
+            }
             item { DateTimeButton("Data", state.occurredAt) { onChange(state.copy(occurredAt = it)) } }
             item { OutlinedTextField(state.notes, { onChange(state.copy(notes = it)) }, label = { Text("Nota") }, modifier = Modifier.fillMaxWidth(), minLines = 2) }
 
@@ -373,7 +451,7 @@ internal fun TransferEditorV2(
                     pendingAttachments,
                     linkText,
                     { linkText = it },
-                    pickDocument,
+                    { pickDocument() },
                     {
                         val link = linkText.trim()
                         if (link.isNotEmpty()) { pendingAttachments = pendingAttachments + AttachmentDraft("PHOTO_URL", link, link); linkText = "" }
@@ -386,6 +464,13 @@ internal fun TransferEditorV2(
 
         Button(onClick = { onSave(state, recurrenceDraft(), pendingAttachments) }, enabled = valid, modifier = Modifier.fillMaxWidth().padding(12.dp)) { Text("Salva") }
     }
+    if (facetPickerOpen) HubFacetPickerDialog(
+        namespace = HubTagNamespaces.SOLDI,
+        selected = selectedFacets,
+        onSelectedChange = ::applyTransferFacets,
+        onDismiss = { facetPickerOpen = false },
+        allowedModules = setOf("people", "places", "substances"),
+    )
 }
 
 @Composable
@@ -393,13 +478,32 @@ internal fun RecurrenceEditorV2(
     value: RecurrenceDraft,
     accounts: List<FinanceAccount>,
     people: List<PersonChoice>,
-    categories: List<String>,
     tags: List<String>,
     onChange: (RecurrenceDraft) -> Unit,
     onBack: () -> Unit,
     onRequestNotifications: () -> Unit,
     onSave: () -> Unit,
 ) {
+    var facetPickerOpen by remember { mutableStateOf(false) }
+    var selectedFacets by remember(value.id) { mutableStateOf<List<HubEntitySummary>>(emptyList()) }
+    LaunchedEffect(value.id) {
+        val entities = HubContextRuntime.summaries(value.contextRefs).values
+        val tagValues = value.tags.split(',').map(String::trim).filter(String::isNotEmpty).mapNotNull { name ->
+            HubContextRuntime.tags().search(HubTagNamespaces.SOLDI, name).firstOrNull {
+                SharedTagEngine.normalize(it.name) == SharedTagEngine.normalize(name)
+            }?.let { tag -> HubEntitySummary(HubEntityRef("tags", "tag", tag.id), tag.name, tag.namespace, attributes = mapOf("icon" to (tag.icon ?: "🏷"))) }
+        }
+        selectedFacets = (entities + tagValues).distinctBy { it.ref }
+    }
+    fun applyFacets(values: List<HubEntitySummary>) {
+        selectedFacets = values.distinctBy { it.ref }
+        onChange(value.copy(
+            personId = null,
+            placeId = null,
+            contextRefs = selectedFacets.filterNot { it.ref.moduleId == "tags" }.mapTo(linkedSetOf()) { it.ref },
+            tags = selectedFacets.filter { it.ref.moduleId == "tags" }.joinToString(", ") { it.label },
+        ))
+    }
     val source = accounts.find { it.id == value.accountId }
     val target = accounts.find { it.id == value.targetAccountId }
     val transfer = value.kind == "TRANSFER"
@@ -444,9 +548,11 @@ internal fun RecurrenceEditorV2(
                     }
                 }
             }
-            item { SuggestionField("Categoria", value.category, categories) { onChange(value.copy(category = it)) } }
-            item { PersonAutocomplete(people, value.personId) { onChange(value.copy(personId = it)) } }
-            item { SuggestionField("Tag (multipli)", value.tags, tags, multiple = true) { onChange(value.copy(tags = it)) } }
+            item { CategoryTagPicker(value.category) { onChange(value.copy(category = it)) } }
+            item {
+                HubFacetChips(selectedFacets, onClick = { facetPickerOpen = true })
+                OutlinedButton(onClick = { facetPickerOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Contesto e tag") }
+            }
             item { OutlinedTextField(value.chain, { onChange(value.copy(chain = it)) }, label = { Text("Esercente / catena") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
             item { Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(!value.lastBusinessDay, { onChange(value.copy(lastBusinessDay = false, dayOfMonth = value.dayOfMonth ?: LocalDate.now().dayOfMonth)) }); Text("Giorno del mese"); Spacer(Modifier.width(8.dp)); OutlinedTextField(value.dayOfMonth?.toString().orEmpty(), { onChange(value.copy(dayOfMonth = it.toIntOrNull()?.coerceIn(1, 31), lastBusinessDay = false)) }, modifier = Modifier.width(76.dp), singleLine = true) } }
             item { Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(value.lastBusinessDay, { onChange(value.copy(lastBusinessDay = true, dayOfMonth = null)) }); Text("Ultimo giorno lavorativo del mese") } }
@@ -461,6 +567,42 @@ internal fun RecurrenceEditorV2(
         }
         Button(onClick = onSave, enabled = valid, modifier = Modifier.fillMaxWidth().padding(12.dp)) { Text("Salva ricorrenza") }
     }
+    if (facetPickerOpen) HubFacetPickerDialog(
+        namespace = HubTagNamespaces.SOLDI,
+        selected = selectedFacets,
+        onSelectedChange = ::applyFacets,
+        onDismiss = { facetPickerOpen = false },
+        allowedModules = setOf("people", "places", "substances"),
+    )
+}
+
+@Composable
+private fun CategoryTagPicker(value: String, onChange: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    var selected by remember(value) { mutableStateOf<List<HubEntitySummary>>(emptyList()) }
+    LaunchedEffect(value) {
+        selected = value.trim().takeIf(String::isNotEmpty)?.let { name ->
+            HubContextRuntime.tags().search(HubTagNamespaces.SOLDI_CATEGORY, name).firstOrNull {
+                SharedTagEngine.normalize(it.name) == SharedTagEngine.normalize(name)
+            }?.let { tag -> listOf(HubEntitySummary(HubEntityRef("tags", "tag", tag.id), tag.name, tag.namespace, attributes = mapOf("icon" to (tag.icon ?: "🏷"))) ) }
+        }.orEmpty()
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        HubFacetChips(selected, maxVisible = 1, onClick = { open = true })
+        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (selected.isEmpty()) "Primary category tag" else "Change primary category")
+        }
+    }
+    if (open) HubFacetPickerDialog(
+        namespace = HubTagNamespaces.SOLDI_CATEGORY,
+        selected = selected,
+        onSelectedChange = { values ->
+            selected = values.filter { it.ref.moduleId == "tags" }.takeLast(1)
+            onChange(selected.singleOrNull()?.label.orEmpty())
+        },
+        onDismiss = { open = false },
+        allowedModules = setOf("category-tags-only"),
+    )
 }
 
 @Composable
@@ -525,7 +667,7 @@ private fun AttachmentEditor(
 private fun AttachmentRow(title: String, uri: String, isPhoto: Boolean, onDelete: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         if (isPhoto) {
-            HubSquarePhotoThumbnail(HubPhoto(uri, uri, uri, title.ifBlank { "Foto transazione" }), size = 46.dp)
+            FinancePhotoThumbnail(uri = uri, title = title, size = 46.dp)
             Spacer(Modifier.width(10.dp))
         }
         Column(Modifier.weight(1f)) {
