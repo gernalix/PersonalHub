@@ -316,6 +316,18 @@ object DatabaseVault {
             val databaseTables = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { c ->
                 buildSet { while (c.moveToNext()) add(c.getString(0)) }
             }
+            require(databaseTables.none { it.startsWith("health_") }) { "PersonalHub database still contains Salute tables" }
+            fun requireNoSaluteRows(table: String, predicate: String) {
+                if (table !in databaseTables) return
+                db.rawQuery("SELECT 1 FROM `$table` WHERE $predicate LIMIT 1", null).use { rows ->
+                    require(!rows.moveToFirst()) { "PersonalHub database still contains Salute records" }
+                }
+            }
+            requireNoSaluteRows("hub_entity_bindings", "module_id='salute'")
+            requireNoSaluteRows("hub_activity_log", "module_id='salute' OR source_table LIKE 'health_%'")
+            requireNoSaluteRows("hub_sync_pending", "table_name LIKE 'health_%'")
+            requireNoSaluteRows("hub_sync_known", "table_name LIKE 'health_%'")
+            requireNoSaluteRows("hub_tags", "namespace='salute'")
             db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
                 while (c.moveToNext()) {
                     val name = c.getString(0); val table = c.getString(1)
