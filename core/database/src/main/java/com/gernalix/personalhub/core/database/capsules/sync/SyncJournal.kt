@@ -46,13 +46,12 @@ object SyncJournal {
         }.toTypedArray()
     }
 
-    fun trigger(table: String, keys: List<String>, op: String, legacy: Boolean = false): String {
+    fun trigger(table: String, keys: List<String>, op: String): String {
         fun enqueue(prefix: String): String {
             val key = keyExpression(keys, prefix)
             // SQLite inherits an outer INSERT OR ABORT policy inside triggers. A guarded
             // INSERT avoids the duplicate entirely instead of relying on OR IGNORE.
-            val insertion = if (legacy) "INSERT OR IGNORE INTO hub_sync_pending(table_name,row_key,revision) SELECT '$table',$key,1;"
-                else "INSERT INTO hub_sync_pending(table_name,row_key,revision) SELECT '$table',$key,1 WHERE NOT EXISTS (SELECT 1 FROM hub_sync_pending WHERE table_name='$table' AND row_key=$key);"
+            val insertion = "INSERT INTO hub_sync_pending(table_name,row_key,revision) SELECT '$table',$key,1 WHERE NOT EXISTS (SELECT 1 FROM hub_sync_pending WHERE table_name='$table' AND row_key=$key);"
             return "UPDATE hub_sync_pending SET revision=revision+1 WHERE table_name='$table' AND row_key=$key; " +
                 insertion
         }

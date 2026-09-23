@@ -344,11 +344,11 @@ object DatabaseVault {
                             "CREATE TRIGGER `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
                         }
                         "hub_sync_${table}_$op" -> {
-                            require(db.version >= 3 && table !in SyncJournal.excluded)
+                            require(table !in SyncJournal.excluded)
                             val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columns ->
                                 buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }
                             }
-                            SyncJournal.trigger(table, keys, op, legacy = db.version == 3)
+                            SyncJournal.trigger(table, keys, op)
                         }
                         "hub_git_dirty_${table}_$op" -> {
                             require(table !in GitDataTracking.operationalTables && table !in SyncJournal.excluded)
@@ -731,7 +731,6 @@ object DatabaseVault {
                     preferences(context).edit().putLong("exported_generation", -1).remove("error").commit()
                     HubAutoExport.request(context)
                     GitDataSync.onDatabaseReplaced(context)
-                    retireSeparateDatabases(context)
                     check(marker(context).delete())
                     syncDirectory(context.filesDir)
                     cleanupOrphanedPreImportBackups(context)
@@ -847,20 +846,6 @@ object DatabaseVault {
             "SELECT 1 FROM $schema.sqlite_master WHERE type='table' AND name=? LIMIT 1",
             arrayOf(table),
         ).use { it.moveToFirst() }
-    }
-
-    private fun retireSeparateDatabases(context: Context) {
-        val names = listOf("luoghi.db", "multitimer.db", "mtt_remote_sync.db", "sostanze.db", "super_contacts.db", "wordpulse.db", "personalhub_migration_map.db")
-        val backup = File(context.filesDir, "retired-databases-${System.currentTimeMillis()}")
-        names.forEach { name ->
-            listOf("", "-wal", "-shm", "-journal").forEach { suffix ->
-                val file = context.getDatabasePath(name + suffix)
-                if (file.exists()) {
-                    backup.mkdirs()
-                    check(file.renameTo(File(backup, name + suffix))) { "Could not preserve former database backup" }
-                }
-            }
-        }
     }
 
     internal interface TransferHooks {
