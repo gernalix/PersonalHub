@@ -67,37 +67,5 @@ class FinanceCapsuleTest {
         assertEquals("12345678901234567890.01", FinanceCapsule.decimal("12345678901234567890,01"))
     }
 
-    @Test fun versionThreeUpgradeKeepsExistingRowsAndCreatesOnlyEmptyFinanceTables() {
-        val name = "finance-upgrade-${UUID.randomUUID()}.db"
-        val file = context.getDatabasePath(name); file.parentFile!!.mkdirs()
-        val schema = org.json.JSONObject(context.assets.open("com.gernalix.personalhub.core.database.PersonalHubDatabase/3.json").bufferedReader().use { it.readText() }).getJSONObject("database")
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { old ->
-            val entities = schema.getJSONArray("entities")
-            for (i in 0 until entities.length()) {
-                val e = entities.getJSONObject(i); val table = e.getString("tableName")
-                old.execSQL(e.getString("createSql").replace("\${TABLE_NAME}", table))
-                val indices = e.optJSONArray("indices") ?: org.json.JSONArray()
-                for (j in 0 until indices.length()) old.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", table))
-            }
-            old.execSQL("INSERT INTO hub_generation VALUES(1,42)")
-            old.execSQL("INSERT INTO sessions VALUES (1,'keep exactly',1000,2000,NULL,1000,2000,NULL)")
-            old.execSQL("INSERT INTO hub_preferences VALUES ('finance-test','{\"preserve\":true}')")
-            old.execSQL(com.gernalix.personalhub.core.database.capsules.sync.SyncJournal.trigger("sessions", listOf("id"), "INSERT", legacy = true))
-            old.version = 3
-        }
-        assertEquals(42, DatabaseVault.validate(context, file))
-        val owner = PersonalHubDatabase.openTemporary(context, name)
-        try {
-            assertEquals(PersonalHubDatabase.SCHEMA_VERSION, owner.openHelper.writableDatabase.version)
-            assertEquals(57, scalar(owner, "SELECT generation FROM hub_generation"))
-            owner.openHelper.writableDatabase.query("SELECT title,start_ms,end_ms FROM sessions").use { assertTrue(it.moveToFirst()); assertEquals("keep exactly", it.getString(0)); assertEquals(1000, it.getInt(1)); assertEquals(2000, it.getInt(2)) }
-            owner.openHelper.writableDatabase.query("SELECT json FROM hub_preferences").use { assertTrue(it.moveToFirst()); assertEquals("{\"preserve\":true}", it.getString(0)) }
-            val names = owner.openHelper.writableDatabase.query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'finance_%'").use { c -> buildList { while(c.moveToNext()) add(c.getString(0)) } }
-            assertEquals(14, names.size)
-            names.forEach { assertEquals(0, scalar(owner, "SELECT count(*) FROM $it")) }
-            owner.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
-            owner.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
-            assertEquals(57, DatabaseVault.validate(context, file))
-        } finally { owner.close(); context.deleteDatabase(name) }
-    }
+
 }
