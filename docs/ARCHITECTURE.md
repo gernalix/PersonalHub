@@ -14,16 +14,16 @@ the application:
 - **Datasette — outbound replica.** The mobile app sends row-level state/tombstones for remote
   browsing and analysis. Datasette never hydrates or overwrites `personalhub.db`.
 - **Git data — outbound versioned history plus explicit recovery/control.** Background sync publishes
-  deterministic state/history and may read verified patch/migration metadata. It does not silently
+  deterministic state/history and may read verified patch metadata. It does not silently
   restore remote state. Full inbound replacement requires an explicit Restore from Git action;
   applying a data patch is also explicit.
 
 Credentials for Datasette and Git are device-local Android-Keystore-encrypted connection material,
 not application data. They must not enter SQLite, SAF exports, Git payloads, logs or saved UI state.
 
-See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch/migration and restore architecture.
+See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch and restore architecture.
 
-PersonalHub contains People, Timer, Places, Substances, WordPulse, Soldi and Salute. The application package is `com.gernalix.personalhub`.
+PersonalHub contains People, Timer, Places, Substances, WordPulse and Soldi. The application package is `com.gernalix.personalhub`.
 
 ## Database capsule
 
