@@ -125,7 +125,6 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
         fun create(context: Context) = get(context)
         fun openTemporary(context: Context, name: String) = build(context, name)
         fun openStaging(context: Context, name: String) = build(context, name)
-        fun canMigrateFrom(version: Int): Boolean = version == SCHEMA_VERSION
         fun closeInstance() = synchronized(this) { instance?.close(); instance = null }
         fun resetForTests() = closeInstance()
 

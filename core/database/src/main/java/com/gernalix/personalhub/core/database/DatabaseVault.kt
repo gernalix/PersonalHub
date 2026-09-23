@@ -217,7 +217,7 @@ object DatabaseVault {
         cleanupOrphanedPreImportBackups(context)
     }
 
-    /** Validates or safely upgrades the canonical database before feature code can write to it. */
+    /** Validates the canonical database before feature code can write to it. */
     fun ensureStartupReady(context: Context): Boolean = operations.withLock {
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
         val prefs = preferences(context)
@@ -256,7 +256,7 @@ object DatabaseVault {
         val sourceVersion = runCatching {
             SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
         }.getOrElse { return@withLock fail("Database is unreadable; existing data was preserved") }
-        if (!PersonalHubDatabase.canMigrateFrom(sourceVersion)) {
+        if (sourceVersion != PersonalHubDatabase.SCHEMA_VERSION) {
             return@withLock fail("Database version is unsupported; existing data was preserved")
         }
         return@withLock runCatching {
@@ -269,7 +269,7 @@ object DatabaseVault {
         require(file.isFile && file.length() >= 100) { "Invalid SQLite file" }
         file.inputStream().use { input -> val header = ByteArray(16); java.io.DataInputStream(input).readFully(header); require(header.contentEquals("SQLite format 3\u0000".toByteArray())) { "Invalid SQLite header" } }
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-            require(PersonalHubDatabase.canMigrateFrom(db.version)) { "Incompatible database version" }
+            require(db.version == PersonalHubDatabase.SCHEMA_VERSION) { "Incompatible database version" }
             val asset = "com.gernalix.personalhub.core.database.PersonalHubDatabase/${db.version}.json"
             val schema = JSONObject(context.assets.open(asset).bufferedReader().use { it.readText() }).getJSONObject("database")
             db.rawQuery("PRAGMA quick_check", null).use { c -> require(c.moveToFirst() && c.getString(0) == "ok" && !c.moveToNext()) { "SQLite integrity check failed" } }
@@ -310,7 +310,7 @@ object DatabaseVault {
                 }
             }
             // Room validates every table PersonalHub owns above. Extra tables are intentionally
-            // tolerated: real databases can retain inert legacy tables after migrations, and an
+            // tolerated: real databases can retain inert legacy tables, and an
             // extra table cannot affect app data unless it has a trigger. Every trigger is still
             // validated below, so this does not weaken the executable-schema boundary.
             val databaseTables = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { c ->
