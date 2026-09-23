@@ -35,8 +35,8 @@ class FinanceCapsuleTest {
         assertEquals(1, scalar(db, "SELECT count(*) FROM finance_products"))
         assertEquals(1, scalar(db, "SELECT count(*) FROM finance_chains"))
         assertEquals(1, scalar(db, "SELECT count(*) FROM places"))
-        assertEquals(2, scalar(db, "SELECT count(*) FROM finance_tags"))
-        assertEquals(4, scalar(db, "SELECT count(*) FROM finance_transaction_tags"))
+        assertEquals(2, scalar(db, "SELECT count(*) FROM hub_tags WHERE namespace='soldi'"))
+        assertEquals(4, scalar(db, "SELECT count(*) FROM hub_tag_assignments WHERE target_binding_id IN (SELECT id FROM hub_entity_bindings WHERE module_id='soldi' AND entity_kind='transaction')"))
         val created = db.financeDao().transaction(first)!!.createdAt
         finance.saveTransaction(d.copy(id = first, amount = "-15", tags = "weekly"))
         assertEquals(created, db.financeDao().transaction(first)!!.createdAt)
