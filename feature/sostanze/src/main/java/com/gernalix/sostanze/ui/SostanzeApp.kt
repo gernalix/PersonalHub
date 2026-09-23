@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gernalix.personalhub.contracts.database.DataExplorerContract
+import com.gernalix.personalhub.core.ui.HubTimeFormat
 import com.gernalix.sostanze.R
 import com.gernalix.sostanze.data.SubstanceEntity
 import com.gernalix.sostanze.data.SubstanceTypes
@@ -96,7 +97,6 @@ import com.gernalix.sostanze.notifications.SostanzeRandomAlertWindow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1183,17 +1183,17 @@ private fun ConfirmDeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: 
 }
 
 private fun formatTime(ms: Long): String =
-    DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()).format(Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()))
+    HubTimeFormat.pattern(ms, "HH:mm")
 
 private fun formatDateTime(ms: Long): String {
     val local = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
     val today = LocalDate.now()
     val pattern = if (local.toLocalDate() == today) "HH:mm" else "d/M/yy - HH:mm"
-    return DateTimeFormatter.ofPattern(pattern, Locale.getDefault()).format(local)
+    return HubTimeFormat.pattern(ms, pattern)
 }
 
 private fun formatDateOnly(date: LocalDate): String =
-    DateTimeFormatter.ofPattern("d/M/yy", Locale.getDefault()).format(date)
+    HubTimeFormat.localDate(date, "d/M/yy")
 
 private fun Double.clean(): String =
     if (this % 1.0 == 0.0) toLong().toString() else "%.2f".format(Locale.US, this).trimEnd('0').trimEnd('.')

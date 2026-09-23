@@ -20,11 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount
 import com.gernalix.personalhub.core.database.capsules.soldi.PersonChoice
+import com.gernalix.personalhub.core.ui.HubTimeFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun SoldiTopBar(
@@ -116,7 +116,7 @@ internal fun MonthHeader(month: YearMonth, onMonth: (YearMonth) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = { onMonth(month.minusMonths(1)) }) { Text("‹", fontSize = 22.sp) }
         Text(
-            month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+            HubTimeFormat.yearMonth(month, "MMMM yyyy"),
             modifier = Modifier.weight(1f),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             fontWeight = FontWeight.SemiBold,
@@ -127,7 +127,7 @@ internal fun MonthHeader(month: YearMonth, onMonth: (YearMonth) -> Unit) {
 
 @Composable
 internal fun MonthTitle(month: YearMonth) {
-    Text(month.format(DateTimeFormatter.ofPattern("MMMM yyyy")), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Text(HubTimeFormat.yearMonth(month, "MMMM yyyy"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 }
 
 @Composable
@@ -318,9 +318,8 @@ internal fun LocalDateButton(label: String, value: String?, allowClear: Boolean 
     }
 }
 
-internal fun formatDateTime(iso: String): String = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-    .format(Instant.parse(iso).atZone(ZoneId.systemDefault()))
-internal fun formatDateTime(epochMs: Long): String = formatDateTime(Instant.ofEpochMilli(epochMs).toString())
+internal fun formatDateTime(iso: String): String = formatDateTime(Instant.parse(iso).toEpochMilli())
+internal fun formatDateTime(epochMs: Long): String = HubTimeFormat.pattern(epochMs, "dd/MM/yyyy HH:mm")
 
 internal fun pickDateTime(context: Context, initial: Instant, onResult: (String) -> Unit) {
     val current = initial.atZone(ZoneId.systemDefault())

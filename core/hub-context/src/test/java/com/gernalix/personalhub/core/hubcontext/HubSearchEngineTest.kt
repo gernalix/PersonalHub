@@ -64,6 +64,29 @@ class HubSearchEngineTest {
         assertEquals(listOf("Copenhagen"), results.map { it.summary.label })
     }
 
+    @Test
+    fun boundedKindFilterAndDedupKeepBestRankedActiveResult() = runBlocking {
+        val ref = HubEntityRef("people", "person", "1")
+        val people = FakeAdapter(
+            "people", "person", setOf("person"),
+            listOf(
+                HubEntitySummary(ref, "A label", description = "Alice"),
+                HubEntitySummary(ref, "Alice"),
+                HubEntitySummary(HubEntityRef("people", "person", "2"), "Alice old", lifecycle = HubEntityLifecycle.ARCHIVED),
+            ),
+        )
+        val places = FakeAdapter(
+            "places", "place", setOf("place"),
+            listOf(HubEntitySummary(HubEntityRef("places", "place", "3"), "Alice Plaza")),
+        )
+        val page = HubSearchEngine { listOf(people, places) }.search(
+            HubSearchQuery(text = " Alice ", entityKinds = setOf(" person "), perAdapterLimit = 3),
+        )
+        assertEquals("Alice", page.query.text)
+        assertEquals(setOf("person"), page.query.entityKinds)
+        assertEquals(listOf("Alice"), page.results.map { it.summary.label })
+    }
+
     private class FakeAdapter(
         override val moduleId: String,
         override val entityKind: String,

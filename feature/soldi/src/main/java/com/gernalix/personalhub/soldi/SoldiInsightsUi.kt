@@ -15,12 +15,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gernalix.personalhub.core.database.capsules.soldi.*
+import com.gernalix.personalhub.core.ui.HubTimeFormat
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 internal data class StatSlice(val name: String, val amount: BigDecimal)
 
@@ -291,7 +291,7 @@ internal fun CalendarScreenV2(
         val future = projected.filter { it.date == day && it.materializedTransactionId == null }
         AlertDialog(
             onDismissRequest = { selectedDay = null },
-            title = { Text(day.format(DateTimeFormatter.ofPattern("dd MMMM yyyy"))) },
+            title = { Text(HubTimeFormat.localDate(day, "dd MMMM yyyy")) },
             text = {
                 Column {
                     actual.forEach { row ->

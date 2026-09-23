@@ -69,13 +69,13 @@ class HubSearchEngine(
         val distinct = candidates
             .asSequence()
             .filter { query.includeArchived || it.lifecycle == HubEntityLifecycle.ACTIVE }
-            .distinctBy(HubEntitySummary::ref)
             .map { summary -> HubSearchResult(summary, rank(query.text, summary)) }
             .sortedWith(
                 compareByDescending<HubSearchResult> { it.rank }
                     .thenBy { it.summary.label.lowercase() }
                     .thenBy { stableKey(it.summary.ref) },
             )
+            .distinctBy { it.summary.ref }
             .take(query.limit)
             .toList()
 
