@@ -1,13 +1,10 @@
 package com.gernalix.personalhub.soldi
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,9 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -29,11 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAttachment
 import com.gernalix.personalhub.core.database.capsules.soldi.TransactionView
+import com.gernalix.personalhub.core.ui.photo.HubPhotoGrid
+import com.gernalix.personalhub.core.ui.photo.HubPhotoGridItem
+import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
@@ -241,7 +237,7 @@ private fun SoldiSearchResultRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (photo != null) {
-            FinancePhotoThumbnail(photo, size = 52.dp)
+            HubSquarePhotoThumbnail(photo.toHubPhoto(), size = 52.dp)
             Spacer(Modifier.width(10.dp))
         }
         Column(Modifier.weight(1f)) {
@@ -282,57 +278,12 @@ private fun SoldiPhotoOnlyGrid(
     onBack: () -> Unit,
     onOpenTransaction: (TransactionView) -> Unit,
 ) {
-    val backColor = MaterialTheme.colorScheme.onSurface
     Column(Modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .padding(4.dp)
-                .width(48.dp)
-                .height(48.dp)
-                .clickable(onClick = onBack),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.width(20.dp).height(20.dp)) {
-                val stroke = 2.dp.toPx()
-                drawLine(
-                    color = backColor,
-                    start = androidx.compose.ui.geometry.Offset(size.width * 0.72f, size.height * 0.12f),
-                    end = androidx.compose.ui.geometry.Offset(size.width * 0.28f, size.height * 0.5f),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-                drawLine(
-                    color = backColor,
-                    start = androidx.compose.ui.geometry.Offset(size.width * 0.28f, size.height * 0.5f),
-                    end = androidx.compose.ui.geometry.Offset(size.width * 0.72f, size.height * 0.88f),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-            }
-        }
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 96.dp),
+        TextButton(onClick = onBack) { Text("‹") }
+        HubPhotoGrid(
+            photos = photos.map { (attachment, row) -> HubPhotoGridItem(attachment.toHubPhoto(), row) },
+            onOpenOwner = onOpenTransaction,
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            items(
-                items = photos,
-                key = { (attachment, _) -> attachment.id },
-            ) { (attachment, row) ->
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clickable { onOpenTransaction(row) },
-                ) {
-                    FinancePhotoThumbnail(
-                        attachment = attachment,
-                        size = 160.dp,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-        }
+        )
     }
 }

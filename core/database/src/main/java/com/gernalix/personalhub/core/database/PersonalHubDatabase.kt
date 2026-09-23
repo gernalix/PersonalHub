@@ -103,7 +103,7 @@ import java.security.MessageDigest
     com.gernalix.personalhub.core.database.capsules.health.HealthAiSnapshots::class,
     com.gernalix.personalhub.core.database.capsules.health.HealthAiEvidence::class,
 
-], version = 19, exportSchema = true)
+], version = 20, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -123,7 +123,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 19
+        const val SCHEMA_VERSION = 20
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null

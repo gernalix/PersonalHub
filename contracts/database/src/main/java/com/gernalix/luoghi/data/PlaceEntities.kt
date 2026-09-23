@@ -22,6 +22,8 @@ data class PlaceEntity(
     val lon: Double? = null,
     @ColumnInfo(name = "radius_m") val radiusM: Double? = null,
     val notes: String? = null,
+    /** Canonical original reference. Shared UI derives square previews without modifying it. */
+    @ColumnInfo(name = "photo_uri") val photoUri: String? = null,
     @ColumnInfo(name = "source_app") val sourceApp: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),

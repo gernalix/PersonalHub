@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gernalix.personalhub.core.database.capsules.soldi.*
+import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -308,7 +309,7 @@ private fun LedgerEntryContent(
                         Text("└", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(4.dp))
                         photoByTransaction[child.value.id]?.let { photo ->
-                            FinancePhotoThumbnail(photo, size = 36.dp)
+                            HubSquarePhotoThumbnail(photo.toHubPhoto(), size = 36.dp)
                             Spacer(Modifier.width(8.dp))
                         }
                         Column(Modifier.weight(1f)) {
@@ -343,7 +344,7 @@ private fun TransactionLineV2(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (photo != null) {
-            FinancePhotoThumbnail(photo, size = 48.dp)
+            HubSquarePhotoThumbnail(photo.toHubPhoto(), size = 48.dp)
         } else {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(34.dp)) {
                 Box(contentAlignment = Alignment.Center) { Text(leading, fontWeight = FontWeight.Bold) }

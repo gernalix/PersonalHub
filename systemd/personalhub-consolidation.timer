@@ -1,0 +1,12 @@
+[Unit]
+Description=Check whether PersonalHub is fully consolidated
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+Unit=personalhub-consolidation.service
+
+[Install]
+WantedBy=timers.target

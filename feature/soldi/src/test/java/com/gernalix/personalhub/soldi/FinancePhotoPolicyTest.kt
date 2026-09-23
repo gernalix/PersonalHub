@@ -23,6 +23,14 @@ class FinancePhotoPolicyTest {
         assertEquals("photo", preferredTransactionPhoto(listOf(generic, photo))?.id)
     }
 
+    @Test
+    fun sharedPhotoBindingKeepsStableTransactionOwner() {
+        val photo = attachment(kind = "PHOTO_URI", mime = "image/jpeg", id = "photo-42").toHubPhoto()
+        assertEquals("photo-42", photo.id)
+        assertEquals("1", photo.ownerId)
+        assertEquals("https://example.test/item", photo.reference)
+    }
+
     private fun attachment(kind: String, mime: String?, id: String = "id") = FinanceAttachment(
         id = id,
         transactionId = 1,

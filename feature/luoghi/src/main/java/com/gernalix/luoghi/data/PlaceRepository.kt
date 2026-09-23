@@ -79,6 +79,7 @@ class PlaceRepository(
         radiusM: Double?,
         notes: String?,
         sourceApp: String?,
+        photoUri: String? = null,
     ): String {
         val resolvedUuid = DatabaseMutationCoordinator.mutex.withLock {
             val now = System.currentTimeMillis()
@@ -93,6 +94,7 @@ class PlaceRepository(
                     lon = lon,
                     radiusM = radiusM,
                     notes = notes.cleanNullable(),
+                    photoUri = photoUri?.trim()?.takeIf(String::isNotBlank),
                     sourceApp = sourceApp.cleanNullable(),
                     createdAt = existing?.createdAt ?: now,
                     updatedAt = now,

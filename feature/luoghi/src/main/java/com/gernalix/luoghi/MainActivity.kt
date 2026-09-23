@@ -268,6 +268,7 @@ private fun LuoghiNavigation(
             onNicknameChange = vm::updateNickname,
             onRadiusChange = vm::updateRadius,
             onNotesChange = vm::updateNotes,
+            onPhotoChange = vm::updatePhotoUri,
             onTagsChange = vm::updatePlaceTags,
             onSave = {
                 vm.savePlace()

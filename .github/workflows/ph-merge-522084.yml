@@ -1,0 +1,35 @@
+name: One-shot PersonalHub branch cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.merged == true && github.event.pull_request.number == 34
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Delete integrated branches and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for branch in             chatgpt/autoexport-single-db-618338             cleanup/zombie-feature-functions-v57             fix/android17-overlay-restricted-settings             fix/launcher-always-home             task/chatgpt-soldi-search-gallery-20260921             task/chatgpt-soldi-transaction-photos-20260921             task/522084             merge/522084-manual
+          do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              git push origin --delete "$branch"
+            fi
+          done
+
+          git rm .github/workflows/ph-merge-522084.yml
+          git commit -m "Remove one-shot PersonalHub branch cleanup"
+          git push origin HEAD:main

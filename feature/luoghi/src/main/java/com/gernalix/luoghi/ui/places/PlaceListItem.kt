@@ -44,6 +44,8 @@ import com.gernalix.luoghi.ui.common.localizedDuration
 import com.gernalix.luoghi.ui.common.localizedTime
 import com.gernalix.luoghi.ui.common.rememberMinuteNow
 import com.gernalix.luoghi.ui.common.visitCount
+import com.gernalix.personalhub.core.ui.photo.HubPhoto
+import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
 
 @Composable
 fun PlaceListItem(
@@ -103,6 +105,13 @@ fun PlaceListItem(
                 .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.Top,
         ) {
+            place.photoUri?.takeIf(String::isNotBlank)?.let { reference ->
+                HubSquarePhotoThumbnail(
+                    photo = HubPhoto("place-${place.uuid}", place.uuid, reference, displayName),
+                    size = 56.dp,
+                    onClick = onOpen,
+                )
+            }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp),

@@ -276,6 +276,43 @@ for feature_name, alias in PUBLIC_SHORTCUT_ALIASES.items():
             f"shortcut alias ownership mismatch for {alias}: expected feature:{feature_name}, found {owners or 'none'}"
         )
 
+# Photo ownership is API-based: standardized picking, square rendering, caching, and
+# downsampling belong to :core:ui. Feature modules keep only owner/persistence adapters.
+photo_features = ("soldi", "supercontacts", "luoghi")
+shared_photo_source = ROOT / "core/ui/src/main/java/com/gernalix/personalhub/core/ui/photo/HubPhotoUi.kt"
+shared_photo_text = shared_photo_source.read_text() if shared_photo_source.is_file() else ""
+for symbol in ("rememberHubPhotoPicker", "HubSquarePhotoThumbnail", "HubPhotoGrid"):
+    if f"fun {symbol}" not in shared_photo_text and f"fun <T> {symbol}" not in shared_photo_text:
+        errors.append(f"shared photo engine missing {symbol}")
+
+for feature_name in photo_features:
+    build_file = ROOT / f"feature/{feature_name}/build.gradle.kts"
+    if ":core:ui" not in project_dependencies(build_file):
+        errors.append(f"feature/{feature_name}/build.gradle.kts must depend on :core:ui for shared photos")
+    kotlin_files = source_files.get(f"feature:{feature_name}", [])
+    texts = [(path, path.read_text()) for path in kotlin_files]
+    if not any("com.gernalix.personalhub.core.ui.photo" in text for _, text in texts):
+        errors.append(f"feature:{feature_name} does not use the shared photo API")
+    for path, text in texts:
+        relative = path.relative_to(ROOT)
+        if "coil3." in text:
+            errors.append(f"{relative} owns Coil photo rendering; use the shared photo API")
+        if "ActivityResultContracts.OpenDocument" in text:
+            errors.append(f"{relative} owns document photo picking; use rememberHubPhotoPicker")
+
+people_source = ROOT / "feature/supercontacts/src/main"
+for legacy_name in ("ContactPhotoStore.kt", "ContactPhotoResolver.kt", "PhotoCapsule.kt"):
+    if any(path.name == legacy_name for path in people_source.rglob("*.kt")):
+        errors.append(f"People legacy photo pipeline still exists: {legacy_name}")
+for path in source_files.get("feature:supercontacts", []):
+    text = path.read_text()
+    for forbidden_api in ("BitmapFactory", "LruCache", "ContactPhotoCropSpec", "saveCroppedContactPhoto"):
+        if forbidden_api in text:
+            errors.append(
+                f"{path.relative_to(ROOT)} owns legacy photo API {forbidden_api}; "
+                "use the shared non-destructive photo engine"
+            )
+
 
 if errors:
     print("ARCHITECTURE_BOUNDARIES=FAIL")
