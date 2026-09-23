@@ -1,0 +1,10 @@
+[Unit]
+Description=PersonalHub consolidated-main Pixel updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/PersonalHub
+ExecStart=/usr/bin/python3 %h/projects/PersonalHub/tools/personalhub_consolidation_watcher.py --json
+TimeoutStartSec=45min
