@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], application = PersonalHubApplication::class)
 class PersonalHubApplicationSinceWhenTest {
     @Test fun validCurrentDatabaseStartupRegistersAllSinceWhenProvenanceProviders() {
-        ApplicationProvider.getApplicationContext<PersonalHubApplication>()
+        ApplicationProvider.getApplicationContext<PersonalHubApplication>().onCreate()
 
         assertEquals("quick_event_entry", HubContextRuntime.adapter("timer", "quick_event_entry").entityKind)
         assertEquals("session", HubContextRuntime.adapter("timer", "session").entityKind)
