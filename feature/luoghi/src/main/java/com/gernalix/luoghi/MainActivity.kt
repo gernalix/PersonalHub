@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,6 +57,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         hubPlaceId = intent.hubPlaceId()
         setContent {
             LuoghiTheme {
