@@ -24,6 +24,8 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
     private val dao = db.financeDao()
     private val sharedTags = SharedTagEngine(db)
+    private val writesGlobalHubContext: Boolean
+        get() = db.openHelper.databaseName == PersonalHubDatabase.DATABASE_NAME
     val accounts = dao.accounts()
     val transactions = dao.transactions()
     val products = dao.products()
@@ -180,12 +182,14 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             draft.tags.split(','),
         )
         replaceCategory(HubEntityRef("soldi", "transaction", value.uuid), draft.category)
-        HubContextRuntime.saveFinanceTransactionLinksIfInitialized(
-            transactionUuid = value.uuid,
-            personPublicId = draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
-            placeId = draft.placeId,
-            contextualRefs = draft.contextRefs,
-        )
+        if (writesGlobalHubContext) {
+            HubContextRuntime.saveFinanceTransactionLinksIfInitialized(
+                transactionUuid = value.uuid,
+                personPublicId = draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
+                placeId = draft.placeId,
+                contextualRefs = draft.contextRefs,
+            )
+        }
         id
     }
 
@@ -461,12 +465,14 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             draft.tags.split(','),
         )
         replaceCategory(HubEntityRef("soldi", "recurrence", value.id), draft.category)
-        HubContextRuntime.saveFinanceRecurrenceLinksIfInitialized(
-            value.id,
-            draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
-            draft.placeId,
-            draft.contextRefs,
-        )
+        if (writesGlobalHubContext) {
+            HubContextRuntime.saveFinanceRecurrenceLinksIfInitialized(
+                value.id,
+                draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
+                draft.placeId,
+                draft.contextRefs,
+            )
+        }
         value.id
     }
 
