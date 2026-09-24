@@ -19,21 +19,17 @@ Inside Search, 📷 opens a photos-only gallery. The gallery contains only squar
 
 Legacy local attachments whose MIME type is `image/*` remain recognized as photos. New image picks are tagged `PHOTO_URI`; explicitly supplied remote photo URLs are tagged `PHOTO_URL`.
 
-## Visual retrieval contract
+## Local semantic retrieval
 
-Semantic visual retrieval is intentionally separate from thumbnail rendering and is not implemented by the basic photo-list UI.
+Soldi indexes transaction photos in the background after the transaction itself has already been saved. The original image still stays outside SQLite. `finance_photo_index` stores only the attachment identity, source hash, model identity/version, a compact 512-value embedding, optional local OCR text and status/error metadata.
 
-The target flow is:
+The encoder is the quantized ONNX conversion of `onnx-community/TinyCLIP-ViT-8M-16-Text-3M-YFCC15M-ONNX`, pinned to revision `9463a9c508a344c837ffefe9d724f3827bf2dc79`. The 24,683,626-byte model and tokenizer are downloaded on demand into app-private storage; they are not packaged in the base APK. Both downloads are SHA-256 verified before use. The model card declares MIT and the upstream TinyCLIP license is MIT, copyright Microsoft Corporation; a copy of the notice is written beside the downloaded model.
 
-1. When a transaction photo is attached, an on-device image encoder creates a compact embedding and optional OCR/labels in the background.
-2. The model must not be bundled into the base APK when that would materially increase APK size; prefer an on-demand model download into app-private storage.
-3. Model code and weights must have a license suitable for product use. Do not make Apple MobileCLIP weights a hard dependency while their model-weight license is restricted to research use.
-4. A future “Trova questo oggetto” action accepts a new camera/gallery image, embeds it, compares it with saved photo embeddings using cosine similarity, and returns a ranked shortlist (normally 5–10 transactions). It must not claim identity from the top score alone.
-5. Retrieval must tolerate normal changes in pose, background and framing; the user must not need to recreate the original photograph.
-6. The searchable index belongs in lightweight structured data. Querying historical photos must not require downloading or re-encoding every original image.
-7. Text/OCR/category signals may be combined with visual similarity so searches such as “giubbotto” can narrow the visual gallery.
+The existing Soldi Search remains the only search surface. Normal transaction fields, tags and attachment metadata are combined with OCR text and local text-to-image similarity. Semantic-only matches show a visual-match score so the result is explainable rather than silently reordering the ledger.
 
-A later implementation may store an optional focal point for the square preview. It must store coordinates/alignment metadata rather than a second permanently cropped original.
+“Trova questo oggetto” accepts either a temporary camera image or a gallery image, embeds it locally and compares it with the stored photo embeddings. It returns at most 10 candidates. The UI explicitly describes these as possible matches, never as a certain same-object identification. After the first model download and photo indexing, stored-history comparisons require no network access.
+
+`finance_owned_items` is an optional layer over a source transaction. It stores an item UUID, name, source transaction and optional primary photo reference; price/date/merchant remain authoritative on the transaction. Deleting the primary photo clears only that reference, while deleting the source transaction deletes its owned-item rows.
 
 ## Performance and durability
 

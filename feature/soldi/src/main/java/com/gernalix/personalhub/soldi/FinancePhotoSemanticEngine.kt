@@ -38,6 +38,27 @@ internal object FinanceSemanticModelSpec {
     const val MODEL_SHA256 = "844d1a46ab18acf50c989e541b12fe3b6dc7f8d6004725b4e992d142788e0600"
     const val TOKENIZER_SHA256 = "6d9109cc838977f3ca94a379eec36aecc7c807e1785cd729660ca2fc0171fb35"
     const val MODEL_SIZE_BYTES = 24_683_626L
+    const val LICENSE_NOTICE = """MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
     private const val BASE =
         "https://huggingface.co/onnx-community/TinyCLIP-ViT-8M-16-Text-3M-YFCC15M-ONNX/resolve/" + MODEL_VERSION
 
@@ -71,6 +92,16 @@ internal class FinanceSemanticAssetStore(private val context: Context) {
                     }
                 }
             }
+            File(dir, "LICENSE-TinyCLIP.txt").writeText(FinanceSemanticModelSpec.LICENSE_NOTICE)
+            File(dir, "MODEL.txt").writeText(
+                listOf(
+                    "id=" + FinanceSemanticModelSpec.MODEL_ID,
+                    "revision=" + FinanceSemanticModelSpec.MODEL_VERSION,
+                    "license=" + FinanceSemanticModelSpec.LICENSE,
+                    "model_sha256=" + FinanceSemanticModelSpec.MODEL_SHA256,
+                    "tokenizer_sha256=" + FinanceSemanticModelSpec.TOKENIZER_SHA256,
+                ).joinToString("\n") + "\n",
+            )
             root.listFiles()
                 ?.filter { it.isDirectory && it.name != FinanceSemanticModelSpec.MODEL_VERSION }
                 ?.forEach(File::deleteRecursively)
