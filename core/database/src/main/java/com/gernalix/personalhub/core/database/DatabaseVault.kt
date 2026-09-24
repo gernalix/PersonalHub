@@ -257,7 +257,7 @@ object DatabaseVault {
             SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
         }.getOrElse { return@withLock fail("Database is unreadable; existing data was preserved") }
         if (sourceVersion != PersonalHubDatabase.SCHEMA_VERSION) {
-            return@withLock fail("Database version is unsupported; existing data was preserved")
+            return@withLock fail("Database schema $sourceVersion is unsupported; schema ${PersonalHubDatabase.SCHEMA_VERSION} is required. Existing data was preserved")
         }
         return@withLock runCatching {
             validate(context, target)
