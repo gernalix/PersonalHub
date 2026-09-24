@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         StartupPerfTrace.activityOnCreateStart()
         super.onCreate(savedInstanceState)
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         updateIntentState(intent)
         enableEdgeToEdge()
         setContent {
