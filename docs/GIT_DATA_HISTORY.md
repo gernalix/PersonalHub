@@ -104,6 +104,8 @@ Do not commit repeated personalhub.db binaries on every change. A Git commit tre
 
 Normal startup never replays Git history. Current UI reads SQLite. History queries use rebuildable local projections, including cached field-lifetime aggregates, rather than rescanning Git. The top-level temporal search can merge indexed Git edits into the same date window as Places, Timer, Soldi, Substances, WordPulse and People without network access. Full reconstruction, old-state reads, semantic revision comparisons and repository scans happen only on demand.
 
+Legacy databases that accumulated exact no-op UPDATE history can be compacted externally with `python3 tools/cleanup_hub_git_noop_events.py SOURCE --output DEST`. The tool never edits SOURCE in place: it creates a coherent SQLite backup copy, removes only UPDATE events whose complete before/after payloads are identical, runs `VACUUM`, then requires both `quick_check` and `foreign_key_check` to pass.
+
 ## Failure model
 
 A normal PH edit succeeds when the SQLite transaction commits. Git may be offline; pending events remain local and WorkManager retries later. Pull, patch and restore fail closed on incompatible schema, stale preconditions, hash mismatch, FK failure or SQLite integrity failure.
