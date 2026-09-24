@@ -64,7 +64,7 @@ interface HubTagDao {
     @Query("SELECT tag_id,count(*) AS count,max(assigned_at) AS last_used_at FROM hub_tag_assignments GROUP BY tag_id")
     suspend fun usage(): List<HubTagUsage>
 
-    @Query("UPDATE hub_tags SET usage_count=(SELECT count(*) FROM hub_tag_assignments WHERE tag_id=hub_tags.id),last_used_at=(SELECT max(assigned_at) FROM hub_tag_assignments WHERE tag_id=hub_tags.id)")
+    @Query("UPDATE hub_tags SET usage_count=(SELECT count(*) FROM hub_tag_assignments WHERE tag_id=hub_tags.id),last_used_at=(SELECT max(assigned_at) FROM hub_tag_assignments WHERE tag_id=hub_tags.id) WHERE usage_count IS NOT (SELECT count(*) FROM hub_tag_assignments WHERE tag_id=hub_tags.id) OR last_used_at IS NOT (SELECT max(assigned_at) FROM hub_tag_assignments WHERE tag_id=hub_tags.id)")
     suspend fun refreshUsage()
 
     @Query("UPDATE OR IGNORE hub_tag_assignments SET tag_id=:targetId WHERE tag_id=:sourceId")

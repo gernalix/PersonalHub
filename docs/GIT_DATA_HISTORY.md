@@ -16,7 +16,7 @@ Git and network operations never run on the interactive write path. Mutations sc
 
 ## Provenance
 
-History records provenance on the edit rather than adding a last-author column to every domain table. Each event records event id, timestamp, author, source, optional reason and group id, table and typed primary key, operation, changed columns, and complete typed before/after row state. The shared database gate automatically assigns one group id to all writes in the same outer SQLite transaction; explicit ChatGPT/Codex/revert contexts can override that provenance for their transaction.
+History records provenance on the edit rather than adding a last-author column to every domain table. Each event records event id, timestamp, author, source, optional reason and group id, table and typed primary key, operation, changed columns, and complete typed before/after row state. SQLite UPDATE statements that leave every column unchanged are ignored by Git tracking: they neither advance the table's pending revision nor create a semantic event. The shared database gate automatically assigns one group id to all writes in the same outer SQLite transaction; explicit ChatGPT/Codex/revert contexts can override that provenance for their transaction.
 
 Typical authors are user, chatgpt, codex and system. Typical sources are ui, remote_patch, history_revert, migration, import and automation. Remote patches default to chatgpt unless they declare another author. Reverts are new edits and never rewrite old history.
 

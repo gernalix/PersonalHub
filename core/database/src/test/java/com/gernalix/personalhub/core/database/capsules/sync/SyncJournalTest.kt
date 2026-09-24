@@ -133,6 +133,34 @@ class SyncJournalTest {
         }
     }
 
+    @Test fun gitTrackingIgnoresNoOpUpdatesButRecordsRealUpdates() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val owner = PersonalHubDatabase.openTemporary(context, "git-noop-update-test.db")
+        try {
+            val db = owner.openHelper.writableDatabase
+            db.execSQL("PRAGMA foreign_keys=OFF")
+            GitDataTracking.install(db, enqueueAll = false)
+            db.execSQL(
+                "INSERT INTO place_events(id,event_uuid,session_uuid,place_id,event_type,timestamp,lat,lon,accuracy_m,source,notes) " +
+                    "VALUES (1,'event-noop','event-noop','place-1','CHECK_IN',1000,NULL,NULL,NULL,'test',NULL)",
+            )
+            db.execSQL("DELETE FROM hub_git_events")
+            db.execSQL("DELETE FROM hub_git_pending")
+
+            db.execSQL("UPDATE place_events SET timestamp=timestamp WHERE id=1")
+            db.query("SELECT count(*) FROM hub_git_events").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
+            db.query("SELECT count(*) FROM hub_git_pending").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
+
+            db.execSQL("UPDATE place_events SET timestamp=1001 WHERE id=1")
+            db.query("SELECT count(*) FROM hub_git_events WHERE table_name='place_events' AND operation='UPDATE' AND before_payload IS NOT after_payload").use {
+                it.moveToFirst(); assertEquals(1, it.getInt(0))
+            }
+            db.query("SELECT count(*) FROM hub_git_pending WHERE table_name='place_events'").use {
+                it.moveToFirst(); assertEquals(1, it.getInt(0))
+            }
+        } finally { owner.close(); context.deleteDatabase("git-noop-update-test.db") }
+    }
+
     @Test fun gitTrackingAllowsRoomReplaceWhenTableIsAlreadyPending() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val owner = PersonalHubDatabase.openTemporary(context, "git-replace-pending-test.db")
