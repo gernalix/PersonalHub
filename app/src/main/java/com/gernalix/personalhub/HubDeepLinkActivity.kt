@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -58,6 +59,7 @@ class HubDeepLinkActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         currentUri = intent?.data
         enableEdgeToEdge()
         setContent {
