@@ -38,6 +38,7 @@ object WorkflowyIntegrationSettings {
     private const val PREFS = "workflowy_integration"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_TARGET = "target"
+    private const val KEY_HAS_API_KEY = "has_api_key"
     private const val ALIAS = "personalhub.workflowy.api"
     private const val SECRET_FILE = "workflowy-api.enc"
 
@@ -52,7 +53,7 @@ object WorkflowyIntegrationSettings {
     fun configuration(context: Context): WorkflowyIntegrationConfiguration =
         WorkflowyIntegrationConfiguration(
             enabled = isEnabled(context),
-            hasApiKey = runCatching { apiKey(context).isNotBlank() }.getOrDefault(false),
+            hasApiKey = prefs(context).getBoolean(KEY_HAS_API_KEY, false),
             target = target(context),
         )
 
@@ -69,11 +70,12 @@ object WorkflowyIntegrationSettings {
             "Invalid Workflowy API key"
         }
         writeSecret(context, normalizedKey)
-        prefs(context).edit().putString(KEY_TARGET, normalizedTarget).apply()
+        prefs(context).edit().putString(KEY_TARGET, normalizedTarget).putBoolean(KEY_HAS_API_KEY, true).apply()
     }
 
     fun clearApiKey(context: Context) {
         secretFile(context).baseFile.delete()
+        prefs(context).edit().putBoolean(KEY_HAS_API_KEY, false).apply()
     }
 
     fun observeEnabled(context: Context, onChanged: (Boolean) -> Unit): () -> Unit {
