@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -21,15 +22,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.gernalix.personalhub.contracts.database.HubCreateRequest
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
-import com.gernalix.personalhub.contracts.database.HubResourceKinds
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
@@ -39,113 +35,193 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
     var composerContextId by rememberSaveable(anchor) { mutableStateOf<String?>(null) }
     var composerOpen by rememberSaveable(anchor) { mutableStateOf(false) }
     var explorerOpen by rememberSaveable(anchor) { mutableStateOf(false) }
+    var workflowyEnabled by remember(context) { mutableStateOf(WorkflowyIntegrationSettings.isEnabled(context)) }
     var workflowyOpen by rememberSaveable(anchor) { mutableStateOf(false) }
     var workflowyUrl by rememberSaveable(anchor) { mutableStateOf("") }
     var workflowyError by rememberSaveable(anchor) { mutableStateOf<String?>(null) }
+    var workflowyNoteOpen by rememberSaveable(anchor) { mutableStateOf(false) }
+    var workflowyNote by rememberSaveable(anchor) { mutableStateOf("") }
+    var workflowyNoteError by rememberSaveable(anchor) { mutableStateOf<String?>(null) }
+    var workflowyBusy by remember(anchor) { mutableStateOf(false) }
+    val invalidWorkflowyMessage = stringResource(R.string.hub_workflowy_invalid)
+    val existingWorkflowyMessage = stringResource(R.string.hub_workflowy_exists)
+    val workflowyNoteFailedMessage = stringResource(R.string.hub_workflowy_note_failed)
     val scope = rememberCoroutineScope()
+
     suspend fun refresh() {
         contexts = HubContextRuntime.contexts(anchor)
         linked = contexts.flatMap { it.members }.filter { it.ref != anchor }.distinctBy { it.ref }
     }
+
+    DisposableEffect(context) {
+        val dispose = WorkflowyIntegrationSettings.observeEnabled(context) { workflowyEnabled = it }
+        onDispose(dispose)
+    }
     LaunchedEffect(anchor) { refresh() }
-    if (composerOpen) HubContextComposerDialog(anchor, composerContextId, { composerOpen = false }, { composerOpen = false; scope.launch { refresh() } })
+
+    if (composerOpen) {
+        HubContextComposerDialog(
+            anchor,
+            composerContextId,
+            { composerOpen = false },
+            { composerOpen = false; scope.launch { refresh() } },
+        )
+    }
     if (explorerOpen) HubContextExplorerDialog(anchor) { explorerOpen = false }
-    if (workflowyOpen) {
-        AlertDialog(
-            onDismissRequest = { workflowyOpen = false; workflowyError = null },
-            title = { Text(stringResource(R.string.hub_workflowy_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = workflowyUrl,
-                        onValueChange = { workflowyUrl = it; workflowyError = null },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text(stringResource(R.string.hub_workflowy_url)) },
-                    )
-                    workflowyError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+    if (workflowyEnabled && workflowyOpen) {
+        ExistingWorkflowyLinkDialog(
+            value = workflowyUrl,
+            error = workflowyError,
+            busy = workflowyBusy,
+            onValueChange = { workflowyUrl = it; workflowyError = null },
+            onDismiss = {
+                if (!workflowyBusy) {
+                    workflowyOpen = false
+                    workflowyError = null
                 }
             },
-            confirmButton = {
-                val invalidWorkflowy = stringResource(R.string.hub_workflowy_invalid)
-                val workflowyExists = stringResource(R.string.hub_workflowy_exists)
-                val workflowyTitle = stringResource(R.string.hub_workflowy_title)
-                Button(
-                    enabled = workflowyUrl.isNotBlank(),
-                    onClick = {
-                        scope.launch {
-                            val normalized = normalizeWorkflowyUrl(workflowyUrl)
-                            if (normalized == null) {
-                                workflowyError = invalidWorkflowy
-                                return@launch
-                            }
-                            if (linked.any { it.ref.moduleId == "hub" && it.ref.entityKind == "resource" && it.attributes["value"] == normalized }) {
-                                workflowyError = workflowyExists
-                                return@launch
-                            }
-                            val adapter = HubContextRuntime.adapter("hub", "resource")
-                            val created = adapter.create(
-                                HubCreateRequest(
-                                    suggestedLabel = workflowyTitle,
-                                    extras = mapOf("kind" to HubResourceKinds.WEB_URL, "value" to normalized),
-                                ),
-                            )
-                            if (created == null) {
-                                workflowyError = invalidWorkflowy
-                                return@launch
-                            }
-                            try {
-                                HubContextRuntime.createContext(
-                                    listOf(anchor to "", created.ref to ""),
-                                    title = workflowyTitle,
-                                )
-                            } catch (error: CancellationException) {
-                                withContext(NonCancellable) {
-                                    (adapter as? ResourceHubAdapter)?.delete(created.ref.canonicalId)
-                                }
-                                throw error
-                            } catch (error: Exception) {
-                                runCatching { (adapter as? ResourceHubAdapter)?.delete(created.ref.canonicalId) }
-                                workflowyError = error.message ?: invalidWorkflowy
-                                return@launch
-                            }
+            onSave = {
+                scope.launch {
+                    val normalized = WorkflowyLinkPolicy.normalize(workflowyUrl)
+                    if (normalized == null) {
+                        workflowyError = invalidWorkflowyMessage
+                        return@launch
+                    }
+                    if (linked.any { WorkflowyLinkPolicy.isWorkflowyResource(it) && it.attributes["value"] == normalized }) {
+                        workflowyError = existingWorkflowyMessage
+                        return@launch
+                    }
+                    workflowyBusy = true
+                    runCatching { WorkflowyHubBridge.attachUrl(context, anchor, normalized) }
+                        .onSuccess {
                             workflowyOpen = false
                             workflowyUrl = ""
                             workflowyError = null
                             refresh()
                         }
-                    },
-                ) { Text(stringResource(R.string.hub_workflowy_save)) }
+                        .onFailure {
+                            workflowyError = it.message ?: invalidWorkflowyMessage
+                        }
+                    workflowyBusy = false
+                }
             },
-            dismissButton = { TextButton(onClick = { workflowyOpen = false; workflowyError = null }) { Text(stringResource(R.string.hub_cancel)) } },
         )
     }
-    Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+
+    if (workflowyEnabled && workflowyNoteOpen) {
+        WorkflowyNoteDialog(
+            value = workflowyNote,
+            error = workflowyNoteError,
+            busy = workflowyBusy,
+            onValueChange = { workflowyNote = it; workflowyNoteError = null },
+            onDismiss = {
+                if (!workflowyBusy) {
+                    workflowyNoteOpen = false
+                    workflowyNoteError = null
+                }
+            },
+            onSave = { openAfter ->
+                scope.launch {
+                    workflowyBusy = true
+                    runCatching { WorkflowyHubBridge.createNote(context, anchor, workflowyNote) }
+                        .onSuccess { node ->
+                            workflowyNoteOpen = false
+                            workflowyNote = ""
+                            workflowyNoteError = null
+                            refresh()
+                            if (openAfter) WorkflowyHubBridge.open(context, node.deepLink)
+                        }
+                        .onFailure {
+                            workflowyNoteError = it.message ?: workflowyNoteFailedMessage
+                        }
+                    workflowyBusy = false
+                }
+            },
+        )
+    }
+
+    val visibleLinked = linked.filter { workflowyEnabled || !WorkflowyLinkPolicy.isWorkflowyResource(it) }
+    Surface(
+        modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = MaterialTheme.shapes.medium,
+    ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(stringResource(R.string.hub_context_links_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(
+                stringResource(R.string.hub_context_links_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
             TextButton(onClick = {
                 copyHubLink(context, HubDeepLinkContract.entityUri(anchor).toString())
             }) { Text(stringResource(R.string.hub_copy_personalhub_link)) }
-            TextButton(onClick = { workflowyUrl = ""; workflowyError = null; workflowyOpen = true }) { Text(stringResource(R.string.hub_attach_workflowy)) }
-            TextButton(onClick = { composerContextId = null; composerOpen = true }, Modifier.testTag("hub-link-action")) { Text(stringResource(R.string.hub_link_action)) }
-            TextButton(onClick = { explorerOpen = true }) { Text(stringResource(R.string.hub_explore_action)) }
+
+            if (workflowyEnabled) {
+                val hasApiKey = WorkflowyIntegrationSettings.configuration(context).hasApiKey
+                TextButton(
+                    enabled = hasApiKey,
+                    onClick = {
+                        workflowyNote = ""
+                        workflowyNoteError = null
+                        workflowyNoteOpen = true
+                    },
+                ) { Text(stringResource(R.string.hub_workflowy_new_note)) }
+                if (!hasApiKey) {
+                    Text(
+                        stringResource(R.string.hub_workflowy_note_requires_key),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = {
+                    workflowyUrl = ""
+                    workflowyError = null
+                    workflowyOpen = true
+                }) { Text(stringResource(R.string.hub_workflowy_attach_existing)) }
+            }
+
+            TextButton(
+                onClick = { composerContextId = null; composerOpen = true },
+                modifier = Modifier.testTag("hub-link-action"),
+            ) { Text(stringResource(R.string.hub_link_action)) }
+            TextButton(onClick = { explorerOpen = true }) {
+                Text(stringResource(R.string.hub_explore_action))
+            }
+
             contexts.forEach { view ->
-                Row(Modifier.fillMaxWidth()) {
-                    TextButton(onClick = { composerContextId = view.context.id; composerOpen = true }, Modifier.weight(1f).testTag("hub-context-${view.context.id}")) {
-                        Text(view.members.filter { it.ref != anchor }.joinToString(" · ") { it.label }.ifBlank { stringResource(R.string.hub_context_empty) })
-                    }
-                    TextButton(onClick = { copyHubLink(context, HubDeepLinkContract.contextUri(view.context.id).toString()) }) {
-                        Text(stringResource(R.string.hub_copy_context_link))
+                val members = view.members.filter { summary ->
+                    summary.ref != anchor && (workflowyEnabled || !WorkflowyLinkPolicy.isWorkflowyResource(summary))
+                }
+                if (members.isNotEmpty()) {
+                    Row(Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = { composerContextId = view.context.id; composerOpen = true },
+                            modifier = Modifier.weight(1f).testTag("hub-context-" + view.context.id),
+                        ) {
+                            Text(members.joinToString(" · ") { it.label })
+                        }
+                        TextButton(onClick = {
+                            copyHubLink(context, HubDeepLinkContract.contextUri(view.context.id).toString())
+                        }) { Text(stringResource(R.string.hub_copy_context_link)) }
                     }
                 }
             }
-            linked.forEach { summary ->
+
+            visibleLinked.forEach { summary ->
                 Text(
                     summary.label,
                     modifier = Modifier.fillMaxWidth().clickable {
                         scope.launch {
-                            val target = HubContextRuntime.adapter(summary.ref.moduleId, summary.ref.entityKind).openTarget(summary.ref.canonicalId) ?: return@launch
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            if (WorkflowyLinkPolicy.isWorkflowyResource(summary)) {
+                                WorkflowyHubBridge.open(context, summary.attributes["value"].orEmpty())
+                                return@launch
+                            }
+                            val target = HubContextRuntime
+                                .adapter(summary.ref.moduleId, summary.ref.entityKind)
+                                .openTarget(summary.ref.canonicalId) ?: return@launch
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             target.activityClassName?.let { intent.setClassName(context.packageName, it) }
                             runCatching { context.startActivity(intent) }
                         }
@@ -157,13 +233,85 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
     }
 }
 
-private fun normalizeWorkflowyUrl(raw: String): String? {
-    val normalized = raw.trim()
-    val uri = runCatching { Uri.parse(normalized) }.getOrNull() ?: return null
-    if (uri.scheme?.lowercase() !in setOf("http", "https")) return null
-    val host = uri.host?.lowercase() ?: return null
-    if (host != "workflowy.com" && !host.endsWith(".workflowy.com")) return null
-    return normalized
+@Composable
+private fun ExistingWorkflowyLinkDialog(
+    value: String,
+    error: String?,
+    busy: Boolean,
+    onValueChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.hub_workflowy_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.hub_workflowy_url)) },
+                )
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (busy) CircularProgressIndicator()
+            }
+        },
+        confirmButton = {
+            Button(enabled = !busy && value.isNotBlank(), onClick = onSave) {
+                Text(stringResource(R.string.hub_workflowy_save))
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) {
+                Text(stringResource(R.string.hub_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun WorkflowyNoteDialog(
+    value: String,
+    error: String?,
+    busy: Boolean,
+    onValueChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: (Boolean) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.hub_workflowy_new_note_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.hub_workflowy_note_text)) },
+                    minLines = 2,
+                )
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (busy) CircularProgressIndicator()
+            }
+        },
+        confirmButton = {
+            Row {
+                TextButton(enabled = !busy && value.isNotBlank(), onClick = { onSave(false) }) {
+                    Text(stringResource(R.string.hub_workflowy_note_save))
+                }
+                Button(enabled = !busy && value.isNotBlank(), onClick = { onSave(true) }) {
+                    Text(stringResource(R.string.hub_workflowy_note_save_open))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !busy, onClick = onDismiss) {
+                Text(stringResource(R.string.hub_cancel))
+            }
+        },
+    )
 }
 
 private fun copyHubLink(context: android.content.Context, value: String) {

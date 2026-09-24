@@ -38,7 +38,7 @@ import kotlinx.coroutines.withContext
 private const val PREFS = "workflowy_days_sync"
 private const val KEY_URL = "feed_url"
 private const val KEY_ENABLED = "enabled"
-private const val DEFAULT_FEED_URL = "https://mtt-sync.danielegalati.com/workflowy-days.json"
+private const val DEFAULT_FEED_URL = ""
 
 @Composable
 internal fun WorkflowyDaysSettings(onBack: () -> Unit) {

@@ -16,6 +16,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -169,6 +170,7 @@ object WorkflowyDaysSync {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun configure(context: Context, feedUrl: String, enabled: Boolean = true) {
+        if (enabled) require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         require(feedUrl.startsWith("https://")) { "Workflowy-days feed must use HTTPS" }
         prefs(context).edit().putString(KEY_URL, feedUrl).putBoolean(KEY_ENABLED, enabled).apply()
         if (enabled) {
@@ -180,6 +182,7 @@ object WorkflowyDaysSync {
     }
 
     fun setEnabled(context: Context, enabled: Boolean) {
+        if (enabled) require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         val preferences = prefs(context)
         if (enabled) require(!preferences.getString(KEY_URL, null).isNullOrBlank()) { "Workflowy-days feed URL is not configured" }
         preferences.edit().putBoolean(KEY_ENABLED, enabled).apply()
@@ -194,11 +197,13 @@ object WorkflowyDaysSync {
     fun status(context: Context): String = prefs(context).getString(KEY_STATUS, "idle") ?: "idle"
 
     fun deepLinksFor(context: Context, date: LocalDate): List<String> =
-        WorkflowyDaysStore.findAll(context, date).map { it.deepLink }
+        if (!WorkflowyIntegrationSettings.isEnabled(context)) emptyList()
+        else WorkflowyDaysStore.findAll(context, date).map { it.deepLink }
 
     /** Null means either no node for that date or more than one valid Workflowy Calendar node. */
     fun deepLinkFor(context: Context, date: LocalDate): String? =
-        WorkflowyDaysStore.find(context, date)?.deepLink
+        if (!WorkflowyIntegrationSettings.isEnabled(context)) null
+        else WorkflowyDaysStore.find(context, date)?.deepLink
 
     fun open(context: Context, date: LocalDate): Boolean {
         val link = deepLinkFor(context, date) ?: return false
@@ -208,6 +213,10 @@ object WorkflowyDaysSync {
 
     /** Safe to call repeatedly; no work is scheduled until a feed URL has been configured. */
     fun ensureScheduled(context: Context) {
+        if (!WorkflowyIntegrationSettings.isEnabled(context)) {
+            cancel(context)
+            return
+        }
         val preferences = prefs(context)
         if (!preferences.getBoolean(KEY_ENABLED, false) || preferences.getString(KEY_URL, null).isNullOrBlank()) return
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
@@ -223,6 +232,7 @@ object WorkflowyDaysSync {
     }
 
     fun requestNow(context: Context) {
+        if (!WorkflowyIntegrationSettings.isEnabled(context)) return
         val preferences = prefs(context)
         if (!preferences.getBoolean(KEY_ENABLED, false) || preferences.getString(KEY_URL, null).isNullOrBlank()) return
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
@@ -243,6 +253,7 @@ object WorkflowyDaysSync {
     }
 
     internal fun run(context: Context): Boolean {
+        if (!WorkflowyIntegrationSettings.isEnabled(context)) return true
         val preferences = prefs(context)
         if (!preferences.getBoolean(KEY_ENABLED, false)) return true
         val url = preferences.getString(KEY_URL, null)?.takeIf { it.isNotBlank() } ?: return true

@@ -280,10 +280,11 @@ fun HubContextComposerScreen(
     onSaved: () -> Unit = onBack,
     editingContextId: String? = null,
     tagNamespace: String = HubTagNamespaces.GLOBAL,
+    anchor: HubEntityRef? = null,
 ) {
     val androidContext = LocalContext.current
-    val state = rememberSaveable(editingContextId, tagNamespace, saver = HubComposerState.Saver) {
-        HubComposerState(null, editingContextId, tagNamespace = tagNamespace)
+    val state = rememberSaveable(anchor, editingContextId, tagNamespace, saver = HubComposerState.Saver) {
+        HubComposerState(anchor, editingContextId, initialScope = listOfNotNull(anchor), tagNamespace = tagNamespace)
     }
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }

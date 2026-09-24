@@ -34,23 +34,29 @@ Search timestamps are ISO-8601 offset date-times, for example `2026-09-11T11:15:
 
 ## Workflowy bridge
 
-Workflowy is treated as an external knowledge surface, not a second PersonalHub database.
+Workflowy is an optional external knowledge surface, not a second PersonalHub database. The Home setting `Integra Workflowy` is the single global feature gate and is off by default. When off, Workflowy-specific actions, linked-node affordances, settings, Android share target and Workflowy-days background work are hidden/disabled. Existing Hub Context links remain stored and reappear if the integration is enabled again.
+
+### PersonalHub -> Workflowy
+
+Workflowy node links remain ordinary `HubResourceKinds.WEB_URL` resources connected to canonical PersonalHub entities through Hub Context. One PersonalHub entity may therefore have zero, one or many Workflowy nodes without provider-specific database columns or a Room schema change.
+
+With an API key configured in the Workflowy settings, `+ Workflowy note` creates the note directly through the Workflowy API under the configured `parent_id` (default `today`), receives the stable node id, stores the derived deep link immediately, and optionally opens the created node. The API credential is stored only in app-private no-backup storage encrypted with a non-exportable Android Keystore key; it is not stored in the PersonalHub database, exports, Git data or source code.
+
+`Link existing Workflowy node` remains available for an already-created Workflowy URL and uses the same Hub Context resource representation. No temporary three-digit matching token or later reconciliation pass is required.
 
 ### Workflowy -> PersonalHub
 
-Use the canonical PersonalHub URI in a Workflowy node, for example:
+When the integration is enabled, PersonalHub exposes an Android `ACTION_SEND` text target. Sharing a Workflowy node link to PersonalHub creates a temporary Hub resource anchor and opens the canonical Hub Context composer, where the user selects the PersonalHub entity/entities to link. Cancelling removes the temporary resource; saving keeps the normal Hub Context relationship. The share component is disabled at Android package-manager level while the global integration gate is off.
+
+### PersonalHub permalinks inside Workflowy
+
+The reverse permalink remains supported. Use the canonical PersonalHub URI in a Workflowy node, for example:
 
 ```text
 personalhub://entity/v1/people/person/48
 ```
 
 PersonalHub resolves the canonical entity through `HubEntityAdapter` and its current `openTarget`, so Workflowy never needs to know which Android screen implements that entity today.
-
-### PersonalHub -> Workflowy
-
-PersonalHub stores the complete Workflowy URL as an opaque `HubResourceKinds.WEB_URL` resource and links that resource to the canonical entity through Hub Context. PersonalHub validates only that the URL is HTTP(S) on `workflowy.com` (or a subdomain); it does not parse, derive, mirror, or synchronize the Workflowy node structure.
-
-Multiple Workflowy URLs may be attached to one PersonalHub entity. This deliberately avoids a rigid `workflowy_url` column and keeps the same resource mechanism usable for other external systems.
 
 ## Examples
 

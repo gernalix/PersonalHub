@@ -1,0 +1,19 @@
+<resources>
+    <string name="workflowy_integration_enable">Integra Workflowy</string>
+    <string name="workflowy_integration_title">Workflowy</string>
+    <string name="workflowy_integration_settings">Workflowy settings</string>
+    <string name="workflowy_integration_description">When disabled, PersonalHub hides Workflowy actions, links, settings, sharing and background sync without deleting existing links.</string>
+    <string name="workflowy_api_key">Workflowy API key</string>
+    <string name="workflowy_api_key_hint">Leave blank to keep the saved key.</string>
+    <string name="workflowy_api_key_saved">API key saved securely on this device.</string>
+    <string name="workflowy_api_key_missing">No API key saved. Existing-node linking still works; direct note creation requires a key.</string>
+    <string name="workflowy_target">New-note destination</string>
+    <string name="workflowy_target_hint">Use today, a Workflowy shortcut, or another supported parent_id.</string>
+    <string name="workflowy_settings_save">Save</string>
+    <string name="workflowy_settings_clear_key">Remove API key</string>
+    <string name="workflowy_settings_saved">Workflowy settings saved.</string>
+    <string name="workflowy_settings_error">Could not save these Workflowy settings.</string>
+    <string name="workflowy_share_title">Link Workflowy node</string>
+    <string name="workflowy_share_invalid">No valid Workflowy node link was shared.</string>
+    <string name="workflowy_share_disabled">Enable “Integra Workflowy” in PersonalHub settings first.</string>
+</resources>
