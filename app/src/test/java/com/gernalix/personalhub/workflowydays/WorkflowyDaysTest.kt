@@ -2,6 +2,7 @@ package com.gernalix.personalhub.workflowydays
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -20,6 +21,7 @@ class WorkflowyDaysTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         WorkflowyDaysStore.replaceAll(context, emptyList())
+        WorkflowyIntegrationSettings.setEnabled(context, false)
     }
 
     @Test
@@ -63,6 +65,17 @@ class WorkflowyDaysTest {
         WorkflowyDaysStore.replaceAll(context, days)
         assertEquals(2, WorkflowyDaysStore.findAll(context, LocalDate.of(2026, 9, 7)).size)
         assertNull(WorkflowyDaysStore.find(context, LocalDate.of(2026, 9, 7)))
+    }
+
+    @Test
+    fun globalIntegrationGateHidesStoredWorkflowyDaysWithoutDeletingThem() {
+        val date = LocalDate.of(2026, 9, 7)
+        val day = WorkflowyDay(date, "2af3dd5c-7b2e-5248-bbee-59d823cea257")
+        WorkflowyDaysStore.replaceAll(context, listOf(day))
+
+        assertNull(WorkflowyDaysSync.deepLinkFor(context, date))
+        WorkflowyIntegrationSettings.setEnabled(context, true)
+        assertEquals(day.deepLink, WorkflowyDaysSync.deepLinkFor(context, date))
     }
 
     @Test
