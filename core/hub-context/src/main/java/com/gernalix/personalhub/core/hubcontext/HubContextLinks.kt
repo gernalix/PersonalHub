@@ -43,6 +43,9 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
     var workflowyNote by rememberSaveable(anchor) { mutableStateOf("") }
     var workflowyNoteError by rememberSaveable(anchor) { mutableStateOf<String?>(null) }
     var workflowyBusy by remember(anchor) { mutableStateOf(false) }
+    val invalidWorkflowyMessage = stringResource(R.string.hub_workflowy_invalid)
+    val existingWorkflowyMessage = stringResource(R.string.hub_workflowy_exists)
+    val workflowyNoteFailedMessage = stringResource(R.string.hub_workflowy_note_failed)
     val scope = rememberCoroutineScope()
 
     suspend fun refresh() {
@@ -82,11 +85,11 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                 scope.launch {
                     val normalized = WorkflowyLinkPolicy.normalize(workflowyUrl)
                     if (normalized == null) {
-                        workflowyError = context.getString(R.string.hub_workflowy_invalid)
+                        workflowyError = invalidWorkflowyMessage
                         return@launch
                     }
                     if (linked.any { WorkflowyLinkPolicy.isWorkflowyResource(it) && it.attributes["value"] == normalized }) {
-                        workflowyError = context.getString(R.string.hub_workflowy_exists)
+                        workflowyError = existingWorkflowyMessage
                         return@launch
                     }
                     workflowyBusy = true
@@ -98,7 +101,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                             refresh()
                         }
                         .onFailure {
-                            workflowyError = it.message ?: context.getString(R.string.hub_workflowy_invalid)
+                            workflowyError = it.message ?: invalidWorkflowyMessage
                         }
                     workflowyBusy = false
                 }
@@ -130,7 +133,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                             if (openAfter) WorkflowyHubBridge.open(context, node.deepLink)
                         }
                         .onFailure {
-                            workflowyNoteError = it.message ?: context.getString(R.string.hub_workflowy_note_failed)
+                            workflowyNoteError = it.message ?: workflowyNoteFailedMessage
                         }
                     workflowyBusy = false
                 }
