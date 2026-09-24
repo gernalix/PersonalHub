@@ -12,9 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.core.database.capsules.soldi.*
+import com.gernalix.personalhub.core.ui.HubTimeFormat
 import java.math.BigDecimal
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun AccountsScreenV2(
@@ -154,7 +154,7 @@ internal fun RecurrencesScreenV2(
                         } else money(BigDecimal(rule.amount), rule.currency)
                         Text("$amountText · ${recurrenceScheduleLabel(rule)}", style = MaterialTheme.typography.bodySmall)
                         nextDates[rule.id]?.let { date ->
-                            Text("Prossima: ${date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Prossima: ${HubTimeFormat.localDate(date, "dd/MM/yyyy")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             TextButton(onClick = { amountEdit = rule to date }, contentPadding = PaddingValues(0.dp)) { Text("Modifica importo prossima") }
                         }
                     }
@@ -194,7 +194,7 @@ private fun RecurrenceAmountDialogV2(
         title = { Text("Modifica importo") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Occorrenza ${date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}")
+                Text("Occorrenza ${HubTimeFormat.localDate(date, "dd/MM/yyyy")}")
                 OutlinedTextField(amount, { amount = it }, label = { Text(if (rule.kind == "TRANSFER") "Importo da prelevare" else "Importo") }, singleLine = true)
                 if (rule.kind == "TRANSFER") {
                     OutlinedTextField(targetAmount, { targetAmount = it }, label = { Text("Importo da ricevere") }, singleLine = true)
