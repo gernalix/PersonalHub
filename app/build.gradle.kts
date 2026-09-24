@@ -120,10 +120,8 @@ android {
             matchingFallbacks += listOf("debug")
             applicationIdSuffix = ".qa"
             // QA supports both the 32-bit TCL and the canonical x86_64 emulator.
+            // Keep QA unminified: instrumentation tests call test hooks that R8 may legitimately remove.
             ndk { abiFilters += listOf("armeabi-v7a", "x86_64") }
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         create("benchmark") {
             initWith(getByName("release"))
