@@ -3,6 +3,7 @@ package com.gernalix.personalhub
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -55,6 +56,7 @@ import kotlinx.coroutines.withContext
 class HubTagsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         enableEdgeToEdge()
         val initialTagId = intent?.data?.lastPathSegment
         setContent {
