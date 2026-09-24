@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import androidx.activity.ComponentActivity
@@ -25,6 +26,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         latestIntent = intent
         handleCallOverlayIntent(intent)
         enableEdgeToEdge()
