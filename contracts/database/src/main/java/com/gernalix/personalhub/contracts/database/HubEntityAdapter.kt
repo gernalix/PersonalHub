@@ -21,5 +21,6 @@ interface HubEntityAdapter {
     suspend fun summaries(canonicalIds: Set<String>): Map<String, HubEntitySummary>
     suspend fun search(query: String, limit: Int): List<HubEntitySummary>
     suspend fun openTarget(canonicalId: String): HubOpenTarget?
+    suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? = null
     suspend fun create(request: HubCreateRequest): HubEntitySummary? = null
 }

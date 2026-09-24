@@ -15,6 +15,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":contracts:database"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)

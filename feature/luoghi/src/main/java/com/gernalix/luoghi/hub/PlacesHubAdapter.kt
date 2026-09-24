@@ -29,6 +29,19 @@ class PlacesHubAdapter(private val context: Context) : HubEntityAdapter, HubTemp
         dao.searchForHub(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("places", "placeId" to canonicalId).toString(), "com.gernalix.luoghi.MainActivity")
 
+    override suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? {
+        val place = dao.getPlace(canonicalId) ?: return null
+        val label = place.nickname.ifBlank { place.address.orEmpty().ifBlank { context.getString(com.gernalix.luoghi.R.string.unnamed_place) } }
+        return SinceWhenSourceDescriptor(
+            entityType = "$moduleId/$entityKind",
+            entityId = place.uuid,
+            defaultCounterTitle = label,
+            timestampSources = listOf(SinceWhenTimestampSource(
+                "added_at", context.getString(com.gernalix.luoghi.R.string.since_when_added_to_ph), place.createdAt, true,
+            )),
+        )
+    }
+
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val cursor = decodeHubTemporalCursor(query.cursor)
         val args = mutableListOf<Any?>(query.fromMs, query.toMs, query.fromMs, query.fromMs, query.toMs, query.fromMs)

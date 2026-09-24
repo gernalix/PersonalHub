@@ -1,0 +1,4 @@
+<resources>
+    <string name="since_when_first_used">First used</string>
+    <string name="since_when_tag_created">Tag created</string>
+</resources>

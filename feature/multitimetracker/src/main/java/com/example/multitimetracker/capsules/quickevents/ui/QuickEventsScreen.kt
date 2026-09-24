@@ -73,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -82,11 +83,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.multitimetracker.R
 import com.example.multitimetracker.capsules.quickevents.controller.QuickEventsCapsuleViewModel
 import com.example.multitimetracker.capsules.quickevents.core.quickEventSinceWhenActionEnabled
-import com.example.multitimetracker.capsules.quickevents.core.quickEventSinceWhenDraft
 import com.example.multitimetracker.capsules.quickevents.state.QuickEventsUiState
 import com.example.multitimetracker.core.quickevent.QuickEventTarget
-import com.example.multitimetracker.capsules.sincewhen.public.LifePeriodEditorDialog
-import com.example.multitimetracker.model.LifePeriodDisplayUnit
 import com.example.multitimetracker.model.QuickEventDefaults
 import com.example.multitimetracker.model.QuickEventEntry
 import com.example.multitimetracker.model.QuickEventFieldDefinition
@@ -97,6 +95,10 @@ import com.example.multitimetracker.model.QuickEventMacro
 import com.example.multitimetracker.model.QuickEventMacroAction
 import com.example.multitimetracker.model.QuickEventTemplate
 import com.example.multitimetracker.model.Tag
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
+import com.gernalix.personalhub.contracts.database.SinceWhenSourceDescriptor
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
+import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
 import com.example.multitimetracker.ui.components.AppTopBar
 import com.example.multitimetracker.ui.components.MttDateTimePickerDialog
 import com.example.multitimetracker.ui.components.ScreenEmptyStateCard
@@ -113,11 +115,12 @@ fun QuickEventsScreen(
     modifier: Modifier,
     capsule: QuickEventsCapsuleViewModel,
     onOpenTag: (Long) -> Unit,
-    onAddLifePeriod: (String, String, Long, Long?, Long, Set<Long>, Set<LifePeriodDisplayUnit>) -> Unit,
     showSeconds: Boolean,
     hideHoursIfZero: Boolean,
     pendingWidgetTarget: QuickEventTarget? = null,
     onPendingWidgetTargetConsumed: () -> Unit = {},
+    initialOpenedEntryId: Long? = null,
+    onConsumedInitialOpenedEntryId: () -> Unit = {},
 ) {
     val state by capsule.uiState.collectAsState()
     val context = LocalContext.current
@@ -149,7 +152,6 @@ fun QuickEventsScreen(
     var editingTemplate by remember { mutableStateOf<QuickEventTemplate?>(null) }
     var editingMacro by remember { mutableStateOf<QuickEventMacro?>(null) }
     var editingEntry by remember { mutableStateOf<QuickEventEntry?>(null) }
-    var creatingLifePeriodFromEntry by remember { mutableStateOf<QuickEventEntry?>(null) }
     var customTemplate by remember { mutableStateOf<QuickEventTemplate?>(null) }
     var customMacro by remember { mutableStateOf<QuickEventMacro?>(null) }
 
@@ -185,6 +187,13 @@ fun QuickEventsScreen(
     }
     val eventHistory = remember(state.quickEventEntries, visibleTags, searchQuery, filterTagIds) {
         QuickEventFilters.filterEntries(state.quickEventEntries, visibleTags, searchQuery, filterTagIds)
+    }
+    LaunchedEffect(initialOpenedEntryId, state.quickEventEntries.map { it.id }) {
+        val id = initialOpenedEntryId ?: return@LaunchedEffect
+        state.quickEventEntries.firstOrNull { it.id == id }?.let { entry ->
+            editingEntry = entry
+            onConsumedInitialOpenedEntryId()
+        }
     }
 
     Scaffold(
@@ -374,7 +383,22 @@ fun QuickEventsScreen(
                             fieldValues = valuesByEntry[entry.id].orEmpty(),
                             readOnly = state.isReadOnly,
                             onEdit = { if (!state.isReadOnly) editingEntry = entry },
-                            onCreateSinceWhen = { if (quickEventSinceWhenActionEnabled(state.isReadOnly)) creatingLifePeriodFromEntry = entry }
+                            onCreateSinceWhen = {
+                                if (quickEventSinceWhenActionEnabled(state.isReadOnly)) {
+                                    val source = SinceWhenSourceDescriptor(
+                                        entityType = "timer/quick_event_entry",
+                                        entityId = entry.id.toString(),
+                                        defaultCounterTitle = entry.title,
+                                        timestampSources = listOf(SinceWhenTimestampSource(
+                                            id = "event_date",
+                                            label = context.getString(R.string.since_when_event_date),
+                                            timestamp = entry.timestampMs,
+                                            isDefault = true,
+                                        )),
+                                    )
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                                }
+                            }
                         )
                     }
                 }
@@ -405,9 +429,12 @@ fun QuickEventsScreen(
             onAddTag = capsule::addTag,
             onDismiss = { creatingEntry = false },
             showCreateTemplateOption = true,
-            onSave = { entryTitle, timestampMs, tagIds, values, createReusableTemplate ->
-                capsule.createStandaloneEntry(entryTitle, timestampMs, tagIds, values, createReusableTemplate)
+            onSave = { entryTitle, timestampMs, tagIds, values, createReusableTemplate, complete ->
+                capsule.createStandaloneEntry(entryTitle, timestampMs, tagIds, values, createReusableTemplate, complete)
+            },
+            onCreated = { id, entryTitle, timestampMs, createCounter ->
                 creatingEntry = false
+                if (createCounter) context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(quickEventSinceWhenDescriptor(id, entryTitle, timestampMs), startEnabled = true)))
             },
             onDelete = null
         )
@@ -461,9 +488,12 @@ fun QuickEventsScreen(
             readOnly = state.isReadOnly,
             onAddTag = capsule::addTag,
             onDismiss = { customTemplate = null },
-            onSave = { entryTitle, timestampMs, tagIds, values, _ ->
-                capsule.createCustomEntry(template.id, null, entryTitle, timestampMs, tagIds, values)
+            onSave = { entryTitle, timestampMs, tagIds, values, _, complete ->
+                capsule.createCustomEntry(template.id, null, entryTitle, timestampMs, tagIds, values, complete)
+            },
+            onCreated = { id, entryTitle, timestampMs, createCounter ->
                 customTemplate = null
+                if (createCounter) context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(quickEventSinceWhenDescriptor(id, entryTitle, timestampMs), startEnabled = true)))
             },
             onDelete = null
         )
@@ -482,27 +512,15 @@ fun QuickEventsScreen(
             readOnly = state.isReadOnly,
             onAddTag = capsule::addTag,
             onDismiss = { editingEntry = null },
-            onSave = { entryTitle, timestampMs, tagIds, values, _ ->
+            onSave = { entryTitle, timestampMs, tagIds, values, _, complete ->
                 capsule.updateEntry(entry.id, entryTitle, timestampMs, tagIds, values)
                 editingEntry = null
+                complete(Result.success(entry.id))
             },
+            onCreated = { _, _, _, _ -> },
             onDelete = {
                 capsule.deleteEntry(entry.id)
                 editingEntry = null
-            }
-        )
-    }
-    creatingLifePeriodFromEntry?.let { entry ->
-        LifePeriodEditorDialog(
-            title = stringResource(R.string.quick_event_create_since_when),
-            initial = null,
-            initialDraft = quickEventSinceWhenDraft(entry),
-            initialNowMs = effectiveTime.nowMs,
-            availableTags = visibleTags,
-            onDismiss = { creatingLifePeriodFromEntry = null },
-            onConfirm = { title, description, startMs, endMs, colorArgb, tagIds, displayUnits ->
-                onAddLifePeriod(title, description, startMs, endMs, colorArgb, tagIds, displayUnits)
-                creatingLifePeriodFromEntry = null
             }
         )
     }
@@ -941,6 +959,13 @@ private fun QuickEventFieldDialog(
     )
 }
 
+private fun quickEventSinceWhenDescriptor(id: Long, title: String, timestampMs: Long) = SinceWhenSourceDescriptor(
+    entityType = "timer/quick_event_entry",
+    entityId = id.toString(),
+    defaultCounterTitle = title,
+    timestampSources = listOf(SinceWhenTimestampSource("event_date", "Event date", timestampMs, true)),
+)
+
 @Composable
 private fun QuickEventEntryDialog(
     title: String,
@@ -955,7 +980,8 @@ private fun QuickEventEntryDialog(
     onAddTag: (String) -> Unit,
     onDismiss: () -> Unit,
     showCreateTemplateOption: Boolean = false,
-    onSave: (String, Long, Set<Long>, List<QuickEventFieldValue>, Boolean) -> Unit,
+    onSave: (String, Long, Set<Long>, List<QuickEventFieldValue>, Boolean, (Result<Long>) -> Unit) -> Unit,
+    onCreated: (Long, String, Long, Boolean) -> Unit,
     onDelete: (() -> Unit)?
 ) {
     var entryTitle by remember(initialEntry, template) { mutableStateOf(initialEntry?.title ?: template?.title.orEmpty()) }
@@ -971,6 +997,8 @@ private fun QuickEventEntryDialog(
     var showTags by remember { mutableStateOf(false) }
     var showTimestampPicker by remember { mutableStateOf(false) }
     var createReusableTemplate by remember(initialEntry, template) { mutableStateOf(false) }
+    var createSinceWhen by remember(initialEntry) { mutableStateOf(false) }
+    var saving by remember(initialEntry) { mutableStateOf(false) }
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val formatter = remember { DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm", Locale.getDefault()) }
@@ -1036,11 +1064,21 @@ private fun QuickEventEntryDialog(
                         )
                     }
                 }
+                if (initialEntry == null) {
+                    SinceWhenCreationControl(
+                        timestampSources = listOf(SinceWhenTimestampSource("event_date", stringResource(R.string.since_when_event_date), timestampMs, true)),
+                        enabled = createSinceWhen,
+                        selectedSourceId = "event_date",
+                        saving = saving || readOnly,
+                        onEnabledChange = { createSinceWhen = it },
+                        onSourceSelected = {},
+                    )
+                }
             }
         },
         confirmButton = {
             val requiredOk = fields.none { it.required && fieldValueText[it.id].orEmpty().isBlank() }
-            Button(enabled = !readOnly && cleanTitle.isNotBlank() && requiredOk, onClick = {
+            Button(enabled = !readOnly && !saving && cleanTitle.isNotBlank() && requiredOk, onClick = {
                 val values = fields.sortedBy { it.displayOrder }.mapIndexed { index, field ->
                     QuickEventFieldValue(
                         id = initialValues.firstOrNull { it.fieldId == field.id }?.id ?: 0L,
@@ -1052,7 +1090,13 @@ private fun QuickEventEntryDialog(
                         displayOrder = field.displayOrder.takeIf { it != 0 } ?: index
                     )
                 }
-                onSave(cleanTitle, timestampMs, tagIds, values, createReusableTemplate)
+                saving = true
+                onSave(cleanTitle, timestampMs, tagIds, values, createReusableTemplate) { result ->
+                    saving = false
+                    result.onSuccess { entryId ->
+                        if (initialEntry == null) onCreated(entryId, cleanTitle, timestampMs, createSinceWhen)
+                    }
+                }
             }) { Text(stringResource(R.string.quick_event_record)) }
         },
         dismissButton = {

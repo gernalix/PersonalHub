@@ -1,5 +1,6 @@
 package com.gernalix.luoghi.ui.places
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +48,9 @@ import com.gernalix.luoghi.ui.common.rememberMinuteNow
 import com.gernalix.luoghi.ui.common.visitCount
 import com.gernalix.personalhub.core.ui.photo.HubPhoto
 import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
+import com.gernalix.personalhub.contracts.database.SinceWhenSourceDescriptor
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
 
 @Composable
 fun PlaceListItem(
@@ -58,6 +63,7 @@ fun PlaceListItem(
     modifier: Modifier = Modifier,
 ) {
     val place = item.place
+    val context = LocalContext.current
     val displayName = place.nickname.ifBlank { stringResource(R.string.unnamed_place) }
     val address = place.address?.takeIf { it.isNotBlank() }
         ?: stringResource(R.string.address_not_set)
@@ -169,6 +175,20 @@ fun PlaceListItem(
                 onHistory = onHistory,
                 onMap = onMap,
                 onDelete = onDelete,
+                onCreateSinceWhen = {
+                    val source = SinceWhenSourceDescriptor(
+                        entityType = "places/place",
+                        entityId = place.uuid,
+                        defaultCounterTitle = displayName,
+                        timestampSources = listOf(SinceWhenTimestampSource(
+                            "added_at",
+                            context.getString(R.string.since_when_added_to_ph),
+                            place.createdAt,
+                            true,
+                        )),
+                    )
+                    context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                },
             )
         }
     }
@@ -181,6 +201,7 @@ private fun PlaceOverflowMenu(
     onHistory: () -> Unit,
     onMap: () -> Unit,
     onDelete: () -> Unit,
+    onCreateSinceWhen: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -216,6 +237,13 @@ private fun PlaceOverflowMenu(
                 onClick = {
                     expanded = false
                     onMap()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.since_when_create_counter)) },
+                onClick = {
+                    expanded = false
+                    onCreateSinceWhen()
                 },
             )
             DropdownMenuItem(

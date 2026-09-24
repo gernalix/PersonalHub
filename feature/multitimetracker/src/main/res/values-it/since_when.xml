@@ -1,0 +1,5 @@
+<resources>
+    <string name="since_when_event_date">Data dell’evento</string>
+    <string name="since_when_session_started">Inizio della sessione</string>
+    <string name="since_when_create_counter">Crea un contatore Since when</string>
+</resources>

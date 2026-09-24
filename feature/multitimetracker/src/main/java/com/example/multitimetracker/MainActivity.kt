@@ -47,6 +47,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private var hubSessionId by mutableStateOf<Long?>(null)
+    private var hubQuickEventEntryId by mutableStateOf<Long?>(null)
     private var pendingQuickEventTarget by mutableStateOf<QuickEventTarget?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +61,8 @@ class MainActivity : ComponentActivity() {
                 MultiTimeTrackerApp(
                     hubSessionId = hubSessionId,
                     onHubSessionDismiss = { hubSessionId = null },
+                    hubQuickEventEntryId = hubQuickEventEntryId,
+                    onHubQuickEventEntryDismiss = { hubQuickEventEntryId = null },
                     pendingQuickEventTarget = pendingQuickEventTarget,
                     onPendingQuickEventTargetConsumed = { pendingQuickEventTarget = null },
                 )
@@ -75,6 +78,7 @@ class MainActivity : ComponentActivity() {
 
     private fun updateIntentState(intent: Intent?) {
         hubSessionId = intent.hubSessionId()
+        hubQuickEventEntryId = intent.hubQuickEventEntryId()
         pendingQuickEventTarget = QuickEventWidgetDeepLink.requestFrom(intent)
     }
 }
@@ -83,10 +87,16 @@ private fun Intent?.hubSessionId(): Long? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/timer" }
     ?.getQueryParameter("sessionId")?.toLongOrNull()
 
+private fun Intent?.hubQuickEventEntryId(): Long? = this?.data
+    ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/timer" }
+    ?.getQueryParameter("quickEventEntryId")?.toLongOrNull()
+
 @Composable
 private fun MultiTimeTrackerApp(
     hubSessionId: Long?,
     onHubSessionDismiss: () -> Unit,
+    hubQuickEventEntryId: Long?,
+    onHubQuickEventEntryDismiss: () -> Unit,
     pendingQuickEventTarget: QuickEventTarget?,
     onPendingQuickEventTargetConsumed: () -> Unit,
     vm: MainViewModel = viewModel(),
@@ -206,7 +216,15 @@ private fun MultiTimeTrackerApp(
         )
     }
 
-    AppRoot(vm, hubSessionId, onHubSessionDismiss, pendingQuickEventTarget, onPendingQuickEventTargetConsumed)
+    AppRoot(
+        vm = vm,
+        hubSessionId = hubSessionId,
+        onHubSessionDismiss = onHubSessionDismiss,
+        pendingQuickEventTarget = pendingQuickEventTarget,
+        onPendingQuickEventTargetConsumed = onPendingQuickEventTargetConsumed,
+        hubQuickEventEntryId = hubQuickEventEntryId,
+        onHubQuickEventEntryDismiss = onHubQuickEventEntryDismiss,
+    )
 }
 
 private fun requiresExactAlarmPermission(nowState: NowUiState, alertsState: AlertsUiState): Boolean {

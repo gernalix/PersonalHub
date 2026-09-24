@@ -1,6 +1,8 @@
 package com.example.multitimetracker.capsules.quickevents.controller
 
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.multitimetracker.R
@@ -191,11 +193,19 @@ class QuickEventsCapsuleViewModel(
         title: String,
         timestampMs: Long,
         tagIds: Set<Long>,
-        fieldValues: List<QuickEventFieldValue> = emptyList()
+        fieldValues: List<QuickEventFieldValue> = emptyList(),
+        onComplete: (Result<Long>) -> Unit = {},
     ) {
-        if (access.blockWriteIfNeeded()) return
-        val ctx = access.appContextOrNull() ?: return
+        if (access.blockWriteIfNeeded()) {
+            onComplete(Result.failure(IllegalStateException("Writes are currently blocked")))
+            return
+        }
+        val ctx = access.appContextOrNull() ?: run {
+            onComplete(Result.failure(IllegalStateException("Application context is unavailable")))
+            return
+        }
         access.launchIo("create quick event entry") {
+            var createdEntryId: Long? = null
             runCatching {
                 val cleanTitle = title.trim()
                 val cleanTagIds = tagIds.filter { it > 0L }.toSet()
@@ -207,6 +217,8 @@ class QuickEventsCapsuleViewModel(
                     tagIds = cleanTagIds,
                     fieldValues = fieldValues,
                 )
+                createdEntryId = entryId
+                withContext(Dispatchers.Main) { onComplete(Result.success(entryId)) }
                 access.logUserEvent(
                     action = "QUICK_EVENT_ENTRY_CREATE",
                     entityType = "QUICK_EVENT_ENTRY",
@@ -221,6 +233,7 @@ class QuickEventsCapsuleViewModel(
             }.onFailure { err ->
                 Log.e("QuickEventsCapsule", "createCustomEntry failed", err)
                 access.showWriteFailed(ctx)
+                if (createdEntryId == null) withContext(Dispatchers.Main) { onComplete(Result.failure(err)) }
             }
         }
     }
@@ -230,11 +243,19 @@ class QuickEventsCapsuleViewModel(
         timestampMs: Long,
         tagIds: Set<Long>,
         fieldValues: List<QuickEventFieldValue> = emptyList(),
-        createReusableTemplate: Boolean = false
+        createReusableTemplate: Boolean = false,
+        onComplete: (Result<Long>) -> Unit = {},
     ) {
-        if (access.blockWriteIfNeeded()) return
-        val ctx = access.appContextOrNull() ?: return
+        if (access.blockWriteIfNeeded()) {
+            onComplete(Result.failure(IllegalStateException("Writes are currently blocked")))
+            return
+        }
+        val ctx = access.appContextOrNull() ?: run {
+            onComplete(Result.failure(IllegalStateException("Application context is unavailable")))
+            return
+        }
         access.launchIo("create standalone quick event entry") {
+            var createdEntryId: Long? = null
             runCatching {
                 val cleanTitle = title.trim()
                 val cleanTagIds = tagIds.filter { it > 0L }.toSet()
@@ -258,6 +279,8 @@ class QuickEventsCapsuleViewModel(
                     )
                 }
                 val entryId = result.entryId
+                createdEntryId = entryId
+                withContext(Dispatchers.Main) { onComplete(Result.success(entryId)) }
                 val createdTemplateId = result.templateId
                 access.logUserEvent(
                     action = "QUICK_EVENT_ENTRY_CREATE",
@@ -291,6 +314,7 @@ class QuickEventsCapsuleViewModel(
             }.onFailure { err ->
                 Log.e("QuickEventsCapsule", "createStandaloneEntry failed", err)
                 access.showWriteFailed(ctx)
+                if (createdEntryId == null) withContext(Dispatchers.Main) { onComplete(Result.failure(err)) }
             }
         }
     }

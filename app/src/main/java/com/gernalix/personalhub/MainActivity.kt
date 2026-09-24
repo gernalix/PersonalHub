@@ -90,6 +90,10 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         HubContextComposerScreen(onBack = { topDestination = null })
         return
     }
+    if (topDestination == "since_when") {
+        SinceWhenScreen(onBack = { topDestination = null })
+        return
+    }
     if (topDestination == "search") {
         HubTemporalSearchScreen(onBack = { topDestination = null })
         return
@@ -145,6 +149,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                     }
                 }
                 item { HomeUtilityButton(R.string.home_search, R.string.home_search_help) { topDestination = "search" } }
+                item { HomeUtilityButton(R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" } }
                 item { HomeUtilityButton(R.string.home_activity_register, R.string.home_activity_help) { topDestination = "activity" } }
                 item {
                     HomeUtilityButton(R.string.home_data_explorer, R.string.home_data_explorer_help) {

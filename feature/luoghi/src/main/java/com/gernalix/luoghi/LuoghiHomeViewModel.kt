@@ -507,7 +507,7 @@ class LuoghiHomeViewModel(
         }
     }
 
-    fun savePlace() {
+    fun savePlace(onSaved: (String) -> Unit = {}) {
         val form = mutableState.value.form
         if (form.nickname.isBlank()) return
         viewModelScope.launch {
@@ -526,7 +526,7 @@ class LuoghiHomeViewModel(
                 sourceApp = form.sourceApp,
             )
             val createdFromUnknownLocation = (pendingLocation != null) && (form.uuid == null)
-            if (createdFromUnknownLocation) {
+            val savedUuid = if (createdFromUnknownLocation) {
                 val createdUuid = runCatching { container.checkIns.checkInNewPlace(mutation, pendingLocation) }
                     .onFailure { error ->
                         if (pendingAttemptId != null) {
@@ -549,6 +549,7 @@ class LuoghiHomeViewModel(
                         matchedPlaceId = createdUuid,
                     )
                 }
+                createdUuid
             } else {
                 container.places.save(mutation)
             }
@@ -570,6 +571,7 @@ class LuoghiHomeViewModel(
                     ),
                 )
             }
+            onSaved(savedUuid)
         }
     }
 

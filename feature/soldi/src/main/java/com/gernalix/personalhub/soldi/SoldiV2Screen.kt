@@ -1,6 +1,7 @@
 package com.gernalix.personalhub.soldi
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,8 +16,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.contracts.database.DataExplorerContract
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.core.database.capsules.soldi.*
 import com.gernalix.personalhub.soldi.receipt.*
+import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
+import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -230,14 +234,20 @@ internal fun SoldiV2Screen(
                         onSwitchToTransfer = { if (!busy) editor = SoldiEditor.Transfer(defaultTransfer(accounts)) },
                         onRequestNotifications = ::requestNotifications,
                         onDeleteAttachment = { attachment -> runAction { capsule.deleteAttachment(attachment.id) } },
-                        onSave = { draft, recurrence, pendingAttachments, saveAndNew ->
+                        saving = busy,
+                        onSave = { draft, recurrence, pendingAttachments, saveAndNew, createSinceWhen, selectedSourceId ->
                             runAction {
                                 val signed = draft.copy(amount = signedAmount(draft.amount, current.kind))
                                 val recurrenceId = recurrence?.let { capsule.saveRecurrence(it) }
-                                val finalDraft = if (recurrenceId == null) signed else signed.copy(recurrenceId = recurrenceId, occurrenceKey = localDate(signed.occurredAt).toString())
+                                val identified = signed.copy(transactionUuid = signed.transactionUuid ?: java.util.UUID.randomUUID().toString())
+                                val finalDraft = if (recurrenceId == null) identified else identified.copy(recurrenceId = recurrenceId, occurrenceKey = localDate(identified.occurredAt).toString())
                                 val transactionId = capsule.saveTransaction(finalDraft)
                                 pendingAttachments.forEach { capsule.addAttachment(transactionId, it) }
                                 FinanceReminderScheduler.reschedule(context.applicationContext)
+                                if (createSinceWhen) {
+                                    SoldiTransactionHubAdapter(context).sinceWhenSource(requireNotNull(finalDraft.transactionUuid))
+                                        ?.let { context.launchSinceWhenCreate(it, selectedSourceId) }
+                                }
                                 editor = if (saveAndNew) SoldiEditor.Transaction(defaultTransaction(accounts), current.kind) else null
                             }
                         },
@@ -414,6 +424,13 @@ internal fun SoldiV2Screen(
                         { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.EXPENSE) },
                         { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.INCOME) },
                         { editor = SoldiEditor.Transfer(defaultTransfer(accounts)) },
+                        onCreateSinceWhen = { row -> runAction {
+                            val source = SoldiTransactionHubAdapter(context.applicationContext)
+                                .sinceWhenSource(row.value.uuid)
+                            if (source != null && source.timestampSources.isNotEmpty()) {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                            }
+                        } },
                     )
                     SoldiTab.OVERVIEW -> OverviewScreenV2(month, accounts, transactions.map { it.value }, projected, transfers, viewOptions.ignoreTransfers)
                     SoldiTab.STATISTICS -> StatisticsScreenV2(month, transactions, transfers, tagsByTransaction)

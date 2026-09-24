@@ -67,6 +67,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="personalhub" android:host="search" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="personalhub" android:host="since_when" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -92,6 +98,9 @@
 
         <activity
             android:name=".HubTagsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".SinceWhenActivity"
             android:exported="false" />
         <activity
             android:name=".DatabaseActivity"

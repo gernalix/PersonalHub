@@ -3,6 +3,8 @@ package com.gernalix.personalhub
 import android.net.Uri
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.SinceWhenSourceDescriptor
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -33,6 +35,26 @@ class HubDeepLinkContractTest {
         val event = HubDeepLinkContract.parse(HubDeepLinkContract.eventUri("evt-1")).target
         assertEquals("ctx-1", (context as HubDeepLinkContract.ContextTarget).contextId)
         assertEquals("evt-1", (event as HubDeepLinkContract.EventTarget).eventId)
+    }
+
+    @Test
+    fun sinceWhenCreateRequestPreservesSemanticTimestampChoices() {
+        val source = SinceWhenSourceDescriptor(
+            entityType = "soldi/transaction",
+            entityId = "txn/42",
+            defaultCounterTitle = "Coffee & tea",
+            timestampSources = listOf(
+                SinceWhenTimestampSource("transaction_date", "Transaction date", 1_790_000_000_000, true),
+                SinceWhenTimestampSource("added_at", "Added to PH", 1_790_000_123_000),
+            ),
+        )
+        val parsed = HubDeepLinkContract.parse(HubDeepLinkContract.sinceWhenCreateUri(source))
+        assertTrue(parsed.isSuccess)
+        assertEquals(source, (parsed.target as HubDeepLinkContract.SinceWhenCreateTarget).source)
+        assertEquals(false, (parsed.target as HubDeepLinkContract.SinceWhenCreateTarget).startEnabled)
+        val enabled = HubDeepLinkContract.parse(HubDeepLinkContract.sinceWhenCreateUri(source, startEnabled = true))
+            .target as HubDeepLinkContract.SinceWhenCreateTarget
+        assertEquals(true, enabled.startEnabled)
     }
 
     @Test

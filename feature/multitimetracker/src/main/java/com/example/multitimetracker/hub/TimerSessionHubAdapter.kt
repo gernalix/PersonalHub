@@ -37,6 +37,18 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
 
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("timer", "sessionId" to canonicalId).toString(), "com.example.multitimetracker.MainActivity")
 
+    override suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? {
+        val session = canonicalId.toLongOrNull()?.let(sessions::readSessionById) ?: return null
+        return SinceWhenSourceDescriptor(
+            entityType = "$moduleId/$entityKind",
+            entityId = canonicalId,
+            defaultCounterTitle = session.hubLabel(loadTagNamesById()),
+            timestampSources = listOf(SinceWhenTimestampSource(
+                "session_started", appContext.getString(com.example.multitimetracker.R.string.since_when_session_started), session.startMs, true,
+            )),
+        )
+    }
+
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val tagNamesById = loadTagNamesById()
         val cursor = decodeHubTemporalCursor(query.cursor)

@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -51,6 +52,9 @@ import com.gernalix.luoghi.ui.place.PlaceDetailScreen
 import com.gernalix.luoghi.ui.place.PlaceEditorDialog
 import com.gernalix.luoghi.ui.place.PlaceAlertsDialog
 import com.gernalix.luoghi.ui.theme.LuoghiTheme
+import com.gernalix.luoghi.hub.PlacesHubAdapter
+import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var hubPlaceId by mutableStateOf<String?>(null)
@@ -124,6 +128,7 @@ private fun LuoghiNavigation(
     onCheckAction: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var destinationName by rememberSaveable { mutableStateOf(AppDestination.HOME.name) }
     var selectedPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var historyFilterPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -272,9 +277,14 @@ private fun LuoghiNavigation(
             onNotesChange = vm::updateNotes,
             onPhotoChange = vm::updatePhotoUri,
             onTagsChange = vm::updatePlaceTags,
-            onSave = {
-                vm.savePlace()
-                editorOpen = false
+            onSave = { createSinceWhen, selectedSourceId ->
+                vm.savePlace { uuid ->
+                    editorOpen = false
+                    if (createSinceWhen) scope.launch {
+                        PlacesHubAdapter(context).sinceWhenSource(uuid)
+                            ?.let { context.launchSinceWhenCreate(it, selectedSourceId) }
+                    }
+                }
             },
             onDismiss = {
                 editorOpen = false

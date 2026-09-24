@@ -41,7 +41,7 @@ internal class TimerSharedTagBridge(database: PersonalHubDatabase) {
     }
 
     suspend fun syncSinceWhen(periods: List<LifePeriod>) {
-        periods.forEach { replace("life_period", it.id, it.tagIds) }
+        periods.forEach { replace("counter", it.id, it.tagIds) }
     }
 
     suspend fun syncNow(tags: List<Tag>, sessions: List<SessionUi>) {
@@ -68,15 +68,17 @@ internal class TimerSharedTagBridge(database: PersonalHubDatabase) {
 
     private suspend fun replace(kind: String, targetId: Long, legacyTagIds: Set<Long>) {
         val namespace = when (kind) {
-            "life_period" -> HubTagNamespaces.TIMER_SINCE_WHEN
+            "life_period", "counter" -> HubTagNamespaces.SINCE_WHEN
             "session" -> HubTagNamespaces.TIMER_NOW
             else -> HubTagNamespaces.TIMER_EVENTS
         }
         val stableIds = legacyTagIds.map { "$namespace:$it" }
-        engine.replace(HubEntityRef("timer", kind, targetId.toString()), namespace, stableIds)
+        val ref = if (kind == "counter") HubEntityRef("since_when", "counter", targetId.toString())
+        else HubEntityRef("timer", kind, targetId.toString())
+        engine.replace(ref, namespace, stableIds)
     }
 
-    private fun HubTagEntity.numericId(): Long? = id.removePrefix("$namespace:").toLongOrNull()
+    private fun HubTagEntity.numericId(): Long? = id.substringAfterLast(':').toLongOrNull()
 
     private fun HubTagEntity.toTimerTag(): Tag? {
         val numericId = numericId() ?: return null
