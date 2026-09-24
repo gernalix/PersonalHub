@@ -155,9 +155,16 @@ class SharedTagEngine(
     ): HubTagEntity = db.withTransaction {
         val current = createStable(id, namespace, name, metadataJson)
         require(current.id == id) { "Projection id collision in $namespace" }
-        val normalized = normalize(name)
+        val trimmed = name.trim()
+        val normalized = normalize(trimmed)
+        if (
+            current.name == trimmed &&
+            current.normalizedName == normalized &&
+            current.archived == archived &&
+            current.metadataJson == metadataJson
+        ) return@withTransaction current
         val updated = current.copy(
-            name = name.trim(),
+            name = trimmed,
             normalizedName = normalized,
             archived = archived,
             metadataJson = metadataJson,
@@ -172,8 +179,10 @@ class SharedTagEngine(
         val desiredNames = names.asSequence().map(String::trim).filter(String::isNotEmpty).distinctBy(::normalize).toList()
         val desired = buildList { for (name in desiredNames) add(getOrCreate(namespace, name)) }
         val current = tags(target).filter { it.namespace == namespace }
-        remove(target, current.map(HubTagEntity::id) - desired.map(HubTagEntity::id).toSet())
-        assign(target, desired.map(HubTagEntity::id))
+        val currentIds = current.mapTo(mutableSetOf(), HubTagEntity::id)
+        val desiredIds = desired.mapTo(mutableSetOf(), HubTagEntity::id)
+        remove(target, currentIds - desiredIds)
+        assign(target, desiredIds - currentIds)
     }
 
     suspend fun replace(target: HubEntityRef, namespace: String, tagIds: Collection<String>) {
@@ -181,8 +190,10 @@ class SharedTagEngine(
         val desired = tagIds.distinct().map { id -> requireNotNull(dao.tag(id)) { "Unknown tag: $id" } }
         desired.forEach { require(it.namespace == namespace || it.isGlobal) }
         val current = tags(target).filter { it.namespace == namespace || it.isGlobal }
-        remove(target, current.map(HubTagEntity::id) - desired.map(HubTagEntity::id).toSet())
-        assign(target, desired.map(HubTagEntity::id))
+        val currentIds = current.mapTo(mutableSetOf(), HubTagEntity::id)
+        val desiredIds = desired.mapTo(mutableSetOf(), HubTagEntity::id)
+        remove(target, currentIds - desiredIds)
+        assign(target, desiredIds - currentIds)
     }
 
     suspend fun assign(
@@ -202,8 +213,8 @@ class SharedTagEngine(
                 .map { it.id }
                 .distinct()
             require(categoryIds.size <= 1) { "Only one primary Soldi category is allowed" }
-            dao.assign(tags.map { HubTagAssignment(binding.id, it.id, assignedAt, provenance) })
-            dao.refreshUsage()
+            val inserted = dao.assign(tags.map { HubTagAssignment(binding.id, it.id, assignedAt, provenance) })
+            if (inserted.any { it != -1L }) dao.refreshUsage()
         }
     }
 
@@ -211,8 +222,7 @@ class SharedTagEngine(
         val binding = binding(target) ?: return
         if (tagIds.isEmpty()) return
         db.withTransaction {
-            dao.bulkUnassign(listOf(binding.id), tagIds.distinct())
-            dao.refreshUsage()
+            if (dao.bulkUnassign(listOf(binding.id), tagIds.distinct()) > 0) dao.refreshUsage()
         }
     }
 
@@ -229,8 +239,7 @@ class SharedTagEngine(
         val bindingIds = targets.distinct().mapNotNull { binding(it)?.id }
         if (bindingIds.isEmpty() || tagIds.isEmpty()) return
         db.withTransaction {
-            dao.bulkUnassign(bindingIds, tagIds.distinct())
-            dao.refreshUsage()
+            if (dao.bulkUnassign(bindingIds, tagIds.distinct()) > 0) dao.refreshUsage()
         }
     }
 
@@ -251,16 +260,22 @@ class SharedTagEngine(
         val tag = requireNotNull(dao.tag(tagId))
         val normalized = normalize(name)
         require(normalized.isNotEmpty())
+        val trimmed = name.trim()
+        if (tag.name == trimmed && tag.normalizedName == normalized) return
         val collision = dao.tag(tag.namespace, normalized)
         require(collision == null || collision.id == tagId) { "Duplicate tag in ${tag.namespace}" }
-        check(dao.rename(tagId, name.trim(), normalized, System.currentTimeMillis()) == 1)
+        check(dao.rename(tagId, trimmed, normalized, System.currentTimeMillis()) == 1)
     }
 
     suspend fun archive(tagId: String, archived: Boolean) {
+        val tag = requireNotNull(dao.tag(tagId))
+        if (tag.archived == archived) return
         check(dao.setArchived(tagId, archived, System.currentTimeMillis()) == 1)
     }
 
     suspend fun pin(tagId: String, pinned: Boolean) {
+        val tag = requireNotNull(dao.tag(tagId))
+        if (tag.pinned == pinned) return
         check(dao.setPinned(tagId, pinned, System.currentTimeMillis()) == 1)
     }
 
@@ -279,12 +294,12 @@ class SharedTagEngine(
             val source = requireNotNull(dao.tag(sourceId))
             val target = requireNotNull(dao.tag(targetId))
             require(source.namespace == target.namespace) { "Cross-namespace merge is forbidden" }
-            dao.moveAssignments(sourceId, targetId)
-            dao.deleteAssignments(sourceId)
+            val movedAssignments = dao.moveAssignments(sourceId, targetId)
+            val deletedAssignments = dao.deleteAssignments(sourceId)
             runCatching { dao.addAlias(HubTagAlias(targetId, target.namespace, source.name, source.normalizedName)) }
             dao.moveAliases(sourceId, targetId, target.namespace)
             check(dao.deleteUnused(sourceId) == 1)
-            dao.refreshUsage()
+            if (movedAssignments > 0 || deletedAssignments > 0) dao.refreshUsage()
         }
     }
 

@@ -39,11 +39,14 @@ internal fun TransactionEditorV2(
     places: List<PlaceChoice>,
     tags: List<String>,
     existingAttachments: List<FinanceAttachment>,
+    ownedItems: List<FinanceOwnedItem>,
     onBack: () -> Unit,
     onChange: (SoldiEditor.Transaction) -> Unit,
     onSwitchToTransfer: () -> Unit,
     onRequestNotifications: () -> Unit,
     onDeleteAttachment: (FinanceAttachment) -> Unit,
+    onTrackOwnedItem: (String) -> Unit,
+    onRemoveOwnedItem: (FinanceOwnedItem) -> Unit,
     saving: Boolean,
     onSave: (TransactionDraft, RecurrenceDraft?, List<AttachmentDraft>, Boolean, Boolean, String?) -> Unit,
 ) {
@@ -61,6 +64,7 @@ internal fun TransactionEditorV2(
     val addedAt = remember(draftKey) { System.currentTimeMillis() }
     var createSinceWhen by remember(draftKey) { mutableStateOf(false) }
     var sinceWhenSourceId by remember(draftKey) { mutableStateOf("transaction_date") }
+    var ownedItemName by remember(draftKey) { mutableStateOf(state.draft.title) }
 
     LaunchedEffect(draftKey) {
         val refs = buildSet {
@@ -235,6 +239,40 @@ internal fun TransactionEditorV2(
                     onDeleteAttachment,
                     { index -> pendingAttachments = pendingAttachments.toMutableList().also { it.removeAt(index) } },
                 )
+            }
+            if (state.draft.id != null) {
+                item {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Oggetti posseduti", fontWeight = FontWeight.SemiBold)
+                            if (ownedItems.isEmpty()) {
+                                Text(
+                                    "Puoi ricordare che un acquisto corrisponde a un oggetto che possiedi.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            ownedItems.forEach { item ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(item.name, modifier = Modifier.weight(1f))
+                                    TextButton(enabled = !saving, onClick = { onRemoveOwnedItem(item) }) { Text("Rimuovi") }
+                                }
+                            }
+                            OutlinedTextField(
+                                value = ownedItemName,
+                                onValueChange = { ownedItemName = it },
+                                label = { Text("Nome oggetto") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                            Button(
+                                enabled = !saving && ownedItemName.isNotBlank(),
+                                onClick = { onTrackOwnedItem(ownedItemName) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Traccia come oggetto") }
+                        }
+                    }
+                }
             }
             item { Spacer(Modifier.height(4.dp)) }
         }

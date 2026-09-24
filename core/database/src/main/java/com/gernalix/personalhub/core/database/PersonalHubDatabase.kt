@@ -28,6 +28,8 @@ import java.security.MessageDigest
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceRecurrenceTag::class,
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceRecurrenceOverride::class,
     com.gernalix.personalhub.core.database.capsules.soldi.FinanceAttachment::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinancePhotoIndex::class,
+    com.gernalix.personalhub.core.database.capsules.soldi.FinanceOwnedItem::class,
     com.supercontacts.app.data.local.BackupMetadataEntity::class,
     com.supercontacts.app.data.local.ContactEntity::class,
     com.supercontacts.app.data.local.ContactFieldEntity::class,
@@ -96,7 +98,7 @@ import java.security.MessageDigest
     SinceWhenCounterEntity::class,
     SinceWhenMigrationState::class,
 
-], version = 22, exportSchema = true)
+], version = 23, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -117,7 +119,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 22
+        const val SCHEMA_VERSION = 23
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null

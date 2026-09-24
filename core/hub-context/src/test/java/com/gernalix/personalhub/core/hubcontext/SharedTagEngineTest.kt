@@ -92,6 +92,18 @@ class SharedTagEngineTest {
         assertNull(database.hubTagDao().tag(duplicate.id))
     }
 
+    @Test fun refreshUsageDoesNotRewriteTagsWhenDerivedValuesAreAlreadyCurrent() = runBlocking {
+        val tag = engine.createStable("timer.now:99", HubTagNamespaces.TIMER_NOW, "Stable")
+        engine.assign(HubEntityRef("timer", "session", "99"), listOf(tag.id))
+        val sqlite = database.openHelper.writableDatabase
+        fun totalChanges(): Long = sqlite.query("SELECT total_changes()").use { it.moveToFirst(); it.getLong(0) }
+        val before = totalChanges()
+
+        database.hubTagDao().refreshUsage()
+
+        assertEquals(before, totalChanges())
+    }
+
     @Test fun soldiCategoryIsTypedAndLimitedToOnePrimaryAssignment() = runBlocking {
         val food = requireNotNull(engine.create(HubTagNamespaces.SOLDI_CATEGORY, "Food", kind = HubTagKinds.CATEGORY).tag)
         val travel = requireNotNull(engine.create(HubTagNamespaces.SOLDI_CATEGORY, "Travel", kind = HubTagKinds.CATEGORY).tag)

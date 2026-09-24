@@ -61,7 +61,7 @@ internal class TimerSharedTagBridge(database: PersonalHubDatabase) {
                     .toString(),
             )
         }
-        engine.all().filter { it.namespace == HubTagNamespaces.TIMER_NOW && it.id !in activeIds }
+        engine.all().filter { it.namespace == HubTagNamespaces.TIMER_NOW && it.id !in activeIds && !it.archived }
             .forEach { engine.archive(it.id, true) }
         sessions.distinctBy { it.id }.forEach { replace("session", it.id, it.tagIds) }
     }

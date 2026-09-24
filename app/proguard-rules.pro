@@ -18,3 +18,10 @@
 -dontwarn org.ietf.jgss.GSSName
 -dontwarn org.ietf.jgss.Oid
 -dontwarn org.slf4j.impl.StaticLoggerBinder
+
+# ONNX Runtime JNI resolves Java classes/constructors by exact name/signature.
+# Keep the complete Java API aligned with libonnxruntime4j_jni in minified builds.
+-keep class ai.onnxruntime.** { *; }
+
+# QA-only semantic-photo bridge is called from the separate instrumentation APK.
+-keep class com.gernalix.personalhub.soldi.FinanceSemanticQa* { *; }

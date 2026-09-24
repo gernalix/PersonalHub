@@ -16,7 +16,7 @@ Git and network operations never run on the interactive write path. Mutations sc
 
 ## Provenance
 
-History records provenance on the edit rather than adding a last-author column to every domain table. Each event records event id, timestamp, author, source, optional reason and group id, table and typed primary key, operation, changed columns, and complete typed before/after row state. The shared database gate automatically assigns one group id to all writes in the same outer SQLite transaction; explicit ChatGPT/Codex/revert contexts can override that provenance for their transaction.
+History records provenance on the edit rather than adding a last-author column to every domain table. Each event records event id, timestamp, author, source, optional reason and group id, table and typed primary key, operation, changed columns, and complete typed before/after row state. SQLite UPDATE statements that leave every column unchanged are ignored by Git tracking: they neither advance the table's pending revision nor create a semantic event. The shared database gate automatically assigns one group id to all writes in the same outer SQLite transaction; explicit ChatGPT/Codex/revert contexts can override that provenance for their transaction.
 
 Typical authors are user, chatgpt, codex and system. Typical sources are ui, remote_patch, history_revert, migration, import and automation. Remote patches default to chatgpt unless they declare another author. Reverts are new edits and never rewrite old history.
 
@@ -103,6 +103,8 @@ A data proposal is never tested by redirecting the live database to another bran
 Do not commit repeated personalhub.db binaries on every change. A Git commit tree plus `state/manifest.json` is itself the logical checkpoint: unchanged shards/objects keep the same blob identity, so an old complete PH state is addressable without storing another SQLite file. Long-term storage should be dominated by compressed small history events, changed current-state shards and genuinely new content-addressed BLOBs. Content-addressed objects are not garbage-collected merely because the current state stopped referencing them; historical revisions may still require them.
 
 Normal startup never replays Git history. Current UI reads SQLite. History queries use rebuildable local projections, including cached field-lifetime aggregates, rather than rescanning Git. The top-level temporal search can merge indexed Git edits into the same date window as Places, Timer, Soldi, Substances, WordPulse and People without network access. Full reconstruction, old-state reads, semantic revision comparisons and repository scans happen only on demand.
+
+Legacy databases that accumulated exact no-op UPDATE history can be compacted externally with `python3 tools/cleanup_hub_git_noop_events.py SOURCE --output DEST`. The tool never edits SOURCE in place: it creates a coherent SQLite backup copy, removes only UPDATE events whose complete before/after payloads are identical, runs `VACUUM`, then requires both `quick_check` and `foreign_key_check` to pass.
 
 ## Failure model
 

@@ -24,6 +24,8 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
     private val dao = db.financeDao()
     private val sharedTags = SharedTagEngine(db)
+    private val writesGlobalHubContext: Boolean
+        get() = db.openHelper.databaseName == PersonalHubDatabase.DATABASE_NAME
     val accounts = dao.accounts()
     val transactions = dao.transactions()
     val products = dao.products()
@@ -34,6 +36,8 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
     val macros = dao.macros()
     val recurrences = dao.recurrenceViews().map { values -> values.map { view -> view.value.apply { category = view.category } } }
     val allAttachments = dao.allAttachments()
+    val photoIndexes = dao.photoIndexes()
+    val ownedItems = dao.ownedItems()
 
     suspend fun tags(id: Long) = dao.transaction(id)?.let { value ->
         sharedTags.tags(HubEntityRef("soldi", "transaction", value.uuid))
@@ -178,12 +182,14 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             draft.tags.split(','),
         )
         replaceCategory(HubEntityRef("soldi", "transaction", value.uuid), draft.category)
-        HubContextRuntime.saveFinanceTransactionLinksIfInitialized(
-            transactionUuid = value.uuid,
-            personPublicId = draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
-            placeId = draft.placeId,
-            contextualRefs = draft.contextRefs,
-        )
+        if (writesGlobalHubContext) {
+            HubContextRuntime.saveFinanceTransactionLinksIfInitialized(
+                transactionUuid = value.uuid,
+                personPublicId = draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
+                placeId = draft.placeId,
+                contextualRefs = draft.contextRefs,
+            )
+        }
         id
     }
 
@@ -369,6 +375,39 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
 
     suspend fun deleteAttachment(id: String) = db.withTransaction { dao.deleteAttachment(id) }
 
+    suspend fun photoIndex(attachmentId: String): FinancePhotoIndex? = dao.photoIndex(attachmentId)
+
+    suspend fun putPhotoIndex(value: FinancePhotoIndex) = db.withTransaction {
+        requireNotNull(dao.transaction(value.transactionId))
+        dao.putPhotoIndex(value)
+    }
+
+    suspend fun ownedItemsForTransaction(transactionId: Long): List<FinanceOwnedItem> =
+        dao.ownedItemsForTransaction(transactionId)
+
+    suspend fun ownedItem(uuid: String): FinanceOwnedItem? = dao.ownedItem(uuid)
+
+    suspend fun trackOwnedItem(
+        transactionId: Long,
+        name: String,
+        primaryAttachmentId: String? = null,
+    ): FinanceOwnedItem = db.withTransaction {
+        requireNotNull(dao.transaction(transactionId))
+        val normalized = name.trim().ifBlank { "Oggetto" }
+        val attachmentId = primaryAttachmentId?.takeIf { candidate ->
+            dao.attachmentsOnce(transactionId).any { it.id == candidate }
+        }
+        val item = FinanceOwnedItem(
+            sourceTransactionId = transactionId,
+            name = normalized,
+            primaryAttachmentId = attachmentId,
+        )
+        dao.putOwnedItem(item)
+        item
+    }
+
+    suspend fun removeOwnedItem(uuid: String) = db.withTransaction { dao.deleteOwnedItem(uuid) }
+
     suspend fun saveRecurrence(draft: RecurrenceDraft): String = db.withTransaction {
         val kind = recurrenceKind(draft.kind)
         val account = requireNotNull(dao.account(draft.accountId))
@@ -426,12 +465,14 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
             draft.tags.split(','),
         )
         replaceCategory(HubEntityRef("soldi", "recurrence", value.id), draft.category)
-        HubContextRuntime.saveFinanceRecurrenceLinksIfInitialized(
-            value.id,
-            draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
-            draft.placeId,
-            draft.contextRefs,
-        )
+        if (writesGlobalHubContext) {
+            HubContextRuntime.saveFinanceRecurrenceLinksIfInitialized(
+                value.id,
+                draft.personId?.let { db.contactsDao().getContactEntity(it)?.publicId },
+                draft.placeId,
+                draft.contextRefs,
+            )
+        }
         value.id
     }
 
