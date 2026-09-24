@@ -810,6 +810,7 @@ private fun SessionRow(
 ) {
     val start = Instant.ofEpochMilli(session.startTs).atZone(zone).toLocalTime()
     val context = LocalContext.current
+    val sinceWhenSessionStarted = stringResource(R.string.since_when_session_started)
     var sinceWhenMenuOpen by rememberSaveable(session.id) { mutableStateOf(false) }
     val end = Instant.ofEpochMilli(session.endTs).atZone(zone).toLocalTime()
     val durMs = (session.endTs - session.startTs).coerceAtLeast(0L)
@@ -1028,7 +1029,7 @@ private fun SessionRow(
                             defaultCounterTitle = resolvedTitle,
                             timestampSources = listOf(SinceWhenTimestampSource(
                                 "session_started",
-                                context.getString(R.string.since_when_session_started),
+                                sinceWhenSessionStarted,
                                 session.startTs,
                                 true,
                             )),

@@ -72,6 +72,7 @@ fun PlaceListItem(
     val totalDuration = localizedDuration(item.totalTimeMs)
     val visits = visitCount(item.visitCount)
     val radius = stringResource(R.string.radius_compact_format, CheckInPolicy.effectiveRadiusM(place))
+    val sinceWhenAddedToPh = stringResource(R.string.since_when_added_to_ph)
     val distance = item.distanceMeters?.let {
         stringResource(R.string.place_distance_format, com.gernalix.luoghi.ui.common.localizedDistance(it))
     }
@@ -182,7 +183,7 @@ fun PlaceListItem(
                         defaultCounterTitle = displayName,
                         timestampSources = listOf(SinceWhenTimestampSource(
                             "added_at",
-                            context.getString(R.string.since_when_added_to_ph),
+                            sinceWhenAddedToPh,
                             place.createdAt,
                             true,
                         )),

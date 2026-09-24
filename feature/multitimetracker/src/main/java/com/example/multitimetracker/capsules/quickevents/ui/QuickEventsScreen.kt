@@ -124,6 +124,7 @@ fun QuickEventsScreen(
 ) {
     val state by capsule.uiState.collectAsState()
     val context = LocalContext.current
+    val sinceWhenEventDate = stringResource(R.string.since_when_event_date)
     val effectiveTime = remember(state.nowMs) { state.effectiveTimeContext() }
     val visibleTags = remember(state.tags) { state.tags.filter { !it.isDeleted && !it.isArchived }.distinctBy { it.id } }
     val fieldsByTemplate = remember(state.quickEventFieldDefinitions) { state.quickEventFieldDefinitions.groupBy { it.templateId } }
@@ -391,7 +392,7 @@ fun QuickEventsScreen(
                                         defaultCounterTitle = entry.title,
                                         timestampSources = listOf(SinceWhenTimestampSource(
                                             id = "event_date",
-                                            label = context.getString(R.string.since_when_event_date),
+                                            label = sinceWhenEventDate,
                                             timestamp = entry.timestampMs,
                                             isDefault = true,
                                         )),
