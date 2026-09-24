@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -58,6 +59,7 @@ import kotlinx.coroutines.withContext
 class DataExplorerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         setContent {
             PersonalHubTheme {
                 Surface(Modifier.fillMaxSize()) {
