@@ -35,6 +35,7 @@ class PersonalHubApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         if (Application.getProcessName() != packageName) return
+        traceStartup("PH.workflowyShareState") { WorkflowyShareActivity.syncEnabled(this) }
 
         traceStartup("PH.recoverInterruptedImport") {
             DatabaseVault.recoverInterruptedImport(this)
@@ -48,7 +49,6 @@ class PersonalHubApplication : Application(), Configuration.Provider {
             TimerStartupApi.applicationOnCreate()
         }
         traceStartup("PH.hubRuntimeInit") { initializeHubContextRuntime(this) }
-        traceStartup("PH.workflowyShareState") { WorkflowyShareActivity.syncEnabled(this) }
         traceStartup("PH.postFirstFrameInstall") {
             PostFirstFrameStartup.install(this)
         }

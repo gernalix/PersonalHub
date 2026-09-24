@@ -93,7 +93,7 @@ fun HubSettings(onBack: () -> Unit) {
                         onCheckedChange = { enabled ->
                             WorkflowyIntegrationSettings.setEnabled(context, enabled)
                             WorkflowyShareActivity.setEnabled(context, enabled)
-                            if (!enabled) WorkflowyDaysSync.setEnabled(context, false)
+                            WorkflowyDaysSync.ensureScheduled(context)
                             workflowyEnabled = enabled
                         },
                     )
