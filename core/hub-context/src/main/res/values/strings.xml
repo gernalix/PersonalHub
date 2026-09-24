@@ -59,4 +59,12 @@
     <string name="hub_workflowy_invalid">Enter a valid workflowy.com URL.</string>
     <string name="hub_workflowy_exists">This Workflowy URL is already linked here.</string>
     <string name="hub_workflowy_save">Link</string>
+    <string name="hub_workflowy_attach_existing">Link existing Workflowy node</string>
+    <string name="hub_workflowy_new_note">+ Workflowy note</string>
+    <string name="hub_workflowy_new_note_title">New Workflowy note</string>
+    <string name="hub_workflowy_note_text">Note</string>
+    <string name="hub_workflowy_note_save">Save</string>
+    <string name="hub_workflowy_note_save_open">Save &amp; open</string>
+    <string name="hub_workflowy_note_requires_key">Configure the Workflowy API key in Settings to create notes directly.</string>
+    <string name="hub_workflowy_note_failed">Could not create the Workflowy note.</string>
 </resources>
