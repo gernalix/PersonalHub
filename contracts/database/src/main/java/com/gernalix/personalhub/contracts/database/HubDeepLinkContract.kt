@@ -26,6 +26,7 @@ object HubDeepLinkContract {
     private const val PARAM_QUERY = "q"
     private const val PARAM_ENTITY_KIND = "entity_kind"
     private const val PARAM_ENTITY_ID = "entity_id"
+    private const val PARAM_SCOPE_MODULE = "scope_module"
 
     sealed interface Target
 
@@ -44,6 +45,7 @@ object HubDeepLinkContract {
         val query: String? = null,
         val entityKind: String? = null,
         val entityId: String? = null,
+        val scopeModuleId: String? = null,
     ) : Target
 
     enum class ParseError {
@@ -160,6 +162,7 @@ object HubDeepLinkContract {
         query: String? = null,
         entityKind: String? = null,
         entityId: String? = null,
+        scopeModuleId: String? = null,
     ): Uri = Uri.Builder()
         .scheme(SCHEME)
         .authority(SEARCH)
@@ -172,8 +175,15 @@ object HubDeepLinkContract {
             query?.trim()?.takeIf { it.isNotEmpty() }?.let { appendQueryParameter(PARAM_QUERY, it) }
             entityKind?.trim()?.takeIf { it.isNotEmpty() }?.let { appendQueryParameter(PARAM_ENTITY_KIND, it) }
             entityId?.trim()?.takeIf { it.isNotEmpty() }?.let { appendQueryParameter(PARAM_ENTITY_ID, it) }
+            scopeModuleId?.trim()?.takeIf { it.isNotEmpty() }?.let { appendQueryParameter(PARAM_SCOPE_MODULE, it) }
         }
         .build()
+
+    fun moduleHistoryUri(moduleId: String): Uri {
+        val normalized = moduleId.trim()
+        require(normalized.isNotEmpty())
+        return searchUri(modules = listOf(normalized), scopeModuleId = normalized)
+    }
 
     fun parse(uri: Uri?): ParseResult {
         if (uri == null) return ParseResult(error = ParseError.MISSING_URI)
@@ -223,6 +233,8 @@ object HubDeepLinkContract {
             return values.singleOrNull()?.trim()?.takeIf { it.isNotEmpty() }
         }
         return runCatching {
+            val scopeModuleId = singleOptional(PARAM_SCOPE_MODULE)
+            require(scopeModuleId == null || scopeModuleId in modules)
             SearchTarget(
                 fromIso = from,
                 toIso = to,
@@ -230,6 +242,7 @@ object HubDeepLinkContract {
                 query = singleOptional(PARAM_QUERY),
                 entityKind = singleOptional(PARAM_ENTITY_KIND),
                 entityId = singleOptional(PARAM_ENTITY_ID),
+                scopeModuleId = scopeModuleId,
             )
         }.fold({ ParseResult(target = it) }, { ParseResult(error = ParseError.MALFORMED) })
     }

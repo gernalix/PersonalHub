@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home_context">Context</string>
-    <string name="home_search">Search</string>
-    <string name="home_activity_register">Activity</string>
+    <string name="home_history_search">🔍</string>
+    <string name="home_history_search_help">Search history and changes</string>
     <string name="home_context_help">Link entities</string>
-    <string name="home_search_help">Find a time span</string>
-    <string name="home_activity_help">Changes and undo</string>
     <string name="home_data_explorer">Data</string>
     <string name="home_data_explorer_help">SQL and advanced exploration</string>
     <string name="data_explorer_title">Data explorer</string>
@@ -133,8 +131,16 @@
     <string name="module_soldi">Soldi</string>
     <string name="module_soldi_subtitle">Transactions and products</string>
 
-    <string name="activity_title">Activity register</string>
+    <string name="activity_title">History &amp; Search</string>
     <string name="activity_back">Back</string>
+    <string name="activity_from">From</string>
+    <string name="activity_to">To</string>
+    <string name="activity_search_hint">🔍 Search history…</string>
+    <string name="activity_reset_filters">Reset filters</string>
+    <string name="activity_invalid_range">From must be before To.</string>
+    <string name="activity_invalid_date">Use a valid date and time.</string>
+    <string name="activity_open">Open</string>
+    <string name="activity_related_changes">%1$d related changes</string>
     <string name="activity_filter_all">All</string>
     <string name="activity_filter_system">System</string>
     <string name="activity_module_episodes">Episodes</string>
