@@ -201,6 +201,24 @@ object WorkflowyApiClient {
             }
         }
 
+    suspend fun deleteNode(context: Context, nodeId: String) = withContext(Dispatchers.IO) {
+        val id = nodeId.trim()
+        require(id.length >= 12) { "Invalid Workflowy node id" }
+        val token = WorkflowyIntegrationSettings.apiKey(context)
+        val connection = URL("https://workflowy.com/api/v1/nodes/" + id).openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "DELETE"
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer " + token)
+            val code = connection.responseCode
+            if (code !in 200..299) throw IOException("Workflowy delete returned HTTP " + code)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     internal fun parseCreatedNodeId(raw: String): String {
         val id = JSONObject(raw).optString("item_id").trim()
         require(id.length >= 12) { "Workflowy API response has no valid item_id" }
@@ -211,7 +229,15 @@ object WorkflowyApiClient {
 object WorkflowyHubBridge {
     suspend fun createNote(context: Context, anchor: HubEntityRef, text: String): WorkflowyCreatedNode {
         val created = WorkflowyApiClient.createNode(context, text)
-        attachUrl(context, anchor, created.deepLink, labelFor(text))
+        try {
+            attachUrl(context, anchor, created.deepLink, labelFor(text))
+        } catch (error: CancellationException) {
+            withContext(NonCancellable) { runCatching { WorkflowyApiClient.deleteNode(context, created.id) } }
+            throw error
+        } catch (error: Exception) {
+            runCatching { WorkflowyApiClient.deleteNode(context, created.id) }
+            throw error
+        }
         return created
     }
 
