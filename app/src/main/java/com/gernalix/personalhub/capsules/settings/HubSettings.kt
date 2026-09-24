@@ -19,6 +19,9 @@ import com.gernalix.personalhub.DatabaseActivity
 import com.gernalix.personalhub.DatabaseRestartActivity
 import com.gernalix.personalhub.R
 import com.gernalix.personalhub.ProfileRuntimeCoordinator
+import com.gernalix.personalhub.WorkflowyShareActivity
+import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
+import com.gernalix.personalhub.workflowydays.WorkflowyDaysSync
 import com.gernalix.personalhub.capsules.shortcuts.HomeShortcutsSettings
 import com.gernalix.personalhub.core.database.ImportRolledBack
 import com.gernalix.personalhub.core.database.DatabaseProfileInitMode
@@ -55,10 +58,14 @@ fun HubSettings(onBack: () -> Unit) {
         "sync" -> SyncSettings { page = "root" }
         "git-data" -> GitDataSyncSettings(onBack = { page = "root" })
         "git-history" -> GitHistorySettings { page = "root" }
+        "workflowy" -> WorkflowyIntegrationSettingsScreen { page = "root" }
         "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
         else -> {
             val context = LocalContext.current
             val privacyPolicyUrl = stringResource(R.string.privacy_policy_url)
+            var workflowyEnabled by remember {
+                mutableStateOf(WorkflowyIntegrationSettings.isEnabled(context))
+            }
             SettingsPage(R.string.settings_title, ::back) {
                 Text(stringResource(R.string.settings_data_model_summary))
                 Button(onClick = { page = "data-guide" }) {
@@ -75,7 +82,35 @@ fun HubSettings(onBack: () -> Unit) {
                 OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
                 OutlinedButton(onClick = { page = "git-data" }) { Text(stringResource(R.string.git_data_sync_title)) }
                 OutlinedButton(onClick = { page = "git-history" }) { Text(stringResource(R.string.git_history_title)) }
-                OutlinedButton(onClick = { page = "workflowy-days" }) { Text(stringResource(R.string.workflowy_days_title)) }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.workflowy_integration_enable), Modifier.weight(1f))
+                    Checkbox(
+                        checked = workflowyEnabled,
+                        onCheckedChange = { enabled ->
+                            WorkflowyIntegrationSettings.setEnabled(context, enabled)
+                            WorkflowyShareActivity.setEnabled(context, enabled)
+                            if (!enabled) WorkflowyDaysSync.setEnabled(context, false)
+                            workflowyEnabled = enabled
+                        },
+                    )
+                }
+                if (workflowyEnabled) {
+                    Text(
+                        stringResource(R.string.workflowy_integration_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = { page = "workflowy" }) {
+                        Text(stringResource(R.string.workflowy_integration_settings))
+                    }
+                    OutlinedButton(onClick = { page = "workflowy-days" }) {
+                        Text(stringResource(R.string.workflowy_days_title))
+                    }
+                }
                 HorizontalDivider()
                 OutlinedButton(onClick = { page = "shortcuts" }) { Text(stringResource(R.string.home_shortcuts_title)) }
                 OutlinedButton(
