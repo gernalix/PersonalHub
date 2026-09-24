@@ -88,6 +88,30 @@ interface HubActivityDao {
         limit: Int,
     ): List<HubActivityEntity>
 
+    @Query(
+        """
+        SELECT * FROM hub_activity_log
+        WHERE (:allModules = 1 OR module_id IN (:moduleIds))
+          AND (:includeSystem = 1 OR is_system = 0)
+          AND (:fromMs IS NULL OR occurred_at >= :fromMs)
+          AND (:toMs IS NULL OR occurred_at <= :toMs)
+          AND (:entityKind IS NULL OR entity_kind = :entityKind)
+          AND (:entityId IS NULL OR entity_id = :entityId)
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun search(
+        moduleIds: List<String>,
+        allModules: Int,
+        includeSystem: Int,
+        fromMs: Long?,
+        toMs: Long?,
+        entityKind: String?,
+        entityId: String?,
+        limit: Int,
+    ): List<HubActivityEntity>
+
     @Query("SELECT * FROM hub_activity_log WHERE id = :id LIMIT 1")
     suspend fun byId(id: String): HubActivityEntity?
 

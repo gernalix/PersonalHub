@@ -28,6 +28,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -59,24 +60,37 @@ import com.gernalix.personalhub.core.database.HubActivityUndoEffect
 import com.gernalix.personalhub.core.database.HubActivityUndoEngine
 import com.gernalix.personalhub.core.database.HubActivityUndoResult
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.formatHubDateTime
+import com.gernalix.personalhub.core.hubcontext.parseHubDateTime
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-private const val ACTIVITY_PAGE_SIZE = 50
-private const val ALL_ACTIVITY_MODULES = "__all__"
+private const val ACTIVITY_SEARCH_LIMIT = 500
+private val ACTIVITY_MODULE_IDS = listOf("people", "timer", "places", "soldi", "substances", "wordpulse", "hub", "tags", "settings")
 
 private data class ActivityUiItem(
     val activity: HubActivityEntity,
     val label: String?,
     val navigationRef: HubEntityRef?,
+    val detail: String? = null,
+    val relatedCount: Int = 1,
 )
 
 private data class ActivityFilter(val id: String, val labelRes: Int)
 
 @Composable
-fun HubActivityRegisterScreen(onBack: () -> Unit, initialEventId: String? = null) {
+fun HubActivityRegisterScreen(
+    onBack: () -> Unit,
+    initialEventId: String? = null,
+    initialModules: Set<String> = emptySet(),
+    initialQuery: String = "",
+    initialFromMs: Long? = null,
+    initialToMs: Long? = null,
+    initialEntityKind: String? = null,
+    initialEntityId: String? = null,
+) {
     val context = LocalContext.current
     val database = remember(context) { PersonalHubDatabase.get(context) }
     val scope = rememberCoroutineScope()
