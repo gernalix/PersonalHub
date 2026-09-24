@@ -2,6 +2,8 @@ package com.gernalix.personalhub.soldi
 
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAttachment
+import com.gernalix.personalhub.core.database.capsules.soldi.FinanceOwnedItem
+import com.gernalix.personalhub.core.database.capsules.soldi.FinancePhotoIndex
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceTransaction
 import com.gernalix.personalhub.core.database.capsules.soldi.TransactionView
 import org.junit.Assert.assertFalse
@@ -74,6 +76,47 @@ class SoldiSearchTest {
     @Test
     fun blankQueryReturnsAllTransactionsForLiveFiltering() {
         assertTrue(financeTransactionMatches("", row, emptyList(), account, emptyList()))
+    }
+
+
+    @Test
+    fun searchesOcrAndOwnedItemNames() {
+        val index = FinancePhotoIndex(
+            attachmentId = "photo-1",
+            transactionId = 42,
+            sourceRef = photo.uri,
+            sourceHash = "hash",
+            modelId = "model",
+            modelVersion = "v1",
+            ocrText = "NORTH FACE SUMMIT",
+            status = "READY",
+        )
+        val item = FinanceOwnedItem(
+            uuid = "owned-1",
+            sourceTransactionId = 42,
+            name = "Giubbotto nero",
+            primaryAttachmentId = "photo-1",
+        )
+        assertTrue(
+            financeTransactionMatches(
+                "summit",
+                row,
+                emptyList(),
+                account,
+                listOf(photo),
+                photoIndexes = listOf(index),
+            ),
+        )
+        assertTrue(
+            financeTransactionMatches(
+                "giubbotto",
+                row,
+                emptyList(),
+                account,
+                listOf(photo),
+                ownedItems = listOf(item),
+            ),
+        )
     }
 
     @Test fun supportsTagAndOrNotAndUntaggedFilters() {

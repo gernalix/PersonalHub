@@ -22,6 +22,7 @@ import com.gernalix.personalhub.soldi.receipt.*
 import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
 import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.Instant
@@ -37,6 +38,8 @@ internal fun SoldiV2Screen(
     val accounts by capsule.accounts.collectAsState(emptyList())
     val transactions by capsule.transactions.collectAsState(emptyList())
     val allAttachments by capsule.allAttachments.collectAsState(emptyList())
+    val photoIndexes by capsule.photoIndexes.collectAsState(emptyList())
+    val ownedItems by capsule.ownedItems.collectAsState(emptyList())
     val transfers by capsule.transfers.collectAsState(emptyList())
     val macros by capsule.macros.collectAsState(emptyList())
     val recurrences by capsule.recurrences.collectAsState(emptyList())
@@ -49,6 +52,8 @@ internal fun SoldiV2Screen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val prefs = remember { SoldiViewPrefs(context.applicationContext) }
+    val semanticEngine = remember(capsule) { FinancePhotoSemanticEngine(context.applicationContext, capsule) }
+    DisposableEffect(semanticEngine) { onDispose { semanticEngine.close() } }
 
     var tab by rememberSaveable { mutableStateOf(SoldiTab.TRANSACTIONS) }
     var bottom by rememberSaveable { mutableStateOf(BottomDestination.HOME) }
@@ -67,6 +72,10 @@ internal fun SoldiV2Screen(
     var tagsByTransaction by remember { mutableStateOf<Map<Long, List<String>>>(emptyMap()) }
     var projected by remember { mutableStateOf<List<ProjectedOccurrence>>(emptyList()) }
     var handledUuid by rememberSaveable { mutableStateOf<String?>(null) }
+    var semanticMatches by remember { mutableStateOf<List<FinanceSemanticMatch>>(emptyList()) }
+    var objectMatches by remember { mutableStateOf<List<FinanceSemanticMatch>>(emptyList()) }
+    var findObjectDialog by remember { mutableStateOf(false) }
+    var semanticBusy by remember { mutableStateOf(false) }
 
     val photoByTransaction = remember(allAttachments) {
         allAttachments
@@ -81,6 +90,39 @@ internal fun SoldiV2Screen(
     fun requestNotifications() {
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    val findObjectGallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                semanticBusy = true
+                try {
+                    objectMatches = semanticEngine.findSimilar(uri, photoIndexes)
+                    globalSearchMode = SoldiSearchMode.OBJECT
+                    searchOpen = true
+                } catch (error: Exception) {
+                    snackbar.showSnackbar(error.message ?: "Ricerca foto non riuscita")
+                } finally {
+                    semanticBusy = false
+                }
+            }
+        }
+    }
+    val findObjectCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        if (bitmap != null) {
+            scope.launch {
+                semanticBusy = true
+                try {
+                    objectMatches = semanticEngine.findSimilar(bitmap, photoIndexes)
+                    globalSearchMode = SoldiSearchMode.OBJECT
+                    searchOpen = true
+                } catch (error: Exception) {
+                    snackbar.showSnackbar(error.message ?: "Ricerca foto non riuscita")
+                } finally {
+                    semanticBusy = false
+                }
+            }
         }
     }
 
@@ -114,6 +156,21 @@ internal fun SoldiV2Screen(
     LaunchedEffect(Unit) {
         runCatching { capsule.materializeDueRecurrences() }
         runCatching { FinanceReminderScheduler.reschedule(context.applicationContext) }
+    }
+
+    LaunchedEffect(allAttachments.map { Triple(it.id, it.uri, it.createdAt) }) {
+        runCatching { semanticEngine.backfill(allAttachments) }
+    }
+
+    LaunchedEffect(globalSearchQuery, photoIndexes, searchOpen, globalSearchMode) {
+        if (!searchOpen || globalSearchMode != SoldiSearchMode.SEARCH || globalSearchQuery.isBlank()) {
+            semanticMatches = emptyList()
+        } else {
+            delay(180)
+            semanticMatches = runCatching {
+                semanticEngine.searchText(globalSearchQuery, photoIndexes)
+            }.getOrDefault(emptyList())
+        }
     }
 
     LaunchedEffect(transactions.map { it.value.id }) {
@@ -166,6 +223,9 @@ internal fun SoldiV2Screen(
         null -> null
     }
     val existingAttachments = rememberFinanceAttachments(capsule, attachmentOwnerId)
+    val currentOwnedItems = remember(ownedItems, attachmentOwnerId) {
+        if (attachmentOwnerId == null) emptyList() else ownedItems.filter { it.sourceTransactionId == attachmentOwnerId }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -229,11 +289,23 @@ internal fun SoldiV2Screen(
                         places = places,
                         tags = tags,
                         existingAttachments = existingAttachments,
+                        ownedItems = currentOwnedItems,
                         onBack = { if (!busy) editor = null },
                         onChange = { if (!busy) editor = it },
                         onSwitchToTransfer = { if (!busy) editor = SoldiEditor.Transfer(defaultTransfer(accounts)) },
                         onRequestNotifications = ::requestNotifications,
                         onDeleteAttachment = { attachment -> runAction { capsule.deleteAttachment(attachment.id) } },
+                        onTrackOwnedItem = { name ->
+                            val transactionId = current.draft.id
+                            if (transactionId != null) runAction {
+                                capsule.trackOwnedItem(
+                                    transactionId,
+                                    name,
+                                    preferredTransactionPhoto(existingAttachments)?.id,
+                                )
+                            }
+                        },
+                        onRemoveOwnedItem = { item -> runAction { capsule.removeOwnedItem(item.uuid) } },
                         saving = busy,
                         onSave = { draft, recurrence, pendingAttachments, saveAndNew, createSinceWhen, selectedSourceId ->
                             runAction {
@@ -308,14 +380,19 @@ internal fun SoldiV2Screen(
                         accounts = accounts,
                         tagsByTransaction = tagsByTransaction,
                         attachments = allAttachments,
+                        photoIndexes = photoIndexes,
+                        ownedItems = ownedItems,
+                        semanticMatches = semanticMatches,
+                        objectMatches = objectMatches,
                         onBack = {
-                            if (globalSearchMode == SoldiSearchMode.PHOTOS) {
+                            if (globalSearchMode == SoldiSearchMode.PHOTOS || globalSearchMode == SoldiSearchMode.OBJECT) {
                                 globalSearchMode = SoldiSearchMode.SEARCH
                             } else {
                                 searchOpen = false
                             }
                         },
                         onPhotos = { globalSearchMode = SoldiSearchMode.PHOTOS },
+                        onFindObject = { if (!semanticBusy) findObjectDialog = true },
                         onSearchMode = { globalSearchMode = SoldiSearchMode.SEARCH },
                         onOpenTransaction = ::openTransaction,
                     )
@@ -445,6 +522,29 @@ internal fun SoldiV2Screen(
 
     if (showViewOptions) {
         ViewOptionsDialog(viewOptions, { viewOptions = it; prefs.save(it) }, { showViewOptions = false })
+    }
+
+    if (findObjectDialog) {
+        AlertDialog(
+            onDismissRequest = { findObjectDialog = false },
+            title = { Text("Trova questo oggetto") },
+            text = { Text("Scatta una foto oppure scegli un'immagine. Vedrai fino a 10 possibili corrispondenze; il risultato non viene trattato come un'identificazione certa.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    findObjectDialog = false
+                    findObjectCamera.launch(null)
+                }) { Text("Fotocamera") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { findObjectDialog = false }) { Text("Annulla") }
+                    TextButton(onClick = {
+                        findObjectDialog = false
+                        findObjectGallery.launch("image/*")
+                    }) { Text("Galleria") }
+                }
+            },
+        )
     }
 
     if (showMore) {

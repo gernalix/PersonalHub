@@ -160,4 +160,19 @@ interface FinanceDao {
     @Query("SELECT * FROM finance_attachments WHERE transactionId=:transactionId ORDER BY createdAt,id") suspend fun attachmentsOnce(transactionId: Long): List<FinanceAttachment>
     @Insert suspend fun add(value: FinanceAttachment)
     @Query("DELETE FROM finance_attachments WHERE id=:id") suspend fun deleteAttachment(id: String)
+
+
+    @Query("SELECT * FROM finance_photo_index ORDER BY transactionId,attachmentId") fun photoIndexes(): Flow<List<FinancePhotoIndex>>
+    @Query("SELECT * FROM finance_photo_index ORDER BY transactionId,attachmentId") suspend fun photoIndexesOnce(): List<FinancePhotoIndex>
+    @Query("SELECT * FROM finance_photo_index WHERE attachmentId=:attachmentId") suspend fun photoIndex(attachmentId: String): FinancePhotoIndex?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putPhotoIndex(value: FinancePhotoIndex)
+    @Query("DELETE FROM finance_photo_index WHERE attachmentId=:attachmentId") suspend fun deletePhotoIndex(attachmentId: String)
+
+    @Query("SELECT * FROM finance_owned_items WHERE archivedAt IS NULL AND disposedAt IS NULL ORDER BY updatedAt DESC,uuid")
+    fun ownedItems(): Flow<List<FinanceOwnedItem>>
+    @Query("SELECT * FROM finance_owned_items WHERE sourceTransactionId=:transactionId AND archivedAt IS NULL AND disposedAt IS NULL ORDER BY updatedAt DESC,uuid")
+    suspend fun ownedItemsForTransaction(transactionId: Long): List<FinanceOwnedItem>
+    @Query("SELECT * FROM finance_owned_items WHERE uuid=:uuid") suspend fun ownedItem(uuid: String): FinanceOwnedItem?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putOwnedItem(value: FinanceOwnedItem)
+    @Query("DELETE FROM finance_owned_items WHERE uuid=:uuid") suspend fun deleteOwnedItem(uuid: String)
 }

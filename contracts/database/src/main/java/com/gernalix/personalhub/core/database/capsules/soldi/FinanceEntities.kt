@@ -195,6 +195,50 @@ data class FinanceAttachment(
     val createdAt: Long = System.currentTimeMillis(),
 )
 
+
+@Entity(
+    tableName = "finance_photo_index",
+    indices = [Index("transactionId"), Index("status"), Index(value = ["modelId", "modelVersion"])],
+    foreignKeys = [
+        ForeignKey(entity = FinanceAttachment::class, parentColumns = ["id"], childColumns = ["attachmentId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = FinanceTransaction::class, parentColumns = ["id"], childColumns = ["transactionId"], onDelete = ForeignKey.CASCADE),
+    ],
+)
+data class FinancePhotoIndex(
+    @PrimaryKey val attachmentId: String,
+    val transactionId: Long,
+    val sourceRef: String,
+    val sourceHash: String,
+    val modelId: String,
+    val modelVersion: String,
+    val embedding: ByteArray? = null,
+    val ocrText: String = "",
+    val labels: String = "",
+    val status: String,
+    val error: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "finance_owned_items",
+    indices = [Index("sourceTransactionId"), Index("primaryAttachmentId")],
+    foreignKeys = [
+        ForeignKey(entity = FinanceTransaction::class, parentColumns = ["id"], childColumns = ["sourceTransactionId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = FinanceAttachment::class, parentColumns = ["id"], childColumns = ["primaryAttachmentId"], onDelete = ForeignKey.SET_NULL),
+    ],
+)
+data class FinanceOwnedItem(
+    @PrimaryKey val uuid: String = java.util.UUID.randomUUID().toString(),
+    val sourceTransactionId: Long,
+    val name: String,
+    val primaryAttachmentId: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val archivedAt: Long? = null,
+    val disposedAt: Long? = null,
+)
+
 data class TransactionView(
     @Embedded val value: FinanceTransaction,
     val title: String,
