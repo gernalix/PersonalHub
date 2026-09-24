@@ -13,6 +13,9 @@ on:
       - 'settings.gradle.kts'
       - 'gradle.properties'
       - 'version.txt'
+      - 'tools/migrate_personalhub_v20_to_v21.py'
+      - 'tools/migrations/**'
+      - 'tools/test_migrate_personalhub_v20_to_v21.py'
       - '.github/workflows/android-unit-ci.yml'
   pull_request:
     paths:
@@ -25,6 +28,9 @@ on:
       - 'settings.gradle.kts'
       - 'gradle.properties'
       - 'version.txt'
+      - 'tools/migrate_personalhub_v20_to_v21.py'
+      - 'tools/migrations/**'
+      - 'tools/test_migrate_personalhub_v20_to_v21.py'
       - '.github/workflows/android-unit-ci.yml'
 
 permissions:
@@ -48,6 +54,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
+      - name: Validate external database migration
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tools/test_migrate_personalhub_v20_to_v21.py
       - name: Run all debug unit tests and lint
         run: |
           chmod +x ./gradlew
