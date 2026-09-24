@@ -2,6 +2,7 @@ package com.gernalix.sostanze
 
 import android.content.Intent
 import android.os.Bundle
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,6 +17,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         hubSubstanceId = intent.hubSubstanceId()
         enableEdgeToEdge()
         setContent {
