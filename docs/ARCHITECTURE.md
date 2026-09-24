@@ -17,6 +17,10 @@ the application:
   deterministic state/history and may read verified patch metadata. It does not silently
   restore remote state. Full inbound replacement requires an explicit Restore from Git action;
   applying a data patch is also explicit.
+- **Obsidian — external derived viewer only.** PersonalHub contains no Obsidian exporter. A Fedora-side
+  projector may consume the private Git Data repository and render a read-only Markdown vault.
+  Obsidian never reads the live Android database, never writes PersonalHub state and must remain
+  operationally independent from the app. See `docs/OBSIDIAN_ARCHIVE.md`.
 
 Credentials for Datasette and Git are device-local Android-Keystore-encrypted connection material,
 not application data. They must not enter SQLite, SAF exports, Git payloads, logs or saved UI state.
