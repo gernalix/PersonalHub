@@ -39,8 +39,8 @@ class DatabaseStartupGateTest {
 
         assertFalse(status.ready)
         assertEquals(20, status.currentVersion)
-        assertEquals(21, status.requiredVersion)
+        assertEquals(PersonalHubDatabase.SCHEMA_VERSION, status.requiredVersion)
         assertTrue(status.reason.orEmpty().contains("20"))
-        assertTrue(status.reason.orEmpty().contains("21"))
+        assertTrue(status.reason.orEmpty().contains(PersonalHubDatabase.SCHEMA_VERSION.toString()))
     }
 }
