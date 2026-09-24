@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: () -> Unit, startEnabled: Boolean = false) {
     val context = LocalContext.current
+    val saveErrorMessage = stringResource(R.string.since_when_save_error)
     val dao = remember { PersonalHubDatabase.get(context).sinceWhenCounterDao() }
     val scope = rememberCoroutineScope()
     var title by remember(source) { mutableStateOf(source.defaultCounterTitle) }
@@ -83,7 +84,7 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
         } catch (_: Exception) {
             val existing = dao.findSourceSnapshot(source.entityType, source.entityId, choice.timestamp)
             if (existing != null) duplicateId = existing.id
-            else error = context.getString(R.string.since_when_save_error)
+            else error = saveErrorMessage
         } finally {
             saving = false
         }
@@ -144,7 +145,7 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
                         } catch (_: Exception) {
                             val existing = dao.findSourceSnapshot(source.entityType, source.entityId, choice.timestamp)
                             if (existing != null) duplicateId = existing.id
-                            else error = context.getString(R.string.since_when_save_error)
+                            else error = saveErrorMessage
                             saving = false
                         }
                     }

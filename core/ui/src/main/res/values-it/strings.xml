@@ -1,5 +1,0 @@
-<resources>
-    <string name="since_when_create_counter">Crea un contatore “Da quando”</string>
-    <string name="since_when_start_from">Inizia da</string>
-    <string name="since_when_starts_from">Inizia da: %1$s</string>
-</resources>
