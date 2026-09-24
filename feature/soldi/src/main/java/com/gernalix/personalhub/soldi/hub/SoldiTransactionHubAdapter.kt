@@ -27,6 +27,21 @@ class SoldiTransactionHubAdapter(private val context: Context) : HubEntityAdapte
     override suspend fun search(query: String, limit: Int) = dao.searchTransactionViews(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("soldi", "transactionUuid" to canonicalId).toString(), "com.gernalix.personalhub.soldi.SoldiActivity")
 
+    override suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? {
+        val transaction = dao.transactionByUuid(canonicalId) ?: return null
+        val label = dao.transactionViewsByUuid(listOf(canonicalId)).firstOrNull()?.let { it.summary().label }
+            ?: transaction.notes.ifBlank { "${transaction.amount} ${transaction.currency}" }
+        return SinceWhenSourceDescriptor(
+            entityType = "$moduleId/$entityKind",
+            entityId = transaction.uuid,
+            defaultCounterTitle = label,
+            timestampSources = buildList {
+                add(SinceWhenTimestampSource("transaction_date", context.getString(com.gernalix.personalhub.soldi.R.string.since_when_transaction_date), transaction.occurredAt, true))
+                if (transaction.createdAt > 0L) add(SinceWhenTimestampSource("added_at", context.getString(com.gernalix.personalhub.soldi.R.string.since_when_added_to_ph), transaction.createdAt))
+            },
+        )
+    }
+
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val cursor = decodeFinanceCursor(query.cursor)
         val args = mutableListOf<Any?>(query.fromMs, query.toMs)

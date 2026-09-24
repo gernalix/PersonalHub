@@ -71,8 +71,6 @@ import com.example.multitimetracker.capsules.system.ui.AppRootSystemPrefs
 import com.example.multitimetracker.capsules.system.ui.DevToolsDialog
 import com.example.multitimetracker.capsules.system.ui.DevToolsRuntimeState
 import com.example.multitimetracker.capsules.system.ui.buildSessionDiagnosticsReport
-import com.example.multitimetracker.capsules.sincewhen.ui.LifePeriodsScreen
-import com.example.multitimetracker.capsules.sincewhen.state.SinceWhenUiState
 import com.example.multitimetracker.capsules.tags.ui.TagsScreen
 import com.example.multitimetracker.capsules.tags.state.TagsUiState
 import com.example.multitimetracker.capsules.now.ui.NowScreen
@@ -106,13 +104,12 @@ import com.example.multitimetracker.ui.components.AppSettingsDialog
 import com.example.multitimetracker.ui.components.AlertPopupHost
 import com.example.multitimetracker.ui.components.LocalOpenAppMenu
 
-private enum class Tab { NOW, QUICK_EVENTS, TAGS, TIMELINE, DA_QUANDO, ALERT, CHAINS }
+private enum class Tab { NOW, QUICK_EVENTS, TAGS, TIMELINE, ALERT, CHAINS }
 private enum class DrawerDestination {
     NOW,
     QUICK_EVENTS,
     TAGS,
     TIMELINE,
-    SINCE_WHEN,
     ALERTS,
     CHAINS,
     STATISTICS,
@@ -138,12 +135,13 @@ fun AppRoot(
     onHubSessionDismiss: () -> Unit = {},
     pendingQuickEventTarget: QuickEventTarget? = null,
     onPendingQuickEventTargetConsumed: () -> Unit = {},
+    hubQuickEventEntryId: Long? = null,
+    onHubQuickEventEntryDismiss: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val view = LocalView.current
     val state by vm.state.collectAsState()
     val tagsState by vm.tagsCapsule.uiState.collectAsState()
-    val sinceWhenState by vm.sinceWhenCapsule.uiState.collectAsState()
     val alertsState by vm.alertsCapsule.uiState.collectAsState()
 
     val showSeconds = rememberSaveable { mutableStateOf(AppRootSystemPrefs.getShowSeconds(context)) }
@@ -160,7 +158,6 @@ fun AppRoot(
     VarTabScaffold(
         state = state,
         tagsState = tagsState,
-        sinceWhenState = sinceWhenState,
         alertsState = alertsState,
         vm = vm,
         showSeconds = showSeconds.value,
@@ -183,6 +180,8 @@ fun AppRoot(
         },
         pendingQuickEventTarget = pendingQuickEventTarget,
         onPendingQuickEventTargetConsumed = onPendingQuickEventTargetConsumed,
+        hubQuickEventEntryId = hubQuickEventEntryId,
+        onHubQuickEventEntryDismiss = onHubQuickEventEntryDismiss,
     )
     val hubSession by produceState<com.example.multitimetracker.model.SessionUi?>(null, hubSessionId) {
         value = hubSessionId?.let { id -> withContext(Dispatchers.IO) { DefaultSessionCore(context).readSessionById(id) } }
@@ -211,7 +210,6 @@ fun AppRoot(
 private fun VarTabScaffold(
     state: UiState,
     tagsState: TagsUiState,
-    sinceWhenState: SinceWhenUiState,
     alertsState: AlertsUiState,
     vm: MainViewModel,
     showSeconds: Boolean,
@@ -222,6 +220,8 @@ private fun VarTabScaffold(
     onKeepScreenOnChange: (Boolean) -> Unit,
     pendingQuickEventTarget: QuickEventTarget?,
     onPendingQuickEventTargetConsumed: () -> Unit,
+    hubQuickEventEntryId: Long?,
+    onHubQuickEventEntryDismiss: () -> Unit,
 ) {
     val tabState = remember { mutableStateOf(Tab.NOW) }
     var showSettings by remember { mutableStateOf(false) }
@@ -238,6 +238,9 @@ private fun VarTabScaffold(
     val tab = tabState.value
     LaunchedEffect(pendingQuickEventTarget) {
         if (pendingQuickEventTarget != null) tabState.value = Tab.QUICK_EVENTS
+    }
+    LaunchedEffect(hubQuickEventEntryId) {
+        if (hubQuickEventEntryId != null) tabState.value = Tab.QUICK_EVENTS
     }
     val isCloneBenchmark = remember { BuildConfig.APPLICATION_ID.endsWith(".devicetest") }
     val pendingTrace = remember { mutableStateOf<String?>(null) }
@@ -511,7 +514,6 @@ if (developerSurfaceEnabled && showDevReport) {
                 DrawerItemSpec(DrawerDestination.TIMELINE, R.string.chronology, Icons.Filled.History)
             ),
             listOf(
-                DrawerItemSpec(DrawerDestination.SINCE_WHEN, R.string.tab_da_quando, Icons.Filled.QueryBuilder),
                 DrawerItemSpec(DrawerDestination.ALERTS, R.string.alert, Icons.Filled.Notifications),
                 DrawerItemSpec(DrawerDestination.CHAINS, R.string.catene, Icons.Filled.Link)
             ),
@@ -529,7 +531,6 @@ if (developerSurfaceEnabled && showDevReport) {
             DrawerDestination.QUICK_EVENTS -> tab == Tab.QUICK_EVENTS
             DrawerDestination.TAGS -> tab == Tab.TAGS
             DrawerDestination.TIMELINE -> tab == Tab.TIMELINE
-            DrawerDestination.SINCE_WHEN -> tab == Tab.DA_QUANDO
             DrawerDestination.ALERTS -> tab == Tab.ALERT
             DrawerDestination.CHAINS -> tab == Tab.CHAINS
             else -> false
@@ -550,7 +551,6 @@ if (developerSurfaceEnabled && showDevReport) {
                 beginTabTrace(Tab.TIMELINE)
                 tabState.value = Tab.TIMELINE
             }
-            DrawerDestination.SINCE_WHEN -> tabState.value = Tab.DA_QUANDO
             DrawerDestination.ALERTS -> tabState.value = Tab.ALERT
             DrawerDestination.CHAINS -> tabState.value = Tab.CHAINS
             DrawerDestination.STATISTICS -> showStatistics = true
@@ -719,11 +719,12 @@ if (developerSurfaceEnabled && showDevReport) {
                                 focusTagIdState.value = tagId
                                 tabState.value = Tab.TAGS
                             },
-                            onAddLifePeriod = vm.sinceWhenCapsule::addLifePeriod,
                             showSeconds = showSeconds,
                             hideHoursIfZero = hideHoursIfZero,
                             pendingWidgetTarget = pendingQuickEventTarget,
                             onPendingWidgetTargetConsumed = onPendingQuickEventTargetConsumed,
+                            initialOpenedEntryId = hubQuickEventEntryId,
+                            onConsumedInitialOpenedEntryId = onHubQuickEventEntryDismiss,
                         )
                     }
                     Tab.TAGS -> stateHolder.SaveableStateProvider("tags") {
@@ -743,16 +744,6 @@ if (developerSurfaceEnabled && showDevReport) {
                             showSeconds = showSeconds,
                             hideHoursIfZero = hideHoursIfZero,
                             modifier = Modifier.padding(inner)
-                        )
-                    }
-                    Tab.DA_QUANDO -> stateHolder.SaveableStateProvider("da_quando") {
-                        LifePeriodsScreen(
-                            modifier = Modifier.padding(inner),
-                            state = sinceWhenState,
-                            onAddPeriod = vm.sinceWhenCapsule::addLifePeriod,
-                            onUpdatePeriod = vm.sinceWhenCapsule::updateLifePeriod,
-                            onDeletePeriod = vm.sinceWhenCapsule::deleteLifePeriod,
-                            onEndSelectedNow = vm.sinceWhenCapsule::endSelectedNow,
                         )
                     }
                     Tab.ALERT -> stateHolder.SaveableStateProvider("alert") {

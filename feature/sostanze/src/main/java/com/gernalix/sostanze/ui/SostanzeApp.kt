@@ -6,6 +6,7 @@
 package com.gernalix.sostanze.ui
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -94,6 +95,12 @@ import com.gernalix.sostanze.domain.SostanzeEngine
 import com.gernalix.sostanze.domain.SubstancePlan
 import com.gernalix.sostanze.notifications.SostanzeRandomAlertStore
 import com.gernalix.sostanze.notifications.SostanzeRandomAlertWindow
+import com.gernalix.sostanze.hub.SubstanceHubAdapter
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
+import com.gernalix.personalhub.contracts.database.SinceWhenSourceDescriptor
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
+import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
+import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -113,6 +120,15 @@ private enum class AppTab {
 fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var sinceWhenSources by remember { mutableStateOf<Map<Long, SinceWhenSourceDescriptor>>(emptyMap()) }
+    LaunchedEffect(context, state.substances.map { it.id }) {
+        val adapter = SubstanceHubAdapter(context.applicationContext)
+        sinceWhenSources = state.substances.mapNotNull { substance ->
+            adapter.sinceWhenSource(substance.id.toString())
+                ?.takeIf { it.timestampSources.isNotEmpty() }
+                ?.let { substance.id to it }
+        }.toMap()
+    }
     LaunchedEffect(Unit) {
         withFrameNanos { }
         viewModel.loadSecondaryState()
@@ -258,6 +274,12 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                     onStock = { stockDialog = it },
                     onHistory = { historySubstanceId = it.id },
                     onRandomAlerts = { randomAlertDialog = it },
+                    sinceWhenSources = sinceWhenSources,
+                    onCreateSinceWhen = { id ->
+                        sinceWhenSources[id]?.let { source ->
+                            context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                        }
+                    },
                 )
                 AppTab.History -> HistoryScreen(
                     rows = state.history.filter { it.substanceName.contains(historyQuery, true) },
@@ -300,15 +322,22 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
             initialTags = state.tagsBySubstance[draft.id].orEmpty().joinToString(", ") { it.name },
             onDismiss = { editingSubstance = null },
             onDelete = if (draft.id == 0L) null else ({ deleteSubstance = draft }),
-            onSave = { substance, tags ->
+            onSave = { substance, tags, createSinceWhen, selectedSourceId, onFinished ->
                 viewModel.saveSubstance(substance, tags) { outcome ->
                     scope.launch {
                         when (outcome) {
-                            is SubstanceSaveOutcome.Saved -> editingSubstance = null
+                            is SubstanceSaveOutcome.Saved -> {
+                                if (createSinceWhen) {
+                                    SubstanceHubAdapter(context).sinceWhenSource(outcome.id.toString())
+                                        ?.let { context.launchSinceWhenCreate(it, selectedSourceId) }
+                                }
+                                editingSubstance = null
+                            }
                             is SubstanceSaveOutcome.Duplicate -> snackbarHostState.showSnackbar(duplicateNameMessage)
                             is SubstanceSaveOutcome.RestoreRequired -> snackbarHostState.showSnackbar(restoreNameMessage)
                             is SubstanceSaveOutcome.Invalid -> snackbarHostState.showSnackbar(duplicateNameMessage)
                         }
+                        onFinished()
                     }
                 }
             }
@@ -424,6 +453,8 @@ private fun HomeScreen(
     onStock: (SubstanceEntity) -> Unit,
     onHistory: (SubstanceEntity) -> Unit,
     onRandomAlerts: (SubstanceEntity) -> Unit,
+    sinceWhenSources: Map<Long, SinceWhenSourceDescriptor>,
+    onCreateSinceWhen: (Long) -> Unit,
 ) {
     val sections = listOf(
         DoseSection.DUE_TODAY to stringResource(R.string.section_due_today),
@@ -476,6 +507,9 @@ private fun HomeScreen(
                         onStock = { onStock(entity) },
                         onHistory = { onHistory(entity) },
                         onRandomAlerts = { onRandomAlerts(entity) },
+                        onCreateSinceWhen = if (state.substance.id in sinceWhenSources) {
+                            { onCreateSinceWhen(state.substance.id) }
+                        } else null,
                     )
                 }
             }
@@ -514,6 +548,7 @@ private fun DoseActionButton(
     onStock: () -> Unit,
     onHistory: () -> Unit,
     onRandomAlerts: () -> Unit,
+    onCreateSinceWhen: (() -> Unit)?,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var pulse by remember { mutableStateOf(false) }
@@ -574,6 +609,12 @@ private fun DoseActionButton(
                         DropdownMenuItem(text = { Text(stringResource(R.string.history)) }, onClick = { menuOpen = false; onHistory() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.random_alerts_enabled)) }, onClick = { menuOpen = false; onRandomAlerts() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.undo_last_tap)) }, onClick = { menuOpen = false; onUndo() })
+                        if (onCreateSinceWhen != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.since_when_create_counter)) },
+                                onClick = { menuOpen = false; onCreateSinceWhen() },
+                            )
+                        }
                     }
                 }
             }
@@ -879,7 +920,13 @@ private fun SectionTitle(title: String, trailing: (@Composable () -> Unit)? = nu
 }
 
 @Composable
-private fun SubstanceDialog(initial: SubstanceEntity, initialTags: String, onDismiss: () -> Unit, onDelete: (() -> Unit)?, onSave: (SubstanceEntity, String) -> Unit) {
+private fun SubstanceDialog(
+    initial: SubstanceEntity,
+    initialTags: String,
+    onDismiss: () -> Unit,
+    onDelete: (() -> Unit)?,
+    onSave: (SubstanceEntity, String, Boolean, String?, () -> Unit) -> Unit,
+) {
     var name by remember(initial) { mutableStateOf(initial.name) }
     var type by remember(initial) { mutableStateOf(initial.type) }
     var stock by remember(initial) { mutableStateOf(initial.stockCurrent.clean()) }
@@ -888,6 +935,9 @@ private fun SubstanceDialog(initial: SubstanceEntity, initialTags: String, onDis
     var prn by remember(initial) { mutableStateOf(initial.prn) }
     var forever by remember(initial) { mutableStateOf(initial.forever) }
     var tags by remember(initial, initialTags) { mutableStateOf(initialTags) }
+    val addedAt = remember(initial.id) { System.currentTimeMillis() }
+    var createSinceWhen by remember(initial.id) { mutableStateOf(false) }
+    var saving by remember(initial.id) { mutableStateOf(false) }
     AlertDialog(
         modifier = Modifier.semantics { if (initial.id != 0L) contentDescription = "hub-detail-substances/substance/${initial.id}" },
         onDismissRequest = onDismiss,
@@ -922,10 +972,26 @@ private fun SubstanceDialog(initial: SubstanceEntity, initialTags: String, onDis
                     Text(stringResource(R.string.forever))
                     Switch(forever, { forever = it })
                 }
+                if (initial.id == 0L) {
+                    SinceWhenCreationControl(
+                        timestampSources = listOf(SinceWhenTimestampSource(
+                            "added_at",
+                            stringResource(R.string.since_when_added_to_ph),
+                            addedAt,
+                            true,
+                        )),
+                        enabled = createSinceWhen,
+                        selectedSourceId = "added_at",
+                        saving = saving,
+                        onEnabledChange = { createSinceWhen = it },
+                        onSourceSelected = {},
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(enabled = name.trim().isNotBlank(), onClick = {
+            Button(enabled = name.trim().isNotBlank() && !saving, onClick = {
+                saving = true
                 onSave(
                     initial.copy(
                         name = name.trim(),
@@ -939,6 +1005,9 @@ private fun SubstanceDialog(initial: SubstanceEntity, initialTags: String, onDis
                         forever = forever,
                     ),
                     tags,
+                    createSinceWhen,
+                    "added_at",
+                    { saving = false },
                 )
             }) { Text(stringResource(R.string.save)) }
         },

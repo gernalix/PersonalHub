@@ -1,0 +1,5 @@
+<resources>
+    <string name="since_when_create_counter">Create “Since when” counter</string>
+    <string name="since_when_start_from">Start from</string>
+    <string name="since_when_starts_from">Starts from: %1$s</string>
+</resources>

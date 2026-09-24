@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -16,6 +17,7 @@ import com.gernalix.personalhub.core.database.capsules.soldi.*
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
 import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.HubFacetPickerDialog
 import com.gernalix.personalhub.core.hubcontext.HubFacetChips
@@ -23,6 +25,7 @@ import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 import com.gernalix.personalhub.core.ui.photo.rememberHubPhotoPicker
 import com.gernalix.personalhub.core.ui.photo.HubSquarePhotoThumbnail
 import com.gernalix.personalhub.core.ui.photo.HubPhoto
+import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
 import com.gernalix.personalhub.soldi.receipt.ReceiptOcrProcessor
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -41,7 +44,8 @@ internal fun TransactionEditorV2(
     onSwitchToTransfer: () -> Unit,
     onRequestNotifications: () -> Unit,
     onDeleteAttachment: (FinanceAttachment) -> Unit,
-    onSave: (TransactionDraft, RecurrenceDraft?, List<AttachmentDraft>, Boolean) -> Unit,
+    saving: Boolean,
+    onSave: (TransactionDraft, RecurrenceDraft?, List<AttachmentDraft>, Boolean, Boolean, String?) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -54,6 +58,9 @@ internal fun TransactionEditorV2(
     var recurrenceReminderDays by remember(draftKey) { mutableStateOf<Int?>(null) }
     var facetPickerOpen by remember(draftKey) { mutableStateOf(false) }
     var selectedFacets by remember(draftKey) { mutableStateOf<List<HubEntitySummary>>(emptyList()) }
+    val addedAt = remember(draftKey) { System.currentTimeMillis() }
+    var createSinceWhen by remember(draftKey) { mutableStateOf(false) }
+    var sinceWhenSourceId by remember(draftKey) { mutableStateOf("transaction_date") }
 
     LaunchedEffect(draftKey) {
         val refs = buildSet {
@@ -133,6 +140,21 @@ internal fun TransactionEditorV2(
                 }
             }
             item { DateTimeButton("Data", state.draft.occurredAt) { onChange(state.copy(draft = state.draft.copy(occurredAt = it))) } }
+            if (state.draft.id == null) {
+                item {
+                    SinceWhenCreationControl(
+                        timestampSources = listOf(
+                            SinceWhenTimestampSource("transaction_date", stringResource(R.string.since_when_transaction_date), Instant.parse(state.draft.occurredAt).toEpochMilli(), true),
+                            SinceWhenTimestampSource("added_at", stringResource(R.string.since_when_added_to_ph), addedAt),
+                        ),
+                        enabled = createSinceWhen,
+                        selectedSourceId = sinceWhenSourceId,
+                        saving = saving,
+                        onEnabledChange = { createSinceWhen = it },
+                        onSourceSelected = { sinceWhenSourceId = it },
+                    )
+                }
+            }
             item { AccountField(accounts, state.draft.accountId) { account -> onChange(state.copy(draft = state.draft.copy(accountId = account.id, currency = account.currency))) } }
             item { CategoryTagPicker(state.draft.category) { onChange(state.copy(draft = state.draft.copy(category = it))) } }
             item {
@@ -218,8 +240,8 @@ internal fun TransactionEditorV2(
         }
 
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(enabled = valid, onClick = { onSave(state.draft, recurrenceDraft(), pendingAttachments, true) }, modifier = Modifier.weight(1f)) { Text("Salva e nuova") }
-            Button(enabled = valid, onClick = { onSave(state.draft, recurrenceDraft(), pendingAttachments, false) }, modifier = Modifier.weight(1f)) { Text("Salva") }
+            OutlinedButton(enabled = valid && !saving, onClick = { onSave(state.draft, recurrenceDraft(), pendingAttachments, true, createSinceWhen, sinceWhenSourceId) }, modifier = Modifier.weight(1f)) { Text("Salva e nuova") }
+            Button(enabled = valid && !saving, onClick = { onSave(state.draft, recurrenceDraft(), pendingAttachments, false, createSinceWhen, sinceWhenSourceId) }, modifier = Modifier.weight(1f)) { Text("Salva") }
         }
     }
 

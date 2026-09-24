@@ -2,6 +2,7 @@
 // v389
 package com.example.multitimetracker.capsules.timeline.ui
 
+import android.content.Intent
 import com.example.multitimetracker.ui.components.SessionEditDialog
 import com.example.multitimetracker.ui.util.TagSelectionOrder
 import com.example.multitimetracker.ui.components.InlineHelpAction
@@ -87,6 +88,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import com.example.multitimetracker.persistence.UiPrefsStore
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
+import com.gernalix.personalhub.contracts.database.SinceWhenSourceDescriptor
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
 import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.heightIn
@@ -805,6 +809,9 @@ private fun SessionRow(
     onClick: () -> Unit
 ) {
     val start = Instant.ofEpochMilli(session.startTs).atZone(zone).toLocalTime()
+    val context = LocalContext.current
+    val sinceWhenSessionStarted = stringResource(R.string.since_when_session_started)
+    var sinceWhenMenuOpen by rememberSaveable(session.id) { mutableStateOf(false) }
     val end = Instant.ofEpochMilli(session.endTs).atZone(zone).toLocalTime()
     val durMs = (session.endTs - session.startTs).coerceAtLeast(0L)
 
@@ -1005,6 +1012,31 @@ private fun SessionRow(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+        }
+        Box {
+            IconButton(onClick = { sinceWhenMenuOpen = true }) {
+                Text("⋮", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            DropdownMenu(expanded = sinceWhenMenuOpen, onDismissRequest = { sinceWhenMenuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.since_when_create_counter)) },
+                    onClick = {
+                        sinceWhenMenuOpen = false
+                        val source = SinceWhenSourceDescriptor(
+                            entityType = "timer/session",
+                            entityId = session.id.toString(),
+                            defaultCounterTitle = resolvedTitle,
+                            timestampSources = listOf(SinceWhenTimestampSource(
+                                "session_started",
+                                sinceWhenSessionStarted,
+                                session.startTs,
+                                true,
+                            )),
+                        )
+                        context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                    },
+                )
             }
         }
         }

@@ -1,0 +1,5 @@
+<resources>
+    <string name="since_when_event_date">Event date</string>
+    <string name="since_when_session_started">Session started</string>
+    <string name="since_when_create_counter">Create Since when counter</string>
+</resources>

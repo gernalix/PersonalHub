@@ -40,14 +40,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
 import com.gernalix.personalhub.contracts.database.HubTagAlias
 import com.gernalix.personalhub.contracts.database.HubTagEntity
 import com.gernalix.personalhub.contracts.database.HubTagKinds
 import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
+import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
+import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -145,6 +150,12 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
                     Text("${selected.namespace} · ${selected.usageCount} uses")
                     selected.description?.let { Text(it) }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                val source = HubContextRuntime.adapter("tags", "tag").sinceWhenSource(selected.id) ?: return@launch
+                                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                            }
+                        }) { Text(stringResource(R.string.since_when_create_counter_action)) }
                         Button(onClick = { scope.launch { HubContextRuntime.tags().pin(selected.id, !selected.pinned); reload() } }) { Text(if (selected.pinned) "Unpin" else "Pin") }
                         OutlinedButton(onClick = { scope.launch { HubContextRuntime.tags().archive(selected.id, !selected.archived); reload() } }) { Text(if (selected.archived) "Unarchive" else "Archive") }
                         OutlinedButton(onClick = { renameDraft = selected.name }) { Text("Rename") }
@@ -201,7 +212,24 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
         }
     }
     createDraft?.let { draft ->
-        TextInputDialog("Create tag in ${namespace ?: HubTagNamespaces.GLOBAL}", draft, { createDraft = it }, onDismiss = { createDraft = null }) {
+        val tagCreatedAt = remember { System.currentTimeMillis() }
+        var createSinceWhen by remember { mutableStateOf(false) }
+        TextInputDialog(
+            "Create tag in ${namespace ?: HubTagNamespaces.GLOBAL}",
+            draft,
+            { createDraft = it },
+            onDismiss = { createDraft = null },
+            extraContent = {
+                SinceWhenCreationControl(
+                    timestampSources = listOf(SinceWhenTimestampSource("tag_created", stringResource(R.string.since_when_tag_created), tagCreatedAt, true)),
+                    enabled = createSinceWhen,
+                    selectedSourceId = "tag_created",
+                    saving = false,
+                    onEnabledChange = { createSinceWhen = it },
+                    onSourceSelected = {},
+                )
+            },
+        ) {
             scope.launch {
                 val targetNamespace = namespace ?: HubTagNamespaces.GLOBAL
                 val outcome = HubContextRuntime.tags().create(
@@ -211,7 +239,15 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
                 )
                 val created = outcome.tag
                 when {
-                    created != null -> { selectedId = created.id; createDraft = null; reload() }
+                    created != null -> {
+                        if (createSinceWhen) {
+                            HubContextRuntime.adapter("tags", "tag").sinceWhenSource(created.id)
+                                ?.let { context.launchSinceWhenCreate(it, "tag_created") }
+                        }
+                        selectedId = created.id
+                        createDraft = null
+                        reload()
+                    }
                     outcome.exactDuplicate != null -> message = "Tag already exists"
                     outcome.nearDuplicates.isNotEmpty() -> message = "Possible duplicate: ${outcome.nearDuplicates.joinToString { it.name }}"
                 }
@@ -235,11 +271,23 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
 }
 
 @Composable
-private fun TextInputDialog(title: String, value: String, onValue: (String) -> Unit, onDismiss: () -> Unit, onSave: () -> Unit) {
+private fun TextInputDialog(
+    title: String,
+    value: String,
+    onValue: (String) -> Unit,
+    onDismiss: () -> Unit,
+    extraContent: (@Composable () -> Unit)? = null,
+    onSave: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { OutlinedTextField(value, onValue) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value, onValue)
+                extraContent?.invoke()
+            }
+        },
         confirmButton = { TextButton(onClick = onSave, enabled = value.isNotBlank()) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

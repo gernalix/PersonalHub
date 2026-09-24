@@ -73,7 +73,11 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
 import com.gernalix.personalhub.core.hubcontext.HubContextLinks
+import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
+import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
+import com.example.multitimetracker.hub.TimerSessionHubAdapter
 
 private enum class SessionTimePickTarget {
     START,
@@ -126,6 +130,7 @@ fun SessionEditDialog(
     var isSavingMeta by remember { mutableStateOf(false) }
     var isSavingTimes by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
+    var createSinceWhen by remember(session.id, isNewSession) { mutableStateOf(false) }
     val saveScope = rememberCoroutineScope()
     var name by remember { mutableStateOf(session.title) }
 
@@ -233,7 +238,17 @@ fun SessionEditDialog(
                             dismissKeyboard()
                             saveScope.launch {
                                 if (isNewSession) {
-                                    onCreateNewSession(name, session.startMs, selectedEffective) { onDismiss() }
+                                    onCreateNewSession(name, session.startMs, selectedEffective) { created ->
+                                        if (createSinceWhen) {
+                                            saveScope.launch {
+                                                TimerSessionHubAdapter(context).sinceWhenSource(created.id.toString())
+                                                    ?.let { context.launchSinceWhenCreate(it, "session_started") }
+                                                onDismiss()
+                                            }
+                                        } else {
+                                            onDismiss()
+                                        }
+                                    }
                                 } else {
                                     saveSessionMetadataOnly(session.id, name, selectedEffective, onSaveMeta)
                                     onDismiss()
@@ -304,6 +319,24 @@ fun SessionEditDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    if (isNewSession) {
+                        SinceWhenCreationControl(
+                            timestampSources = listOf(
+                                SinceWhenTimestampSource(
+                                    "session_started",
+                                    stringResource(R.string.since_when_session_started),
+                                    session.startMs,
+                                    true,
+                                ),
+                            ),
+                            enabled = createSinceWhen,
+                            selectedSourceId = "session_started",
+                            saving = isSavingMeta || readOnly,
+                            onEnabledChange = { createSinceWhen = it },
+                            onSourceSelected = {},
+                        )
+                    }
 
                     if (!isNewSession) HubContextLinks(HubEntityRef("timer", "session", session.id.toString()))
 

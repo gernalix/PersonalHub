@@ -33,6 +33,7 @@ dependencies {
     implementation(project(":contracts:database"))
     implementation(project(":core:database"))
     implementation(project(":core:hub-context"))
+    implementation(project(":core:ui"))
     implementation(project(":core:alerts"))
     implementation(project(":core:ui"))
     implementation(platform(libs.androidx.compose.bom))

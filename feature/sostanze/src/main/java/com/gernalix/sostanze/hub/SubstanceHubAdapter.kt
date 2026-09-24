@@ -15,6 +15,7 @@ class SubstanceHubAdapter(private val context: Context) : HubEntityAdapter {
     override val entityKind = "substance"
     override val capabilities = setOf("substance", "health")
     private val dao get() = PersonalHubDatabase.get(context).dao()
+    private val database get() = PersonalHubDatabase.get(context)
 
     override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let { dao.substanceById(it) } != null
     override suspend fun lifecycle(canonicalId: String) = when (canonicalId.toLongOrNull()?.let { dao.substanceById(it) }?.archived) {
@@ -26,6 +27,19 @@ class SubstanceHubAdapter(private val context: Context) : HubEntityAdapter {
         dao.substancesByIds(canonicalIds.mapNotNull(String::toLongOrNull)).associate { it.id.toString() to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchSubstances(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("substances", "substanceId" to canonicalId).toString(), "com.gernalix.sostanze.MainActivity")
+
+    override suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? {
+        val substanceId = canonicalId.toLongOrNull() ?: return null
+        val substance = dao.substanceById(substanceId) ?: return null
+        val createdAt = database.openHelper.readableDatabase.query(
+            SimpleSQLiteQuery(
+                "SELECT min(occurred_at) FROM hub_activity_log WHERE module_id = 'substances' AND entity_kind = 'substance' AND entity_id = ? AND action = 'substance_created'",
+                arrayOf(canonicalId),
+            ),
+        ).use { cursor -> if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null }
+        val sources = createdAt?.let { listOf(SinceWhenTimestampSource("added_at", context.getString(com.gernalix.sostanze.R.string.since_when_added_to_ph), it, true)) }.orEmpty()
+        return SinceWhenSourceDescriptor("$moduleId/$entityKind", canonicalId, substance.name, sources)
+    }
 
     private fun SubstanceEntity.summary() = HubEntitySummary(
         HubEntityRef(moduleId, entityKind, id.toString()), name,

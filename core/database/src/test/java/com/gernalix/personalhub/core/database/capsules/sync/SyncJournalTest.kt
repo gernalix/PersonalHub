@@ -24,7 +24,9 @@ class SyncJournalTest {
             // Fixture values need not form a domain graph. This isolated DB is never uploaded.
             db.execSQL("PRAGMA foreign_keys=OFF")
             val tables = SyncJournal.tables(db)
-            assertEquals(86, tables.size)
+            assertEquals(87, tables.size)
+            assertTrue("Since When counters must be included in the shared sync journal", "since_when_counters" in tables)
+            assertFalse("One-time migration markers must remain local", "since_when_migration_state" in tables)
             for (table in tables) {
                 db.execSQL("DELETE FROM `$table`")
                 db.execSQL("DELETE FROM hub_sync_pending")

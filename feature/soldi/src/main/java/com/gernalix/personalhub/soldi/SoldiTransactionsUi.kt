@@ -67,6 +67,7 @@ internal fun TransactionsScreenV2(
     onNewExpense: () -> Unit,
     onNewIncome: () -> Unit,
     onNewTransfer: () -> Unit,
+    onCreateSinceWhen: (TransactionView) -> Unit = {},
 ) {
     val logicalEntries = remember(month, rows, transfers, macros, options.hideFuture) {
         buildLedgerEntries(month, rows, transfers, macros, options.hideFuture)
@@ -100,6 +101,7 @@ internal fun TransactionsScreenV2(
                             expanded = expanded,
                             onEdit = onEdit,
                             onEditTransfer = onEditTransfer,
+                            onCreateSinceWhen = onCreateSinceWhen,
                         )
                     }
                 }
@@ -117,6 +119,7 @@ internal fun TransactionsScreenV2(
                             expanded = expanded,
                             onEdit = onEdit,
                             onEditTransfer = onEditTransfer,
+                            onCreateSinceWhen = onCreateSinceWhen,
                         )
                     }
                 }
@@ -192,6 +195,7 @@ private fun DayGroupCardV2(
     expanded: MutableMap<String, Boolean>,
     onEdit: (TransactionView) -> Unit,
     onEditTransfer: (FinanceTransfer, TransactionView, TransactionView) -> Unit,
+    onCreateSinceWhen: (TransactionView) -> Unit,
 ) {
     val rawDayRows = allRows.filter { localDate(it.value.occurredAt) == date }
     val dayTotals = rawDayRows.groupBy { it.value.currency }.mapValues { (_, list) ->
@@ -233,7 +237,7 @@ private fun DayGroupCardV2(
             }
             HorizontalDivider()
             entries.forEach { entry ->
-                LedgerEntryContent(entry, accountMap, tagsByTransaction, photoByTransaction, expanded, onEdit, onEditTransfer)
+                LedgerEntryContent(entry, accountMap, tagsByTransaction, photoByTransaction, expanded, onEdit, onEditTransfer, onCreateSinceWhen)
             }
         }
     }
@@ -248,6 +252,7 @@ private fun LedgerEntryContent(
     expanded: MutableMap<String, Boolean>,
     onEdit: (TransactionView) -> Unit,
     onEditTransfer: (FinanceTransfer, TransactionView, TransactionView) -> Unit,
+    onCreateSinceWhen: (TransactionView) -> Unit,
 ) {
     when (entry) {
         is RowEntry -> {
@@ -267,6 +272,7 @@ private fun LedgerEntryContent(
                 leading = if (BigDecimal(row.value.amount).signum() < 0) "−" else "+",
                 photo = photoByTransaction[row.value.id],
                 onClick = { onEdit(row) },
+                onCreateSinceWhen = { onCreateSinceWhen(row) },
             )
         }
         is TransferEntry -> {
@@ -321,6 +327,7 @@ private fun LedgerEntryContent(
                             if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Text(money(BigDecimal(child.value.amount), child.value.currency), color = amountColor(BigDecimal(child.value.amount)), fontSize = 12.sp)
+                        TransactionSinceWhenMenu { onCreateSinceWhen(child) }
                     }
                 }
             }
@@ -338,6 +345,7 @@ private fun TransactionLineV2(
     neutralAmount: Boolean = false,
     photo: FinanceAttachment? = null,
     onClick: () -> Unit,
+    onCreateSinceWhen: (() -> Unit)? = null,
 ) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
@@ -363,5 +371,23 @@ private fun TransactionLineV2(
             fontWeight = FontWeight.SemiBold,
             fontSize = 12.sp,
         )
+        if (onCreateSinceWhen != null) TransactionSinceWhenMenu(onCreateSinceWhen)
+    }
+}
+
+@Composable
+private fun TransactionSinceWhenMenu(onCreate: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }) { Text("⋮") }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(androidx.compose.ui.res.stringResource(R.string.since_when_create_counter)) },
+                onClick = {
+                    expanded = false
+                    onCreate()
+                },
+            )
+        }
     }
 }

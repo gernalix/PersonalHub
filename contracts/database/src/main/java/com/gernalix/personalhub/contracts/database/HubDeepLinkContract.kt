@@ -16,6 +16,9 @@ object HubDeepLinkContract {
     private const val EVENT = "event"
     private const val SEARCH = "search"
     private const val MODULE = "module"
+    private const val SINCE_WHEN = "since_when"
+    private const val CREATE = "create"
+    private const val PARAM_SOURCE = "source"
     private const val PARAM_ACTION = "action"
     private const val PARAM_FROM = "from"
     private const val PARAM_TO = "to"
@@ -30,6 +33,7 @@ object HubDeepLinkContract {
 
     data class ContextTarget(val contextId: String) : Target
     data class EventTarget(val eventId: String) : Target
+    data class SinceWhenCreateTarget(val source: SinceWhenSourceDescriptor, val startEnabled: Boolean = false) : Target
     data class SearchTarget(
         val fromIso: String?,
         val toIso: String?,
@@ -68,6 +72,25 @@ object HubDeepLinkContract {
 
     fun contextUri(contextId: String): Uri = simpleUri(CONTEXT, contextId)
     fun eventUri(eventId: String): Uri = simpleUri(EVENT, eventId)
+
+    fun sinceWhenCreateUri(source: SinceWhenSourceDescriptor, startEnabled: Boolean = false): Uri {
+        val timestamps = org.json.JSONArray().apply {
+            source.timestampSources.forEach { timestamp ->
+                put(org.json.JSONObject().put("id", timestamp.id).put("label", timestamp.label)
+                    .put("timestamp", timestamp.timestamp).put("default", timestamp.isDefault))
+            }
+        }
+        val payload = org.json.JSONObject()
+            .put("type", source.entityType)
+            .put("id", source.entityId)
+            .put("title", source.defaultCounterTitle)
+            .put("timestamps", timestamps)
+            .toString()
+        return Uri.Builder().scheme(SCHEME).authority(SINCE_WHEN).appendPath(VERSION).appendPath(CREATE)
+            .appendQueryParameter(PARAM_SOURCE, payload)
+            .apply { if (startEnabled) appendQueryParameter("enabled", "true") }
+            .build()
+    }
 
     /**
      * Stable compatibility URI for feature-module launchers/shortcuts/widgets.
@@ -151,6 +174,7 @@ object HubDeepLinkContract {
             ENTITY -> parseEntity(uri, segments)
             CONTEXT -> parseSimple(segments, ParseError.MALFORMED) { ContextTarget(it) }
             EVENT -> parseSimple(segments, ParseError.MALFORMED) { EventTarget(it) }
+            SINCE_WHEN -> parseSinceWhenCreate(uri, segments)
             SEARCH -> parseSearch(uri, segments)
             else -> ParseResult(error = ParseError.UNKNOWN_ENDPOINT)
         }
@@ -182,6 +206,36 @@ object HubDeepLinkContract {
             .filter { it.isNotEmpty() }
             .distinct()
         return ParseResult(target = SearchTarget(from, to, modules))
+    }
+
+    private fun parseSinceWhenCreate(uri: Uri, segments: List<String>): ParseResult {
+        if (segments != listOf(VERSION, CREATE)) return ParseResult(error = ParseError.MALFORMED)
+        val values = uri.getQueryParameters(PARAM_SOURCE)
+        if (values.size != 1) return ParseResult(error = ParseError.MALFORMED)
+        val enabledValues = uri.getQueryParameters("enabled")
+        if (enabledValues.size > 1 || enabledValues.any { it != "true" && it != "false" }) return ParseResult(error = ParseError.MALFORMED)
+        return runCatching {
+            val payload = org.json.JSONObject(values.single())
+            val sources = payload.getJSONArray("timestamps")
+            val timestamps = List(sources.length()) { index ->
+                val item = sources.getJSONObject(index)
+                SinceWhenTimestampSource(
+                    id = item.getString("id"),
+                    label = item.getString("label"),
+                    timestamp = item.getLong("timestamp"),
+                    isDefault = item.optBoolean("default"),
+                )
+            }
+            SinceWhenCreateTarget(
+                SinceWhenSourceDescriptor(
+                    entityType = payload.getString("type"),
+                    entityId = payload.getString("id"),
+                    defaultCounterTitle = payload.getString("title"),
+                    timestampSources = timestamps,
+                ),
+                startEnabled = enabledValues.singleOrNull() == "true",
+            )
+        }.fold({ ParseResult(target = it) }, { ParseResult(error = ParseError.MALFORMED) })
     }
 
     private inline fun <T : Target> parseSimple(

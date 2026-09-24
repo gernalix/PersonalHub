@@ -37,6 +37,8 @@ import com.gernalix.luoghi.R
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressSuggestion
 import androidx.compose.ui.platform.testTag
 import com.gernalix.personalhub.core.ui.photo.rememberHubPhotoPicker
+import com.gernalix.personalhub.contracts.database.SinceWhenTimestampSource
+import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
 
 @Composable
 fun PlaceEditorDialog(
@@ -48,11 +50,14 @@ fun PlaceEditorDialog(
     onRadiusChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
     onPhotoChange: (String) -> Unit = {},
-    onSave: () -> Unit,
+    onSave: (createSinceWhen: Boolean, selectedSourceId: String?) -> Unit,
     onDismiss: () -> Unit,
     onTagsChange: (String) -> Unit = {},
 ) {
     val pickPhoto = rememberHubPhotoPicker { onPhotoChange(it.reference) }
+    val addedAt = remember(form.uuid) { System.currentTimeMillis() }
+    var createSinceWhen by remember(form.uuid) { mutableStateOf(false) }
+    var saving by remember(form.uuid) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -76,10 +81,28 @@ fun PlaceEditorDialog(
                     onRemovePhoto = { onPhotoChange("") },
                     onTagsChange = onTagsChange,
                 )
+                if (form.uuid == null) {
+                    SinceWhenCreationControl(
+                        timestampSources = listOf(SinceWhenTimestampSource(
+                            "added_at",
+                            stringResource(R.string.since_when_added_to_ph),
+                            addedAt,
+                            true,
+                        )),
+                        enabled = createSinceWhen,
+                        selectedSourceId = "added_at",
+                        saving = saving,
+                        onEnabledChange = { createSinceWhen = it },
+                        onSourceSelected = {},
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(enabled = form.nickname.isNotBlank(), onClick = onSave) {
+            TextButton(enabled = form.nickname.isNotBlank() && !saving, onClick = {
+                saving = true
+                onSave(createSinceWhen, "added_at")
+            }) {
                 Text(stringResource(R.string.save))
             }
         },

@@ -93,8 +93,10 @@ import java.security.MessageDigest
     HubEntityBinding::class, HubContextType::class, HubContextTypeField::class, HubContext::class, HubContextMember::class,
     HubTagEntity::class, HubTagAlias::class, HubTagAssignment::class, HubTagParent::class, HubSavedTagFilter::class,
     HubResource::class, HubActivityEntity::class,
+    SinceWhenCounterEntity::class,
+    SinceWhenMigrationState::class,
 
-], version = 21, exportSchema = true)
+], version = 22, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -107,6 +109,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun hubTagDao(): HubTagDao
     abstract fun hubResourceDao(): HubResourceDao
     abstract fun activityDao(): HubActivityDao
+    abstract fun sinceWhenCounterDao(): SinceWhenCounterDao
 
     final override suspend fun referenceCount(placeId: String): Int =
         financeDao().transactionCountForPlace(placeId) + financeDao().storeCountForPlace(placeId)
@@ -114,7 +117,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 21
+        const val SCHEMA_VERSION = 22
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -200,5 +203,6 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                     }
                 }).build()
         }
+
     }
 }

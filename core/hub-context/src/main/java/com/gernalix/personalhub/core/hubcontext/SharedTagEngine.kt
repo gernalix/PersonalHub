@@ -332,6 +332,7 @@ class SharedTagEngine(
             "places" -> HubTagNamespaces.PLACES
             "soldi" -> HubTagNamespaces.SOLDI
             "substances" -> HubTagNamespaces.SUBSTANCES
+            "since_when" -> HubTagNamespaces.SINCE_WHEN
             else -> require(moduleId.startsWith("timer")) { "Unsupported tag module: $moduleId" }.let { HubTagNamespaces.TIMER_NOW }
         }
 
@@ -339,7 +340,7 @@ class SharedTagEngine(
             namespaceForModule(ref.moduleId)
         } else when (ref.entityKind) {
             "quick_event_template", "quick_event_entry", "quick_event_macro" -> HubTagNamespaces.TIMER_EVENTS
-            "life_period" -> HubTagNamespaces.TIMER_SINCE_WHEN
+            "life_period", "counter" -> HubTagNamespaces.SINCE_WHEN
             else -> HubTagNamespaces.TIMER_NOW
         }
 
@@ -365,7 +366,7 @@ class SharedTagEngine(
     }
 }
 
-internal class HubTagAdapter(context: Context) : HubEntityAdapter {
+internal class HubTagAdapter(private val context: Context) : HubEntityAdapter {
     private val db = PersonalHubDatabase.get(context)
     override val moduleId = "tags"
     override val entityKind = "tag"
@@ -386,6 +387,17 @@ internal class HubTagAdapter(context: Context) : HubEntityAdapter {
         "personalhub://tags/$canonicalId",
         "com.gernalix.personalhub.HubTagsActivity",
     )
+
+    override suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? {
+        val tag = db.hubTagDao().tag(canonicalId) ?: return null
+        val assignments = db.hubTagDao().assignmentsForTag(canonicalId)
+        val firstUsed = assignments.minOfOrNull { it.assignedAt }
+        val sources = buildList {
+            if (firstUsed != null) add(SinceWhenTimestampSource("first_used", context.getString(com.gernalix.personalhub.core.hubcontext.R.string.since_when_first_used), firstUsed, true))
+            add(SinceWhenTimestampSource("tag_created", context.getString(com.gernalix.personalhub.core.hubcontext.R.string.since_when_tag_created), tag.createdAt, firstUsed == null))
+        }
+        return SinceWhenSourceDescriptor("$moduleId/$entityKind", tag.id, tag.name, sources)
+    }
 
     private fun HubTagEntity.toHubSummary() = HubEntitySummary(
         HubEntityRef(moduleId, entityKind, id),

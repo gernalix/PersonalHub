@@ -9,6 +9,7 @@ import android.view.Choreographer
 import androidx.work.Configuration
 import com.example.multitimetracker.api.TimerStartupApi
 import com.example.multitimetracker.hub.TimerSessionHubAdapter
+import com.example.multitimetracker.hub.TimerQuickEventEntryHubAdapter
 import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.core.database.DatabaseVault
 import com.gernalix.personalhub.core.database.HubAutoExport
@@ -16,6 +17,7 @@ import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.ResourceHubAdapter
+import com.gernalix.personalhub.hub.SinceWhenCounterHubAdapter
 import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
 import com.gernalix.personalhub.workflowydays.WorkflowyDaysSync
 import com.gernalix.sostanze.hub.SubstanceHubAdapter
@@ -45,25 +47,29 @@ class PersonalHubApplication : Application(), Configuration.Provider {
         traceStartup("PH.timerStartupHook") {
             TimerStartupApi.applicationOnCreate()
         }
-        traceStartup("PH.hubRuntimeInit") {
-            HubContextRuntime.initialize(
-                this,
-                listOf(
-                    PeopleHubAdapter(this),
-                    TimerSessionHubAdapter(this),
-                    PlacesHubAdapter(this),
-                    SoldiTransactionHubAdapter(this),
-                    SubstanceHubAdapter(this),
-                    SubstanceIntakeHubAdapter(this),
-                    WordSessionHubAdapter(this),
-                    ResourceHubAdapter(this),
-                ),
-            )
-        }
+        traceStartup("PH.hubRuntimeInit") { initializeHubContextRuntime(this) }
         traceStartup("PH.postFirstFrameInstall") {
             PostFirstFrameStartup.install(this)
         }
     }
+}
+
+private fun initializeHubContextRuntime(context: android.content.Context) {
+    HubContextRuntime.initialize(
+        context.applicationContext,
+        listOf(
+            PeopleHubAdapter(context),
+            TimerSessionHubAdapter(context),
+            TimerQuickEventEntryHubAdapter(context),
+            PlacesHubAdapter(context),
+            SoldiTransactionHubAdapter(context),
+            SubstanceHubAdapter(context),
+            SubstanceIntakeHubAdapter(context),
+            WordSessionHubAdapter(context),
+            ResourceHubAdapter(context),
+            SinceWhenCounterHubAdapter(context),
+        ),
+    )
 }
 
 private object PostFirstFrameStartup {
