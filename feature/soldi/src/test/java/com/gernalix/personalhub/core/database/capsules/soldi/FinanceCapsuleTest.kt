@@ -68,4 +68,48 @@ class FinanceCapsuleTest {
     }
 
 
+
+    @Test fun semanticIndexAndOwnedItemsRespectAttachmentAndTransactionLifecycle() = database { db, finance ->
+        val transactionId = finance.saveTransaction(
+            TransactionDraft(title = "Jacket", amount = "-100", currency = "DKK"),
+        )
+        val attachment = finance.addAttachment(
+            transactionId,
+            AttachmentDraft(
+                kind = "PHOTO_URI",
+                uri = "content://qa/jacket",
+                title = "front",
+                mimeType = "image/jpeg",
+            ),
+        )
+        finance.putPhotoIndex(
+            FinancePhotoIndex(
+                attachmentId = attachment.id,
+                transactionId = transactionId,
+                sourceRef = attachment.uri,
+                sourceHash = "sha",
+                modelId = "tinyclip",
+                modelVersion = "1",
+                embedding = byteArrayOf(1, 2, 3, 4),
+                status = "READY",
+            ),
+        )
+        val owned = finance.trackOwnedItem(transactionId, "Black jacket", attachment.id)
+        assertEquals("Black jacket", finance.ownedItem(owned.uuid)?.name)
+        assertEquals(attachment.id, finance.ownedItem(owned.uuid)?.primaryAttachmentId)
+        assertEquals(1, scalar(db, "SELECT count(*) FROM finance_photo_index"))
+
+        finance.deleteAttachment(attachment.id)
+        assertEquals(0, scalar(db, "SELECT count(*) FROM finance_photo_index"))
+        assertNull(finance.ownedItem(owned.uuid)?.primaryAttachmentId)
+
+        finance.removeOwnedItem(owned.uuid)
+        assertNull(finance.ownedItem(owned.uuid))
+
+        val second = finance.trackOwnedItem(transactionId, "Replacement")
+        finance.deleteTransaction(transactionId)
+        assertNull(finance.ownedItem(second.uuid))
+        db.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+    }
+
 }

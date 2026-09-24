@@ -27,6 +27,7 @@ dependencies {
     implementation(project(":core:alerts"))
     implementation(project(":core:ui"))
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.onnxruntime.android)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
