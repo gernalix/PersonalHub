@@ -1,0 +1,4 @@
+<resources>
+    <string name="personalhub_database_preparing">Preparing PersonalHub database…</string>
+    <string name="personalhub_database_startup_failed">Database startup check failed; existing data was preserved.</string>
+</resources>
