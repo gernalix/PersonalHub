@@ -4,18 +4,13 @@ import android.net.Uri
 import com.supercontacts.app.data.repository.AddressSuggestion
 import com.supercontacts.app.data.repository.ContactDetail
 import com.supercontacts.app.data.repository.ContactDuplicateCandidate
-import com.supercontacts.app.data.repository.ContactEvent
 import com.supercontacts.app.data.repository.ContactFieldSuggestion
 import com.supercontacts.app.data.repository.ContactHomeSortState
 import com.supercontacts.app.data.repository.ContactInitiative
 import com.supercontacts.app.data.repository.ContactStats
 import com.supercontacts.app.data.repository.ContactSummary
 import com.supercontacts.app.data.repository.ContactTag
-import com.supercontacts.app.data.repository.GlobalContactEvent
 import com.supercontacts.app.data.repository.GlobalContactInitiative
-import com.supercontacts.app.data.repository.HistoryCalendarState
-import com.supercontacts.app.data.repository.HistoryDateRange
-import com.supercontacts.app.data.repository.HistoryRangeDetails
 import com.supercontacts.app.data.repository.InitiativeCalendarState
 import com.supercontacts.app.data.repository.InitiativeDayDetails
 import com.supercontacts.app.data.repository.InitiativeType
@@ -37,20 +32,6 @@ data class ContactsUiState(
     val contacts: List<ContactSummary> = emptyList(),
     val detail: ContactDetail? = null,
     val contactStats: ContactStats? = null,
-    val historyEvents: List<ContactEvent> = emptyList(),
-    val globalHistoryEvents: List<GlobalContactEvent> = emptyList(),
-    val globalHistoryAscending: Boolean = false,
-    val historyIncludeContact: Boolean = true,
-    val historyIncludeField: Boolean = true,
-    val historyIncludeInitiative: Boolean = true,
-    val historyCalendar: HistoryCalendarState =
-        HistoryCalendarState(month = YearMonth.now(ZoneId.systemDefault())),
-    val selectedHistoryRange: HistoryDateRange =
-        HistoryDateRange(
-            startDate = LocalDate.now(ZoneId.systemDefault()),
-            endDate = LocalDate.now(ZoneId.systemDefault()),
-        ),
-    val historyRangeDetails: HistoryRangeDetails? = null,
     val homeInitiatives: List<GlobalContactInitiative> = emptyList(),
     val contactInitiatives: List<ContactInitiative> = emptyList(),
     val contactInitiativeAscending: Boolean = false,
@@ -131,25 +112,6 @@ interface ContactMessagingOwner {
     fun scanMessagingLinks(contactId: Long)
     fun scanAllMessagingLinks()
     fun updateMessagingLinkVerificationStatus(linkId: Long, verificationStatus: String)
-}
-
-interface ContactHistoryOwner {
-    val state: StateFlow<ContactHistoryState>
-    fun observeContactHistory(contactId: Long)
-    fun clearHistory()
-    fun observeGlobalHistory()
-    fun setHistoryIncludeContact(include: Boolean)
-    fun setHistoryIncludeField(include: Boolean)
-    fun setHistoryIncludeInitiative(include: Boolean)
-    fun toggleGlobalHistorySort()
-    fun clearGlobalHistory()
-    fun observeHistoryCalendar()
-    fun observeHistoryRange()
-    fun previousHistoryMonth()
-    fun nextHistoryMonth()
-    fun selectHistoryDate(date: LocalDate)
-    fun clearHistoryCalendar()
-    fun updateHistoryTimestamp(event: ContactEvent, timestampUtc: Long)
 }
 
 interface ContactInitiativeOwner {

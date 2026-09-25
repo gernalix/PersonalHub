@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,7 +63,7 @@ import com.gernalix.luoghi.capsules.places.PlaceSortState
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
 import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
-import com.gernalix.luoghi.ui.history.VisitTimelineItem
+import com.gernalix.luoghi.ui.visits.VisitTimelineItem
 import com.gernalix.luoghi.ui.places.PlaceListItem
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,7 +74,7 @@ fun HomeScreen(
     onAmbiguousCheckIn: (String) -> Unit,
     onOpenPlace: (PlaceListUiModel) -> Unit,
     onEditPlace: (PlaceListUiModel) -> Unit,
-    onPlaceHistory: (PlaceListUiModel) -> Unit,
+    onPlaceVisits: (PlaceListUiModel) -> Unit,
     onPlaceMap: (PlaceListUiModel) -> Unit,
     onDeletePlace: (PlaceListUiModel) -> Unit,
     onSortPlaces: (PlaceSortCriterion, PlaceSortDirection) -> Unit,
@@ -81,7 +82,8 @@ fun HomeScreen(
     onToggleTagFilter: (String) -> Unit,
     onGlobalMap: () -> Unit,
     onGlobalStats: () -> Unit,
-    onOpenHistory: (String?) -> Unit,
+    onHistorySearch: () -> Unit,
+    onOpenVisits: (String?) -> Unit,
     onNewPlace: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -99,6 +101,12 @@ fun HomeScreen(
                                 contentDescription = stringResource(R.string.checkin_diagnostics_open),
                             )
                         }
+                    }
+                    IconButton(onClick = onHistorySearch) {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = stringResource(R.string.history_search),
+                        )
                     }
                     IconButton(
                         onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "places")) },
@@ -184,7 +192,7 @@ fun HomeScreen(
                         item = item,
                         onOpen = { onOpenPlace(item) },
                         onEdit = { onEditPlace(item) },
-                        onHistory = { onPlaceHistory(item) },
+                        onHistory = { onPlaceVisits(item) },
                         onMap = { onPlaceMap(item) },
                         onDelete = { onDeletePlace(item) },
                     )
@@ -207,13 +215,13 @@ fun HomeScreen(
                 items(recentVisits, key = { "recent-${it.stableId}" }) { visit: VisitUiModel ->
                     VisitTimelineItem(
                         visit = visit,
-                        onClick = { onOpenHistory(visit.stableId) },
+                        onClick = { onOpenVisits(visit.stableId) },
                         showAddress = false,
                     )
                 }
             }
             item(key = "history-all") {
-                TextButton(onClick = { onOpenHistory(null) }, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = { onOpenVisits(null) }, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.view_all_history))
                 }
             }

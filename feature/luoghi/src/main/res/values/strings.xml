@@ -133,7 +133,7 @@
     <string name="place_accessibility_active_format">%1$s. Here now. %2$s. %3$s.</string>
     <string name="open_place_details">Open place details</string>
     <string name="place_actions_format">Actions for %1$s</string>
-    <string name="place_history">Place history</string>
+    <string name="place_history">Visits</string>
     <string name="here_now">HERE NOW</string>
     <string name="today">Today</string>
     <string name="yesterday">Yesterday</string>
@@ -174,7 +174,8 @@
     <string name="history_anomaly_place_mismatch">events refer to different places</string>
     <string name="history_anomaly_unusual_duration">unusual duration</string>
     <string name="history_anomaly_unknown_event">unknown event type</string>
-    <string name="history_title">History</string>
+    <string name="visits_title">Visits</string>
+    <string name="history_search">Search changes</string>
     <string name="where_was_i">Where was I?</string>
     <string name="where_was_i_invalid">Enter a date and time to check.</string>
     <string name="where_was_i_inside_format">You were at %1$s.</string>
@@ -198,7 +199,7 @@
     <string name="sort_refresh_location">Refresh location</string>
     <string name="sort_distance_unavailable">Distance is unavailable until foreground location is available.</string>
     <string name="recent_visits">Recent visits</string>
-    <string name="view_all_history">View all history</string>
+    <string name="view_all_history">View all visits</string>
     <string name="home_footer_format">v%1$s · Autoexport: %2$s</string>
     <string name="place_active_detail_format">Here now · entered at %1$s · %2$s</string>
     <string name="place_overview">Overview</string>

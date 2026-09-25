@@ -128,6 +128,7 @@ import com.supercontacts.app.data.repository.AppContainer
 import com.supercontacts.app.data.repository.ContactDetail
 import com.supercontacts.app.data.repository.ContactDeepLink
 import com.gernalix.personalhub.contracts.database.DataExplorerContract
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.HubContextLinks
 import com.supercontacts.app.data.repository.ContactDuplicateCandidate
@@ -231,19 +232,14 @@ fun SuperContactsApp(
     var selectedContactId by rememberSaveable { mutableStateOf<Long?>(null) }
     var isCreating by rememberSaveable { mutableStateOf(false) }
     var isEditing by rememberSaveable { mutableStateOf(false) }
-    var isViewingHistory by rememberSaveable { mutableStateOf(false) }
-    var isViewingGlobalHistory by rememberSaveable { mutableStateOf(false) }
     var isViewingContactInitiatives by rememberSaveable { mutableStateOf(false) }
     var isViewingGlobalInitiatives by rememberSaveable { mutableStateOf(false) }
-    var timestampEditEvent by remember { mutableStateOf<ContactEvent?>(null) }
     var handledDeepLink by rememberSaveable { mutableStateOf<String?>(null) }
 
     val openContact: (Long) -> Unit = { contactId ->
         selectedContactId = contactId
         isCreating = false
         isEditing = false
-        isViewingHistory = false
-        isViewingGlobalHistory = false
         isViewingContactInitiatives = false
         isViewingGlobalInitiatives = false
         viewModel.recordContactOpen(contactId)
@@ -349,20 +345,10 @@ fun SuperContactsApp(
         if (contactId == null) {
             viewModel.clearDetail()
             viewModel.clearContactStats()
-            viewModel.clearHistory()
             viewModel.clearContactInitiatives()
         } else {
             viewModel.observeContact(contactId)
             viewModel.observeContactStats(contactId)
-        }
-    }
-
-    LaunchedEffect(selectedContactId, isViewingHistory) {
-        val contactId = selectedContactId
-        if (contactId != null && isViewingHistory) {
-            viewModel.observeContactHistory(contactId)
-        } else {
-            viewModel.clearHistory()
         }
     }
 
@@ -375,20 +361,13 @@ fun SuperContactsApp(
         }
     }
 
-    LaunchedEffect(isViewingGlobalHistory) {
-        if (isViewingGlobalHistory) {
-            viewModel.observeGlobalHistory()
-        } else {
-            viewModel.clearGlobalHistory()
-        }
-    }
-
     LaunchedEffect(isViewingGlobalInitiatives) {
         if (isViewingGlobalInitiatives) {
-            viewModel.observeHistoryCalendar()
-            viewModel.observeHistoryRange()
+            viewModel.observeGlobalInitiatives()
+            viewModel.observeInitiativeCalendar()
         } else {
-            viewModel.clearHistoryCalendar()
+            viewModel.clearGlobalInitiatives()
+            viewModel.clearInitiativeCalendar()
             viewModel.clearSelectedInitiativeDay()
         }
     }
@@ -430,9 +409,7 @@ fun SuperContactsApp(
                     selectedContactId = null
                     isCreating = false
                     isEditing = false
-                    isViewingHistory = false
-                    isViewingGlobalHistory = false
-                    isViewingContactInitiatives = false
+                                                            isViewingContactInitiatives = false
                     isViewingGlobalInitiatives = false
                 }
             }
@@ -449,9 +426,7 @@ fun SuperContactsApp(
                 selectedContactId = null
                 isCreating = false
                 isEditing = false
-                isViewingHistory = false
-                isViewingGlobalHistory = false
-                isViewingContactInitiatives = false
+                                                isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
                 viewModel.clearError()
                 appScope.launch {
@@ -469,43 +444,22 @@ fun SuperContactsApp(
     }
 
     when {
-        isViewingGlobalInitiatives -> HistoryCalendarScreen(
+        isViewingGlobalInitiatives && uiState.selectedInitiativeDay != null -> InitiativeDayViewScreen(
             snackbarHostState = snackbarHostState,
-            calendarState = uiState.historyCalendar,
-            selectedRange = uiState.selectedHistoryRange,
-            rangeDetails = uiState.historyRangeDetails,
-            includeContact = uiState.historyIncludeContact,
-            includeField = uiState.historyIncludeField,
-            includeInitiative = uiState.historyIncludeInitiative,
-            onPreviousMonth = viewModel::previousHistoryMonth,
-            onNextMonth = viewModel::nextHistoryMonth,
-            onDayClick = viewModel::selectHistoryDate,
-            onIncludeContactChange = viewModel::setHistoryIncludeContact,
-            onIncludeFieldChange = viewModel::setHistoryIncludeField,
-            onIncludeInitiativeChange = viewModel::setHistoryIncludeInitiative,
-            onEventClick = { event ->
-                event.contactId.takeIf { it > 0L }?.let(openContact)
-            },
-            onTimestampClick = { event -> timestampEditEvent = event },
-            onBack = { isViewingGlobalInitiatives = false },
+            dayDetails = uiState.initiativeDayDetails,
+            onBack = viewModel::clearSelectedInitiativeDay,
         )
 
-        isViewingGlobalHistory -> GlobalHistoryScreen(
+        isViewingGlobalInitiatives -> GlobalInitiativeScreen(
             snackbarHostState = snackbarHostState,
-            events = uiState.globalHistoryEvents,
-            isAscending = uiState.globalHistoryAscending,
-            includeContact = uiState.historyIncludeContact,
-            includeField = uiState.historyIncludeField,
-            includeInitiative = uiState.historyIncludeInitiative,
-            onToggleSort = viewModel::toggleGlobalHistorySort,
-            onIncludeContactChange = viewModel::setHistoryIncludeContact,
-            onIncludeFieldChange = viewModel::setHistoryIncludeField,
-            onIncludeInitiativeChange = viewModel::setHistoryIncludeInitiative,
-            onEventClick = { event ->
-                event.contactId.takeIf { it > 0L }?.let(openContact)
-            },
-            onTimestampClick = { event -> timestampEditEvent = event },
-            onBack = { isViewingGlobalHistory = false },
+            calendarState = uiState.initiativeCalendar,
+            initiatives = uiState.globalInitiatives,
+            isAscending = uiState.globalInitiativeAscending,
+            onToggleSort = viewModel::toggleGlobalInitiativeSort,
+            onPreviousMonth = viewModel::previousInitiativeMonth,
+            onNextMonth = viewModel::nextInitiativeMonth,
+            onDayClick = viewModel::selectInitiativeDay,
+            onBack = { isViewingGlobalInitiatives = false },
         )
 
         isCreating -> ContactEditScreen(
@@ -614,20 +568,6 @@ fun SuperContactsApp(
             onDeleteInitiative = viewModel::deleteInitiative,
         )
 
-        selectedContactId != null && isViewingHistory -> ContactHistoryScreen(
-            snackbarHostState = snackbarHostState,
-            detail = uiState.detail,
-            events = uiState.historyEvents,
-            includeContact = uiState.historyIncludeContact,
-            includeField = uiState.historyIncludeField,
-            includeInitiative = uiState.historyIncludeInitiative,
-            onIncludeContactChange = viewModel::setHistoryIncludeContact,
-            onIncludeFieldChange = viewModel::setHistoryIncludeField,
-            onIncludeInitiativeChange = viewModel::setHistoryIncludeInitiative,
-            onTimestampClick = { event -> timestampEditEvent = event },
-            onBack = { isViewingHistory = false },
-        )
-
         selectedContactId != null -> ContactDetailScreen(
             snackbarHostState = snackbarHostState,
             detail = uiState.detail,
@@ -639,9 +579,7 @@ fun SuperContactsApp(
             onBack = {
                 selectedContactId = null
                 isEditing = false
-                isViewingHistory = false
-                isViewingGlobalHistory = false
-                isViewingContactInitiatives = false
+                                                isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
                 viewModel.clearAddressSuggestions()
                 viewModel.clearError()
@@ -653,7 +591,21 @@ fun SuperContactsApp(
                     }
                 }
             },
-            onHistory = { isViewingHistory = true },
+            onHistory = {
+                uiState.detail?.let { detail ->
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            HubDeepLinkContract.searchUri(
+                                modules = listOf("people"),
+                                entityKind = "person",
+                                entityId = detail.publicId,
+                                scopeModuleId = "people",
+                            ),
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
             onInitiativeHistory = { isViewingContactInitiatives = true },
             onInitiativeClick = viewModel::recordInitiative,
             onFieldOpen = { contactId, fieldType -> viewModel.recordFieldOpen(contactId, fieldType) },
@@ -662,8 +614,7 @@ fun SuperContactsApp(
             onDelete = { contactId ->
                 viewModel.deleteContact(contactId) {
                     selectedContactId = null
-                    isViewingHistory = false
-                    isViewingContactInitiatives = false
+                                        isViewingContactInitiatives = false
                 }
             },
             onChangePhoto = pickDetailPhoto,
@@ -680,8 +631,7 @@ fun SuperContactsApp(
                 viewModel.setActiveTagFilter(tag)
                 selectedContactId = null
                 isEditing = false
-                isViewingHistory = false
-                isViewingContactInitiatives = false
+                                isViewingContactInitiatives = false
             },
             onScanMessagingLinks = viewModel::scanMessagingLinks,
             onConfirmMessagingLink = viewModel::confirmMessagingLink,
@@ -723,29 +673,24 @@ fun SuperContactsApp(
             onInitiativeClick = viewModel::recordInitiative,
             onNewContact = {
                 isCreating = true
-                isViewingHistory = false
-                isViewingGlobalHistory = false
-                isViewingContactInitiatives = false
+                                                isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
                 viewModel.clearError()
             },
             onGlobalHistory = {
-                selectedContactId = null
-                isCreating = false
-                isEditing = false
-                isViewingHistory = false
-                isViewingContactInitiatives = false
-                isViewingGlobalHistory = true
-                isViewingGlobalInitiatives = false
+                context.startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        HubDeepLinkContract.moduleHistoryUri("people"),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
             },
             onGlobalInitiatives = {
                 selectedContactId = null
                 isCreating = false
                 isEditing = false
-                isViewingHistory = false
-                isViewingContactInitiatives = false
-                isViewingGlobalHistory = false
-                isViewingGlobalInitiatives = true
+                                isViewingContactInitiatives = false
+                                isViewingGlobalInitiatives = true
             },
             onErrorDismiss = viewModel::clearError,
         )
@@ -759,17 +704,6 @@ fun SuperContactsApp(
             onOpenContact = { contactId ->
                 activeCallOverlay = null
                 openContact(contactId)
-            },
-        )
-    }
-
-    timestampEditEvent?.let { event ->
-        HistoryTimestampDialog(
-            initialTimestamp = event.occurredAt,
-            onDismiss = { timestampEditEvent = null },
-            onConfirm = { timestampUtc ->
-                viewModel.updateHistoryTimestamp(event, timestampUtc)
-                timestampEditEvent = null
             },
         )
     }
