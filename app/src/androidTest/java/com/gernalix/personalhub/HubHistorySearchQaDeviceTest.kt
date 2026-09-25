@@ -32,11 +32,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.FixMethodOrder
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class HubHistorySearchQaDeviceTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -139,7 +142,7 @@ class HubHistorySearchQaDeviceTest {
     }
 
     @Test
-    fun placesAndTimerEntryPointsOpenTheSharedScopedScreen() {
+    fun zz_placesAndTimerEntryPointsOpenTheSharedScopedScreen() {
         val context = qaContext()
         PersonalHubDatabase.get(context)
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
