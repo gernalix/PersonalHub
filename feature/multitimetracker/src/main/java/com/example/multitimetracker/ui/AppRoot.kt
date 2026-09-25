@@ -669,6 +669,7 @@ if (developerSurfaceEnabled && showDevReport) {
                                 onClick = {
                                     context.startActivity(
                                         Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("timer"))
+                                            .setPackage(context.packageName)
                                     )
                                 },
                                 icon = { Icon(Icons.Filled.History, contentDescription = stringResource(R.string.history_search)) },
