@@ -1,0 +1,4 @@
+<resources>
+    <string name="personalhub_database_preparing">Preparazione del database PersonalHub…</string>
+    <string name="personalhub_database_startup_failed">Controllo iniziale del database non riuscito; i dati esistenti sono stati conservati.</string>
+</resources>

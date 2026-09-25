@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 
 data class DatabaseStartupStatus(
@@ -18,6 +19,8 @@ data class DatabaseStartupStatus(
 )
 
 object DatabaseStartupGate {
+    @Volatile private var preparedInProcess = false
+
     fun status(context: Context): DatabaseStartupStatus {
         val app = context.applicationContext
         val file = app.getDatabasePath(PersonalHubDatabase.DB_NAME)
@@ -49,9 +52,56 @@ object DatabaseStartupGate {
     }
 
     fun blockIfNotReady(activity: Activity): Boolean {
-        val status = status(activity)
-        if (status.ready) return false
+        if (preparedInProcess) return false
 
+        val density = activity.resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val preparing = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        }
+        preparing.addView(ProgressBar(activity))
+        preparing.addView(TextView(activity).apply {
+            text = activity.getString(R.string.personalhub_database_preparing)
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(16), 0, 0)
+        })
+        activity.setContentView(preparing)
+
+        val app = activity.applicationContext
+        Thread {
+            val result = runCatching {
+                status(app).also { ready ->
+                    if (ready.ready) PersonalHubDatabase.get(app).openHelper.writableDatabase
+                }
+            }.getOrElse {
+                DatabaseStartupStatus(
+                    ready = false,
+                    currentVersion = null,
+                    requiredVersion = PersonalHubDatabase.SCHEMA_VERSION,
+                    reason = app.getString(R.string.personalhub_database_startup_failed),
+                )
+            }
+            activity.runOnUiThread {
+                if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+                if (result.ready) {
+                    preparedInProcess = true
+                    activity.recreate()
+                } else {
+                    showBlocked(activity, result)
+                }
+            }
+        }.start()
+        return true
+    }
+
+    private fun showBlocked(activity: Activity, status: DatabaseStartupStatus) {
         val density = activity.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
         val current = status.currentVersion?.toString() ?: "unreadable"
@@ -85,6 +135,5 @@ object DatabaseStartupGate {
             setOnClickListener { activity.finishAffinity() }
         })
         activity.setContentView(root)
-        return true
     }
 }

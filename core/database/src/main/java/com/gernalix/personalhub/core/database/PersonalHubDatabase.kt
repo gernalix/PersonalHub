@@ -163,9 +163,9 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                             GitDataSettings.configuration(context).enabled
                         }.getOrDefault(false)
                         val manifestPrefs = context.getSharedPreferences("hub_open_manifest", Context.MODE_PRIVATE)
-                        fun manifest() = "v1:$appVersion:$gitHistoryEnabled:${schemaFingerprint(db)}"
-                        if (gitHistoryEnabled && manifestPrefs.getString(name, null) == manifest()) {
-                            GitDataTracking.resumeInstalled(db)
+                        fun manifest() = "v2:$appVersion:$gitHistoryEnabled:${schemaFingerprint(db)}"
+                        if (manifestPrefs.getString(name, null) == manifest()) {
+                            if (gitHistoryEnabled) GitDataTracking.resumeInstalled(db)
                             return
                         }
                         db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
@@ -201,7 +201,9 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                                 }
                             }
                         }
-                        if (gitHistoryEnabled) manifestPrefs.edit().putString(name, manifest()).apply()
+                        check(manifestPrefs.edit().putString(name, manifest()).commit()) {
+                            "Could not persist database open manifest"
+                        }
                     }
                 }).build()
         }
