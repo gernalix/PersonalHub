@@ -221,9 +221,9 @@ class DataExplorerActivity : ComponentActivity() {
     private fun localLiteUrl(snapshot: File, table: String?): String {
         val databaseUrl =
             "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/snapshot/${Uri.encode(snapshot.name)}"
-        val fragment = table?.let { "#/personalhub/${Uri.encode(it)}" }.orEmpty()
+        val fragment = table?.let { "#/personalhub_read/${Uri.encode(it)}" }.orEmpty()
         return "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/assets/datasette-lite/index.html" +
-            "?url=${Uri.encode(databaseUrl)}&analytics=off$fragment"
+            "?snapshot=${Uri.encode(databaseUrl)}$fragment"
     }
 
     @SuppressLint("SetJavaScriptEnabled")

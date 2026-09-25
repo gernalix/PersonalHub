@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PersonalHub Data Explorer</title>
+<link rel="stylesheet" href="app.css">
+<style>
+#ph-loading { padding: 1rem; font-family: sans-serif; }
+#ph-log { width: 100%; min-height: 7rem; }
+</style>
+</head>
+<body>
+<div id="ph-loading" data-state="boot">
+  <strong>Preparing offline Data Explorer…</strong>
+  <textarea id="ph-log" readonly>Loading vendored runtime…</textarea>
+</div>
+<div id="output"></div>
+<script>
+const params = new URLSearchParams(location.search);
+const snapshotUrl = params.get('snapshot');
+const worker = new Worker('webworker.js');
+const log = document.getElementById('ph-log');
+const loading = document.getElementById('ph-loading');
+const output = document.getElementById('output');
+function escapeHtml(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function fail(message) {
+  loading.dataset.state = 'error';
+  loading.innerHTML = `<h3>Offline Data Explorer error</h3><pre>${escapeHtml(message)}</pre>`;
+}
+if (!snapshotUrl) fail('Missing detached snapshot URL');
+let logs = ['Loading vendored runtime…'];
+worker.onmessage = (event) => {
+  const data = event.data || {};
+  if (data.type === 'log') {
+    logs.push(data.line);
+    log.value = logs.join('\n');
+    log.scrollTop = log.scrollHeight;
+    return;
+  }
+  if (data.error) { fail(data.error); return; }
+  let html = '';
+  if ((data.contentType || '').startsWith('text/html')) html = data.text;
+  else if ((data.contentType || '').startsWith('application/json')) {
+    html = `<pre>${escapeHtml(JSON.stringify(JSON.parse(data.text), null, 2))}</pre>`;
+  } else html = `<pre>${escapeHtml(data.text || '')}</pre>`;
+  output.innerHTML = html;
+  loading.dataset.state = 'ready';
+  loading.style.display = 'none';
+  window.scrollTo({top: 0, left: 0});
+};
+function loadPath(path) {
+  const normalized = path.split('#')[0].replace('http://localhost', '') || '/';
+  history.pushState({path: normalized}, normalized, '#' + normalized);
+  worker.postMessage({type: 'path', path: normalized});
+}
+window.onpopstate = () => worker.postMessage({type: 'path', path: location.hash.replace(/^#/, '') || '/'});
+output.addEventListener('click', (event) => {
+  const link = event.target.closest('a');
+  if (!link || !link.getAttribute('href')) return;
+  event.preventDefault();
+  const href = link.getAttribute('href');
+  if (/^https?:\/\//.test(href) && !href.startsWith('http://localhost')) return;
+  loadPath(href);
+}, true);
+output.addEventListener('submit', (event) => {
+  const form = event.target;
+  if (!form || form.method.toLowerCase() !== 'get') return;
+  event.preventDefault();
+  const qs = new URLSearchParams(new FormData(form)).toString();
+  loadPath(`${form.getAttribute('action')}?${qs}`);
+}, true);
+worker.postMessage({
+  type: 'startup',
+  snapshotUrl,
+  initialPath: location.hash.replace(/^#/, '') || '/',
+});
+</script>
+</body>
+</html>

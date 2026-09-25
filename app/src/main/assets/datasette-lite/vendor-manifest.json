@@ -1,0 +1,279 @@
+{
+  "datasette": {
+    "version": "0.65.5",
+    "wheels": [
+      {
+        "bytes": 14668,
+        "file": "aiofiles-25.1.0-py3-none-any.whl",
+        "sha256": "abe311e527c862958650f9438e859c1fa7568a141b22abcd015e120e86a85695"
+      },
+      {
+        "bytes": 80896,
+        "file": "anyio-3.7.1-py3-none-any.whl",
+        "sha256": "91dee416e570e92c64041bd18b900d1d6fa78dff7048769ce5ac5ddad004fbb5"
+      },
+      {
+        "bytes": 11704,
+        "file": "asgi_csrf-0.11-py3-none-any.whl",
+        "sha256": "03ac140115f39d4295288a9adf74fdc6ae607f6ef44abee8466520458207242b"
+      },
+      {
+        "bytes": 25478,
+        "file": "asgiref-3.12.1-py3-none-any.whl",
+        "sha256": "fe386d1c2bff7259ea95929266d12a8cf9a8b5a1c2598402967d8792e7a7c094"
+      },
+      {
+        "bytes": 136983,
+        "file": "certifi-2026.7.22-py3-none-any.whl",
+        "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775"
+      },
+      {
+        "bytes": 125251,
+        "file": "click-8.5.0-py3-none-any.whl",
+        "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360"
+      },
+      {
+        "bytes": 4123,
+        "file": "click_default_group-1.2.4-py2.py3-none-any.whl",
+        "sha256": "9b60486923720e7fc61731bdb32b617039aba820e22e1c88766b1125592eaa5f"
+      },
+      {
+        "bytes": 399477,
+        "file": "datasette-0.65.5-py3-none-any.whl",
+        "sha256": "ca5faf528d4c1acc22e78b0274257435683ae6c75cf275939f2b92a10e498dbb"
+      },
+      {
+        "bytes": 13263,
+        "file": "flexcache-0.3-py3-none-any.whl",
+        "sha256": "d43c9fea82336af6e0115e308d9d33a185390b8346a017564611f1466dcd2e32"
+      },
+      {
+        "bytes": 27625,
+        "file": "flexparser-0.4-py3-none-any.whl",
+        "sha256": "3738b456192dcb3e15620f324c447721023c0293f6af9955b481e91d00179846"
+      },
+      {
+        "bytes": 54857,
+        "file": "h11-0.12.0-py3-none-any.whl",
+        "sha256": "36a3cb8c0a032f56e2da7084577878a035d3b61d104230d4bd49c0c6b555a9c6"
+      },
+      {
+        "bytes": 68449,
+        "file": "httpcore-0.15.0-py3-none-any.whl",
+        "sha256": "1105b8b73c025f23ff7c36468e4432226cbb959176eab66864b8e31c4ee27fa6"
+      },
+      {
+        "bytes": 84847,
+        "file": "httpx-0.23.0-py3-none-any.whl",
+        "sha256": "42974f577483e1e932c3cdc3cd2303e883cbfba17fe228b0f63589764d7b9c4b"
+      },
+      {
+        "bytes": 22830,
+        "file": "hupper-1.12.1-py3-none-any.whl",
+        "sha256": "e872b959f09d90be5fb615bd2e62de89a0b57efc037bdf9637fb09cdf8552b19"
+      },
+      {
+        "bytes": 69583,
+        "file": "idna-3.20-py3-none-any.whl",
+        "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+      },
+      {
+        "bytes": 16234,
+        "file": "itsdangerous-2.2.0-py3-none-any.whl",
+        "sha256": "c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef"
+      },
+      {
+        "bytes": 12161,
+        "file": "janus-2.0.0-py3-none-any.whl",
+        "sha256": "7e6449d34eab04cd016befbd7d8c0d8acaaaab67cb59e076a69149f9031745f9"
+      },
+      {
+        "bytes": 134899,
+        "file": "jinja2-3.1.6-py3-none-any.whl",
+        "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67"
+      },
+      {
+        "bytes": 6354,
+        "file": "mergedeep-1.3.4-py3-none-any.whl",
+        "sha256": "70775750742b25c0d8f36c55aed03d24c3384d17c951b3175d898bd778ef0307"
+      },
+      {
+        "bytes": 1816632,
+        "file": "pip-26.2.1-py3-none-any.whl",
+        "sha256": "71138adf1f4ca900cdb7d289c21b7494329f2332b6d85f0e1c42108c0384ed3e"
+      },
+      {
+        "bytes": 26700,
+        "file": "platformdirs-4.11.14-py3-none-any.whl",
+        "sha256": "c1b1a1eab4f4d1b0eb81754593f1c38de88e84ebe6f93bf6714706a6759074b1"
+      },
+      {
+        "bytes": 20538,
+        "file": "pluggy-1.6.0-py3-none-any.whl",
+        "sha256": "e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746"
+      },
+      {
+        "bytes": 24392,
+        "file": "python_multipart-0.0.15-py3-none-any.whl",
+        "sha256": "167e3fc3d115de7849efb43e061f213350c87d72ba64fcd014b0ae15ce5e7d4c"
+      },
+      {
+        "bytes": 31976,
+        "file": "rfc3986-1.5.0-py2.py3-none-any.whl",
+        "sha256": "a86d6e1f5b1dc238b218b012df0aa79409667bb209e58da56d0b94704e712a97"
+      },
+      {
+        "bytes": 10235,
+        "file": "sniffio-1.3.1-py3-none-any.whl",
+        "sha256": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2"
+      },
+      {
+        "bytes": 44614,
+        "file": "typing_extensions-4.15.0-py3-none-any.whl",
+        "sha256": "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548"
+      },
+      {
+        "bytes": 87427,
+        "file": "uvicorn-0.54.0-py3-none-any.whl",
+        "sha256": "505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf"
+      }
+    ]
+  },
+  "datasette_lite": {
+    "commit": "779b2d4da76a5dc2f1d9aea0d7c8d854f6e1497b"
+  },
+  "format": 1,
+  "projector": {
+    "commit": "51e3106a35a98816593994510919239b644af462",
+    "files": [
+      {
+        "bytes": 0,
+        "file": "projector/scripts/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "bytes": 1758,
+        "file": "projector/scripts/personalhub_model.py",
+        "sha256": "48ac22008a3c6b18bdc31a35cfffa29c1d1146eb8b9a2f14e3c5b1f0c853d5bd"
+      },
+      {
+        "bytes": 4185,
+        "file": "projector/scripts/personalhub_labels.py",
+        "sha256": "35cccbccee05747658da3af6c1cf16b24f603af174a7e5a96335b8f5625393a8"
+      },
+      {
+        "bytes": 62399,
+        "file": "projector/scripts/personalhub_projection.py",
+        "sha256": "f8d1e3f992e1ffc5e86d0d5617e6812b1d5ca9653d63d30d402d8f7bdc15635a"
+      },
+      {
+        "bytes": 3867,
+        "file": "projector/scripts/personalhub_local_envelope.py",
+        "sha256": "3162dbbc165ae578ce4161952ab09f739227e837dbb8b8182069e4d46e4f0b52"
+      },
+      {
+        "bytes": 261532,
+        "file": "projector/schema.json",
+        "sha256": "e24718364685cc7c3b4f7ec66520a94eadc387dfaca17ca7ea380e8992721b17"
+      }
+    ]
+  },
+  "pyodide": {
+    "files": [
+      {
+        "bytes": 31671,
+        "file": "MarkupSafe-2.1.5-cp312-cp312-pyodide_2024_0_wasm32.whl",
+        "package": "markupsafe",
+        "sha256": "d7e66ed044fd7ec0e33cf9f2ec6ecc0590ee09863fa61cca27ba2824858bb795"
+      },
+      {
+        "bytes": 140739,
+        "file": "micropip-0.8.0-py3-none-any.whl",
+        "package": "micropip",
+        "sha256": "f06926694dba95e19768a2be65770c953ab350b8b622314b308c3b39f7ebebfa"
+      },
+      {
+        "bytes": 2025919,
+        "file": "openssl-1.1.1w.zip",
+        "package": "openssl",
+        "sha256": "7e796ef6d3ca7ed6f1af820fc7061033a034e986cddca38fc487e6ef9a4ac915"
+      },
+      {
+        "bytes": 259534,
+        "file": "packaging-24.2-py3-none-any.whl",
+        "package": "packaging",
+        "sha256": "55c1c81063e172dd2d9d24321dd56b3d539bbc4d4583c24870bd4b7b350ec84c"
+      },
+      {
+        "bytes": 394748,
+        "file": "pyparsing-3.1.2-py3-none-any.whl",
+        "package": "pyparsing",
+        "sha256": "1bfcec2f29dc86b12d23b4c7284af1004c1f3b5886fcfe38f2dd8ae8bc1983d5"
+      },
+      {
+        "bytes": 502836,
+        "file": "PyYAML-6.0.2-cp312-cp312-pyodide_2024_0_wasm32.whl",
+        "package": "pyyaml",
+        "sha256": "4f6d4fd462caf96fdce9171287b143dd1e68c88648ede044a531dd35d9c3ca78"
+      },
+      {
+        "bytes": 3059220,
+        "file": "setuptools-69.5.1-py3-none-any.whl",
+        "package": "setuptools",
+        "sha256": "55db9a495173f61154429e94d917ec869c870fd6e8899eb3cc3a6fe9b9a045ec"
+      },
+      {
+        "bytes": 1455224,
+        "file": "sqlite3-1.0.0-py2.py3-none-any.whl",
+        "package": "sqlite3",
+        "sha256": "23c51f8913c23ea67eb7c86ad80db7d26ce98f22e1ed48909d80be4452e9b20e"
+      },
+      {
+        "bytes": 186535,
+        "file": "ssl-1.0.0-py2.py3-none-any.whl",
+        "package": "ssl",
+        "sha256": "cd62925e0170c80ea371c125dbc512a43c8018ddbf58ee9c71987f64700dbaf7"
+      },
+      {
+        "bytes": 14810,
+        "file": "pyodide.js",
+        "package": "runtime",
+        "sha256": "ee1ce9d20fd7d5fc6df64f77751bf635e7a929665f2c33bfdaf84c175a525d52"
+      },
+      {
+        "bytes": 1253021,
+        "file": "pyodide.asm.js",
+        "package": "runtime",
+        "sha256": "c5bc43242dbdd922b03fd9f9ca22480d37451238686e84cb38499143f81ec75b"
+      },
+      {
+        "bytes": 10102467,
+        "file": "pyodide.asm.wasm",
+        "package": "runtime",
+        "sha256": "7936ef6019d80723adce4bd86666b84534d071362839f1cf9b2b80bed917c812"
+      },
+      {
+        "bytes": 2358641,
+        "file": "python_stdlib.zip",
+        "package": "runtime",
+        "sha256": "7a4edf94cc3d937ba29078adb857d1646d9ce064ad93e795645d124e212eb5a1"
+      },
+      {
+        "bytes": 108095,
+        "file": "pyodide-lock.json",
+        "package": "runtime",
+        "sha256": "3a3cfb1c0bc02917a1792c1ecdf2b9b484ca406f5d03cb8af4083e97ec7d706a"
+      }
+    ],
+    "load_packages": [
+      "micropip",
+      "ssl",
+      "setuptools",
+      "pyyaml",
+      "markupsafe",
+      "sqlite3"
+    ],
+    "python": "3.12.7",
+    "version": "0.27.2"
+  }
+}
