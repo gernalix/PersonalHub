@@ -44,15 +44,16 @@ import com.gernalix.luoghi.capsules.mapviewer.MapViewerCapsule
 import com.gernalix.luoghi.capsules.geofence.PlaceGeofenceAction
 import com.gernalix.luoghi.capsules.places.PlaceListUiModel
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
-import com.gernalix.luoghi.ui.history.HistoryScreen
-import com.gernalix.luoghi.ui.history.formatHistoryTimestampForInput
-import com.gernalix.luoghi.ui.history.parseHistoryTimestampInput
+import com.gernalix.luoghi.ui.visits.VisitsScreen
+import com.gernalix.luoghi.ui.visits.formatVisitTimestampForInput
+import com.gernalix.luoghi.ui.visits.parseVisitTimestampInput
 import com.gernalix.luoghi.ui.home.HomeScreen
 import com.gernalix.luoghi.ui.place.PlaceDetailScreen
 import com.gernalix.luoghi.ui.place.PlaceEditorDialog
 import com.gernalix.luoghi.ui.place.PlaceAlertsDialog
 import com.gernalix.luoghi.ui.theme.LuoghiTheme
 import com.gernalix.luoghi.hub.PlacesHubAdapter
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
 import kotlinx.coroutines.launch
 
@@ -81,7 +82,7 @@ private fun Intent?.hubPlaceId(): String? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/places" }
     ?.getQueryParameter("placeId")?.takeIf(String::isNotBlank)
 
-private enum class AppDestination { HOME, PLACE_DETAIL, HISTORY }
+private enum class AppDestination { HOME, PLACE_DETAIL, VISITS }
 
 @Composable
 fun LuoghiHome(initialPlaceId: String? = null) {
@@ -131,7 +132,7 @@ private fun LuoghiNavigation(
     val scope = rememberCoroutineScope()
     var destinationName by rememberSaveable { mutableStateOf(AppDestination.HOME.name) }
     var selectedPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
-    var historyFilterPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var visitsFilterPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var initialVisitId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorOpen by rememberSaveable { mutableStateOf(value = false) }
     var globalStatsOpen by rememberSaveable { mutableStateOf(value = false) }
@@ -139,7 +140,7 @@ private fun LuoghiNavigation(
     var pendingDeletePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var manualVisitPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var geofencePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
-    val historyListState: LazyListState = rememberLazyListState()
+    val visitsListState: LazyListState = rememberLazyListState()
     val destination = runCatching { AppDestination.valueOf(destinationName) }.getOrDefault(AppDestination.HOME)
     val selectedItem = selectedPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
     val pendingDelete = pendingDeletePlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
@@ -154,17 +155,17 @@ private fun LuoghiNavigation(
     fun openHome() {
         destinationName = AppDestination.HOME.name
         selectedPlaceId = null
-        historyFilterPlaceId = null
+        visitsFilterPlaceId = null
         initialVisitId = null
     }
     fun openDetail(item: PlaceListUiModel) {
         selectedPlaceId = item.place.uuid
         destinationName = AppDestination.PLACE_DETAIL.name
     }
-    fun openHistory(placeId: String? = null, visitId: String? = null) {
-        historyFilterPlaceId = placeId
+    fun openVisits(placeId: String? = null, visitId: String? = null) {
+        visitsFilterPlaceId = placeId
         initialVisitId = visitId
-        destinationName = AppDestination.HISTORY.name
+        destinationName = AppDestination.VISITS.name
     }
     fun edit(item: PlaceListUiModel) {
         vm.editPlace(item.place)
@@ -178,8 +179,8 @@ private fun LuoghiNavigation(
             AppDestination.HOME -> Unit
             AppDestination.PLACE_DETAIL -> openHome()
 
-            AppDestination.HISTORY -> {
-                val detail = historyFilterPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
+            AppDestination.VISITS -> {
+                val detail = visitsFilterPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
                 if (detail != null) openDetail(detail) else openHome()
             }
         }
@@ -200,7 +201,7 @@ private fun LuoghiNavigation(
             onAmbiguousCheckIn = vm::selectAmbiguousCheckIn,
             onOpenPlace = ::openDetail,
             onEditPlace = ::edit,
-            onPlaceHistory = { openHistory(it.place.uuid) },
+            onPlaceVisits = { openVisits(it.place.uuid) },
             onPlaceMap = ::showMap,
             onDeletePlace = { pendingDeletePlaceId = it.place.uuid },
             onSortPlaces = vm::updatePlaceSort,
@@ -213,7 +214,10 @@ private fun LuoghiNavigation(
                 globalStatsOpen = true
                 vm.refreshRouteDistanceStats()
             },
-            onOpenHistory = { openHistory(visitId = it) },
+            onHistorySearch = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("places")).setPackage(context.packageName))
+            },
+            onOpenVisits = { openVisits(visitId = it) },
             onNewPlace = {
                 vm.newPlace()
                 editorOpen = true
@@ -228,7 +232,7 @@ private fun LuoghiNavigation(
                 onEdit = { edit(item) },
                 onMap = { showMap(item) },
                 onHistory = {
-                    openHistory(item.place.uuid)
+                    openVisits(item.place.uuid)
                 },
                 onCheckInNow = { vm.manualCheckIn(item.place.uuid) },
                 onAddManualVisit = { manualVisitPlaceId = item.place.uuid },
@@ -239,29 +243,23 @@ private fun LuoghiNavigation(
                 onGeofenceSettings = { geofencePlaceId = item.place.uuid },
             )
         }
-        AppDestination.HISTORY -> {
-            val filterName = historyFilterPlaceId?.let { id ->
+        AppDestination.VISITS -> {
+            val filterName = visitsFilterPlaceId?.let { id ->
                 state.placeItems.firstOrNull { it.place.uuid == id }?.place?.nickname
             }
-            HistoryScreen(
+            VisitsScreen(
                 visits = state.visits,
                 events = state.checkIn.events,
-                historyState = state.history,
                 isLoading = !state.dataLoaded,
-                filterPlaceId = historyFilterPlaceId,
+                filterPlaceId = visitsFilterPlaceId,
                 filterPlaceName = filterName,
                 places = state.places,
                 initialVisitId = initialVisitId,
-                listState = historyListState,
-                onBack = {
-                    navigateBack()
-                },
+                listState = visitsListState,
+                onBack = ::navigateBack,
                 onEditEvent = vm::editHistoryEvent,
                 onDeleteEvent = vm::deleteHistoryEvent,
                 onDeleteVisit = vm::deleteHistorySession,
-                onUndo = vm::undoHistory,
-                onRedo = vm::redoHistory,
-                onClearMessage = vm::clearHistoryMessage,
             )
         }
     }
@@ -404,10 +402,10 @@ private fun ManualVisitDialog(
     onSave: (Long, Long?, String?) -> Unit,
 ) {
     var checkInText by rememberSaveable {
-        mutableStateOf(formatHistoryTimestampForInput(System.currentTimeMillis()))
+        mutableStateOf(formatVisitTimestampForInput(System.currentTimeMillis()))
     }
     var checkOutText by rememberSaveable {
-        mutableStateOf(formatHistoryTimestampForInput(System.currentTimeMillis() + 3_600_000L))
+        mutableStateOf(formatVisitTimestampForInput(System.currentTimeMillis() + 3_600_000L))
     }
     var notesText by rememberSaveable { mutableStateOf("") }
     var parseFailed by rememberSaveable { mutableStateOf(false) }
@@ -448,8 +446,8 @@ private fun ManualVisitDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                val checkIn = parseHistoryTimestampInput(checkInText)
-                val checkOut = checkOutText.trim().takeIf { it.isNotEmpty() }?.let { parseHistoryTimestampInput(it) }
+                val checkIn = parseVisitTimestampInput(checkInText)
+                val checkOut = checkOutText.trim().takeIf { it.isNotEmpty() }?.let { parseVisitTimestampInput(it) }
                 if (checkIn == null || (checkOutText.isNotBlank() && checkOut == null)) {
                     parseFailed = true
                 } else {

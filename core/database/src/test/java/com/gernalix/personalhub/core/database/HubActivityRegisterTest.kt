@@ -173,6 +173,63 @@ class HubActivityRegisterTest {
         }
     }
 
+    @Test
+    fun sharedSearchAppliesBoundsModuleEntitySystemAndLimitNewestFirst() = runBlocking {
+        withDatabase { database ->
+            val dao = database.activityDao()
+            suspend fun add(
+                id: String,
+                occurredAt: Long,
+                moduleId: String,
+                entityKind: String,
+                entityId: String,
+                isSystem: Boolean = false,
+            ) {
+                dao.insert(
+                    HubActivityEntity(
+                        id = id,
+                        occurredAt = occurredAt,
+                        moduleId = moduleId,
+                        action = "updated",
+                        entityKind = entityKind,
+                        entityId = entityId,
+                        entityLabel = id,
+                        isSystem = isSystem,
+                        sourceTable = "test",
+                    ),
+                )
+            }
+            add("old-place", 100, "places", "place", "p1")
+            add("target-place", 300, "places", "place", "p2")
+            add("person", 250, "people", "person", "person-1")
+            add("system-place", 350, "places", "place", "p2", isSystem = true)
+
+            val filtered = dao.search(
+                moduleIds = listOf("places"),
+                allModules = 0,
+                includeSystem = 0,
+                fromMs = 150,
+                toMs = 400,
+                entityKind = "place",
+                entityId = "p2",
+                limit = 10,
+            )
+            assertEquals(listOf("target-place"), filtered.map { it.id })
+
+            val bounded = dao.search(
+                moduleIds = listOf("places", "people"),
+                allModules = 1,
+                includeSystem = 0,
+                fromMs = null,
+                toMs = null,
+                entityKind = null,
+                entityId = null,
+                limit = 2,
+            )
+            assertEquals(listOf("target-place", "person"), bounded.map { it.id })
+        }
+    }
+
     private suspend fun withDatabase(block: suspend (PersonalHubDatabase) -> Unit) {
         val name = "activity-register-${UUID.randomUUID()}.db"
         val database = PersonalHubDatabase.openTemporary(context, name)

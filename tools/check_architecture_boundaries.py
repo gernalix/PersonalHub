@@ -190,6 +190,99 @@ for owner, files in source_files.items():
             )
 
 
+# Shared History/Search is host-owned. Features may expose only the public deep-link
+# contract; removed per-feature change-history browsers must not return.
+legacy_history_ui = (
+    "app/src/main/java/com/gernalix/personalhub/HubActivityRegisterScreen.kt",
+    "app/src/main/java/com/gernalix/personalhub/capsules/settings/GitHistorySettings.kt",
+    "feature/supercontacts/src/main/java/com/supercontacts/app/ui/contacts/ContactHistoryCapsule.kt",
+    "feature/luoghi/src/main/java/com/gernalix/luoghi/ui/history/HistoryScreen.kt",
+    "feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/timeline/ui/TimelineScreen.kt",
+    "feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/timeline/ui/TimelineCapsuleUi.kt",
+    "feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/TaskHistoryDialog.kt",
+)
+for relative in legacy_history_ui:
+    if (ROOT / relative).exists():
+        errors.append(f"legacy user-facing History/Timeline surface returned: {relative}")
+
+wordpulse_screen = ROOT / "feature/wordpulse/src/main/java/com/wordpulse/app/ui/WordPulseScreen.kt"
+if wordpulse_screen.is_file():
+    text = wordpulse_screen.read_text()
+    for forbidden in ('Timeline("Timeline")', "private fun TimelineTab(", "timeline-word-"):
+        if forbidden in text:
+            errors.append(f"WordPulse legacy Timeline surface returned: {forbidden}")
+
+hub_settings = ROOT / "app/src/main/java/com/gernalix/personalhub/capsules/settings/HubSettings.kt"
+if hub_settings.is_file() and '"git-history"' in hub_settings.read_text():
+    errors.append("Settings exposes legacy Git History / Time Machine route")
+
+temporal_search = ROOT / "app/src/main/java/com/gernalix/personalhub/HubTemporalSearchScreen.kt"
+if temporal_search.is_file():
+    text = temporal_search.read_text()
+    for forbidden in ("GitHistory", "git-history:", "temporal_git_history"):
+        if forbidden in text:
+            errors.append(f"temporal domain search contains technical change-history UI: {forbidden}")
+
+module_history_contracts = {
+    "supercontacts": "people",
+    "luoghi": "places",
+    "multitimetracker": "timer",
+    "sostanze": "substances",
+    "wordpulse": "wordpulse",
+    "soldi": "soldi",
+}
+for feature_name, module_id in module_history_contracts.items():
+    expected = f'moduleHistoryUri("{module_id}")'
+    files = source_files.get(f"feature:{feature_name}", [])
+    if not any(expected in path.read_text() for path in files):
+        errors.append(
+            f"feature:{feature_name} lacks shared History/Search entry via HubDeepLinkContract.{expected}"
+        )
+
+
+# Unified History/Search is host-owned. Features may expose domain chronology (sessions,
+# visits, intakes, transactions), but change-history entry points must route through the
+# public HubDeepLinkContract instead of owning a parallel browser.
+legacy_history_surfaces = (
+    "app/src/main/java/com/gernalix/personalhub/HubActivityRegisterScreen.kt",
+    "app/src/main/java/com/gernalix/personalhub/capsules/settings/GitHistorySettings.kt",
+    "feature/supercontacts/src/main/java/com/supercontacts/app/ui/contacts/ContactHistoryCapsule.kt",
+    "feature/luoghi/src/main/java/com/gernalix/luoghi/ui/history/HistoryScreen.kt",
+    "feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/timeline/ui/TimelineScreen.kt",
+    "feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/timeline/ui/TimelineCapsuleUi.kt",
+    "feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/TaskHistoryDialog.kt",
+)
+for relative_name in legacy_history_surfaces:
+    if (ROOT / relative_name).exists():
+        errors.append(f"legacy parallel History/Timeline UI returned: {relative_name}")
+
+settings_source = ROOT / "app/src/main/java/com/gernalix/personalhub/capsules/settings/HubSettings.kt"
+if settings_source.is_file() and '"git-history"' in settings_source.read_text():
+    errors.append("HubSettings reintroduced the legacy git-history route")
+
+people_app = ROOT / "feature/supercontacts/src/main/java/com/supercontacts/app/ui/app/SuperContactsApp.kt"
+if people_app.is_file():
+    people_text = people_app.read_text()
+    for legacy_symbol in ("ContactHistoryScreen", "GlobalHistoryScreen", "HistoryCalendarScreen"):
+        if f"private fun {legacy_symbol}(" in people_text:
+            errors.append(f"People reintroduced parallel history UI {legacy_symbol}")
+
+wordpulse_screen = ROOT / "feature/wordpulse/src/main/java/com/wordpulse/app/ui/WordPulseScreen.kt"
+if wordpulse_screen.is_file() and "WordPulseTab.Timeline" in wordpulse_screen.read_text():
+    errors.append("WordPulse reintroduced the legacy Timeline tab")
+
+module_history_routes = {
+    "feature:supercontacts": 'HubDeepLinkContract.moduleHistoryUri("people")',
+    "feature:multitimetracker": 'HubDeepLinkContract.moduleHistoryUri("timer")',
+    "feature:luoghi": 'HubDeepLinkContract.moduleHistoryUri("places")',
+    "feature:sostanze": 'HubDeepLinkContract.moduleHistoryUri("substances")',
+    "feature:wordpulse": 'HubDeepLinkContract.moduleHistoryUri("wordpulse")',
+    "feature:soldi": 'HubDeepLinkContract.moduleHistoryUri("soldi")',
+}
+for owner, route_literal in module_history_routes.items():
+    if not any(route_literal in path.read_text() for path in source_files.get(owner, [])):
+        errors.append(f"{owner} does not expose the shared module History/Search route")
+
 # String-based component routing must not smuggle implementation class names around import checks.
 # Public Android entrypoints are stable host aliases owned by feature manifests.
 for kotlin in source_files.get("app", []):

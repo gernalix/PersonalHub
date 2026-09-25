@@ -1,4 +1,4 @@
-package com.gernalix.luoghi.ui.history
+package com.gernalix.luoghi.ui.visits
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

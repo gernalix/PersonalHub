@@ -3,6 +3,7 @@
 @file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
 
 package com.example.multitimetracker.ui
+import android.content.Intent
 import android.os.Trace
 import android.widget.Toast
 import androidx.compose.ui.unit.dp
@@ -77,7 +78,6 @@ import com.example.multitimetracker.capsules.now.ui.NowScreen
 import com.example.multitimetracker.capsules.quickevents.ui.QuickEventsScreen
 import com.example.multitimetracker.core.quickevent.QuickEventTarget
 import com.example.multitimetracker.capsules.chains.ui.ChainsScreen
-import com.example.multitimetracker.capsules.timeline.ui.TimelineScreen
 import com.example.multitimetracker.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.rememberScrollState
@@ -103,13 +103,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.example.multitimetracker.ui.components.AppSettingsDialog
 import com.example.multitimetracker.ui.components.AlertPopupHost
 import com.example.multitimetracker.ui.components.LocalOpenAppMenu
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 
-private enum class Tab { NOW, QUICK_EVENTS, TAGS, TIMELINE, ALERT, CHAINS }
+private enum class Tab { NOW, QUICK_EVENTS, TAGS, ALERT, CHAINS }
 private enum class DrawerDestination {
     NOW,
     QUICK_EVENTS,
     TAGS,
-    TIMELINE,
+    HISTORY_SEARCH,
     ALERTS,
     CHAINS,
     STATISTICS,
@@ -124,7 +125,6 @@ private data class DrawerItemSpec(
 )
 
 private const val TRACE_TAB_TAGS = "mtt_bench_tab_tags"
-private const val TRACE_TAB_TIMELINE = "mtt_bench_tab_timeline"
 private const val TRACE_TAB_QUICK_EVENTS = "mtt_bench_tab_quick_events"
 
     // === FEATURE CAPSULE: AppRoot+Navigation+Settings (UI) START ===
@@ -286,7 +286,6 @@ private fun VarTabScaffold(
         val name = when (target) {
             Tab.QUICK_EVENTS -> TRACE_TAB_QUICK_EVENTS
             Tab.TAGS -> TRACE_TAB_TAGS
-            Tab.TIMELINE -> TRACE_TAB_TIMELINE
             else -> null
         } ?: return
         if (pendingTrace.value != null) {
@@ -301,7 +300,6 @@ private fun VarTabScaffold(
         val expected = when (tab) {
             Tab.QUICK_EVENTS -> TRACE_TAB_QUICK_EVENTS
             Tab.TAGS -> TRACE_TAB_TAGS
-            Tab.TIMELINE -> TRACE_TAB_TIMELINE
             else -> null
         }
         if (expected != null && pendingTrace.value == expected) {
@@ -511,7 +509,7 @@ if (developerSurfaceEnabled && showDevReport) {
                 DrawerItemSpec(DrawerDestination.NOW, R.string.now, Icons.Filled.Timer),
                 DrawerItemSpec(DrawerDestination.QUICK_EVENTS, R.string.quick_events, Icons.Filled.Event),
                 DrawerItemSpec(DrawerDestination.TAGS, R.string.tags, Icons.AutoMirrored.Filled.Label),
-                DrawerItemSpec(DrawerDestination.TIMELINE, R.string.chronology, Icons.Filled.History)
+                DrawerItemSpec(DrawerDestination.HISTORY_SEARCH, R.string.history_search, Icons.Filled.History)
             ),
             listOf(
                 DrawerItemSpec(DrawerDestination.ALERTS, R.string.alert, Icons.Filled.Notifications),
@@ -530,7 +528,7 @@ if (developerSurfaceEnabled && showDevReport) {
             DrawerDestination.NOW -> tab == Tab.NOW
             DrawerDestination.QUICK_EVENTS -> tab == Tab.QUICK_EVENTS
             DrawerDestination.TAGS -> tab == Tab.TAGS
-            DrawerDestination.TIMELINE -> tab == Tab.TIMELINE
+            DrawerDestination.HISTORY_SEARCH -> false
             DrawerDestination.ALERTS -> tab == Tab.ALERT
             DrawerDestination.CHAINS -> tab == Tab.CHAINS
             else -> false
@@ -547,9 +545,8 @@ if (developerSurfaceEnabled && showDevReport) {
                 beginTabTrace(Tab.TAGS)
                 tabState.value = Tab.TAGS
             }
-            DrawerDestination.TIMELINE -> {
-                beginTabTrace(Tab.TIMELINE)
-                tabState.value = Tab.TIMELINE
+            DrawerDestination.HISTORY_SEARCH -> {
+                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("timer")).setPackage(context.packageName))
             }
             DrawerDestination.ALERTS -> tabState.value = Tab.ALERT
             DrawerDestination.CHAINS -> tabState.value = Tab.CHAINS
@@ -668,13 +665,15 @@ if (developerSurfaceEnabled && showDevReport) {
                                 label = { Text(stringResource(R.string.tags)) }
                             )
                             NavigationBarItem(
-                                selected = tab == Tab.TIMELINE,
+                                selected = false,
                                 onClick = {
-                                    beginTabTrace(Tab.TIMELINE)
-                                    tabState.value = Tab.TIMELINE
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("timer"))
+                                            .setPackage(context.packageName)
+                                    )
                                 },
-                                icon = { Icon(Icons.Filled.History, contentDescription = stringResource(R.string.chronology)) },
-                                label = { Text(stringResource(R.string.chronology)) }
+                                icon = { Icon(Icons.Filled.History, contentDescription = stringResource(R.string.history_search)) },
+                                label = { Text(stringResource(R.string.history_search)) }
                             )
                         }
                     }
@@ -736,14 +735,6 @@ if (developerSurfaceEnabled && showDevReport) {
                             onConsumedInitialOpenedTagId = { focusTagIdState.value = null },
                             showSeconds = showSeconds,
                             hideHoursIfZero = hideHoursIfZero
-                        )
-                    }
-                    Tab.TIMELINE -> stateHolder.SaveableStateProvider("timeline") {
-                        TimelineScreen(
-                            capsule = vm.timelineCapsule,
-                            showSeconds = showSeconds,
-                            hideHoursIfZero = hideHoursIfZero,
-                            modifier = Modifier.padding(inner)
                         )
                     }
                     Tab.ALERT -> stateHolder.SaveableStateProvider("alert") {

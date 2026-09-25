@@ -71,6 +71,41 @@ class HubDeepLinkContractTest {
     }
 
     @Test
+    fun searchPreservesHumanQueryAndEntityFilter() {
+        val uri = HubDeepLinkContract.searchUri(
+            modules = listOf("people"),
+            query = "Marco Rossi",
+            entityKind = "person",
+            entityId = "person-1",
+        )
+
+        val target = HubDeepLinkContract.parse(uri).target as HubDeepLinkContract.SearchTarget
+
+        assertEquals("Marco Rossi", target.query)
+        assertEquals("person", target.entityKind)
+        assertEquals("person-1", target.entityId)
+    }
+
+    @Test
+    fun moduleHistoryUriCreatesImmutableModuleScope() {
+        val uri = HubDeepLinkContract.moduleHistoryUri("people")
+        val target = HubDeepLinkContract.parse(uri).target as HubDeepLinkContract.SearchTarget
+
+        assertEquals(listOf("people"), target.modules)
+        assertEquals("people", target.scopeModuleId)
+    }
+
+    @Test
+    fun parserRejectsHistoryScopeOutsideRequestedModules() {
+        val parsed = HubDeepLinkContract.parse(
+            Uri.parse("personalhub://search/v1?module=places&scope_module=people"),
+        )
+
+        assertNull(parsed.target)
+        assertEquals(HubDeepLinkContract.ParseError.MALFORMED, parsed.error)
+    }
+
+    @Test
     fun moduleUriKeepsLegacyShapeAndCentralizesMatching() {
         val uri = HubDeepLinkContract.moduleUri(
             "timer",

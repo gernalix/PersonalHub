@@ -57,7 +57,6 @@ fun HubSettings(onBack: () -> Unit) {
         }
         "sync" -> SyncSettings { page = "root" }
         "git-data" -> GitDataSyncSettings(onBack = { page = "root" })
-        "git-history" -> GitHistorySettings { page = "root" }
         "workflowy" -> WorkflowyIntegrationSettingsScreen { page = "root" }
         "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
         else -> {
@@ -81,7 +80,6 @@ fun HubSettings(onBack: () -> Unit) {
                 Text(stringResource(R.string.settings_optional_services_section), style = MaterialTheme.typography.titleMedium)
                 OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
                 OutlinedButton(onClick = { page = "git-data" }) { Text(stringResource(R.string.git_data_sync_title)) }
-                OutlinedButton(onClick = { page = "git-history" }) { Text(stringResource(R.string.git_history_title)) }
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

@@ -1,11 +1,10 @@
-package com.gernalix.luoghi.ui.history
+package com.gernalix.luoghi.ui.visits
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,11 +13,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Redo
-import androidx.compose.material.icons.automirrored.outlined.Undo
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Place
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -44,8 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gernalix.luoghi.HistoryMessage
-import com.gernalix.luoghi.HistoryUiState
 import com.gernalix.luoghi.R
 import com.gernalix.luoghi.capsules.checkin.WhereWasIQuery
 import com.gernalix.luoghi.capsules.checkin.WhereWasIResult
@@ -62,10 +55,9 @@ private data class VisitDayGroup(val day: LocalDate, val visits: List<VisitUiMod
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun HistoryScreen(
+fun VisitsScreen(
     visits: List<VisitUiModel>,
     events: List<PlaceEventEntity>,
-    historyState: HistoryUiState,
     isLoading: Boolean,
     filterPlaceId: String?,
     filterPlaceName: String?,
@@ -76,9 +68,6 @@ fun HistoryScreen(
     onEditEvent: (Long, Long, String?) -> Unit,
     onDeleteEvent: (Long) -> Unit,
     onDeleteVisit: (String) -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onClearMessage: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     val filteredVisits = remember(visits, filterPlaceId) {
@@ -116,7 +105,7 @@ fun HistoryScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(stringResource(R.string.history_title))
+                        Text(stringResource(R.string.visits_title))
                         filterPlaceName?.let {
                             Text(
                                 it,
@@ -162,18 +151,18 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    item(key = "history-actions") {
-                        HistoryActions(
-                            state = historyState,
-                            onUndo = onUndo,
-                            onRedo = onRedo,
-                            onWhereWasI = { whereWasIOpen = true },
-                            onClearMessage = onClearMessage,
-                        )
+                    item(key = "visit-actions") {
+                        OutlinedButton(
+                            onClick = { whereWasIOpen = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Outlined.Place, contentDescription = null)
+                            Text(stringResource(R.string.where_was_i), modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                     if (filteredVisits.isEmpty()) {
                         item(key = "history-empty") {
-                            EmptyHistory(modifier = Modifier.fillMaxWidth())
+                            EmptyVisits(modifier = Modifier.fillMaxWidth())
                         }
                     }
                     if (activeVisits.isNotEmpty()) {
@@ -218,7 +207,7 @@ fun HistoryScreen(
         )
     }
     editingEvent?.let { event ->
-        HistoryEventEditDialog(
+        VisitEventEditDialog(
             event = event,
             onDismiss = { editingEventId = null },
             onSave = { timestamp, notes ->
@@ -270,61 +259,16 @@ private fun DayHeader(text: String) {
 }
 
 @Composable
-private fun HistoryActions(
-    state: HistoryUiState,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onWhereWasI: () -> Unit,
-    onClearMessage: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                enabled = state.canUndo,
-                onClick = onUndo,
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = null)
-                Text(stringResource(R.string.undo), modifier = Modifier.padding(start = 8.dp))
-            }
-            OutlinedButton(
-                enabled = state.canRedo,
-                onClick = onRedo,
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = null)
-                Text(stringResource(R.string.redo), modifier = Modifier.padding(start = 8.dp))
-            }
-        }
-        OutlinedButton(onClick = onWhereWasI, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Outlined.Place, contentDescription = null)
-            Text(stringResource(R.string.where_was_i), modifier = Modifier.padding(start = 8.dp))
-        }
-        state.message?.let { message: HistoryMessage ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(historyMessageText(message), modifier = Modifier.weight(1f))
-                    TextButton(onClick = onClearMessage) { Text(stringResource(R.string.close)) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun WhereWasIDialog(
     visits: List<VisitUiModel>,
     places: List<PlaceEntity>,
     onDismiss: () -> Unit,
 ) {
     var timestampText by rememberSaveable {
-        mutableStateOf(formatHistoryTimestampForInput(System.currentTimeMillis()))
+        mutableStateOf(formatVisitTimestampForInput(System.currentTimeMillis()))
     }
     var parseFailed by rememberSaveable { mutableStateOf(false) }
-    val instant = parseHistoryTimestampInput(timestampText)
+    val instant = parseVisitTimestampInput(timestampText)
     val result = instant?.let { WhereWasIQuery.at(visits, places, it) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -368,14 +312,14 @@ private fun whereWasIText(result: WhereWasIResult?): String = when (result) {
 }
 
 @Composable
-private fun EmptyHistory(modifier: Modifier = Modifier) {
+private fun EmptyVisits(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            Icons.Outlined.History,
+            Icons.Outlined.Place,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

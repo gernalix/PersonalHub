@@ -45,8 +45,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 import com.gernalix.personalhub.capsules.settings.HubSettings
-import com.gernalix.personalhub.capsules.settings.GitHistorySettings
-import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
 import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
@@ -94,19 +92,8 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         SinceWhenScreen(onBack = { topDestination = null })
         return
     }
-    if (topDestination == "search") {
-        HubTemporalSearchScreen(onBack = { topDestination = null })
-        return
-    }
-    if (topDestination == "activity") {
-        val gitHistoryEnabled = runCatching {
-            GitDataSettings.configuration(context).enabled
-        }.getOrDefault(false)
-        if (gitHistoryEnabled) {
-            GitHistorySettings(onBack = { topDestination = null })
-        } else {
-            HubActivityRegisterScreen(onBack = { topDestination = null })
-        }
+    if (topDestination == "history") {
+        HubHistorySearchScreen(onBack = { topDestination = null })
         return
     }
     if (showSettings) {
@@ -148,9 +135,8 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                         Text("Tags")
                     }
                 }
-                item { HomeUtilityButton(R.string.home_search, R.string.home_search_help) { topDestination = "search" } }
+                item { HomeUtilityButton(R.string.home_history_search, R.string.home_history_search_help) { topDestination = "history" } }
                 item { HomeUtilityButton(R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" } }
-                item { HomeUtilityButton(R.string.home_activity_register, R.string.home_activity_help) { topDestination = "activity" } }
                 item {
                     HomeUtilityButton(R.string.home_data_explorer, R.string.home_data_explorer_help) {
                         context.startActivity(Intent(context, DataExplorerActivity::class.java))

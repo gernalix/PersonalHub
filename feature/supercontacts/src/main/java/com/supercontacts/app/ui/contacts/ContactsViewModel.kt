@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import com.supercontacts.app.data.repository.AddressAutocompleteRepository
 import com.supercontacts.app.data.repository.AddressSuggestion
 import com.supercontacts.app.data.repository.ContactDuplicateCandidate
-import com.supercontacts.app.data.repository.ContactEvent
 import com.supercontacts.app.data.repository.ContactHomeSort
 import com.supercontacts.app.data.repository.ContactHomeSortState
 import com.supercontacts.app.data.repository.ContactInput
@@ -50,12 +49,6 @@ class ContactsViewModel(
         status = statusOwner,
         scope = viewModelScope,
     )
-    private val historyOwner = ContactHistoryCapsule(
-        repository = repository,
-        status = statusOwner,
-        currentContactId = { detailOwner.currentContactId },
-        scope = viewModelScope,
-    )
     private val initiativeOwner = ContactInitiativeCapsule(
         repository = repository,
         status = statusOwner,
@@ -81,7 +74,6 @@ class ContactsViewModel(
         combine(
             homeOwner.state,
             detailOwner.state,
-            historyOwner.state,
             initiativeOwner.state,
             suggestionOwner.state,
             duplicateOwner.state,
@@ -90,11 +82,10 @@ class ContactsViewModel(
             @Suppress("UNCHECKED_CAST")
             val home = values[0] as ContactHomeState
             val detail = values[1] as ContactDetailState
-            val history = values[2] as ContactHistoryState
-            val initiative = values[3] as ContactInitiativeState
-            val suggestion = values[4] as ContactSuggestionState
-            val duplicate = values[5] as ContactDuplicateState
-            val status = values[6] as OperationStatusState
+            val initiative = values[2] as ContactInitiativeState
+            val suggestion = values[3] as ContactSuggestionState
+            val duplicate = values[4] as ContactDuplicateState
+            val status = values[5] as OperationStatusState
             ContactsUiState(
                 searchQuery = home.searchQuery,
                 activeTagFilters = home.activeTagFilters,
@@ -104,15 +95,6 @@ class ContactsViewModel(
                 contacts = home.contacts,
                 detail = detail.detail,
                 contactStats = detail.contactStats,
-                historyEvents = history.historyEvents,
-                globalHistoryEvents = history.globalHistoryEvents,
-                globalHistoryAscending = history.globalHistoryAscending,
-                historyIncludeContact = history.historyIncludeContact,
-                historyIncludeField = history.historyIncludeField,
-                historyIncludeInitiative = history.historyIncludeInitiative,
-                historyCalendar = history.historyCalendar,
-                selectedHistoryRange = history.selectedHistoryRange,
-                historyRangeDetails = history.historyRangeDetails,
                 homeInitiatives = initiative.homeInitiatives,
                 contactInitiatives = initiative.contactInitiatives,
                 contactInitiativeAscending = initiative.contactInitiativeAscending,
@@ -210,23 +192,6 @@ class ContactsViewModel(
             linkId,
             MessagingLinkVerificationStatus.Unverified,
         )
-
-    fun observeContactHistory(contactId: Long) = historyOwner.observeContactHistory(contactId)
-    fun clearHistory() = historyOwner.clearHistory()
-    fun observeGlobalHistory() = historyOwner.observeGlobalHistory()
-    fun setHistoryIncludeContact(include: Boolean) = historyOwner.setHistoryIncludeContact(include)
-    fun setHistoryIncludeField(include: Boolean) = historyOwner.setHistoryIncludeField(include)
-    fun setHistoryIncludeInitiative(include: Boolean) = historyOwner.setHistoryIncludeInitiative(include)
-    fun toggleGlobalHistorySort() = historyOwner.toggleGlobalHistorySort()
-    fun clearGlobalHistory() = historyOwner.clearGlobalHistory()
-    fun observeHistoryCalendar() = historyOwner.observeHistoryCalendar()
-    fun observeHistoryRange() = historyOwner.observeHistoryRange()
-    fun previousHistoryMonth() = historyOwner.previousHistoryMonth()
-    fun nextHistoryMonth() = historyOwner.nextHistoryMonth()
-    fun selectHistoryDate(date: LocalDate) = historyOwner.selectHistoryDate(date)
-    fun clearHistoryCalendar() = historyOwner.clearHistoryCalendar()
-    fun updateHistoryTimestamp(event: ContactEvent, timestampUtc: Long) =
-        historyOwner.updateHistoryTimestamp(event, timestampUtc)
 
     fun observeContactInitiatives(contactId: Long) = initiativeOwner.observeContactInitiatives(contactId)
     fun toggleContactInitiativeSort() = initiativeOwner.toggleContactInitiativeSort()

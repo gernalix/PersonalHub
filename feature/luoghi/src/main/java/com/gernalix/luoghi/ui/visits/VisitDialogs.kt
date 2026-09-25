@@ -1,4 +1,4 @@
-package com.gernalix.luoghi.ui.history
+package com.gernalix.luoghi.ui.visits
 
 import android.icu.text.ListFormatter
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +30,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gernalix.luoghi.HistoryMessage
 import com.gernalix.luoghi.R
 import com.gernalix.luoghi.capsules.checkin.PlaceEventTypes
 import com.gernalix.luoghi.capsules.visits.VisitAnomaly
@@ -166,12 +165,12 @@ private fun EventActionRow(
 }
 
 @Composable
-fun HistoryEventEditDialog(
+fun VisitEventEditDialog(
     event: PlaceEventEntity,
     onDismiss: () -> Unit,
     onSave: (Long, String?) -> Unit,
 ) {
-    var timestampText by rememberSaveable(event.id) { mutableStateOf(formatHistoryTimestampForInput(event.timestamp)) }
+    var timestampText by rememberSaveable(event.id) { mutableStateOf(formatVisitTimestampForInput(event.timestamp)) }
     var notesText by rememberSaveable(event.id) { mutableStateOf(event.notes.orEmpty()) }
     var parseFailed by rememberSaveable(event.id) { mutableStateOf(false) }
 
@@ -206,7 +205,7 @@ fun HistoryEventEditDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                val timestamp = parseHistoryTimestampInput(timestampText)
+                val timestamp = parseVisitTimestampInput(timestampText)
                 if (timestamp == null) parseFailed = true else onSave(timestamp, notesText)
             }) { Text(stringResource(R.string.save)) }
         },
@@ -253,26 +252,6 @@ fun DeleteVisitConfirmation(
 }
 
 @Composable
-fun historyMessageText(message: HistoryMessage): String = when (message) {
-    HistoryMessage.EVENT_UPDATED -> stringResource(R.string.history_message_event_updated)
-    HistoryMessage.EVENT_DELETED -> stringResource(R.string.history_message_event_deleted)
-    HistoryMessage.SESSION_DELETED -> stringResource(R.string.history_message_session_deleted)
-    HistoryMessage.CHECKED_IN -> stringResource(R.string.history_message_checked_in)
-    HistoryMessage.VISIT_CREATED -> stringResource(R.string.history_message_visit_created)
-    HistoryMessage.UNDONE -> stringResource(R.string.history_message_undone)
-    HistoryMessage.REDONE -> stringResource(R.string.history_message_redone)
-    HistoryMessage.EVENT_NOT_FOUND -> stringResource(R.string.history_error_event_not_found)
-    HistoryMessage.INVALID_TIMESTAMP -> stringResource(R.string.history_error_invalid_timestamp)
-    HistoryMessage.CHECKOUT_BEFORE_CHECKIN -> stringResource(R.string.history_error_checkout_before_checkin)
-    HistoryMessage.OVERLAP -> stringResource(R.string.history_error_overlap)
-    HistoryMessage.DUPLICATE -> stringResource(R.string.history_error_duplicate)
-    HistoryMessage.ORPHAN_CHECKOUT -> stringResource(R.string.history_error_orphan_checkout)
-    HistoryMessage.SESSION_NOT_FOUND -> stringResource(R.string.history_error_session_not_found)
-    HistoryMessage.NOTHING_TO_UNDO -> stringResource(R.string.history_error_nothing_to_undo)
-    HistoryMessage.NOTHING_TO_REDO -> stringResource(R.string.history_error_nothing_to_redo)
-}
-
-@Composable
 private fun visitDetailInterval(visit: VisitUiModel): String = when {
     visit.startedAt != null && visit.endedAt != null -> stringResource(
         R.string.visit_detail_interval_format,
@@ -312,10 +291,10 @@ private fun anomalyList(anomalies: Set<VisitAnomaly>): String {
     return remember(labels, locale) { ListFormatter.getInstance(locale).format(labels) }
 }
 
-fun formatHistoryTimestampForInput(timestamp: Long): String =
+fun formatVisitTimestampForInput(timestamp: Long): String =
     HISTORY_EDIT_FORMATTER.format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
 
-fun parseHistoryTimestampInput(value: String): Long? = try {
+fun parseVisitTimestampInput(value: String): Long? = try {
     LocalDateTime.parse(value.trim(), HISTORY_EDIT_FORMATTER)
         .atZone(ZoneId.systemDefault())
         .toInstant()

@@ -128,6 +128,7 @@ import com.supercontacts.app.data.repository.AppContainer
 import com.supercontacts.app.data.repository.ContactDetail
 import com.supercontacts.app.data.repository.ContactDeepLink
 import com.gernalix.personalhub.contracts.database.DataExplorerContract
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.HubContextLinks
 import com.supercontacts.app.data.repository.ContactDuplicateCandidate
@@ -231,19 +232,14 @@ fun SuperContactsApp(
     var selectedContactId by rememberSaveable { mutableStateOf<Long?>(null) }
     var isCreating by rememberSaveable { mutableStateOf(false) }
     var isEditing by rememberSaveable { mutableStateOf(false) }
-    var isViewingHistory by rememberSaveable { mutableStateOf(false) }
-    var isViewingGlobalHistory by rememberSaveable { mutableStateOf(false) }
     var isViewingContactInitiatives by rememberSaveable { mutableStateOf(false) }
     var isViewingGlobalInitiatives by rememberSaveable { mutableStateOf(false) }
-    var timestampEditEvent by remember { mutableStateOf<ContactEvent?>(null) }
     var handledDeepLink by rememberSaveable { mutableStateOf<String?>(null) }
 
     val openContact: (Long) -> Unit = { contactId ->
         selectedContactId = contactId
         isCreating = false
         isEditing = false
-        isViewingHistory = false
-        isViewingGlobalHistory = false
         isViewingContactInitiatives = false
         isViewingGlobalInitiatives = false
         viewModel.recordContactOpen(contactId)
@@ -349,20 +345,10 @@ fun SuperContactsApp(
         if (contactId == null) {
             viewModel.clearDetail()
             viewModel.clearContactStats()
-            viewModel.clearHistory()
             viewModel.clearContactInitiatives()
         } else {
             viewModel.observeContact(contactId)
             viewModel.observeContactStats(contactId)
-        }
-    }
-
-    LaunchedEffect(selectedContactId, isViewingHistory) {
-        val contactId = selectedContactId
-        if (contactId != null && isViewingHistory) {
-            viewModel.observeContactHistory(contactId)
-        } else {
-            viewModel.clearHistory()
         }
     }
 
@@ -375,20 +361,13 @@ fun SuperContactsApp(
         }
     }
 
-    LaunchedEffect(isViewingGlobalHistory) {
-        if (isViewingGlobalHistory) {
-            viewModel.observeGlobalHistory()
-        } else {
-            viewModel.clearGlobalHistory()
-        }
-    }
-
     LaunchedEffect(isViewingGlobalInitiatives) {
         if (isViewingGlobalInitiatives) {
-            viewModel.observeHistoryCalendar()
-            viewModel.observeHistoryRange()
+            viewModel.observeGlobalInitiatives()
+            viewModel.observeInitiativeCalendar()
         } else {
-            viewModel.clearHistoryCalendar()
+            viewModel.clearGlobalInitiatives()
+            viewModel.clearInitiativeCalendar()
             viewModel.clearSelectedInitiativeDay()
         }
     }
@@ -430,9 +409,7 @@ fun SuperContactsApp(
                     selectedContactId = null
                     isCreating = false
                     isEditing = false
-                    isViewingHistory = false
-                    isViewingGlobalHistory = false
-                    isViewingContactInitiatives = false
+                                                            isViewingContactInitiatives = false
                     isViewingGlobalInitiatives = false
                 }
             }
@@ -449,9 +426,7 @@ fun SuperContactsApp(
                 selectedContactId = null
                 isCreating = false
                 isEditing = false
-                isViewingHistory = false
-                isViewingGlobalHistory = false
-                isViewingContactInitiatives = false
+                                                isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
                 viewModel.clearError()
                 appScope.launch {
@@ -469,43 +444,22 @@ fun SuperContactsApp(
     }
 
     when {
-        isViewingGlobalInitiatives -> HistoryCalendarScreen(
+        isViewingGlobalInitiatives && uiState.selectedInitiativeDay != null -> InitiativeDayViewScreen(
             snackbarHostState = snackbarHostState,
-            calendarState = uiState.historyCalendar,
-            selectedRange = uiState.selectedHistoryRange,
-            rangeDetails = uiState.historyRangeDetails,
-            includeContact = uiState.historyIncludeContact,
-            includeField = uiState.historyIncludeField,
-            includeInitiative = uiState.historyIncludeInitiative,
-            onPreviousMonth = viewModel::previousHistoryMonth,
-            onNextMonth = viewModel::nextHistoryMonth,
-            onDayClick = viewModel::selectHistoryDate,
-            onIncludeContactChange = viewModel::setHistoryIncludeContact,
-            onIncludeFieldChange = viewModel::setHistoryIncludeField,
-            onIncludeInitiativeChange = viewModel::setHistoryIncludeInitiative,
-            onEventClick = { event ->
-                event.contactId.takeIf { it > 0L }?.let(openContact)
-            },
-            onTimestampClick = { event -> timestampEditEvent = event },
-            onBack = { isViewingGlobalInitiatives = false },
+            dayDetails = uiState.initiativeDayDetails,
+            onBack = viewModel::clearSelectedInitiativeDay,
         )
 
-        isViewingGlobalHistory -> GlobalHistoryScreen(
+        isViewingGlobalInitiatives -> GlobalInitiativeScreen(
             snackbarHostState = snackbarHostState,
-            events = uiState.globalHistoryEvents,
-            isAscending = uiState.globalHistoryAscending,
-            includeContact = uiState.historyIncludeContact,
-            includeField = uiState.historyIncludeField,
-            includeInitiative = uiState.historyIncludeInitiative,
-            onToggleSort = viewModel::toggleGlobalHistorySort,
-            onIncludeContactChange = viewModel::setHistoryIncludeContact,
-            onIncludeFieldChange = viewModel::setHistoryIncludeField,
-            onIncludeInitiativeChange = viewModel::setHistoryIncludeInitiative,
-            onEventClick = { event ->
-                event.contactId.takeIf { it > 0L }?.let(openContact)
-            },
-            onTimestampClick = { event -> timestampEditEvent = event },
-            onBack = { isViewingGlobalHistory = false },
+            calendarState = uiState.initiativeCalendar,
+            initiatives = uiState.globalInitiatives,
+            isAscending = uiState.globalInitiativeAscending,
+            onToggleSort = viewModel::toggleGlobalInitiativeSort,
+            onPreviousMonth = viewModel::previousInitiativeMonth,
+            onNextMonth = viewModel::nextInitiativeMonth,
+            onDayClick = viewModel::selectInitiativeDay,
+            onBack = { isViewingGlobalInitiatives = false },
         )
 
         isCreating -> ContactEditScreen(
@@ -614,20 +568,6 @@ fun SuperContactsApp(
             onDeleteInitiative = viewModel::deleteInitiative,
         )
 
-        selectedContactId != null && isViewingHistory -> ContactHistoryScreen(
-            snackbarHostState = snackbarHostState,
-            detail = uiState.detail,
-            events = uiState.historyEvents,
-            includeContact = uiState.historyIncludeContact,
-            includeField = uiState.historyIncludeField,
-            includeInitiative = uiState.historyIncludeInitiative,
-            onIncludeContactChange = viewModel::setHistoryIncludeContact,
-            onIncludeFieldChange = viewModel::setHistoryIncludeField,
-            onIncludeInitiativeChange = viewModel::setHistoryIncludeInitiative,
-            onTimestampClick = { event -> timestampEditEvent = event },
-            onBack = { isViewingHistory = false },
-        )
-
         selectedContactId != null -> ContactDetailScreen(
             snackbarHostState = snackbarHostState,
             detail = uiState.detail,
@@ -639,9 +579,7 @@ fun SuperContactsApp(
             onBack = {
                 selectedContactId = null
                 isEditing = false
-                isViewingHistory = false
-                isViewingGlobalHistory = false
-                isViewingContactInitiatives = false
+                                                isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
                 viewModel.clearAddressSuggestions()
                 viewModel.clearError()
@@ -653,7 +591,21 @@ fun SuperContactsApp(
                     }
                 }
             },
-            onHistory = { isViewingHistory = true },
+            onHistory = {
+                uiState.detail?.let { detail ->
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            HubDeepLinkContract.searchUri(
+                                modules = listOf("people"),
+                                entityKind = "person",
+                                entityId = detail.publicId,
+                                scopeModuleId = "people",
+                            ),
+                        ).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
             onInitiativeHistory = { isViewingContactInitiatives = true },
             onInitiativeClick = viewModel::recordInitiative,
             onFieldOpen = { contactId, fieldType -> viewModel.recordFieldOpen(contactId, fieldType) },
@@ -662,8 +614,7 @@ fun SuperContactsApp(
             onDelete = { contactId ->
                 viewModel.deleteContact(contactId) {
                     selectedContactId = null
-                    isViewingHistory = false
-                    isViewingContactInitiatives = false
+                                        isViewingContactInitiatives = false
                 }
             },
             onChangePhoto = pickDetailPhoto,
@@ -680,8 +631,7 @@ fun SuperContactsApp(
                 viewModel.setActiveTagFilter(tag)
                 selectedContactId = null
                 isEditing = false
-                isViewingHistory = false
-                isViewingContactInitiatives = false
+                                isViewingContactInitiatives = false
             },
             onScanMessagingLinks = viewModel::scanMessagingLinks,
             onConfirmMessagingLink = viewModel::confirmMessagingLink,
@@ -723,29 +673,24 @@ fun SuperContactsApp(
             onInitiativeClick = viewModel::recordInitiative,
             onNewContact = {
                 isCreating = true
-                isViewingHistory = false
-                isViewingGlobalHistory = false
-                isViewingContactInitiatives = false
+                                                isViewingContactInitiatives = false
                 isViewingGlobalInitiatives = false
                 viewModel.clearError()
             },
             onGlobalHistory = {
-                selectedContactId = null
-                isCreating = false
-                isEditing = false
-                isViewingHistory = false
-                isViewingContactInitiatives = false
-                isViewingGlobalHistory = true
-                isViewingGlobalInitiatives = false
+                context.startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        HubDeepLinkContract.moduleHistoryUri("people"),
+                    ).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
             },
             onGlobalInitiatives = {
                 selectedContactId = null
                 isCreating = false
                 isEditing = false
-                isViewingHistory = false
-                isViewingContactInitiatives = false
-                isViewingGlobalHistory = false
-                isViewingGlobalInitiatives = true
+                                isViewingContactInitiatives = false
+                                isViewingGlobalInitiatives = true
             },
             onErrorDismiss = viewModel::clearError,
         )
@@ -759,17 +704,6 @@ fun SuperContactsApp(
             onOpenContact = { contactId ->
                 activeCallOverlay = null
                 openContact(contactId)
-            },
-        )
-    }
-
-    timestampEditEvent?.let { event ->
-        HistoryTimestampDialog(
-            initialTimestamp = event.occurredAt,
-            onDismiss = { timestampEditEvent = null },
-            onConfirm = { timestampUtc ->
-                viewModel.updateHistoryTimestamp(event, timestampUtc)
-                timestampEditEvent = null
             },
         )
     }
@@ -2622,275 +2556,6 @@ private fun InitiativeDetailSection(
                 scope = "detail",
                 onInitiativeClick = onInitiativeClick,
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ContactHistoryScreen(
-    snackbarHostState: SnackbarHostState,
-    detail: ContactDetail?,
-    events: List<ContactEvent>,
-    includeContact: Boolean,
-    includeField: Boolean,
-    includeInitiative: Boolean,
-    onIncludeContactChange: (Boolean) -> Unit,
-    onIncludeFieldChange: (Boolean) -> Unit,
-    onIncludeInitiativeChange: (Boolean) -> Unit,
-    onTimestampClick: (ContactEvent) -> Unit,
-    onBack: () -> Unit,
-) {
-    BackHandler(onBack = onBack)
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.history)) },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        if (detail == null) {
-            CenteredLoading(innerPadding)
-            return@Scaffold
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = detail.displayName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = stringResource(R.string.contact_history),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            item {
-                HistoryFilterRow(
-                    includeContact = includeContact,
-                    includeField = includeField,
-                    includeInitiative = includeInitiative,
-                    onIncludeContactChange = onIncludeContactChange,
-                    onIncludeFieldChange = onIncludeFieldChange,
-                    onIncludeInitiativeChange = onIncludeInitiativeChange,
-                )
-            }
-            if (events.isEmpty()) {
-                item {
-                    Text(
-                        text = stringResource(R.string.no_history_yet),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                items(events, key = { event -> event.id }) { event ->
-                    HistoryEventRow(
-                        event = event,
-                        onTimestampClick = { onTimestampClick(event) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GlobalHistoryScreen(
-    snackbarHostState: SnackbarHostState,
-    events: List<GlobalContactEvent>,
-    isAscending: Boolean,
-    includeContact: Boolean,
-    includeField: Boolean,
-    includeInitiative: Boolean,
-    onToggleSort: () -> Unit,
-    onIncludeContactChange: (Boolean) -> Unit,
-    onIncludeFieldChange: (Boolean) -> Unit,
-    onIncludeInitiativeChange: (Boolean) -> Unit,
-    onEventClick: (ContactEvent) -> Unit,
-    onTimestampClick: (ContactEvent) -> Unit,
-    onBack: () -> Unit,
-) {
-    BackHandler(onBack = onBack)
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.global_history)) },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    TextButton(onClick = onToggleSort) {
-                        Text(stringResource(if (isAscending) R.string.sort_asc else R.string.sort_desc))
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                Text(
-                    text = stringResource(
-                        if (isAscending) R.string.oldest_events_first else R.string.newest_events_first,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            item {
-                HistoryFilterRow(
-                    includeContact = includeContact,
-                    includeField = includeField,
-                    includeInitiative = includeInitiative,
-                    onIncludeContactChange = onIncludeContactChange,
-                    onIncludeFieldChange = onIncludeFieldChange,
-                    onIncludeInitiativeChange = onIncludeInitiativeChange,
-                )
-            }
-            if (events.isEmpty()) {
-                item {
-                    Text(
-                        text = stringResource(R.string.no_history_yet),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                items(events, key = { item -> item.event.id }) { item ->
-                    GlobalHistoryEventRow(
-                        item = item,
-                        onClick = { onEventClick(item.event) },
-                        onTimestampClick = { onTimestampClick(item.event) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HistoryCalendarScreen(
-    snackbarHostState: SnackbarHostState,
-    calendarState: HistoryCalendarState,
-    selectedRange: HistoryDateRange,
-    rangeDetails: HistoryRangeDetails?,
-    includeContact: Boolean,
-    includeField: Boolean,
-    includeInitiative: Boolean,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
-    onDayClick: (LocalDate) -> Unit,
-    onIncludeContactChange: (Boolean) -> Unit,
-    onIncludeFieldChange: (Boolean) -> Unit,
-    onIncludeInitiativeChange: (Boolean) -> Unit,
-    onEventClick: (ContactEvent) -> Unit,
-    onTimestampClick: (ContactEvent) -> Unit,
-    onBack: () -> Unit,
-) {
-    BackHandler(onBack = onBack)
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.history_calendar)) },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.back))
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                HistoryCalendarSection(
-                    state = calendarState,
-                    selectedRange = selectedRange,
-                    onPreviousMonth = onPreviousMonth,
-                    onNextMonth = onNextMonth,
-                    onDayClick = onDayClick,
-                )
-            }
-            item {
-                HistoryFilterRow(
-                    includeContact = includeContact,
-                    includeField = includeField,
-                    includeInitiative = includeInitiative,
-                    onIncludeContactChange = onIncludeContactChange,
-                    onIncludeFieldChange = onIncludeFieldChange,
-                    onIncludeInitiativeChange = onIncludeInitiativeChange,
-                )
-            }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = stringResource(R.string.history_selected_range),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = rangeText(selectedRange),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            val events = rangeDetails?.events.orEmpty()
-            if (rangeDetails == null) {
-                item { LoadingScreenContent() }
-            } else if (events.isEmpty()) {
-                item {
-                    Text(
-                        text = stringResource(R.string.no_history_in_range),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                items(events, key = { item -> item.event.id }) { item ->
-                    GlobalHistoryEventRow(
-                        item = item,
-                        onClick = { onEventClick(item.event) },
-                        onTimestampClick = { onTimestampClick(item.event) },
-                    )
-                }
-            }
         }
     }
 }
@@ -4927,123 +4592,6 @@ private fun InitiativeButton(
 }
 
 @Composable
-private fun HistoryFilterRow(
-    includeContact: Boolean,
-    includeField: Boolean,
-    includeInitiative: Boolean,
-    onIncludeContactChange: (Boolean) -> Unit,
-    onIncludeFieldChange: (Boolean) -> Unit,
-    onIncludeInitiativeChange: (Boolean) -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.history_filters),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            HistoryFilterCheckbox(
-                checked = includeContact,
-                label = stringResource(R.string.history_filter_contact),
-                onCheckedChange = onIncludeContactChange,
-            )
-            HistoryFilterCheckbox(
-                checked = includeField,
-                label = stringResource(R.string.history_filter_field),
-                onCheckedChange = onIncludeFieldChange,
-            )
-            HistoryFilterCheckbox(
-                checked = includeInitiative,
-                label = stringResource(R.string.history_filter_initiative),
-                onCheckedChange = onIncludeInitiativeChange,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HistoryFilterCheckbox(
-    checked: Boolean,
-    label: String,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-@Composable
-private fun GlobalHistoryEventRow(
-    item: GlobalContactEvent,
-    onClick: () -> Unit,
-    onTimestampClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = stringResource(
-                    R.string.global_event_row,
-                    item.contactDisplayName,
-                    eventDescription(item.event),
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = formatTimestamp(item.event.occurredAt),
-                modifier = Modifier.clickable { onTimestampClick() },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HistoryEventRow(
-    event: ContactEvent,
-    onTimestampClick: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = formatTimestamp(event.occurredAt),
-                modifier = Modifier.clickable { onTimestampClick() },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = eventDescription(event),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
-
-@Composable
 private fun ContactInitiativeRow(
     initiative: ContactInitiative,
     onDeleteRequest: () -> Unit,
@@ -6062,90 +5610,6 @@ private fun messagingStatusText(link: ContactMessagingLink): String =
         MessagingLinkVerificationStatus.ManuallyRejected -> stringResource(R.string.messaging_status_manually_rejected)
         else -> stringResource(R.string.messaging_status_generated_unverified)
     }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HistoryTimestampDialog(
-    initialTimestamp: Long,
-    onDismiss: () -> Unit,
-    onConfirm: (Long) -> Unit,
-) {
-    val zoneId = remember { ZoneId.systemDefault() }
-    val initialDateTime = remember(initialTimestamp) {
-        Instant.ofEpochMilli(initialTimestamp).atZone(zoneId)
-    }
-    val initialDateMillis = remember(initialTimestamp) {
-        initialDateTime.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-    }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialDateMillis)
-    val timePickerState = rememberTimePickerState(
-        initialHour = initialDateTime.hour,
-        initialMinute = initialDateTime.minute,
-        is24Hour = true,
-    )
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 560.dp)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = stringResource(R.string.history_timestamp_edit),
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                DatePicker(
-                    state = datePickerState,
-                    modifier = Modifier.fillMaxWidth(),
-                    title = null,
-                    headline = null,
-                    showModeToggle = false,
-                )
-                TimeInput(state = timePickerState)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    TextButton(
-                        onClick = {
-                            val selectedDate = datePickerState.selectedDateMillis
-                                ?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
-                                ?: initialDateTime.toLocalDate()
-                            val selectedTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                            onConfirm(
-                                selectedDate
-                                    .atTime(selectedTime)
-                                    .atZone(zoneId)
-                                    .toInstant()
-                                    .toEpochMilli(),
-                            )
-                        },
-                    ) {
-                        Text(stringResource(R.string.save))
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun timestampText(timestamp: ContactFieldTimestamp): String =

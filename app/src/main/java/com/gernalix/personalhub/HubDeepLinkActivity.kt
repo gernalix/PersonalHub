@@ -85,7 +85,7 @@ private fun HubDeepLinkEntry(uri: Uri?, onBack: () -> Unit) {
         is HubDeepLinkContract.EntityTarget -> EntityDeepLink(target, onBack)
         is HubDeepLinkContract.SinceWhenCreateTarget -> SinceWhenCreateScreen(target.source, onBack, startEnabled = target.startEnabled)
         is HubDeepLinkContract.ContextTarget -> ContextDeepLink(target.contextId, onBack)
-        is HubDeepLinkContract.EventTarget -> HubActivityRegisterScreen(onBack = onBack, initialEventId = target.eventId)
+        is HubDeepLinkContract.EventTarget -> HubHistorySearchScreen(onBack = onBack, initialEventId = target.eventId)
         is HubDeepLinkContract.SearchTarget -> SearchDeepLink(target, onBack)
         null -> DeepLinkErrorScreen(
             messageRes = when (parsed.error) {
@@ -129,12 +129,15 @@ private fun SearchDeepLink(target: HubDeepLinkContract.SearchTarget, onBack: () 
         return
     }
     val (from, to) = parsedRange.getOrThrow()
-    HubTemporalSearchScreen(
+    HubHistorySearchScreen(
         onBack = onBack,
+        scopeModuleId = target.scopeModuleId,
         initialFromMs = from,
         initialToMs = to,
         initialModules = target.modules.toSet(),
-        autoSearch = target.fromIso != null || target.toIso != null || target.modules.isNotEmpty(),
+        initialQuery = target.query.orEmpty(),
+        initialEntityKind = target.entityKind,
+        initialEntityId = target.entityId,
     )
 }
 

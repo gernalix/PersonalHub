@@ -140,9 +140,11 @@ private fun MultiTimeTrackerApp(
             SnapshotSqlite.ensureStartupQuickEventSchema(app)
         }
         StartupPerfTrace.firstFrame()
-        android.view.Choreographer.getInstance().postFrameCallback {
+        withContext(Dispatchers.Main.immediate) {
             android.view.Choreographer.getInstance().postFrameCallback {
-                com.example.multitimetracker.api.TimerStartupApi.signalFirstUsableScreen()
+                android.view.Choreographer.getInstance().postFrameCallback {
+                    com.example.multitimetracker.api.TimerStartupApi.signalFirstUsableScreen()
+                }
             }
         }
         if (Build.VERSION.SDK_INT >= 33 && !notificationPermissionGranted.value) {
