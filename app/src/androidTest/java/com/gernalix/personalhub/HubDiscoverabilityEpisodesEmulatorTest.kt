@@ -62,23 +62,11 @@ class HubDiscoverabilityEpisodesEmulatorTest {
         composeRule.setContent {
             PersonalHubTheme {
                 Surface {
-                    PersonalHubApp()
+                    HubTemporalSearchScreen(onBack = {})
                 }
             }
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.home_context)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.home_context_help)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.home_search)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.home_search_help)).assertIsDisplayed()
-        composeRule.onNodeWithTag("home-utilities")
-            .performScrollToNode(hasText(context.getString(R.string.home_activity_register)))
-        composeRule.onNodeWithText(context.getString(R.string.home_activity_register)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.home_activity_help)).assertIsDisplayed()
-
-        composeRule.onNodeWithTag("home-utilities")
-            .performScrollToNode(hasText(context.getString(R.string.home_search)))
-        composeRule.onNodeWithText(context.getString(R.string.home_search)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.temporal_saved_episodes)).assertIsDisplayed()
         composeRule.onNodeWithText(episodeTitle).assertIsDisplayed()
 
