@@ -181,7 +181,10 @@ class DataExplorerOfflineQaDeviceTest {
         var body = ""
         while (System.currentTimeMillis() < deadline) {
             body = evalString(webView, "document.body ? document.body.innerText : ''")
-            if (body.contains("Offline Data Explorer error")) error(body)
+            if (body.contains("Offline Data Explorer error")) {
+                android.util.Log.e("DataExplorerOfflineQA", body.take(4_000))
+                throw AssertionError(body)
+            }
             if (body.contains(text)) return body
             Thread.sleep(400)
         }
