@@ -298,7 +298,7 @@ internal fun WordPulseScreen(
                                 Intent(
                                     Intent.ACTION_VIEW,
                                     HubDeepLinkContract.moduleHistoryUri("wordpulse"),
-                                ),
+                                ).setPackage(context.packageName),
                             )
                         },
                         onDeleteAllData = { showDeleteConfirmation = true },

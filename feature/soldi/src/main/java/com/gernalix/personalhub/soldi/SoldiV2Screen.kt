@@ -565,7 +565,7 @@ internal fun SoldiV2Screen(
                         modifier = Modifier.clickable {
                             showMore = false
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("soldi")),
+                                Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("soldi")).setPackage(context.packageName),
                             )
                         },
                     )

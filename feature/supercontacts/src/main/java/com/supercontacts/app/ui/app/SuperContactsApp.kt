@@ -602,7 +602,7 @@ fun SuperContactsApp(
                                 entityId = detail.publicId,
                                 scopeModuleId = "people",
                             ),
-                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        ).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 }
             },
@@ -682,7 +682,7 @@ fun SuperContactsApp(
                     Intent(
                         Intent.ACTION_VIEW,
                         HubDeepLinkContract.moduleHistoryUri("people"),
-                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    ).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             },
             onGlobalInitiatives = {

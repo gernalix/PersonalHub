@@ -546,7 +546,7 @@ if (developerSurfaceEnabled && showDevReport) {
                 tabState.value = Tab.TAGS
             }
             DrawerDestination.HISTORY_SEARCH -> {
-                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("timer")))
+                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("timer")).setPackage(context.packageName))
             }
             DrawerDestination.ALERTS -> tabState.value = Tab.ALERT
             DrawerDestination.CHAINS -> tabState.value = Tab.CHAINS

@@ -110,7 +110,7 @@ class HubHistorySearchQaDeviceTest {
     @Test
     fun moduleScopeIsImmutableAndHasNoModuleFilter() {
         val context = qaContext()
-        resetQaDatabase(context)
+        PersonalHubDatabase.get(context)
         val module = mutableStateOf("places")
 
         composeRule.setContent {
@@ -141,7 +141,7 @@ class HubHistorySearchQaDeviceTest {
     @Test
     fun placesAndTimerEntryPointsOpenTheSharedScopedScreen() {
         val context = qaContext()
-        resetQaDatabase(context)
+        PersonalHubDatabase.get(context)
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         device.wakeUp()
         context.startActivity(
@@ -155,7 +155,9 @@ class HubHistorySearchQaDeviceTest {
             7_000,
         )
         assertNotNull("Places shared History/Search entry is missing", placesSearch)
-        placesSearch!!.click()
+        placesSearch!!.visibleBounds.let { bounds ->
+            device.click(bounds.centerX(), bounds.centerY())
+        }
         assertNotNull(
             device.wait(
                 Until.findObject(
@@ -184,7 +186,9 @@ class HubHistorySearchQaDeviceTest {
             7_000,
         )
         assertNotNull("Timer shared History/Search entry is missing", timerHistory)
-        timerHistory!!.click()
+        timerHistory!!.visibleBounds.let { bounds ->
+            device.click(bounds.centerX(), bounds.centerY())
+        }
         assertNotNull(
             device.wait(
                 Until.findObject(
@@ -214,14 +218,8 @@ class HubHistorySearchQaDeviceTest {
         return context
     }
 
-    private fun resetQaDatabase(context: Context): PersonalHubDatabase {
-        PersonalHubDatabase.resetForTests()
-        context.deleteDatabase(PersonalHubDatabase.DATABASE_NAME)
-        return PersonalHubDatabase.get(context)
-    }
-
     private fun seedReversiblePlaceUpdate(context: Context): PlaceSeed {
-        val database = resetQaDatabase(context)
+        val database = PersonalHubDatabase.get(context)
         val db = database.openHelper.writableDatabase
         val suffix = System.currentTimeMillis().toString()
         val placeId = UUID.randomUUID().toString()

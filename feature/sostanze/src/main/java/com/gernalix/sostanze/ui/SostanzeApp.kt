@@ -187,7 +187,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                         TextButton(
                             onClick = {
                                 context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("substances")),
+                                    Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("substances")).setPackage(context.packageName),
                                 )
                             },
                         ) {

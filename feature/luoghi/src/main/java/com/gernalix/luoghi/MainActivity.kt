@@ -215,7 +215,7 @@ private fun LuoghiNavigation(
                 vm.refreshRouteDistanceStats()
             },
             onHistorySearch = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("places")))
+                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("places")).setPackage(context.packageName))
             },
             onOpenVisits = { openVisits(visitId = it) },
             onNewPlace = {
