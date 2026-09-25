@@ -251,8 +251,10 @@ class DataExplorerActivity : ComponentActivity() {
         }
         DisposableEffect(Unit) {
             onDispose {
+                // Let Activity/process teardown own WebView destruction. Calling destroy()
+                // here terminates Chromium's renderer before instrumentation can publish
+                // an otherwise successful result.
                 webView?.stopLoading()
-                webView?.destroy()
                 webView = null
             }
         }
