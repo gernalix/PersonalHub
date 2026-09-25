@@ -1,5 +1,6 @@
 package com.wordpulse.app.ui
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
@@ -92,6 +94,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gernalix.personalhub.contracts.database.DataExplorerContract
+import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.wordpulse.app.BuildConfig
 import com.wordpulse.app.data.SessionSummaryRow
 import com.wordpulse.app.domain.BaselineComparison
@@ -157,7 +160,6 @@ import com.wordpulse.app.domain.SimilarityMetrics
 import com.wordpulse.app.domain.SoundShapeDriftMetrics
 import com.wordpulse.app.domain.SoundShapeSegment
 import com.wordpulse.app.domain.SoundShapeShift
-import com.wordpulse.app.domain.TimelineEntry
 import com.wordpulse.app.domain.TypingAlert
 import com.wordpulse.app.domain.TypingAlertAction
 import com.wordpulse.app.domain.VocabularyMetrics
@@ -182,7 +184,6 @@ import kotlinx.coroutines.launch
 
 private enum class WordPulseTab(val label: String) {
     Today("Today"),
-    Timeline("Timeline"),
     Explore("Explore"),
     Lab("Lab"),
     Sessions("Sessions"),
@@ -292,6 +293,14 @@ internal fun WordPulseScreen(
                             restoreTypingFocus()
                         },
                         onDataExplorer = { context.startActivity(DataExplorerContract.intent(context.packageName, "word_entries")) },
+                        onHistory = {
+                            context.startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    HubDeepLinkContract.moduleHistoryUri("wordpulse"),
+                                ),
+                            )
+                        },
                         onDeleteAllData = { showDeleteConfirmation = true },
                     )
 
@@ -323,10 +332,6 @@ internal fun WordPulseScreen(
 
                     when (selectedTab) {
                         WordPulseTab.Today -> TodayTab(uiState.metrics)
-                        WordPulseTab.Timeline -> TimelineTab(
-                            timeline = uiState.metrics.timeline,
-                            onSelectWord = onSelectWord,
-                        )
                         WordPulseTab.Explore -> ExploreTab(
                             searchQuery = uiState.searchQuery,
                             searchMode = uiState.searchMode,
@@ -394,6 +399,7 @@ private fun Header(
     onStartNewSession: () -> Unit,
     onClearInput: () -> Unit,
     onDataExplorer: () -> Unit,
+    onHistory: () -> Unit,
     onDeleteAllData: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -423,6 +429,9 @@ private fun Header(
                 }
                 IconButton(onClick = onDataExplorer, modifier = Modifier.testTag("data-explorer-button")) {
                     Icon(Icons.Filled.Storage, contentDescription = "Datasette")
+                }
+                IconButton(onClick = onHistory, modifier = Modifier.testTag("history-search-button")) {
+                    Icon(Icons.Filled.History, contentDescription = "History and search")
                 }
                 IconButton(onClick = onDeleteAllData, modifier = Modifier.testTag("delete-all-data-button")) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete all data")
@@ -530,46 +539,6 @@ private fun InsightStrip(insights: List<Insight>) {
             }
         }
     }
-}
-
-@Composable
-private fun TimelineTab(
-    timeline: List<TimelineEntry>,
-    onSelectWord: (String) -> Unit,
-) {
-    Section("Current Session Timeline") {
-        if (timeline.isEmpty()) {
-            EmptyText()
-        } else {
-            timeline.asReversed().forEach { entry ->
-                TimelineRow(entry, onSelectWord)
-                HorizontalDivider()
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimelineRow(entry: TimelineEntry, onSelectWord: (String) -> Unit) {
-    ListItem(
-        modifier = Modifier
-            .clickable { onSelectWord(entry.normalizedWord) }
-            .testTag("timeline-word-${entry.id}"),
-        headlineContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(entry.originalWord, fontWeight = FontWeight.SemiBold)
-                if (entry.duplicateOrdinal > 1) {
-                    AssistChip(onClick = {}, label = { Text("dup ${entry.duplicateOrdinal}") })
-                }
-            }
-        },
-        supportingContent = {
-            Text(
-                "${entry.createdAtUtcMs.formatTime()} - ${entry.elapsedSincePreviousMs.formatDuration()} - " +
-                    "${entry.wordLength} chars - sim ${entry.similarityToPrevious.formatSimilarityShort()}",
-            )
-        },
-    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

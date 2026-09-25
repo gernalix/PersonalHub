@@ -185,6 +185,15 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                     title = { Text(stringResource(R.string.app_name)) },
                     actions = {
                         TextButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("substances")),
+                                )
+                            },
+                        ) {
+                            Text("🔍")
+                        }
+                        TextButton(
                             onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "substances")) },
                         ) {
                             Text("Data")

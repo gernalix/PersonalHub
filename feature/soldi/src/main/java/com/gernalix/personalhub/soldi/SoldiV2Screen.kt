@@ -560,6 +560,16 @@ internal fun SoldiV2Screen(
                     )
                     ListItem(headlineContent = { Text("Opzioni di visualizzazione") }, modifier = Modifier.clickable { showMore = false; showViewOptions = true })
                     ListItem(
+                        headlineContent = { Text("Cronologia / ricerca") },
+                        supportingContent = { Text("Modifiche registrate in Soldi") },
+                        modifier = Modifier.clickable {
+                            showMore = false
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("soldi")),
+                            )
+                        },
+                    )
+                    ListItem(
                         headlineContent = { Text("Esplora dati") },
                         supportingContent = { Text("Datasette · transazioni") },
                         modifier = Modifier.clickable {

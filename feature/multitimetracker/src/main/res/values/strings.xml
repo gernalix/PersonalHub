@@ -121,6 +121,7 @@
     <string name="chain_steps_count">%1$d steps</string>
     <string name="chiudi">Close</string>
     <string name="chronology">Timeline</string>
+    <string name="history_search">History/Search</string>
     <string name="clear_log">Clear log</string>
     <string name="clear_log_cancel">Clear log cancel</string>
     <string name="clear_log_confirm">Clear log confirm</string>
