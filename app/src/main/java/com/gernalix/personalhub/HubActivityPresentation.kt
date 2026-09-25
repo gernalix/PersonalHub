@@ -11,6 +11,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import org.json.JSONObject
 
+private val TECHNICAL_UUID_VALUE = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+
 internal data class HumanActivityChange(
     val label: String,
     val beforeText: String?,
@@ -227,6 +229,7 @@ private fun cleanHumanValue(value: String?): String? {
     val trimmed = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
     if (trimmed.length > 240) return null
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) return null
+    if (TECHNICAL_UUID_VALUE.matches(trimmed)) return null
     return trimmed
 }
 
@@ -244,6 +247,7 @@ private fun humanFieldLabel(raw: String?): String? {
         key.endsWith("_uuid") ||
         key.endsWith("_json") ||
         key.endsWith("_at") ||
+        key.endsWith("_ms") ||
         key.startsWith("normalized_") ||
         key.startsWith("sort_") ||
         key.contains("cursor") ||

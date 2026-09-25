@@ -75,6 +75,48 @@ class HubActivityPresentationTest {
     }
 
     @Test
+    fun technicalUuidValueIsSuppressedEvenUnderHumanFieldLabel() {
+        val uuid = "08afb1f0-225f-4fed-8a10-7081d8e28ec4"
+        val activity = activity(
+            moduleId = "people",
+            action = "updated",
+            entityKind = "person",
+            entityLabel = "Marco Rossi",
+            detailKey = "address",
+            beforePayload = null,
+            afterPayload = uuid,
+            payloadKind = HubActivityPayloadKind.PEOPLE_EVENT_V1,
+        )
+
+        val text = humanizeActivity(activity, "Marco Rossi", "People")
+
+        assertFalse(text.title.contains(uuid))
+        assertFalse(text.searchText.contains(uuid))
+        assertFalse(text.detail.orEmpty().contains(uuid))
+    }
+
+    @Test
+    fun timerEpochMillisecondsAreNotRenderedOrIndexed() {
+        val epoch = "1789794443437"
+        val activity = activity(
+            moduleId = "timer",
+            action = "created",
+            entityKind = "session",
+            entityLabel = "filler",
+            payloadKind = HubActivityPayloadKind.ROW_V1,
+            payloadColumns = "timestamp_ms",
+            afterPayload = rowPayload(epoch.toLong()),
+        )
+
+        val text = humanizeActivity(activity, "filler", "Timer")
+
+        assertFalse(text.title.contains("Timestamp Ms"))
+        assertFalse(text.title.contains(epoch))
+        assertFalse(text.searchText.contains(epoch))
+        assertFalse(text.detail.orEmpty().contains(epoch))
+    }
+
+    @Test
     fun groupingKeepsUngroupedRowsSeparateAndCombinesSharedGroup() {
         val groupedA = activity(id = "a", groupId = "group-1")
         val groupedB = activity(id = "b", groupId = "group-1")
