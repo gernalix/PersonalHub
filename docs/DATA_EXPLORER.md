@@ -14,6 +14,12 @@ The embedded Datasette Lite runtime belongs under `app/src/main/assets/datasette
 
 Local mode rejects network requests outside that synthetic origin. A build is therefore offline-capable only when the vendored Datasette Lite, Pyodide and required wheels/assets start successfully with networking disabled.
 
+The checked-in offline runtime pins Pyodide `0.27.2` (Python 3.12.7), Datasette `0.65.5`, the Datasette Lite shell at upstream commit `779b2d4da76a5dc2f1d9aea0d7c8d854f6e1497b`, and the PersonalHub relational projector from `gernalix/datasette5` commit `51e3106a35a98816593994510919239b644af462`. `vendor-manifest.json` records SHA-256 and byte size for every Pyodide package, wheel and projector input used at runtime. The WebView worker validates those hashes before use and contains no external HTTP(S) runtime URL.
+
+For local browsing the WebView receives only the detached validated Room snapshot. Inside Pyodide that snapshot is transformed into the same envelope identities used by sync, then the existing server projector builds a temporary `personalhub_read.db` with semantic labels, native PK/FK links, Context relationships and temporal associations. The projected database is integrity/FK checked, checkpointed out of WAL mode and opened by Datasette as immutable. Neither the live Room database nor its WAL/SHM enters the WebView.
+
+The current vendored asset tree is about 24.55 MiB uncompressed and contributes about 11.68 MiB compressed to the QA APK. Final release/shrink measurement remains owned by the release-preflight task, not by Data Explorer implementation.
+
 ## Remote mode
 
 Remote exploration reuses the HTTPS base address already stored by Datasette sync but never reads or injects the mobile Bearer token. The default presentation database is `personalhub_read`, matching the canonical `datasette5` projection, and can be overridden in the explorer.
