@@ -30,4 +30,3 @@ TIMER_COLLECTIONS = {
 
 def snake(value):
     return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
-

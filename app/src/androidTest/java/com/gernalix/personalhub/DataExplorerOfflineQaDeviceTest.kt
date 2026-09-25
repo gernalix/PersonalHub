@@ -2,7 +2,8 @@ package com.gernalix.personalhub
 
 import android.content.Context
 import android.content.Intent
-import android.provider.Settings
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -15,6 +16,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import java.io.FileInputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -33,6 +35,7 @@ class DataExplorerOfflineQaDeviceTest {
 
     @After
     fun cleanup() {
+        runCatching { setOfflineMode(false) }
         PersonalHubDatabase.closeInstance()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
     }
@@ -44,12 +47,10 @@ class DataExplorerOfflineQaDeviceTest {
             android.os.Build.MODEL.contains("sdk_gphone", ignoreCase = true) ||
                 android.os.Build.FINGERPRINT.contains("generic", ignoreCase = true),
         ) { "Offline Data Explorer QA must run on the emulator" }
-        assertEquals(
-            "Gate must run with Android airplane mode enabled",
-            1,
-            Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0),
-        )
-        seedDatabase()
+        setOfflineMode(true)
+        try {
+            assertOfflineMode()
+            seedDatabase()
 
         val intent = Intent(context, DataExplorerActivity::class.java)
             .putExtra(DataExplorerContract.EXTRA_TABLE, "contact_fields")
@@ -120,7 +121,51 @@ class DataExplorerOfflineQaDeviceTest {
             awaitHashContains(webView, "/personalhub_read/contact_fields", 20_000)
             awaitBodyContains(webView, "Ada Example", 20_000)
         }
+            assertOfflineMode()
+        } finally {
+            setOfflineMode(false)
+        }
     }
+
+    private fun setOfflineMode(enabled: Boolean) {
+        if (enabled) {
+            shell("cmd connectivity airplane-mode enable")
+            shell("svc wifi disable")
+            shell("svc data disable")
+            val deadline = System.currentTimeMillis() + 5_000
+            while (System.currentTimeMillis() < deadline) {
+                if (!hasValidatedInternet()) return
+                Thread.sleep(100)
+            }
+            error("Validated Internet remained available after disabling connectivity")
+        } else {
+            shell("cmd connectivity airplane-mode disable")
+            shell("svc wifi enable")
+            shell("svc data enable")
+        }
+    }
+
+    private fun assertOfflineMode() {
+        assertTrue(
+            "Validated Internet became available while offline Data Explorer was running",
+            !hasValidatedInternet(),
+        )
+    }
+
+    private fun hasValidatedInternet(): Boolean {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        return connectivity.allNetworks.any { network ->
+            connectivity.getNetworkCapabilities(network)?.let { capabilities ->
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            } == true
+        }
+    }
+
+    private fun shell(command: String): String =
+        instrumentation.uiAutomation.executeShellCommand(command).use { descriptor ->
+            FileInputStream(descriptor.fileDescriptor).bufferedReader().use { it.readText() }
+        }
 
     private fun seedDatabase() {
         PersonalHubDatabase.closeInstance()
