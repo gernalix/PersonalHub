@@ -64,7 +64,8 @@ run_app_test 'DatasetteSyncInstrumentedTest#configureFromPrivateRuntimeFile'
 run_app_test 'DatasetteSyncInstrumentedTest#oracleFullRoundTripUpload'
 
 # Library instrumentation uses the same emulator, never concurrently.
-timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --max-workers=1 \
+python3 tools/android_connected_test_gate.py -- \
+  timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --max-workers=1 \
   :feature:luoghi:connectedDebugAndroidTest \
   :feature:multitimetracker:connectedDebugAndroidTest \
   -Ppersonalhub.allowCiEmulatorDebug=true

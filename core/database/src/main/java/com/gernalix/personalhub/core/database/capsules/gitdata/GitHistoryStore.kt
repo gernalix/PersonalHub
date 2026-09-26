@@ -86,7 +86,7 @@ object GitHistoryStore {
                 "INSERT OR REPLACE INTO " + TABLE + "(" +
                     "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,changed_columns," +
                     "history_path,commit_sha,reverted_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL)",
-                arrayOf(
+                arrayOf<Any?>(
                     event.id,
                     event.occurredAt,
                     event.author,
@@ -351,7 +351,7 @@ object GitHistoryStore {
                 "INSERT OR REPLACE INTO " + FIELD_STATS_TABLE +
                     "(table_name,row_key,column_name,last_occurred_at,interval_sum_ms,interval_count)" +
                     " VALUES(?,?,?,?,?,?)",
-                arrayOf(table, rowKey, column, occurredAt, sum, count),
+                arrayOf<Any?>(table, rowKey, column, occurredAt, sum, count),
             )
         }
     }

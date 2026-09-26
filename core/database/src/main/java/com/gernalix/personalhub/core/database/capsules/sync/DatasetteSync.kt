@@ -219,7 +219,7 @@ object DatasetteSync {
                     val db = db(context)
                     db.beginTransaction()
                     try {
-                        items.forEach { db.execSQL("DELETE FROM hub_sync_pending WHERE table_name=? AND row_key=? AND revision=?", arrayOf(it.table, it.key, it.revision)) }
+                        items.forEach { db.execSQL("DELETE FROM hub_sync_pending WHERE table_name=? AND row_key=? AND revision=?", arrayOf<Any?>(it.table, it.key, it.revision)) }
                         db.setTransactionSuccessful()
                     } finally { db.endTransaction() }
                 }

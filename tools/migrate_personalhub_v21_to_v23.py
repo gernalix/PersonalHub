@@ -16,6 +16,12 @@ ADDED = {
     22: {"since_when_counters", "since_when_migration_state"},
     23: {"finance_owned_items", "finance_photo_index"},
 }
+LEGACY_MIGRATION_STATE_TABLE = "since_when_migration_state"
+LEGACY_TRIGGER_PREFIXES = {
+    "hub_dirty": "UPDATE hub_generation",
+    "hub_sync": "hub_sync_pending",
+    "hub_git_dirty": "hub_git_pending",
+}
 
 
 def schema(version: int) -> dict:
@@ -86,6 +92,26 @@ def validate(db: sqlite3.Connection, version: int) -> None:
     check(db)
 
 
+def retire_legacy_migration_state_triggers(db: sqlite3.Connection) -> list[str]:
+    """Remove only generated triggers for a now-excluded technical state table."""
+    removed = []
+    for name, sql in db.execute(
+        "SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name=?",
+        (LEGACY_MIGRATION_STATE_TABLE,),
+    ).fetchall():
+        matches = [
+            marker for prefix, marker in LEGACY_TRIGGER_PREFIXES.items()
+            for op in ("INSERT", "UPDATE", "DELETE")
+            if name == f"{prefix}_{LEGACY_MIGRATION_STATE_TABLE}_{op}"
+            and f"AFTER {op} ON `{LEGACY_MIGRATION_STATE_TABLE}`" in sql
+        ]
+        if len(matches) != 1 or matches[0] not in sql:
+            raise ValueError(f"unexpected migration-state trigger: {name}")
+        db.execute(f'DROP TRIGGER "{name}"')
+        removed.append(name)
+    return sorted(removed)
+
+
 def migrate(source: Path, output: Path) -> dict:
     if not source.is_file() or output.exists() or source.resolve() == output.resolve():
         raise ValueError("source missing, output exists, or paths identical")
@@ -114,8 +140,14 @@ def migrate(source: Path, output: Path) -> dict:
                             dst.execute(index["createSql"].replace("${TABLE_NAME}", table))
                 dst.execute("UPDATE room_master_table SET identity_hash=? WHERE id=42", (schema(next_version)["identityHash"],))
                 dst.execute(f"PRAGMA user_version={next_version}")
+            retired_triggers = retire_legacy_migration_state_triggers(dst)
             dst.commit()
             validate(dst, 23)
+            if dst.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='trigger' AND tbl_name=?",
+                (LEGACY_MIGRATION_STATE_TABLE,),
+            ).fetchone():
+                raise ValueError("migration-state trigger remains")
             after = snapshot(dst)
             if {table: after.get(table) for table in before} != before:
                 raise ValueError("existing table data changed")
@@ -127,6 +159,7 @@ def migrate(source: Path, output: Path) -> dict:
         temp = None
         report = {"status": "PASS", "source_version": version, "target_version": 23,
                   "source_sha256": digest(source), "output_sha256": digest(output),
+                  "retired_legacy_triggers": retired_triggers,
                   "preserved_tables": len(before), "table_counts": {k: v[0] for k, v in after.items()},
                   "quick_check": "ok", "integrity_check": "ok", "foreign_key_check": []}
         Path(str(output) + ".validation.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")

@@ -33,9 +33,9 @@ class DatabasePreferences(context: Context, private val namespace: String) : Sha
         }.toMutableMap()
     }
     override fun contains(key: String?) = read().has(key)
-    override fun getString(key: String?, defValue: String?): String? = read().let { if (it.has(key)) it.getString(key) else defValue }
+    override fun getString(key: String?, defValue: String?): String? = read().let { if (key != null && it.has(key)) it.getString(key) else defValue }
     override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? = read().let { json ->
-        if (!json.has(key)) defValues?.toMutableSet() else json.getJSONArray(key).let { a -> (0 until a.length()).map { a.getString(it) }.toMutableSet() }
+        if (key == null || !json.has(key)) defValues?.toMutableSet() else json.getJSONArray(key).let { a -> (0 until a.length()).map { a.getString(it) }.toMutableSet() }
     }
     override fun getInt(key: String?, defValue: Int) = read().optInt(key, defValue)
     override fun getLong(key: String?, defValue: Long) = read().optLong(key, defValue)
@@ -71,7 +71,7 @@ class DatabasePreferences(context: Context, private val namespace: String) : Sha
                         if (value == null) after.remove(key) else after.put(key, value)
                     }
                     if (changed.isNotEmpty()) {
-                        if (timer) db.execSQL("INSERT OR REPLACE INTO ui_prefs_mirror(id,json,saved_at_ms) VALUES(1,?,?)", arrayOf(after.toString(), System.currentTimeMillis()))
+                        if (timer) db.execSQL("INSERT OR REPLACE INTO ui_prefs_mirror(id,json,saved_at_ms) VALUES(1,?,?)", arrayOf<Any?>(after.toString(), System.currentTimeMillis()))
                         else db.execSQL("INSERT OR REPLACE INTO hub_preferences(namespace,json) VALUES(?,?)", arrayOf(namespace, after.toString()))
                     }
                     db.setTransactionSuccessful()

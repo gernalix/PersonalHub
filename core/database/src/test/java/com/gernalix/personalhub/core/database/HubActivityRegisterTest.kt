@@ -30,9 +30,9 @@ class HubActivityRegisterTest {
                 INSERT INTO places(uuid,nickname,address,lat,lon,radius_m,notes,source_app,created_at,updated_at,archived,first_check_in_at_place)
                 VALUES(?, 'Home', NULL, NULL, NULL, NULL, NULL, 'test', ?, ?, 0, NULL)
                 """.trimIndent(),
-                arrayOf(placeId, now, now),
+                arrayOf<Any?>(placeId, now, now),
             )
-            db.execSQL("UPDATE places SET nickname='Casa', updated_at=? WHERE uuid=?", arrayOf(now + 1, placeId))
+            db.execSQL("UPDATE places SET nickname='Casa', updated_at=? WHERE uuid=?", arrayOf<Any?>(now + 1, placeId))
 
             val rows = database.activityDao().page("places", 1, null, null, 20)
             val update = rows.first { it.action == "place_updated" && it.entityId == placeId }
@@ -66,9 +66,9 @@ class HubActivityRegisterTest {
                 INSERT INTO places(uuid,nickname,address,lat,lon,radius_m,notes,source_app,created_at,updated_at,archived,first_check_in_at_place)
                 VALUES(?, 'Home', NULL, NULL, NULL, NULL, NULL, 'test', ?, ?, 0, NULL)
                 """.trimIndent(),
-                arrayOf(placeId, now, now),
+                arrayOf<Any?>(placeId, now, now),
             )
-            db.execSQL("UPDATE places SET nickname='Casa', updated_at=? WHERE uuid=?", arrayOf(now + 1, placeId))
+            db.execSQL("UPDATE places SET nickname='Casa', updated_at=? WHERE uuid=?", arrayOf<Any?>(now + 1, placeId))
             val update = database.activityDao().page("places", 1, null, null, 20)
                 .first { it.action == "place_updated" && it.entityId == placeId }
 
@@ -113,9 +113,9 @@ class HubActivityRegisterTest {
             db.execSQL(
                 "INSERT INTO hub_tags(id,namespace,kind,name,normalized_name,description,icon,color,created_at,updated_at,archived,pinned,is_global,last_used_at,usage_count,metadata_json) " +
                     "VALUES(?, 'people', 'FREE', 'Family', 'family', NULL, NULL, NULL, ?, ?, 0, 0, 0, NULL, 0, NULL)",
-                arrayOf(tagId, now, now),
+                arrayOf<Any?>(tagId, now, now),
             )
-            db.execSQL("UPDATE hub_tags SET name='Relatives', normalized_name='relatives', updated_at=? WHERE id=?", arrayOf(now + 1, tagId))
+            db.execSQL("UPDATE hub_tags SET name='Relatives', normalized_name='relatives', updated_at=? WHERE id=?", arrayOf<Any?>(now + 1, tagId))
 
             val update = database.activityDao().page("tags", 1, null, null, 20)
                 .first { it.action == "tag_updated" && it.entityId == tagId }

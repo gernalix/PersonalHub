@@ -232,7 +232,7 @@ object HubActivityUndoEngine {
                 old_value, new_value, occurred_at, metadata_json
             ) VALUES(?, 'Contact', ?, ?, NULL, NULL, NULL, ?, NULL)
             """.trimIndent(),
-            arrayOf(contactId, actionType, eventType, occurredAt),
+            arrayOf<Any?>(contactId, actionType, eventType, occurredAt),
         )
     }
 
