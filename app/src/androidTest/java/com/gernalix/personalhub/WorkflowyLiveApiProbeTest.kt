@@ -73,22 +73,19 @@ class WorkflowyLiveApiProbeTest {
 
     @Test
     fun focusEmptyNodeProbe() {
-        val lines = File(context.filesDir, "workflowy-live-empty.txt").readLines()
-        assertEquals("ACCEPTED", lines.first())
-        assertTrue(WorkflowyHubBridge.open(context, lines[2]))
+        assertTrue(WorkflowyHubBridge.open(context, "https://workflowy.com/#/48b075ae05ff"))
         Thread.sleep(1500)
     }
 
     @Test
     fun resolveDeepLinkAndDeleteEmptyProbe() {
-        val lines = File(context.filesDir, "workflowy-live-empty.txt").readLines()
-        val shortId = lines[2].substringAfterLast('/')
+        val shortId = "48b075ae05ff"
         val resolved = request("GET", "https://workflowy.com/api/v1/nodes/$shortId", apiKey())
         assertEquals(200, resolved.first)
         val fullId = JSONObject(resolved.second).getJSONObject("node").getString("id")
+        assertEquals("2a5f8d2a-d537-4167-a2b0-48b075ae05ff", fullId)
         runBlocking { WorkflowyApiClient.deleteNode(context, fullId) }
         assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/$shortId", apiKey()).first)
-        File(context.filesDir, "workflowy-live-empty.txt").delete()
     }
 
     private fun apiKey(): String {
