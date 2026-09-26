@@ -57,7 +57,7 @@ class HubHistorySearchQaDeviceTest {
         }
 
         val searchLabel = context.getString(R.string.home_history_search)
-        composeRule.onNodeWithTag("home-utilities")
+        composeRule.onNodeWithTag("home-grid")
             .performScrollToNode(hasText(searchLabel))
         composeRule.onNodeWithText(searchLabel).performClick()
         composeRule.onNodeWithTag("history-module-filter").assertIsDisplayed()
@@ -103,7 +103,7 @@ class HubHistorySearchQaDeviceTest {
         assertNotNull("Undo must append a compensating history event", compensation)
 
         composeRule.onNodeWithText(context.getString(R.string.activity_back)).performClick()
-        composeRule.onNodeWithTag("home-utilities")
+        composeRule.onNodeWithTag("home-grid")
             .performScrollToNode(hasText(context.getString(R.string.settings_title)))
         composeRule.onNodeWithText(context.getString(R.string.settings_title)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.git_history_title))
@@ -216,7 +216,7 @@ class HubHistorySearchQaDeviceTest {
             android.os.Build.MODEL.contains("Pixel", ignoreCase = true) ||
                 android.os.Build.MODEL.contains("sdk", ignoreCase = true),
         ) {
-            "History/Search QA is emulator-only"
+            "History/Search QA requires an isolated Pixel QA package"
         }
         return context
     }

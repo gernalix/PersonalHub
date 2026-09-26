@@ -3,6 +3,7 @@ package com.gernalix.personalhub
 import com.gernalix.personalhub.core.database.HubActivityEntity
 import com.gernalix.personalhub.core.database.HubActivityPayloadKind
 import com.gernalix.personalhub.core.database.HubActivityStatus
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Locale
@@ -11,8 +12,32 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class HubActivityPresentationTest {
+    @Test
+    fun gitHistoryProjectionIsHumanAndSearchesBothSides() {
+        val item = GitHistoryItem(
+            id = "technical-id", occurredAt = 1L, author = "technical-author", source = "backend",
+            reason = null, groupId = null, table = "places", operation = "UPDATE",
+            rowKey = "technical-row", changedColumns = "address,notes,updated_at",
+            historyPath = "history/technical.jsonl", commitSha = "technical-sha", revertedBy = null,
+            displayBefore = "{\"nickname\":\"Casa\",\"address\":\"Old street\",\"notes\":\"hidden-before\"}",
+            displayAfter = "{\"nickname\":\"Casa\",\"address\":\"New street\",\"notes\":\"hidden-after\"}",
+        )
+        val text = humanizeGitHistory(item, "Places")
+        assertTrue(text.title.contains("Updated place “Casa”"))
+        assertTrue(text.detail!!.contains("Old street → New street"))
+        assertTrue(text.searchText.contains("hidden-before"))
+        assertTrue(text.searchText.contains("hidden-after"))
+        listOf("technical-id", "technical-row", "technical-sha", "technical-author", "backend", "updated_at")
+            .forEach { assertFalse(text.searchText.contains(it)) }
+        assertEquals("places", gitHistoryModule(item.table))
+    }
     @Test
     fun dateLabelUsesCompactLocalizedWeekdayFormat() {
         val zone = ZoneId.of("Europe/Copenhagen")

@@ -225,7 +225,7 @@ private fun humanValue(value: Any?): String? = when (value) {
     else -> cleanHumanValue(value.toString())
 }
 
-private fun cleanHumanValue(value: String?): String? {
+internal fun cleanHumanValue(value: String?): String? {
     val trimmed = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
     if (trimmed.length > 240) return null
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) return null
@@ -233,7 +233,7 @@ private fun cleanHumanValue(value: String?): String? {
     return trimmed
 }
 
-private fun humanFieldLabel(raw: String?): String? {
+internal fun humanFieldLabel(raw: String?): String? {
     val key = raw
         ?.trim()
         ?.takeIf(String::isNotEmpty)
@@ -299,4 +299,58 @@ private fun humanFieldLabel(raw: String?): String? {
             .joinToString(" ") { token -> token.replaceFirstChar(Char::uppercase) }
             .takeIf(String::isNotBlank)
     }
+}
+
+
+internal fun gitHistoryModule(table: String): String = when {
+    table.startsWith("finance_") -> "soldi"
+    table.startsWith("wordpulse_") -> "wordpulse"
+    table == "contacts" || table.startsWith("contact_") || table.startsWith("people_") -> "people"
+    table.startsWith("timer_") || table.startsWith("time_") || table.startsWith("session") ||
+        table == "audit_events" -> "timer"
+    table.startsWith("place") || table.startsWith("route_") || table.startsWith("visit_") -> "places"
+    table.startsWith("substance") || table.startsWith("intake_") || table.startsWith("stock_") ||
+        table.startsWith("prescription") || table.startsWith("macro") -> "substances"
+    table.startsWith("hub_tag") -> "tags"
+    else -> "hub"
+}
+
+internal fun humanizeGitHistory(
+    item: com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem,
+    moduleLabel: String,
+): HumanActivityText {
+    val before = runCatching { JSONObject(item.displayBefore.orEmpty()) }.getOrNull()
+    val after = runCatching { JSONObject(item.displayAfter.orEmpty()) }.getOrNull()
+    val objectName = listOf("name", "nickname", "title", "label")
+        .firstNotNullOfOrNull { key -> cleanHumanValue(after?.optString(key)) ?: cleanHumanValue(before?.optString(key)) }
+    val type = when (item.table) {
+        "places" -> "place"
+        "finance_accounts" -> "account"
+        "finance_transactions" -> "transaction"
+        "intake_events" -> "intake"
+        "stock_adjustments" -> "stock adjustment"
+        "contact_events" -> "person event"
+        "contacts" -> "person"
+        "substances" -> "substance"
+        "prescriptions" -> "prescription"
+        "sessions" -> "session"
+        "hub_tags" -> "tag"
+        else -> "item"
+    }
+    val changes = item.changedColumns.split(',').mapNotNull { key ->
+        val label = humanFieldLabel(key) ?: return@mapNotNull null
+        val oldValue = cleanHumanValue(before?.opt(key)?.takeUnless { it == JSONObject.NULL }?.toString())
+        val newValue = cleanHumanValue(after?.opt(key)?.takeUnless { it == JSONObject.NULL }?.toString())
+        if (oldValue == newValue) null else HumanActivityChange(label, oldValue, newValue)
+    }
+    val action = when (item.operation.uppercase(Locale.ROOT)) {
+        "INSERT" -> "Created"
+        "DELETE" -> "Deleted"
+        "UPDATE" -> "Updated"
+        else -> "Changed"
+    }
+    val subject = objectName?.let { "$type “$it”" } ?: type
+    val title = "$action $subject" + (changes.firstOrNull()?.let { " · ${it.render()}" } ?: "")
+    val detail = changes.take(8).joinToString("\n") { it.render() }.takeIf(String::isNotBlank)
+    return HumanActivityText(title, detail, listOfNotNull(title, moduleLabel, detail).joinToString(" "))
 }
