@@ -310,7 +310,7 @@ object WorkflowyHubBridge {
         val uri = Uri.parse(normalized)
         val explicit = Intent(Intent.ACTION_VIEW, uri)
             .setPackage("com.workflowy.android")
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         if (runCatching { context.startActivity(explicit); true }.getOrDefault(false)) return true
         return runCatching {
             context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
