@@ -111,6 +111,16 @@
             android:taskAffinity="com.gernalix.personalhub.restart" />
 
         <activity
+            android:name=".HubAlertsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="personalhub" android:host="alerts" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".HubTagsActivity"
             android:exported="false" />
         <activity

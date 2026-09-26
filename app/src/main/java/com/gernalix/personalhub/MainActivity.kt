@@ -149,6 +149,11 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                     context.startActivity(Intent(context, HubTagsActivity::class.java))
                 }
             }
+            item(key = "home-alerts") {
+                HomeActionTile("🔔", R.string.home_alerts, R.string.home_alerts_help) {
+                    context.startActivity(Intent(context, HubAlertsActivity::class.java))
+                }
+            }
             item(key = "home-audit") {
                 HomeActionTile("🔍", R.string.home_history_search, R.string.home_history_search_help) { topDestination = "audit" }
             }
