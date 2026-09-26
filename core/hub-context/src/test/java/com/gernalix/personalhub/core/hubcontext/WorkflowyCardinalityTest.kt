@@ -16,6 +16,41 @@ import java.util.UUID
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WorkflowyCardinalityTest {
+    @Test fun remoteDeleteFailurePreservesBindingThenSuccessRemovesIt() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        WorkflowyIntegrationSettings.setEnabled(context, true)
+        val resourceAdapter = ResourceHubAdapter(context)
+        HubContextRuntime.initialize(context, listOf(FakeAnchor(), resourceAdapter))
+        val anchor = HubEntityRef("people", "person", UUID.randomUUID().toString())
+        val url = "https://workflowy.com/#/59d823cea257"
+        val resource = WorkflowyHubBridge.attachUrl(context, anchor, url)
+        var remoteCalls = 0
+        try {
+            val failed = runCatching {
+                WorkflowyHubBridge.deleteLinkedNodeUsing(context, anchor, resource.ref) { _, actual ->
+                    assertEquals(url, actual)
+                    remoteCalls++
+                    error("injected remote failure")
+                }
+            }
+            assertTrue(failed.isFailure)
+            assertEquals(1, remoteCalls)
+            assertEquals(url, WorkflowyHubBridge.notificationUrl(context, anchor))
+            assertEquals(1, HubContextRuntime.contexts(anchor).size)
+            WorkflowyHubBridge.deleteLinkedNodeUsing(context, anchor, resource.ref) { _, actual ->
+                assertEquals(url, actual)
+                remoteCalls++
+            }
+            assertEquals(2, remoteCalls)
+            assertTrue(HubContextRuntime.contexts(anchor).isEmpty())
+            assertEquals(null, WorkflowyHubBridge.notificationUrl(context, anchor))
+        } finally {
+            HubContextRuntime.contexts(anchor).forEach { HubContextRuntime.deleteContext(it.context.id) }
+            resourceAdapter.delete(resource.ref.canonicalId)
+            WorkflowyIntegrationSettings.setEnabled(context, false)
+        }
+    }
+
     @Test fun genericComposerCannotBypassOneLinkPerEntity() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         WorkflowyIntegrationSettings.setEnabled(context, true)
