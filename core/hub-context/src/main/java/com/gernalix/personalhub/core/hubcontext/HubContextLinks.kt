@@ -174,6 +174,18 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                TextButton(
+                    enabled = hasApiKey && !workflowyBusy,
+                    onClick = {
+                        scope.launch {
+                            workflowyBusy = true
+                            runCatching { WorkflowyHubBridge.discoverAttachAndOpen(context, anchor) }
+                                .onSuccess { refresh() }
+                                .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                            workflowyBusy = false
+                        }
+                    },
+                ) { Text(stringResource(R.string.hub_workflowy_open_auto)) }
                 TextButton(onClick = {
                     workflowyUrl = ""
                     workflowyError = null
