@@ -175,7 +175,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                     )
                 }
                 TextButton(
-                    enabled = hasApiKey && !workflowyBusy,
+                    enabled = !workflowyBusy && (hasApiKey || linked.any { WorkflowyLinkPolicy.isWorkflowyResource(it) }),
                     onClick = {
                         scope.launch {
                             workflowyBusy = true
@@ -185,7 +185,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                             workflowyBusy = false
                         }
                     },
-                ) { Text(stringResource(R.string.hub_workflowy_open_auto)) }
+                ) { Text("🔗", modifier = Modifier.testTag("workflowy-jump")) }
                 TextButton(onClick = {
                     workflowyUrl = ""
                     workflowyError = null
