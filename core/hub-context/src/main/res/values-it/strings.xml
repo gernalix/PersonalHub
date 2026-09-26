@@ -1,0 +1,5 @@
+<resources>
+    <string name="hub_workflowy_new_empty">+ Nodo Workflowy vuoto</string>
+    <string name="hub_workflowy_delete">Elimina nodo</string>
+    <string name="hub_workflowy_delete_failed">Impossibile eliminare il nodo Workflowy.</string>
+</resources>

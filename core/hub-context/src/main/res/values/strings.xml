@@ -61,6 +61,9 @@
     <string name="hub_workflowy_save">Link</string>
     <string name="hub_workflowy_attach_existing">Link existing Workflowy node</string>
     <string name="hub_workflowy_new_note">+ Workflowy note</string>
+    <string name="hub_workflowy_new_empty">+ Empty Workflowy node</string>
+    <string name="hub_workflowy_delete">Delete node</string>
+    <string name="hub_workflowy_delete_failed">Could not delete the Workflowy node.</string>
     <string name="hub_workflowy_new_note_title">New Workflowy note</string>
     <string name="hub_workflowy_note_text">Note</string>
     <string name="hub_workflowy_note_save">Save</string>
