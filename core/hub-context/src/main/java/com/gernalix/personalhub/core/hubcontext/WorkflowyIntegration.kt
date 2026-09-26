@@ -275,7 +275,7 @@ object WorkflowyHubBridge {
         val summary = HubContextRuntime.adapter(anchor.moduleId, anchor.entityKind)
             .summaries(setOf(anchor.canonicalId))[anchor.canonicalId]
             ?: error("PersonalHub entity could not be resolved")
-        val found = findUniqueExactNode(context, summary.label)
+        val found = WorkflowyApiClient.findUniqueExactNode(context, summary.label)
             ?: error("No unique exact Workflowy node matches this entity")
         attachUrl(context, anchor, found.deepLink, "Workflowy · " + summary.label.take(60))
         return open(context, found.deepLink)
