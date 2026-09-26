@@ -519,7 +519,7 @@ object GitHistory {
                                 "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key," +
                                 "changed_columns,history_path,commit_sha,reverted_by" +
                                 ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL)",
-                            arrayOf(
+                            arrayOf<Any?>(
                                 event.getString("event_id"),
                                 event.getLong("timestamp_ms"),
                                 event.optString("author", "unknown"),

@@ -230,7 +230,7 @@ object GitDataTracking {
         eventIds: List<String>,
     ) {
         pending.forEach { (table, revision) ->
-            db.delete(TABLE, "table_name=? AND revision=?", arrayOf(table, revision))
+            db.delete(TABLE, "table_name=? AND revision=?", arrayOf<Any?>(table, revision))
         }
         eventIds.forEach { id ->
             db.delete(EVENTS_TABLE, "id=?", arrayOf(id))
@@ -300,7 +300,7 @@ object GitDataTracking {
     fun markPatchApplied(db: SupportSQLiteDatabase, patchId: String) {
         db.execSQL(
             "INSERT INTO $APPLIED_PATCHES_TABLE(id,applied_at) VALUES(?,?)",
-            arrayOf(patchId, System.currentTimeMillis()),
+            arrayOf<Any?>(patchId, System.currentTimeMillis()),
         )
     }
 }

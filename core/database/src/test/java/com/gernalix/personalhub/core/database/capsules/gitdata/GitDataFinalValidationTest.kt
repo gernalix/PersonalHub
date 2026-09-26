@@ -97,7 +97,7 @@ class GitDataFinalValidationTest {
             repeat(501) { index ->
                 db.execSQL(
                     "INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) VALUES(?,?,?,?,?,?)",
-                    arrayOf("acct-$index", "Account $index", "DKK", "0", index.toLong(), 1),
+                    arrayOf<Any?>("acct-$index", "Account $index", "DKK", "0", index.toLong(), 1),
                 )
             }
             db.setTransactionSuccessful()
