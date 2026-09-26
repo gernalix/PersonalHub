@@ -23,7 +23,7 @@ class WorkflowyLiveApiProbeTest {
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun createUnderTodayAndDeleteFromDeepLink() {
+    fun textCreatedUnderTodayWithoutOpeningWorkflowyThenDeletedByDeepLink() {
         val config = WorkflowyIntegrationSettings.configuration(context)
         assertTrue(config.enabled)
         assertTrue(config.hasApiKey)
@@ -42,11 +42,10 @@ class WorkflowyLiveApiProbeTest {
             val todayId = JSONObject(todayGet.second).getJSONObject("node").getString("id")
             assertEquals(todayId, createdParent)
 
-            val shortId = created.deepLink.substringAfterLast('/')
-            runBlocking { WorkflowyApiClient.deleteNode(context, shortId) }
-            assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/$shortId", token).first)
-            File(context.filesDir, "workflowy-live-delete.txt")
-                .writeText("PASS\n${created.deepLink}\n")
+            assertEquals(created.id, runBlocking { WorkflowyApiClient.resolveDeepLink(context, created.deepLink) })
+            Thread.sleep(15_000)
+            runBlocking { WorkflowyApiClient.deleteFromDeepLink(context, created.deepLink) }
+            assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/${created.id}", token).first)
         } finally {
             runCatching { runBlocking { WorkflowyApiClient.deleteNode(context, created.id) } }
         }
