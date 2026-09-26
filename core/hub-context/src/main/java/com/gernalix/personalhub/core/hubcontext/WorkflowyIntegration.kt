@@ -139,6 +139,8 @@ object WorkflowyIntegrationSettings {
 object WorkflowyLinkPolicy {
     private val workflowyUrlRegex =
         Regex("""https?://(?:[A-Za-z0-9-]+\.)*workflowy\.com/[^\s<>"]+""", RegexOption.IGNORE_CASE)
+    private val shortIdRegex = Regex("[0-9a-fA-F]{12}")
+    private val fullIdRegex = Regex("[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 
     fun normalize(raw: String): String? {
         val normalized = raw.trim().trimEnd('.', ',', ';', ')', ']', '}')
@@ -157,9 +159,20 @@ object WorkflowyLinkPolicy {
 
     fun deepLink(nodeId: String): String {
         val normalized = nodeId.trim()
-        require(normalized.length >= 12) { "Invalid Workflowy node id" }
+        require(fullIdRegex.matches(normalized)) { "Invalid Workflowy node id" }
         return "https://workflowy.com/#/" + normalized.takeLast(12)
     }
+
+    fun shortId(rawUrl: String): String? {
+        val normalized = normalize(rawUrl) ?: return null
+        val uri = Uri.parse(normalized)
+        if (uri.path != "/" || uri.query != null) return null
+        val fragment = uri.fragment ?: return null
+        val shortId = fragment.removePrefix("/")
+        return shortId.takeIf { fragment.startsWith('/') && shortIdRegex.matches(it) }?.lowercase()
+    }
+
+    internal fun isFullId(value: String): Boolean = fullIdRegex.matches(value)
 
     fun isWorkflowyResource(summary: HubEntitySummary): Boolean =
         summary.ref.moduleId == "hub" &&
@@ -169,51 +182,63 @@ object WorkflowyLinkPolicy {
 
 object WorkflowyApiClient {
     suspend fun createNode(context: Context, name: String): WorkflowyCreatedNode =
+        createNodeInternal(context, name, allowEmpty = false)
+
+    suspend fun createEmptyNode(context: Context): WorkflowyCreatedNode =
+        createNodeInternal(context, "", allowEmpty = true)
+
+    private suspend fun createNodeInternal(context: Context, name: String, allowEmpty: Boolean): WorkflowyCreatedNode =
         withContext(Dispatchers.IO) {
             val text = name.trim()
-            require(text.isNotBlank()) { "Workflowy note cannot be empty" }
+            require(allowEmpty || text.isNotBlank()) { "Workflowy note cannot be empty" }
             val config = WorkflowyIntegrationSettings.configuration(context)
             require(config.enabled) { "Workflowy integration is disabled" }
             require(config.hasApiKey) { "Workflowy API key is not configured" }
-            val token = WorkflowyIntegrationSettings.apiKey(context)
             val body = JSONObject()
                 .put("parent_id", config.target)
                 .put("name", text)
                 .put("position", "top")
                 .toString()
-            val connection = URL("https://workflowy.com/api/v1/nodes").openConnection() as HttpURLConnection
-            try {
-                connection.requestMethod = "POST"
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 30_000
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("Authorization", "Bearer " + token)
-                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body) }
-                val code = connection.responseCode
-                if (code !in 200..299) throw IOException("Workflowy API returned HTTP " + code)
-                val response = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                val nodeId = parseCreatedNodeId(response)
-                WorkflowyCreatedNode(nodeId, WorkflowyLinkPolicy.deepLink(nodeId))
-            } finally {
-                connection.disconnect()
-            }
+            val nodeId = parseCreatedNodeId(request(context, "POST", body = body))
+            WorkflowyCreatedNode(nodeId, WorkflowyLinkPolicy.deepLink(nodeId))
         }
+
+    suspend fun resolveDeepLink(context: Context, rawUrl: String): String = withContext(Dispatchers.IO) {
+        val shortId = WorkflowyLinkPolicy.shortId(rawUrl) ?: error("Invalid Workflowy node link")
+        parseResolvedNodeId(request(context, "GET", shortId), shortId)
+    }
+
+    suspend fun deleteFromDeepLink(context: Context, rawUrl: String) {
+        deleteNode(context, resolveDeepLink(context, rawUrl))
+    }
 
     suspend fun deleteNode(context: Context, nodeId: String) = withContext(Dispatchers.IO) {
         val id = nodeId.trim()
-        require(id.length >= 12) { "Invalid Workflowy node id" }
+        require(WorkflowyLinkPolicy.isFullId(id)) { "Invalid Workflowy node id" }
+        request(context, "DELETE", id)
+    }
+
+    private fun request(context: Context, method: String, id: String? = null, body: String? = null): String {
+        val config = WorkflowyIntegrationSettings.configuration(context)
+        require(config.enabled) { "Workflowy integration is disabled" }
+        require(config.hasApiKey) { "Workflowy API key is not configured" }
         val token = WorkflowyIntegrationSettings.apiKey(context)
-        val connection = URL("https://workflowy.com/api/v1/nodes/" + id).openConnection() as HttpURLConnection
+        val endpoint = "https://workflowy.com/api/v1/nodes" + (id?.let { "/$it" } ?: "")
+        val connection = URL(endpoint).openConnection() as HttpURLConnection
         try {
-            connection.requestMethod = "DELETE"
+            connection.requestMethod = method
             connection.connectTimeout = 15_000
             connection.readTimeout = 30_000
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("Authorization", "Bearer " + token)
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body) }
+            }
             val code = connection.responseCode
-            if (code !in 200..299) throw IOException("Workflowy delete returned HTTP " + code)
+            if (code !in 200..299) throw IOException("Workflowy API returned HTTP " + code)
+            return connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         } finally {
             connection.disconnect()
         }
@@ -221,10 +246,17 @@ object WorkflowyApiClient {
 
     internal fun parseCreatedNodeId(raw: String): String {
         val id = JSONObject(raw).optString("item_id").trim()
-        require(id.length >= 12) { "Workflowy API response has no valid item_id" }
+        require(WorkflowyLinkPolicy.isFullId(id)) { "Workflowy API response has no valid item_id" }
         return id
     }
 
+    internal fun parseResolvedNodeId(raw: String, shortId: String): String {
+        val id = JSONObject(raw).getJSONObject("node").optString("id").trim()
+        require(WorkflowyLinkPolicy.isFullId(id) && id.takeLast(12).equals(shortId, ignoreCase = true)) {
+            "Workflowy API response does not match node link"
+        }
+        return id
+    }
 
 }
 
@@ -256,6 +288,21 @@ object WorkflowyHubBridge {
             runCatching { WorkflowyApiClient.deleteNode(context, created.id) }
             throw error
         }
+        return created
+    }
+
+    suspend fun createEmptyAndOpen(context: Context, anchor: HubEntityRef): WorkflowyCreatedNode {
+        val created = WorkflowyApiClient.createEmptyNode(context)
+        try {
+            attachUrl(context, anchor, created.deepLink)
+        } catch (error: CancellationException) {
+            withContext(NonCancellable) { runCatching { WorkflowyApiClient.deleteNode(context, created.id) } }
+            throw error
+        } catch (error: Exception) {
+            runCatching { WorkflowyApiClient.deleteNode(context, created.id) }
+            throw error
+        }
+        if (!open(context, created.deepLink)) error("Could not open Workflowy node")
         return created
     }
 
