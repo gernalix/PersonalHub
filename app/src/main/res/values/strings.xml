@@ -8,6 +8,9 @@
     <string name="home_tags_help">Browse and manage tags</string>
     <string name="home_audit_log">Audit log</string>
     <string name="home_audit_log_help">History, changes and undo</string>
+    <string name="audit_title">Audit log</string>
+    <string name="audit_git_source">Current Git Data audit history, newest first.</string>
+    <string name="audit_search_hint">Search audit log</string>
     <string name="home_data_explorer">Data</string>
     <string name="home_data_explorer_help">SQL and advanced exploration</string>
     <string name="data_explorer_title">Data explorer</string>
@@ -136,11 +139,11 @@
     <string name="module_soldi">Soldi</string>
     <string name="module_soldi_subtitle">Transactions and products</string>
 
-    <string name="activity_title">Audit log</string>
+    <string name="activity_title">History &amp; Search</string>
     <string name="activity_back">Back</string>
     <string name="activity_from">From</string>
     <string name="activity_to">To</string>
-    <string name="activity_search_hint">🔍 Search audit log…</string>
+    <string name="activity_search_hint">🔍 Search history…</string>
     <string name="activity_reset_filters">Reset filters</string>
     <string name="activity_invalid_range">From must be before To.</string>
     <string name="activity_invalid_date">Use a valid date and time.</string>

@@ -90,8 +90,8 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         SinceWhenScreen(onBack = { topDestination = null })
         return
     }
-    if (topDestination == "history") {
-        HubHistorySearchScreen(onBack = { topDestination = null })
+    if (topDestination == "audit") {
+        HubAuditLogScreen(onBack = { topDestination = null })
         return
     }
     if (showSettings) {
@@ -150,7 +150,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                 }
             }
             item(key = "home-audit") {
-                HomeActionTile("📜", R.string.home_audit_log, R.string.home_audit_log_help) { topDestination = "history" }
+                HomeActionTile("📜", R.string.home_audit_log, R.string.home_audit_log_help) { topDestination = "audit" }
             }
             item(key = "home-since-when") {
                 HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }
