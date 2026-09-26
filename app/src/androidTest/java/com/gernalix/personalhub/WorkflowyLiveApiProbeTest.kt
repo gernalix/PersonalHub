@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.gernalix.personalhub.core.hubcontext.WorkflowyApiClient
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
 import com.gernalix.personalhub.core.hubcontext.WorkflowyLinkPolicy
+import com.gernalix.personalhub.core.hubcontext.WorkflowyHubBridge
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -68,6 +69,26 @@ class WorkflowyLiveApiProbeTest {
         } else {
             out.writeText("REJECTED\n${result.first}\n${result.second.take(500)}\n")
         }
+    }
+
+    @Test
+    fun focusEmptyNodeProbe() {
+        val lines = File(context.filesDir, "workflowy-live-empty.txt").readLines()
+        assertEquals("ACCEPTED", lines.first())
+        assertTrue(WorkflowyHubBridge.open(context, lines[2]))
+        Thread.sleep(1500)
+    }
+
+    @Test
+    fun resolveDeepLinkAndDeleteEmptyProbe() {
+        val lines = File(context.filesDir, "workflowy-live-empty.txt").readLines()
+        val shortId = lines[2].substringAfterLast('/')
+        val resolved = request("GET", "https://workflowy.com/api/v1/nodes/$shortId", apiKey())
+        assertEquals(200, resolved.first)
+        val fullId = JSONObject(resolved.second).getJSONObject("node").getString("id")
+        runBlocking { WorkflowyApiClient.deleteNode(context, fullId) }
+        assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/$shortId", apiKey()).first)
+        File(context.filesDir, "workflowy-live-empty.txt").delete()
     }
 
     private fun apiKey(): String {
