@@ -225,45 +225,12 @@ object WorkflowyApiClient {
         return id
     }
 
-    suspend fun findUniqueExactNode(context: Context, label: String): WorkflowyCreatedNode? =
-        withContext(Dispatchers.IO) {
-            val wanted = label.trim()
-            require(wanted.isNotBlank()) { "PersonalHub entity has no label" }
-            val token = WorkflowyIntegrationSettings.apiKey(context)
-            val connection = URL("https://workflowy.com/api/v1/nodes-export").openConnection() as HttpURLConnection
-            try {
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 30_000
-                connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("Authorization", "Bearer " + token)
-                val code = connection.responseCode
-                if (code !in 200..299) throw IOException("Workflowy export returned HTTP " + code)
-                val response = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-                parseUniqueExactNode(response, wanted)
-            } finally {
-                connection.disconnect()
-            }
-        }
 
-    internal fun parseUniqueExactNode(raw: String, label: String): WorkflowyCreatedNode? {
-        val nodes = JSONObject(raw).optJSONArray("nodes") ?: return null
-        val wanted = label.trim()
-        val matches = buildList {
-            repeat(nodes.length()) { index ->
-                val node = nodes.optJSONObject(index) ?: return@repeat
-                val name = node.optString("name").trim()
-                val id = node.optString("id").trim()
-                if (name.equals(wanted, ignoreCase = true) && id.length >= 12) add(id)
-            }
-        }.distinct()
-        return matches.singleOrNull()?.let { WorkflowyCreatedNode(it, WorkflowyLinkPolicy.deepLink(it)) }
-    }
 }
 
 object WorkflowyHubBridge {
 
-    suspend fun discoverAttachAndOpen(context: Context, anchor: HubEntityRef): Boolean {
+    suspend fun createAttachAndOpen(context: Context, anchor: HubEntityRef): Boolean {
         require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         val existing = HubContextRuntime.contexts(anchor)
             .flatMap { it.members }
@@ -275,10 +242,8 @@ object WorkflowyHubBridge {
         val summary = HubContextRuntime.adapter(anchor.moduleId, anchor.entityKind)
             .summaries(setOf(anchor.canonicalId))[anchor.canonicalId]
             ?: error("PersonalHub entity could not be resolved")
-        val found = WorkflowyApiClient.findUniqueExactNode(context, summary.label)
-            ?: error("No unique exact Workflowy node matches this entity")
-        attachUrl(context, anchor, found.deepLink, "Workflowy · " + summary.label.take(60))
-        return open(context, found.deepLink)
+        val created = createNote(context, anchor, summary.label)
+        return open(context, created.deepLink)
     }
     suspend fun createNote(context: Context, anchor: HubEntityRef, text: String): WorkflowyCreatedNode {
         val created = WorkflowyApiClient.createNode(context, text)

@@ -179,7 +179,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                     onClick = {
                         scope.launch {
                             workflowyBusy = true
-                            runCatching { WorkflowyHubBridge.discoverAttachAndOpen(context, anchor) }
+                            runCatching { WorkflowyHubBridge.createAttachAndOpen(context, anchor) }
                                 .onSuccess { refresh() }
                                 .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
                             workflowyBusy = false

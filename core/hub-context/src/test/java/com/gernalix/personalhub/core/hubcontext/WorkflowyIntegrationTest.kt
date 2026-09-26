@@ -65,14 +65,5 @@ class WorkflowyIntegrationTest {
         assertFalse(WorkflowyIntegrationSettings.validTarget(""))
     }
 
-    @Test
-    fun exactWorkflowyNodeDetectionRequiresOneUniqueMatch() {
-        val id = "2af3dd5c-7b2e-5248-bbee-59d823cea257"
-        val unique = """{"nodes":[{"id":"$id","name":"5 stelle"},{"id":"other","name":"Else"}]}"""
-        assertEquals(WorkflowyLinkPolicy.deepLink(id), WorkflowyApiClient.parseUniqueExactNode(unique, "5 STELLE")?.deepLink)
-        val ambiguous = """{"nodes":[{"id":"$id","name":"5 stelle"},{"id":"11111111-2222-3333-4444-555555555555","name":"5 STELLE"}]}"""
-        assertNull(WorkflowyApiClient.parseUniqueExactNode(ambiguous, "5 stelle"))
-        assertNull(WorkflowyApiClient.parseUniqueExactNode("""{"nodes":[]}""", "5 stelle"))
-    }
 
 }
