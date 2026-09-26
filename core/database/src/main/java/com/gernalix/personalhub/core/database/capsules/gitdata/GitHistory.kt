@@ -80,6 +80,44 @@ data class GitHistoryDetail(
  * milestones and semantic revision diffs. Git is the durable history; SQLite holds only an index.
  */
 object GitHistory {
+    private val displayRebuildAttempted = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    fun recentForDisplay(context: Context, limit: Int = 1000): List<GitHistoryItem> {
+        val rows = recent(context, limit)
+        val missing = rows.filter { it.displayBefore == null && it.displayAfter == null }
+        if (missing.isNotEmpty() && displayRebuildAttempted.compareAndSet(false, true)) {
+            runCatching { fillMissingDisplayProjection(context.applicationContext, missing) }
+            return recent(context, limit)
+        }
+        return rows
+    }
+
+    private fun fillMissingDisplayProjection(context: Context, missing: List<GitHistoryItem>) {
+        val git = transport(context)
+        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        missing.groupBy { it.historyPath to it.commitSha }.forEach { (source, items) ->
+            val (path, sha) = source
+            val bytes = git.readFile(path, sha)
+            val signature = requireNotNull(git.readFileOrNull(path + ".sig.json", sha))
+            require(GitDataSigner.verify(bytes, signature)) { "Git history signature verification failed" }
+            val indexedIds = items.map { it.id }.toSet()
+            String(bytes, Charsets.UTF_8).lineSequence().filter(String::isNotBlank).forEach { line ->
+                val event = JSONObject(line)
+                val id = event.getString("event_id")
+                if (id !in indexedIds) return@forEach
+                val changed = event.optJSONArray("changed_columns") ?: JSONArray()
+                val columns = buildList {
+                    for (index in 0 until changed.length()) add(changed.getString(index))
+                }.joinToString(",")
+                GitHistoryStore.updateDisplayProjection(
+                    db, id,
+                    GitHistoryStore.projectJson(event.optJSONObject("before"), columns),
+                    GitHistoryStore.projectJson(event.optJSONObject("after"), columns),
+                )
+            }
+        }
+    }
+
     fun recent(
         context: Context,
         limit: Int = 200,
@@ -495,6 +533,13 @@ object GitHistory {
         val files = remote.historyPaths(head.commitSha)
         val db = PersonalHubDatabase.get(app).openHelper.writableDatabase
         GitHistoryStore.install(db)
+        val reverted = db.query(
+            "SELECT id,reverted_by FROM " + GitHistoryStore.TABLE + " WHERE reverted_by IS NOT NULL",
+        ).use { cursor ->
+            buildMap {
+                while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1))
+            }
+        }
         db.beginTransaction()
         try {
             db.execSQL("DELETE FROM " + GitHistoryStore.TABLE)
@@ -517,8 +562,8 @@ object GitHistory {
                         db.execSQL(
                             "INSERT OR REPLACE INTO " + GitHistoryStore.TABLE + "(" +
                                 "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key," +
-                                "changed_columns,history_path,commit_sha,reverted_by" +
-                                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL)",
+                                "changed_columns,history_path,commit_sha,reverted_by,display_before,display_after" +
+                                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?)",
                             arrayOf<Any?>(
                                 event.getString("event_id"),
                                 event.getLong("timestamp_ms"),
@@ -532,10 +577,13 @@ object GitHistory {
                                 changedColumns,
                                 path,
                                 head.commitSha,
+                                GitHistoryStore.projectJson(event.optJSONObject("before"), changedColumns),
+                                GitHistoryStore.projectJson(event.optJSONObject("after"), changedColumns),
                             ),
                         )
                     }
             }
+            reverted.forEach { (id, revertedBy) -> GitHistoryStore.markReverted(db, id, revertedBy) }
             GitHistoryStore.rebuildFieldStats(db)
             db.setTransactionSuccessful()
         } finally {

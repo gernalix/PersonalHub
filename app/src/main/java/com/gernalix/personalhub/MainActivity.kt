@@ -127,7 +127,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 240.dp),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag("home-grid"),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -150,7 +150,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                 }
             }
             item(key = "home-audit") {
-                HomeActionTile("📜", R.string.home_audit_log, R.string.home_audit_log_help) { topDestination = "audit" }
+                HomeActionTile("🔍", R.string.home_history_search, R.string.home_history_search_help) { topDestination = "audit" }
             }
             item(key = "home-since-when") {
                 HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }

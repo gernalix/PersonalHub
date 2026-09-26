@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home_context">Context</string>
-    <string name="home_history_search">🔍</string>
+    <string name="home_history_search">History &amp; Search</string>
     <string name="home_history_search_help">Search history and changes</string>
     <string name="home_context_help">Link entities</string>
     <string name="home_tags">Tags</string>

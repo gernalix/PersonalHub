@@ -1,6 +1,8 @@
 package com.gernalix.personalhub.core.database.capsules.gitdata
 
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
+import org.json.JSONObject
 
 data class GitHistoryCommitMeta(
     val id: String,
@@ -22,6 +24,8 @@ data class GitHistoryItem(
     val historyPath: String,
     val commitSha: String,
     val revertedBy: String?,
+    val displayBefore: String? = null,
+    val displayAfter: String? = null,
 )
 
 data class GitHistoryCount(val key: String, val count: Long)
@@ -43,10 +47,12 @@ object GitHistoryStore {
                 "`author` TEXT NOT NULL, `source` TEXT NOT NULL DEFAULT 'unknown', `reason` TEXT, `group_id` TEXT, `table_name` TEXT NOT NULL, " +
                 "`operation` TEXT NOT NULL, `row_key` TEXT NOT NULL, " +
                 "`changed_columns` TEXT NOT NULL, `history_path` TEXT NOT NULL, " +
-                "`commit_sha` TEXT NOT NULL, `reverted_by` TEXT)",
+                "`commit_sha` TEXT NOT NULL, `reverted_by` TEXT, `display_before` TEXT, `display_after` TEXT)",
         )
         ensureColumn(db, "source", "TEXT NOT NULL DEFAULT 'unknown'")
         ensureColumn(db, "reason", "TEXT")
+        ensureColumn(db, "display_before", "TEXT")
+        ensureColumn(db, "display_after", "TEXT")
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS `" + FIELD_STATS_TABLE + "` (" +
                 "`table_name` TEXT NOT NULL, `row_key` TEXT NOT NULL, " +
@@ -85,7 +91,7 @@ object GitHistoryStore {
             db.execSQL(
                 "INSERT OR REPLACE INTO " + TABLE + "(" +
                     "id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,changed_columns," +
-                    "history_path,commit_sha,reverted_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL)",
+                    "history_path,commit_sha,reverted_by,display_before,display_after) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?)",
                 arrayOf<Any?>(
                     event.id,
                     event.occurredAt,
@@ -99,6 +105,8 @@ object GitHistoryStore {
                     committed.changedColumns,
                     committed.historyPath,
                     commitSha,
+                    projectPayload(event.beforePayload, event.columns, committed.changedColumns),
+                    projectPayload(event.afterPayload, event.columns, committed.changedColumns),
                 ),
             )
             if (!alreadyIndexed) {
@@ -111,6 +119,42 @@ object GitHistoryStore {
                 )
             }
         }
+    }
+
+
+    // This is a disposable, bounded display projection. The signed Git event remains authoritative.
+    private fun displayFieldAllowed(key: String): Boolean =
+        key !in setOf("id", "uuid", "source", "source_app", "version", "metadata") &&
+            !key.endsWith("_id") && !key.endsWith("_uuid") && !key.endsWith("_json") &&
+            !key.endsWith("_at") && !key.endsWith("_ms") &&
+            !key.contains("hash") && !key.contains("payload") && !key.contains("cursor")
+
+    internal fun projectPayload(payload: String?, columnsCsv: String, changedCsv: String): String? {
+        if (payload == null) return null
+        val columns = columnsCsv.split(',').filter(String::isNotBlank)
+        val values = runCatching { SyncJournal.keyValues(payload) }.getOrNull() ?: return null
+        if (values.size != columns.size) return null
+        val wanted = changedCsv.split(',').toSet() + setOf("name", "nickname", "title", "label")
+        val result = JSONObject()
+        columns.forEachIndexed { index, key ->
+            if (key !in wanted || !displayFieldAllowed(key)) return@forEachIndexed
+            val value = values[index]
+            if (value is String && value.length <= 240) result.put(key, value)
+            else if (value is Number || value is Boolean) result.put(key, value)
+        }
+        return result.toString()
+    }
+
+    internal fun projectJson(row: JSONObject?, changedCsv: String): String? {
+        if (row == null) return null
+        val wanted = changedCsv.split(',').toSet() + setOf("name", "nickname", "title", "label")
+        val result = JSONObject()
+        wanted.filter(::displayFieldAllowed).forEach { key ->
+            val value = row.opt(key)
+            if (value is String && value.length <= 240) result.put(key, value)
+            else if (value is Number || value is Boolean) result.put(key, value)
+        }
+        return result.toString()
     }
 
     fun recent(
@@ -129,7 +173,7 @@ object GitHistoryStore {
         val where = if (clauses.isEmpty()) "" else " WHERE " + clauses.joinToString(" AND ")
         return db.query(
             "SELECT id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,changed_columns," +
-                "history_path,commit_sha,reverted_by FROM " + TABLE + where +
+                "history_path,commit_sha,reverted_by,display_before,display_after FROM " + TABLE + where +
                 " ORDER BY occurred_at DESC,id DESC LIMIT " + limit,
             args.toTypedArray(),
         ).use { cursor ->
@@ -150,6 +194,8 @@ object GitHistoryStore {
                             historyPath = cursor.getString(10),
                             commitSha = cursor.getString(11),
                             revertedBy = if (cursor.isNull(12)) null else cursor.getString(12),
+                            displayBefore = if (cursor.isNull(13)) null else cursor.getString(13),
+                            displayAfter = if (cursor.isNull(14)) null else cursor.getString(14),
                         ),
                     )
                 }
@@ -160,7 +206,7 @@ object GitHistoryStore {
     fun find(db: SupportSQLiteDatabase, id: String): GitHistoryItem? =
         db.query(
             "SELECT id,occurred_at,author,source,reason,group_id,table_name,operation,row_key,changed_columns," +
-                "history_path,commit_sha,reverted_by FROM " + TABLE + " WHERE id=? LIMIT 1",
+                "history_path,commit_sha,reverted_by,display_before,display_after FROM " + TABLE + " WHERE id=? LIMIT 1",
             arrayOf(id),
         ).use { cursor ->
             if (!cursor.moveToFirst()) null else GitHistoryItem(
@@ -177,13 +223,15 @@ object GitHistoryStore {
                 historyPath = cursor.getString(10),
                 commitSha = cursor.getString(11),
                 revertedBy = if (cursor.isNull(12)) null else cursor.getString(12),
+                            displayBefore = if (cursor.isNull(13)) null else cursor.getString(13),
+                            displayAfter = if (cursor.isNull(14)) null else cursor.getString(14),
             )
         }
 
     fun byGroup(db: SupportSQLiteDatabase, groupId: String): List<GitHistoryItem> =
         db.query(
             "SELECT id,occurred_at,author,source,reason,group_id,table_name,operation,row_key," +
-                "changed_columns,history_path,commit_sha,reverted_by FROM " + TABLE +
+                "changed_columns,history_path,commit_sha,reverted_by,display_before,display_after FROM " + TABLE +
                 " WHERE group_id=? ORDER BY occurred_at DESC,id DESC",
             arrayOf(groupId),
         ).use { cursor ->
@@ -203,6 +251,8 @@ object GitHistoryStore {
                         historyPath = cursor.getString(10),
                         commitSha = cursor.getString(11),
                         revertedBy = if (cursor.isNull(12)) null else cursor.getString(12),
+                            displayBefore = if (cursor.isNull(13)) null else cursor.getString(13),
+                            displayAfter = if (cursor.isNull(14)) null else cursor.getString(14),
                     ),
                 )
             }
@@ -221,7 +271,7 @@ object GitHistoryStore {
             else arrayOf<Any?>(fromMs, toMs, table)
         return db.query(
             "SELECT id,occurred_at,author,source,reason,group_id,table_name,operation,row_key," +
-                "changed_columns,history_path,commit_sha,reverted_by FROM " + TABLE +
+                "changed_columns,history_path,commit_sha,reverted_by,display_before,display_after FROM " + TABLE +
                 " WHERE occurred_at>=? AND occurred_at<=?" + tableClause +
                 " ORDER BY occurred_at ASC,id ASC LIMIT " + limit,
             args,
@@ -242,10 +292,22 @@ object GitHistoryStore {
                         historyPath = cursor.getString(10),
                         commitSha = cursor.getString(11),
                         revertedBy = if (cursor.isNull(12)) null else cursor.getString(12),
+                            displayBefore = if (cursor.isNull(13)) null else cursor.getString(13),
+                            displayAfter = if (cursor.isNull(14)) null else cursor.getString(14),
                     ),
                 )
             }
         }
+    }
+
+    fun updateDisplayProjection(
+        db: SupportSQLiteDatabase, id: String, before: String?, after: String?,
+    ) {
+        db.execSQL(
+            "UPDATE " + TABLE + " SET display_before=?,display_after=? WHERE id=? " +
+                "AND display_before IS NULL AND display_after IS NULL",
+            arrayOf(before, after, id),
+        )
     }
 
     fun markReverted(db: SupportSQLiteDatabase, id: String, revertedBy: String) {

@@ -119,9 +119,9 @@ android {
             initWith(getByName("debug"))
             matchingFallbacks += listOf("debug")
             applicationIdSuffix = ".qa"
-            // QA supports both the 32-bit TCL and the canonical x86_64 emulator.
+            // QA supports 32-bit devices, the physical Pixel arm64, and the x86_64 emulator.
             // Keep QA unminified: instrumentation tests call test hooks that R8 may legitimately remove.
-            ndk { abiFilters += listOf("armeabi-v7a", "x86_64") }
+            ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64") }
         }
         create("benchmark") {
             initWith(getByName("release"))

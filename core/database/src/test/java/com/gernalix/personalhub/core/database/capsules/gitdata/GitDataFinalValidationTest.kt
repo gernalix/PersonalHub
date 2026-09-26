@@ -48,6 +48,17 @@ class GitDataFinalValidationTest {
         java.io.File(context.noBackupFilesDir, "git-data.enc").delete()
     }
 
+    @Test
+    fun displayProjectionRetainsOnlyBoundedHumanValues() {
+        val row = JSONObject().put("nickname", "Casa").put("notes", "before")
+            .put("uuid", "technical-id").put("updated_at", 123L)
+        val projected = JSONObject(requireNotNull(GitHistoryStore.projectJson(row, "notes,uuid,updated_at")))
+        assertEquals("Casa", projected.getString("nickname"))
+        assertEquals("before", projected.getString("notes"))
+        assertFalse(projected.has("uuid"))
+        assertFalse(projected.has("updated_at"))
+    }
+
     private fun event(id: String, operation: String = "UPDATE", at: Long = 1L) = GitEditEvent(
         id = id,
         occurredAt = at,
