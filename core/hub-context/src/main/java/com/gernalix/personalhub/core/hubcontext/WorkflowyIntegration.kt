@@ -224,7 +224,6 @@ object WorkflowyApiClient {
         require(id.length >= 12) { "Workflowy API response has no valid item_id" }
         return id
     }
-}
 
     suspend fun findUniqueExactNode(context: Context, label: String): WorkflowyCreatedNode? =
         withContext(Dispatchers.IO) {
@@ -260,6 +259,7 @@ object WorkflowyApiClient {
         }.distinct()
         return matches.singleOrNull()?.let { WorkflowyCreatedNode(it, WorkflowyLinkPolicy.deepLink(it)) }
     }
+}
 
 object WorkflowyHubBridge {
 
