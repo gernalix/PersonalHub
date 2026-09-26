@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -39,12 +41,10 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
     var workflowyOpen by rememberSaveable(anchor) { mutableStateOf(false) }
     var workflowyUrl by rememberSaveable(anchor) { mutableStateOf("") }
     var workflowyError by rememberSaveable(anchor) { mutableStateOf<String?>(null) }
-    var workflowyNoteOpen by rememberSaveable(anchor) { mutableStateOf(false) }
-    var workflowyNote by rememberSaveable(anchor) { mutableStateOf("") }
-    var workflowyNoteError by rememberSaveable(anchor) { mutableStateOf<String?>(null) }
+    var workflowyMenuOpen by remember { mutableStateOf(false) }
+    var workflowyDeleteRef by remember { mutableStateOf<HubEntityRef?>(null) }
     var workflowyBusy by remember(anchor) { mutableStateOf(false) }
     val invalidWorkflowyMessage = stringResource(R.string.hub_workflowy_invalid)
-    val existingWorkflowyMessage = stringResource(R.string.hub_workflowy_exists)
     val workflowyNoteFailedMessage = stringResource(R.string.hub_workflowy_note_failed)
     val scope = rememberCoroutineScope()
 
@@ -57,7 +57,16 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
         val dispose = WorkflowyIntegrationSettings.observeEnabled(context) { workflowyEnabled = it }
         onDispose(dispose)
     }
-    LaunchedEffect(anchor) { refresh() }
+    LaunchedEffect(workflowyEnabled) {
+        if (!workflowyEnabled) {
+            workflowyOpen = false
+            workflowyDeleteRef = null
+            workflowyMenuOpen = false
+            composerOpen = false
+            explorerOpen = false
+        }
+    }
+    LaunchedEffect(anchor, workflowyEnabled) { refresh() }
 
     if (composerOpen) {
         HubContextComposerDialog(
@@ -88,10 +97,6 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                         workflowyError = invalidWorkflowyMessage
                         return@launch
                     }
-                    if (linked.any { WorkflowyLinkPolicy.isWorkflowyResource(it) && it.attributes["value"] == normalized }) {
-                        workflowyError = existingWorkflowyMessage
-                        return@launch
-                    }
                     workflowyBusy = true
                     runCatching { WorkflowyHubBridge.attachUrl(context, anchor, normalized) }
                         .onSuccess {
@@ -109,39 +114,28 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
         )
     }
 
-    if (workflowyEnabled && workflowyNoteOpen) {
-        WorkflowyNoteDialog(
-            value = workflowyNote,
-            error = workflowyNoteError,
-            busy = workflowyBusy,
-            onValueChange = { workflowyNote = it; workflowyNoteError = null },
-            onDismiss = {
-                if (!workflowyBusy) {
-                    workflowyNoteOpen = false
-                    workflowyNoteError = null
-                }
+    if (workflowyEnabled && workflowyDeleteRef != null) {
+        val target = requireNotNull(workflowyDeleteRef)
+        AlertDialog(
+            onDismissRequest = { if (!workflowyBusy) workflowyDeleteRef = null },
+            title = { Text(stringResource(R.string.hub_workflowy_delete_title)) },
+            text = { Text(stringResource(R.string.hub_workflowy_delete_confirm)) },
+            confirmButton = {
+                Button(enabled = !workflowyBusy, onClick = {
+                    scope.launch {
+                        workflowyBusy = true
+                        runCatching { WorkflowyHubBridge.deleteLinkedNode(context, anchor, target) }
+                            .onSuccess { workflowyDeleteRef = null; refresh() }
+                            .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                        workflowyBusy = false
+                    }
+                }) { Text(stringResource(R.string.hub_workflowy_delete_node)) }
             },
-            onSave = { openAfter ->
-                scope.launch {
-                    workflowyBusy = true
-                    runCatching { WorkflowyHubBridge.createNote(context, anchor, workflowyNote) }
-                        .onSuccess { node ->
-                            workflowyNoteOpen = false
-                            workflowyNote = ""
-                            workflowyNoteError = null
-                            refresh()
-                            if (openAfter) WorkflowyHubBridge.open(context, node.deepLink)
-                        }
-                        .onFailure {
-                            workflowyNoteError = it.message ?: workflowyNoteFailedMessage
-                        }
-                    workflowyBusy = false
-                }
-            },
+            dismissButton = { TextButton(onClick = { workflowyDeleteRef = null }) { Text(stringResource(R.string.hub_cancel)) } },
         )
     }
 
-    val visibleLinked = linked.filter { workflowyEnabled || !WorkflowyLinkPolicy.isWorkflowyResource(it) }
+    val visibleLinked = linked.filterNot(WorkflowyLinkPolicy::isWorkflowyResource)
     Surface(
         modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -158,39 +152,64 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
             }) { Text(stringResource(R.string.hub_copy_personalhub_link)) }
 
             if (workflowyEnabled) {
-                val hasApiKey = WorkflowyIntegrationSettings.configuration(context).hasApiKey
-                TextButton(
-                    enabled = hasApiKey,
-                    onClick = {
-                        workflowyNote = ""
-                        workflowyNoteError = null
-                        workflowyNoteOpen = true
-                    },
-                ) { Text(stringResource(R.string.hub_workflowy_new_note)) }
-                if (!hasApiKey) {
-                    Text(
-                        stringResource(R.string.hub_workflowy_note_requires_key),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(
-                    enabled = !workflowyBusy && (hasApiKey || linked.any { WorkflowyLinkPolicy.isWorkflowyResource(it) }),
-                    onClick = {
-                        scope.launch {
-                            workflowyBusy = true
-                            runCatching { WorkflowyHubBridge.createAttachAndOpen(context, anchor) }
-                                .onSuccess { refresh() }
-                                .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
-                            workflowyBusy = false
+                val workflowyLinks = linked.filter(WorkflowyLinkPolicy::isWorkflowyResource)
+                    .sortedBy { it.ref.canonicalId }
+                Box {
+                    TextButton(
+                        enabled = !workflowyBusy,
+                        onClick = { workflowyMenuOpen = true },
+                        modifier = Modifier.testTag("workflowy-actions"),
+                    ) { Text(stringResource(R.string.hub_workflowy_title)) }
+                    DropdownMenu(expanded = workflowyMenuOpen, onDismissRequest = { workflowyMenuOpen = false }) {
+                        if (workflowyLinks.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.hub_workflowy_link_auto)) },
+                                enabled = WorkflowyIntegrationSettings.configuration(context).hasApiKey,
+                                onClick = {
+                                    workflowyMenuOpen = false
+                                    scope.launch {
+                                        workflowyBusy = true
+                                        runCatching { WorkflowyHubBridge.createEmptyAndOpen(context, anchor) }
+                                            .onSuccess { refresh() }
+                                            .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                                        workflowyBusy = false
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.hub_workflowy_link_manual)) },
+                                onClick = { workflowyMenuOpen = false; workflowyUrl = ""; workflowyOpen = true },
+                            )
+                        } else {
+                            workflowyLinks.forEachIndexed { index, node ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.hub_workflowy_open_node) +
+                                        if (workflowyLinks.size > 1) " · ${index + 1}" else "") },
+                                    onClick = { workflowyMenuOpen = false; WorkflowyHubBridge.open(context, node.attributes["value"].orEmpty()) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.hub_workflowy_delink_node) +
+                                        if (workflowyLinks.size > 1) " · ${index + 1}" else "") },
+                                    onClick = {
+                                        workflowyMenuOpen = false
+                                        scope.launch {
+                                            workflowyBusy = true
+                                            runCatching { WorkflowyHubBridge.delink(context, anchor, node.ref) }
+                                                .onSuccess { refresh() }
+                                                .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                                            workflowyBusy = false
+                                        }
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.hub_workflowy_delete_node) +
+                                        if (workflowyLinks.size > 1) " · ${index + 1}" else "") },
+                                    onClick = { workflowyMenuOpen = false; workflowyDeleteRef = node.ref },
+                                )
+                            }
                         }
-                    },
-                ) { Text("🔗", modifier = Modifier.testTag("workflowy-jump")) }
-                TextButton(onClick = {
-                    workflowyUrl = ""
-                    workflowyError = null
-                    workflowyOpen = true
-                }) { Text(stringResource(R.string.hub_workflowy_attach_existing)) }
+                    }
+                }
             }
 
             TextButton(
@@ -203,7 +222,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
 
             contexts.forEach { view ->
                 val members = view.members.filter { summary ->
-                    summary.ref != anchor && (workflowyEnabled || !WorkflowyLinkPolicy.isWorkflowyResource(summary))
+                    summary.ref != anchor && !WorkflowyLinkPolicy.isWorkflowyResource(summary)
                 }
                 if (members.isNotEmpty()) {
                     Row(Modifier.fillMaxWidth()) {
@@ -273,49 +292,6 @@ private fun ExistingWorkflowyLinkDialog(
         confirmButton = {
             Button(enabled = !busy && value.isNotBlank(), onClick = onSave) {
                 Text(stringResource(R.string.hub_workflowy_save))
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss) {
-                Text(stringResource(R.string.hub_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun WorkflowyNoteDialog(
-    value: String,
-    error: String?,
-    busy: Boolean,
-    onValueChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onSave: (Boolean) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.hub_workflowy_new_note_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.hub_workflowy_note_text)) },
-                    minLines = 2,
-                )
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (busy) CircularProgressIndicator()
-            }
-        },
-        confirmButton = {
-            Row {
-                TextButton(enabled = !busy && value.isNotBlank(), onClick = { onSave(false) }) {
-                    Text(stringResource(R.string.hub_workflowy_note_save))
-                }
-                Button(enabled = !busy && value.isNotBlank(), onClick = { onSave(true) }) {
-                    Text(stringResource(R.string.hub_workflowy_note_save_open))
-                }
             }
         },
         dismissButton = {

@@ -124,6 +124,7 @@ object TimeFenceNotifier {
         title: String,
         message: String,
         notificationType: TimedTagNotificationType,
+        linkedUrl: String? = null,
     ) {
         ensureChannel(context)
         if (!HubNotificationPlatform.canPost(context)) return
@@ -147,6 +148,7 @@ object TimeFenceNotifier {
             notificationId = notificationId,
             message = message,
             fallbackIntent = fullIntent,
+            linkedUrl = linkedUrl,
         )
         val acknowledgeIntent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
             action = TimeFenceTimerReceiver.ACTION_ACK_TIMED_SESSION

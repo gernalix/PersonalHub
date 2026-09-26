@@ -49,6 +49,7 @@ class TimeFenceRestoreReceiver : BroadcastReceiver() {
                             fireAtMs = fireAtMs,
                             title = appContext.getString(R.string.random_alert_timer_title),
                             message = rule.message,
+                            ruleId = rule.id,
                         )
                     }
             }

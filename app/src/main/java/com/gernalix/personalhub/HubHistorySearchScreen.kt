@@ -23,6 +23,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -124,6 +126,7 @@ fun HubHistorySearchScreen(
     var selectedModuleIds by rememberSaveable(scopeModuleId, initialModules) {
         mutableStateOf(initialSelection.sorted())
     }
+    var moduleMenuOpen by remember { mutableStateOf(false) }
     var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }
     var fromText by rememberSaveable(initialFromMs) {
         mutableStateOf(initialFromMs?.let(::formatHubDateTime).orEmpty())
@@ -157,17 +160,17 @@ fun HubHistorySearchScreen(
         if (debounceQuery && query.isNotBlank()) delay(60)
         if (gitEnabled) {
             val rows = withContext(Dispatchers.IO) { GitHistory.recentForDisplay(context.applicationContext, limit = 1000) }
-            val humanized = rows.map { item ->
+            val humanized = groupGitHistoryRows(rows).filter(::displayableGitHistoryGroup).map { group ->
+                val (item, text) = humanizeGitHistoryGroup(group) { module -> moduleDisplayName(context, module) }
                 val moduleId = gitHistoryModule(item.table)
-                val text = humanizeGitHistory(item, moduleDisplayName(context, moduleId))
                 ActivityUiItem(
-                    id = item.id,
+                    id = item.groupId ?: item.id,
                     occurredAt = item.occurredAt,
                     moduleId = moduleId,
                     title = text.title,
                     detail = text.detail,
                     searchText = text.searchText,
-                    relatedCount = 1,
+                    relatedCount = group.size,
                     navigationRef = null,
                     undoActivityId = null,
                     git = item,
@@ -179,7 +182,7 @@ fun HubHistorySearchScreen(
                     (item.moduleId in selectedSet || (scopeModuleId == null && selectedSet == allModuleIds)) &&
                     (parsedFrom.value == null || item.occurredAt >= parsedFrom.value!!) &&
                     (parsedTo.value == null || item.occurredAt <= parsedTo.value!!) &&
-                    (initialEventId == null || item.id == initialEventId) &&
+                    (initialEventId == null || item.id == initialEventId || item.git?.id == initialEventId) &&
                     (initialEntityId == null || item.git?.rowKey == initialEntityId) &&
                     (needle.isBlank() || normalizeHistorySearchText(item.searchText).contains(needle))
             }.sortedWith(compareByDescending<ActivityUiItem> { it.occurredAt }.thenByDescending { it.id })
@@ -232,8 +235,8 @@ fun HubHistorySearchScreen(
                 .fillMaxSize()
                 .padding(contentPadding)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -249,7 +252,7 @@ fun HubHistorySearchScreen(
                             append(moduleDisplayName(context, it))
                         }
                     },
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -278,35 +281,22 @@ fun HubHistorySearchScreen(
                 }
 
                 if (scopeModuleId == null) {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth().testTag("history-module-filter"),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(modules, key = { it.shortcutPath }) { module ->
-                            val checked = module.shortcutPath in selectedSet
-                            Row(
-                                modifier = Modifier
-                                    .clickable {
-                                        selectedModuleIds = if (checked) {
-                                            selectedSet.minus(module.shortcutPath).sorted()
-                                        } else {
-                                            selectedSet.plus(module.shortcutPath).sorted()
-                                        }
-                                    }
-                                    .padding(horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(
-                                    checked = checked,
-                                    onCheckedChange = { isChecked ->
-                                        selectedModuleIds = if (isChecked) {
-                                            selectedSet.plus(module.shortcutPath).sorted()
-                                        } else {
-                                            selectedSet.minus(module.shortcutPath).sorted()
-                                        }
+                    androidx.compose.foundation.layout.Box(modifier = Modifier.testTag("history-module-filter")) {
+                        OutlinedButton(onClick = { moduleMenuOpen = true }) {
+                            Text(stringResource(R.string.activity_modules_selected, selectedSet.size, allModuleIds.size))
+                        }
+                        DropdownMenu(expanded = moduleMenuOpen, onDismissRequest = { moduleMenuOpen = false }) {
+                            modules.forEach { module ->
+                                val checked = module.shortcutPath in selectedSet
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(module.titleRes)) },
+                                    leadingIcon = { Checkbox(checked = checked, onCheckedChange = null) },
+                                    onClick = {
+                                        selectedModuleIds = (if (checked) selectedSet - module.shortcutPath
+                                            else selectedSet + module.shortcutPath).sorted()
+                                        moduleMenuOpen = false
                                     },
                                 )
-                                Text(stringResource(module.titleRes))
                             }
                         }
                     }
@@ -364,15 +354,19 @@ fun HubHistorySearchScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f).testTag("history-results"),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(entries, key = { it.id }) { item ->
+                    entries.forEachIndexed { index, activityRow ->
+                        if (index == 0 || historyDayLabel(activityRow.occurredAt) != historyDayLabel(entries[index - 1].occurredAt)) {
+                            item(key = "day-${activityRow.id}") { Text(historyDayLabel(activityRow.occurredAt), style = MaterialTheme.typography.labelMedium) }
+                        }
+                        item(key = activityRow.id) {
                         ActivityCard(
-                            item = item,
-                            moduleName = moduleDisplayName(context, item.moduleId),
-                            onOpen = { coroutineScope.launch { openActivityTarget(context, item) } },
+                            item = activityRow,
+                            moduleName = moduleDisplayName(context, activityRow.moduleId),
+                            onOpen = { coroutineScope.launch { openActivityTarget(context, activityRow) } },
                             onUndo = {
-                                val gitItem = item.git
+                                val gitItem = activityRow.git
                                 if (gitItem != null) {
                                     coroutineScope.launch {
                                         val result = withContext(Dispatchers.IO) {
@@ -388,7 +382,7 @@ fun HubHistorySearchScreen(
                                         refreshVisibleEntries()
                                     }
                                 }
-                                val undoId = item.undoActivityId
+                                val undoId = activityRow.undoActivityId
                                 if (undoId != null) coroutineScope.launch {
                                     when (val result = HubActivityUndoEngine.undo(database, undoId)) {
                                         is HubActivityUndoResult.Success -> {
@@ -411,6 +405,7 @@ fun HubHistorySearchScreen(
                                 }
                             },
                         )
+                        }
                     }
                 }
             }
@@ -426,8 +421,19 @@ private fun ActivityCard(
     onUndo: () -> Unit,
 ) {
     val activity = item.activity
+    val context = LocalContext.current
+    var gitUndoSafe by remember(item.id) { mutableStateOf(false) }
     val canOpen = activity != null && (item.navigationRef != null || moduleFor(item.moduleId) != null)
     var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    LaunchedEffect(item.git?.id, expanded) {
+        gitUndoSafe = false
+        val git = item.git ?: return@LaunchedEffect
+        if (expanded && git.revertedBy == null) {
+            gitUndoSafe = withContext(Dispatchers.IO) {
+                runCatching { GitHistory.previewRevert(context.applicationContext, git.id).safe }.getOrDefault(false)
+            }
+        }
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -436,8 +442,8 @@ private fun ActivityCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -445,16 +451,16 @@ private fun ActivityCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 Text(
-                    text = "${item.title} · $moduleName · ${historyDateLabel(item.occurredAt)}",
+                    text = "${item.title} · $moduleName · ${historyTimeLabel(item.occurredAt)}",
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = if (expanded) 6 else 3,
                     overflow = TextOverflow.Ellipsis,
                 )
                 OutlinedButton(
                     onClick = onUndo,
-                    enabled = item.undoActivityId != null || (item.git != null && item.git.revertedBy == null),
+                    enabled = item.undoActivityId != null || gitUndoSafe,
                     modifier = Modifier.testTag("history-undo"),
                 ) {
                     Text("↩️")

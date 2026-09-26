@@ -259,6 +259,7 @@ private fun PlaceAlertRuleCard(
     onDelete: () -> Unit,
     onSetEnabled: (Boolean) -> Unit,
 ) {
+    var linksOpen by remember(rule.id) { mutableStateOf(false) }
     val tagNames = tagIds.mapNotNull { id -> tags.firstOrNull { it.id == id }?.name }
     val target = if (rule.targetKind == AlertTargetKind.ENTITY.name) {
         stringResource(R.string.place_alert_specific_place)
@@ -295,6 +296,14 @@ private fun PlaceAlertRuleCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onEdit) { Text(stringResource(R.string.place_alert_edit)) }
                 TextButton(onClick = onDelete) { Text(stringResource(R.string.delete)) }
+                TextButton(onClick = { linksOpen = !linksOpen }) {
+                    Text(stringResource(com.gernalix.personalhub.core.hubcontext.R.string.hub_context_links_title))
+                }
+            }
+            if (linksOpen) {
+                com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                    com.gernalix.personalhub.contracts.database.HubEntityRef("places", "alert", rule.id),
+                )
             }
         }
     }

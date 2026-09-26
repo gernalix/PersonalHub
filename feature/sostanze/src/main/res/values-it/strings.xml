@@ -28,6 +28,8 @@
     <string name="undo_last_tap">Annulla ultimo tocco</string>
     <string name="dose_counter_next">%1$d/%2$d prossima: %3$s</string>
     <string name="history_for">Cronologia: %1$s</string>
+    <string name="manage_intakes">Gestisci assunzioni</string>
+    <string name="manage_intakes_for">Gestisci assunzioni: %1$s</string>
     <string name="close">Chiudi</string>
     <string name="daily_consumption">Uso medio: %1$s %2$s/giorno</string>
     <string name="covered_days">Giorni coperti: %1$s</string>

@@ -189,6 +189,11 @@ private fun ContextDeepLink(contextId: String, onBack: () -> Unit) {
             }) { Text(stringResource(R.string.deep_link_copy)) }
         }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                    HubEntityRef("hub", "context", contextId),
+                )
+            }
             items(resolved.members, key = { "${it.ref.moduleId}/${it.ref.entityKind}/${it.ref.canonicalId}" }) { summary ->
                 Card(
                     Modifier

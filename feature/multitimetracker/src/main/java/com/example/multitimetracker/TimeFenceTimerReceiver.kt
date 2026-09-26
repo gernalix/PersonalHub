@@ -8,6 +8,8 @@ import com.example.multitimetracker.persistence.SnapshotStore
 import com.example.multitimetracker.util.CapsuleWriteApi
 import com.example.multitimetracker.widget.QuickSessionWidgetProvider
 import com.gernalix.personalhub.core.database.DatabaseProfiles
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.hubcontext.WorkflowyHubBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -62,16 +64,21 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
         TimeFenceNotifier.acknowledgeTimedSession(context, notificationId)
     }
 
-    private fun handleRandomAlert(context: Context, intent: Intent) {
+    private suspend fun handleRandomAlert(context: Context, intent: Intent) {
         val title = intent.getStringExtra(EXTRA_RANDOM_ALERT_TITLE) ?: context.getString(R.string.app_name)
         val text = intent.getStringExtra(EXTRA_RANDOM_ALERT_TEXT) ?: context.getString(R.string.notification_label)
         val id = intent.getIntExtra(EXTRA_NOTIFICATION_ID, title.hashCode())
+        val ruleId = intent.getLongExtra(EXTRA_ALERT_RULE_ID, -1L)
+        val linkedUrl = if (ruleId > 0L) WorkflowyHubBridge.notificationUrl(
+            context, HubEntityRef("timer", "alert", ruleId.toString()),
+        ) else null
         TimeFenceNotifier.notifyTimedSession(
             context = context,
             notificationId = id,
             title = title,
             message = text,
             notificationType = com.example.multitimetracker.model.TimedTagNotificationType.NORMAL,
+            linkedUrl = linkedUrl,
         )
     }
 
@@ -87,5 +94,6 @@ class TimeFenceTimerReceiver : BroadcastReceiver() {
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
         const val EXTRA_RANDOM_ALERT_TITLE = "extra_random_alert_title"
         const val EXTRA_RANDOM_ALERT_TEXT = "extra_random_alert_text"
+        const val EXTRA_ALERT_RULE_ID = "extra_alert_rule_id"
     }
 }

@@ -22,6 +22,7 @@ import com.gernalix.personalhub.soldi.hub.SoldiTransactionHubAdapter
 import com.gernalix.personalhub.workflowydays.WorkflowyDaysSync
 import com.gernalix.sostanze.hub.SubstanceHubAdapter
 import com.gernalix.sostanze.hub.SubstanceIntakeHubAdapter
+import com.gernalix.sostanze.hub.PrescriptionHubAdapter
 import com.supercontacts.app.hub.PeopleHubAdapter
 import com.wordpulse.app.hub.WordSessionHubAdapter
 import java.util.concurrent.Executors
@@ -62,12 +63,16 @@ private fun initializeHubContextRuntime(context: android.content.Context) {
             PeopleHubAdapter(context),
             TimerSessionHubAdapter(context),
             TimerQuickEventEntryHubAdapter(context),
+            com.example.multitimetracker.hub.TimerAlertHubAdapter(context),
             PlacesHubAdapter(context),
+            com.gernalix.luoghi.hub.PlaceAlertHubAdapter(context),
             SoldiTransactionHubAdapter(context),
             SubstanceHubAdapter(context),
             SubstanceIntakeHubAdapter(context),
+            PrescriptionHubAdapter(context),
             WordSessionHubAdapter(context),
             ResourceHubAdapter(context),
+            com.gernalix.personalhub.core.hubcontext.HubContextHubAdapter(context),
             SinceWhenCounterHubAdapter(context),
         ),
     )

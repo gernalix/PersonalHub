@@ -59,7 +59,7 @@ class HubContextRepository(
     ) = database.withTransaction {
         val existing = requireNotNull(dao.context(contextId)) { "Context not found" }
         val normalizedTitle = title?.trim()?.takeIf(String::isNotEmpty)
-        validateMembers(members, typeId)
+        validateMembers(members, typeId, excludingContextId = contextId)
         dao.deleteMembers(contextId)
         dao.insertMembers(members.mapIndexed { index, member -> HubContextMember(contextId, member.bindingId, member.role.trim(), index) })
         require(dao.updateContext(contextId, typeId, normalizedTitle, now()) == 1)
@@ -228,11 +228,38 @@ class HubContextRepository(
     }
 
     private fun normalizedScope(scope: Collection<String>) = scope.toSet().toList().also { require(it.isNotEmpty()) }
-    private suspend fun validateMembers(members: List<HubContextMemberDraft>, typeId: String?) {
+    private suspend fun validateMembers(
+        members: List<HubContextMemberDraft>,
+        typeId: String?,
+        excludingContextId: String? = null,
+    ) {
         require(members.size >= 2) { "A Context requires at least two members" }
         require(members.map { it.bindingId to it.role.trim() }.distinct().size == members.size) { "Duplicate member role" }
         val found = bindings(members.map { it.bindingId }).associateBy { it.id }
         val bindings = members.associateWith { requireNotNull(found[it.bindingId]) { "Unknown Hub entity binding" } }
+        val workflowyBindings = bindings.values.filter { binding ->
+            binding.moduleId == "hub" && binding.entityKind == "resource" &&
+                database.hubResourceDao().resource(binding.canonicalId)?.value?.let(WorkflowyLinkPolicy::normalize) != null
+        }
+        if (workflowyBindings.isNotEmpty()) {
+            require(WorkflowyIntegrationSettings.isEnabled(requireNotNull(HubContextRuntime.workflowyContext()))) {
+                "Workflowy integration is disabled"
+            }
+            require(workflowyBindings.size == 1) { "One Workflowy link per entity" }
+            bindings.values.filterNot { it in workflowyBindings }.forEach { anchor ->
+                val alreadyLinked = dao.contextsForEntity(anchor.id)
+                    .filter { it.id != excludingContextId }
+                    .any { existing ->
+                        dao.members(existing.id).any { member ->
+                            val resource = dao.binding(member.entityId)
+                            resource?.moduleId == "hub" && resource.entityKind == "resource" &&
+                                database.hubResourceDao().resource(resource.canonicalId)?.value
+                                    ?.let(WorkflowyLinkPolicy::normalize) != null
+                        }
+                    }
+                require(!alreadyLinked) { "One Workflowy link per entity" }
+            }
+        }
         if (typeId == null) return
         val fields = requireNotNull(type(typeId)) { "Unknown Context Type" }.second
         fields.forEach { field ->
@@ -292,9 +319,10 @@ class HubContextRepository(
             val first = group.first()
             val adapter = adapters.adapter(HubEntityRef(first.moduleId, first.entityKind, first.canonicalId))
             val resolved = adapter.summaries(group.map { it.canonicalId }.toSet())
-            group.map { binding ->
+            group.mapNotNull { binding ->
                 resolved[binding.canonicalId]
-                    ?: HubEntitySummary(
+                    ?: if (binding.moduleId == "hub" && binding.entityKind == "resource") null
+                    else HubEntitySummary(
                         HubEntityRef(binding.moduleId, binding.entityKind, binding.canonicalId),
                         binding.canonicalId,
                         lifecycle = binding.lifecycle,

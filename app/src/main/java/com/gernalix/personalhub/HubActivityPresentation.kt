@@ -40,10 +40,68 @@ internal fun historyDateLabel(
 ): String = DateTimeFormatter.ofPattern("EEE d/M/yy", locale)
     .format(Instant.ofEpochMilli(epochMs).atZone(zoneId))
 
+internal fun historyTimeLabel(epochMs: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
+    DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(epochMs).atZone(zoneId))
+
+internal fun historyDayLabel(
+    epochMs: Long,
+    todayMs: Long = System.currentTimeMillis(),
+    zoneId: ZoneId = ZoneId.systemDefault(),
+    locale: Locale = Locale.getDefault(),
+): String {
+    val date = Instant.ofEpochMilli(epochMs).atZone(zoneId).toLocalDate()
+    val today = Instant.ofEpochMilli(todayMs).atZone(zoneId).toLocalDate()
+    return when (date) {
+        today -> if (locale.language == "it") "Oggi" else "Today"
+        today.minusDays(1) -> if (locale.language == "it") "Ieri" else "Yesterday"
+        else -> DateTimeFormatter.ofPattern("d MMM yyyy", locale).format(date)
+    }
+}
+
+internal fun groupGitHistoryRows(rows: List<com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem>) =
+    rows.groupBy { it.groupId?.takeIf(String::isNotBlank) ?: it.id }.values.toList()
+
+private val GIT_DERIVED_TABLES = setOf("hub_context_members", "hub_entity_bindings", "hub_activity_log")
+
+internal fun displayableGitHistoryGroup(
+    group: List<com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem>,
+): Boolean = group.any { row ->
+    row.table !in GIT_DERIVED_TABLES &&
+        (!row.operation.equals("UPDATE", true) ||
+            row.changedColumns.split(',').any { humanFieldLabel(it) != null })
+}
+
+internal fun humanizeGitHistoryGroup(
+    group: List<com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem>,
+    moduleLabel: (String) -> String,
+): Pair<com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem, HumanActivityText> {
+    require(group.isNotEmpty())
+    val semantic = group.filter { row ->
+        row.table !in GIT_DERIVED_TABLES &&
+            (!row.operation.equals("UPDATE", true) ||
+                row.changedColumns.split(',').any { humanFieldLabel(it) != null })
+    }.ifEmpty { group }
+    val primary = semantic.firstOrNull { it.table == "sessions" || it.table == "contacts" || it.table == "hub_tags" }
+        ?: semantic.first()
+    val workflowy = group.any { row ->
+        row.table in setOf("hub_resources", "hub_contexts") &&
+            listOf(row.displayBefore, row.displayAfter).any { it?.contains("workflowy", ignoreCase = true) == true }
+    }
+    val parts = semantic.map { humanizeGitHistory(it, moduleLabel(gitHistoryModule(it.table))) }
+    val title = if (workflowy) {
+        if (group.any { it.operation.equals("INSERT", true) }) "Linked Workflowy node"
+        else "Removed Workflowy link"
+    } else parts.first().title
+    val detail = parts.mapNotNull(HumanActivityText::detail).flatMap { it.lines() }.distinct()
+        .take(8).joinToString("\n").takeIf(String::isNotBlank)
+    return primary to HumanActivityText(title, detail, listOfNotNull(title, detail).joinToString(" "))
+}
+
 internal fun groupActivityRows(rows: List<HubActivityEntity>): List<List<HubActivityEntity>> =
     rows.groupBy { it.groupId?.takeIf(String::isNotBlank) ?: it.id }.values.toList()
 
 internal fun safeUndoActivityId(group: List<HubActivityEntity>): String? {
+    if (group.size != 1) return null // The fallback engine reverses one row, never a partial logical edit.
     val candidates = group.filter {
         it.reversible &&
             it.status == HubActivityStatus.ACTIVE &&
@@ -57,6 +115,10 @@ internal fun humanizeActivity(
     subjectLabel: String?,
     moduleLabel: String,
 ): HumanActivityText {
+    if (activity.sourceTable == "hub_contexts" && subjectLabel == "Workflowy") {
+        val title = if (activity.action.contains("delete")) "Removed Workflowy link" else "Linked Workflowy node"
+        return HumanActivityText(title, null, "$title $moduleLabel")
+    }
     val entityType = humanEntityType(activity.entityKind)
     val subject = subjectLabel?.trim()?.takeIf(String::isNotEmpty)
     val changes = activityChanges(activity)
@@ -238,6 +300,7 @@ internal fun humanFieldLabel(raw: String?): String? {
         ?.trim()
         ?.takeIf(String::isNotEmpty)
         ?.replace(Regex("([a-z0-9])([A-Z])"), "$1_$2")
+        ?.replace(' ', '_')
         ?.lowercase(Locale.ROOT)
         ?: return null
     if (
@@ -248,6 +311,10 @@ internal fun humanFieldLabel(raw: String?): String? {
         key.endsWith("_json") ||
         key.endsWith("_at") ||
         key.endsWith("_ms") ||
+        key.endsWith("_utc") ||
+        key.endsWith("_epoch") ||
+        key == "timestamp" ||
+        key.endsWith("_timestamp") ||
         key.startsWith("normalized_") ||
         key.startsWith("sort_") ||
         key.contains("cursor") ||
@@ -256,7 +323,10 @@ internal fun humanFieldLabel(raw: String?): String? {
         key.contains("schema") ||
         key.contains("payload") ||
         key.contains("source_row") ||
-        key in setOf("public_id", "source", "source_app", "version", "app_version", "metadata")
+        key == "resource_kind" ||
+        key in setOf("public_id", "source", "source_app", "version", "app_version", "metadata",
+            "provenance", "position", "usage_count", "entity_kind", "entity_type", "stock_current",
+            "timestamp_utc", "timestamp_ms", "row_key", "table_name")
     ) {
         return null
     }

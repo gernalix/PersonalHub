@@ -221,6 +221,7 @@ private fun AlertRuleCard(
     onDelete: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit
 ) {
+    var linksOpen by remember(rule.id) { mutableStateOf(false) }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
@@ -300,6 +301,14 @@ private fun AlertRuleCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onEdit) { Text(stringResource(R.string.modifica)) }
                 TextButton(onClick = onDelete) { Text(stringResource(R.string.elimina)) }
+                TextButton(onClick = { linksOpen = !linksOpen }) {
+                    Text(stringResource(com.gernalix.personalhub.core.hubcontext.R.string.hub_context_links_title))
+                }
+            }
+            if (linksOpen) {
+                com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                    com.gernalix.personalhub.contracts.database.HubEntityRef("timer", "alert", rule.id.toString()),
+                )
             }
         }
     }

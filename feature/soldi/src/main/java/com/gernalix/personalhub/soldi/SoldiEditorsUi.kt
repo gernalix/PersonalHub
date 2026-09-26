@@ -274,6 +274,13 @@ internal fun TransactionEditorV2(
                     }
                 }
             }
+            state.draft.transactionUuid?.let { uuid ->
+                item {
+                    com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                        HubEntityRef("soldi", "transaction", uuid),
+                    )
+                }
+            }
             item { Spacer(Modifier.height(4.dp)) }
         }
 

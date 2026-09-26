@@ -66,7 +66,6 @@ class ResourceHubAdapter(private val context: Context) : HubEntityAdapter {
 
     private fun visible(resource: HubResource): Boolean =
         WorkflowyIntegrationSettings.isEnabled(context) ||
-            resource.kind != HubResourceKinds.WEB_URL ||
             WorkflowyLinkPolicy.normalize(resource.value) == null
 
     private fun HubResource.summary() = HubEntitySummary(
