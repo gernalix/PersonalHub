@@ -181,6 +181,18 @@ class HubHistorySearchQaDeviceTest {
             LauncherShortcutsCapsule.moduleIntent(context, HubModule.TIMER)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+        // A clean Android 13+ install shows Timer's local-reminder primer on first launch.
+        // Dismiss it by its actual action before looking for the History/Search entry.
+        device.wait(
+            Until.findObject(By.text(context.getString(com.example.multitimetracker.R.string.notification_permission_title))),
+            7_000,
+        )?.let {
+            val notNow = device.findObject(
+                By.text(context.getString(com.example.multitimetracker.R.string.notification_permission_not_now)),
+            )
+            assertNotNull("Timer local-reminder primer has no dismiss action", notNow)
+            notNow!!.click()
+        }
         assertNull(
             "Legacy Timer Timeline must not be reachable",
             device.wait(Until.findObject(By.text("Timeline")), 1_000),

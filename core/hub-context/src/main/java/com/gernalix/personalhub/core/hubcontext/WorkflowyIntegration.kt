@@ -363,7 +363,15 @@ object WorkflowyHubBridge {
         HubContextRuntime.deleteContext(view.context.id)
     }
 
-    suspend fun deleteLinkedNode(context: Context, anchor: HubEntityRef, resourceRef: HubEntityRef) = linkMutex.withLock {
+    suspend fun deleteLinkedNode(context: Context, anchor: HubEntityRef, resourceRef: HubEntityRef) =
+        deleteLinkedNodeUsing(context, anchor, resourceRef, WorkflowyApiClient::deleteFromDeepLink)
+
+    internal suspend fun deleteLinkedNodeUsing(
+        context: Context,
+        anchor: HubEntityRef,
+        resourceRef: HubEntityRef,
+        remoteDelete: suspend (Context, String) -> Unit,
+    ) = linkMutex.withLock {
         require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         val pair = links(anchor).firstOrNull { it.second.ref == resourceRef }
             ?: error("Workflowy link is no longer present")
@@ -372,7 +380,7 @@ object WorkflowyHubBridge {
         }
         val url = pair.second.attributes["value"].orEmpty()
         deleteRemoteThenLocal(
-            remote = { WorkflowyApiClient.deleteFromDeepLink(context, url) },
+            remote = { remoteDelete(context, url) },
             local = { HubContextRuntime.deleteContext(pair.first.context.id) },
         )
     }
