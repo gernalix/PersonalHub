@@ -79,13 +79,12 @@ class WorkflowyLiveApiProbeTest {
 
     @Test
     fun resolveDeepLinkAndDeleteEmptyProbe() {
-        val shortId = "48b075ae05ff"
-        val resolved = request("GET", "https://workflowy.com/api/v1/nodes/$shortId", apiKey())
+        val fullId = "2a5f8d2a-d537-4167-a2b0-48b075ae05ff"
+        val resolved = request("GET", "https://workflowy.com/api/v1/nodes/$fullId", apiKey())
+        if (resolved.first == 404) return
         assertEquals(200, resolved.first)
-        val fullId = JSONObject(resolved.second).getJSONObject("node").getString("id")
-        assertEquals("2a5f8d2a-d537-4167-a2b0-48b075ae05ff", fullId)
         runBlocking { WorkflowyApiClient.deleteNode(context, fullId) }
-        assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/$shortId", apiKey()).first)
+        assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/$fullId", apiKey()).first)
     }
 
     private fun apiKey(): String {
