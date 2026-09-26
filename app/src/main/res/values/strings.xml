@@ -4,6 +4,10 @@
     <string name="home_history_search">🔍</string>
     <string name="home_history_search_help">Search history and changes</string>
     <string name="home_context_help">Link entities</string>
+    <string name="home_tags">Tags</string>
+    <string name="home_tags_help">Browse and manage tags</string>
+    <string name="home_audit_log">Audit log</string>
+    <string name="home_audit_log_help">History, changes and undo</string>
     <string name="home_data_explorer">Data</string>
     <string name="home_data_explorer_help">SQL and advanced exploration</string>
     <string name="data_explorer_title">Data explorer</string>
@@ -73,6 +77,7 @@
     <string name="database_profile_clone">Clone current</string>
     <string name="database_profile_error">Profile operation failed.</string>
     <string name="settings_title">Settings</string>
+    <string name="home_settings_help">App, data and integrations</string>
     <string name="settings_back">Back</string>
     <string name="home_shortcuts_title">Home shortcuts</string>
     <string name="home_shortcuts_description">The launcher long-press menu may show only some modules. Add any module to your Home screen here.</string>

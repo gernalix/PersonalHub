@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -26,7 +25,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -122,28 +120,9 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LazyRow(
-                modifier = Modifier.weight(1f).testTag("home-utilities"),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                item { HomeUtilityButton(R.string.home_context, R.string.home_context_help) { topDestination = "composer" } }
-                item {
-                    OutlinedButton(onClick = { context.startActivity(Intent(context, HubTagsActivity::class.java)) }) {
-                        Text("Tags")
-                    }
-                }
-                item { HomeUtilityButton(R.string.home_history_search, R.string.home_history_search_help) { topDestination = "history" } }
-                item { HomeUtilityButton(R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" } }
-                item {
-                    HomeUtilityButton(R.string.home_data_explorer, R.string.home_data_explorer_help) {
-                        context.startActivity(Intent(context, DataExplorerActivity::class.java))
-                    }
-                }
-                item { OutlinedButton(onClick = { showSettings = true }) { Text(stringResource(R.string.settings_title)) } }
-            }
             HomeAutoExportStatusIndicator()
         }
         LazyVerticalGrid(
@@ -162,6 +141,28 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                     },
                 )
             }
+            item(key = "home-context") {
+                HomeActionTile("🔗", R.string.home_context, R.string.home_context_help) { topDestination = "composer" }
+            }
+            item(key = "home-tags") {
+                HomeActionTile("🏷️", R.string.home_tags, R.string.home_tags_help) {
+                    context.startActivity(Intent(context, HubTagsActivity::class.java))
+                }
+            }
+            item(key = "home-audit") {
+                HomeActionTile("📜", R.string.home_audit_log, R.string.home_audit_log_help) { topDestination = "history" }
+            }
+            item(key = "home-since-when") {
+                HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }
+            }
+            item(key = "home-data") {
+                HomeActionTile("🗃️", R.string.home_data_explorer, R.string.home_data_explorer_help) {
+                    context.startActivity(Intent(context, DataExplorerActivity::class.java))
+                }
+            }
+            item(key = "home-settings") {
+                HomeActionTile("⚙️", R.string.settings_title, R.string.home_settings_help) { showSettings = true }
+            }
         }
         Text(
             text = BuildConfig.VERSION_NAME,
@@ -173,15 +174,32 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
 }
 
 @Composable
-private fun HomeUtilityButton(titleRes: Int, helpRes: Int, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick) {
-        Column {
-            Text(stringResource(titleRes))
-            Text(
-                stringResource(helpRes),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+private fun HomeActionTile(icon: String, titleRes: Int, subtitleRes: Int, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(icon, style = MaterialTheme.typography.headlineSmall)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(subtitleRes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
