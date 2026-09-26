@@ -60,7 +60,6 @@
     <string name="hub_workflowy_exists">This Workflowy URL is already linked here.</string>
     <string name="hub_workflowy_save">Link</string>
     <string name="hub_workflowy_attach_existing">Link existing Workflowy node</string>
-    <string name="hub_workflowy_open_auto">Open in Workflowy</string>
     <string name="hub_workflowy_new_note">+ Workflowy note</string>
     <string name="hub_workflowy_new_note_title">New Workflowy note</string>
     <string name="hub_workflowy_note_text">Note</string>
