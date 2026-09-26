@@ -22,6 +22,12 @@ class AndroidConnectedTestGateTests(unittest.TestCase):
             gate.run([sys.executable, "-c", "print(\"DELETE_FAILED_INTERNAL_ERROR\"); print(\"BUILD SUCCESSFUL\")"]),
         )
 
+    def test_runner_setup_failure_is_fail_closed_even_when_child_exits_zero(self) -> None:
+        self.assertEqual(
+            2,
+            gate.run([sys.executable, "-c", "print(\"INSTRUMENTATION_RESULT: shortMsg=Unable to find instrumentation\"); print(\"BUILD SUCCESSFUL\")"]),
+        )
+
     def test_nonzero_child_status_is_preserved(self) -> None:
         self.assertEqual(7, gate.run([sys.executable, "-c", "raise SystemExit(7)"]))
 

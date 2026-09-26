@@ -7,11 +7,13 @@ import sys
 
 FAILURE_MARKERS = (
     "INSTRUMENTATION_FAILED",
-    "DELETE_FAILED_INTERNAL_ERROR",
+    "INSTRUMENTATION_RESULT: shortMsg=",
+    "INSTALL_FAILED",
+    "DELETE_FAILED",
     "INSTRUMENTATION_STATUS_CODE: -2",
     "FAILURES!!!",
     "Test run failed to complete",
-    "INSTRUMENTATION_RESULT: shortMsg=Process crashed",
+    "No tests found",
 )
 
 
