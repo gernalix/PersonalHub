@@ -117,7 +117,11 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                     workflowyBusy = true
                     runCatching {
                         WorkflowyApiClient.deleteFromDeepLink(context, normalized)
-                        linked.filter { WorkflowyLinkPolicy.isWorkflowyResource(it) && it.attributes["value"] == normalized }
+                        val shortId = WorkflowyLinkPolicy.shortId(normalized)
+                        linked.filter {
+                            WorkflowyLinkPolicy.isWorkflowyResource(it) &&
+                                WorkflowyLinkPolicy.shortId(it.attributes["value"].orEmpty()) == shortId
+                        }
                             .forEach { WorkflowyHubBridge.deleteDetachedResource(it.ref) }
                     }.onSuccess {
                         workflowyOpen = false
