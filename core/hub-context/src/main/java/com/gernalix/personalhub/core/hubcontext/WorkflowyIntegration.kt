@@ -224,9 +224,27 @@ object WorkflowyApiClient {
         require(id.length >= 12) { "Workflowy API response has no valid item_id" }
         return id
     }
+
+
 }
 
 object WorkflowyHubBridge {
+
+    suspend fun createAttachAndOpen(context: Context, anchor: HubEntityRef): Boolean {
+        require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
+        val existing = HubContextRuntime.contexts(anchor)
+            .flatMap { it.members }
+            .filter { it.ref != anchor && WorkflowyLinkPolicy.isWorkflowyResource(it) }
+            .distinctBy { it.attributes["value"] }
+        if (existing.size == 1) return open(context, existing.single().attributes["value"].orEmpty())
+        if (existing.size > 1) error("More than one Workflowy node is linked to this entity")
+
+        val summary = HubContextRuntime.adapter(anchor.moduleId, anchor.entityKind)
+            .summaries(setOf(anchor.canonicalId))[anchor.canonicalId]
+            ?: error("PersonalHub entity could not be resolved")
+        val created = createNote(context, anchor, summary.label)
+        return open(context, created.deepLink)
+    }
     suspend fun createNote(context: Context, anchor: HubEntityRef, text: String): WorkflowyCreatedNode {
         val created = WorkflowyApiClient.createNode(context, text)
         try {
@@ -292,7 +310,7 @@ object WorkflowyHubBridge {
         val uri = Uri.parse(normalized)
         val explicit = Intent(Intent.ACTION_VIEW, uri)
             .setPackage("com.workflowy.android")
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         if (runCatching { context.startActivity(explicit); true }.getOrDefault(false)) return true
         return runCatching {
             context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

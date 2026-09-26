@@ -174,6 +174,18 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                TextButton(
+                    enabled = !workflowyBusy && (hasApiKey || linked.any { WorkflowyLinkPolicy.isWorkflowyResource(it) }),
+                    onClick = {
+                        scope.launch {
+                            workflowyBusy = true
+                            runCatching { WorkflowyHubBridge.createAttachAndOpen(context, anchor) }
+                                .onSuccess { refresh() }
+                                .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                            workflowyBusy = false
+                        }
+                    },
+                ) { Text("🔗", modifier = Modifier.testTag("workflowy-jump")) }
                 TextButton(onClick = {
                     workflowyUrl = ""
                     workflowyError = null

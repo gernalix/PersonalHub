@@ -64,4 +64,6 @@ class WorkflowyIntegrationTest {
         assertFalse(WorkflowyIntegrationSettings.validTarget("two words"))
         assertFalse(WorkflowyIntegrationSettings.validTarget(""))
     }
+
+
 }

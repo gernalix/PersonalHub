@@ -77,6 +77,7 @@ internal fun WorkflowyIntegrationSettingsScreen(onBack: () -> Unit) {
                         configuration = WorkflowyIntegrationSettings.configuration(context)
                         target = configuration.target
                         saved = true
+                        onBack()
                     }
                 },
             ) { Text(stringResource(R.string.workflowy_settings_save)) }
