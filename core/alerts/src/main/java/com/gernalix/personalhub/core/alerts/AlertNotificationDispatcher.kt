@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
+import com.gernalix.personalhub.core.hubcontext.WorkflowyLinkPolicy
 
 object AlertNotificationDispatcher {
     const val CHANNEL_ID = "personalhub_alerts_v1"
@@ -90,6 +92,8 @@ object AlertNotificationDispatcher {
     }
 
     private fun directUriIntentOrNull(context: Context, link: android.net.Uri): Intent? {
+        if (WorkflowyLinkPolicy.normalize(link.toString()) != null &&
+            !WorkflowyIntegrationSettings.isEnabled(context)) return null
         val base = Intent(Intent.ACTION_VIEW, link).apply {
             addCategory(Intent.CATEGORY_BROWSABLE)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
