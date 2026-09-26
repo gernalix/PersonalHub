@@ -786,6 +786,7 @@ private fun QuickEventEntryRow(
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm", Locale.getDefault()) }
     var menuOpen by remember { mutableStateOf(false) }
+    var linksOpen by remember(entry.id) { mutableStateOf(false) }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().combinedClickable(enabled = !readOnly, onClick = onEdit, onLongClick = { menuOpen = true }),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
@@ -801,6 +802,10 @@ private fun QuickEventEntryRow(
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.quick_event_entry_actions), modifier = Modifier.size(20.dp))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(com.gernalix.personalhub.core.hubcontext.R.string.hub_context_links_title)) },
+                            onClick = { menuOpen = false; linksOpen = !linksOpen },
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.quick_event_edit_entry)) },
                             leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
@@ -823,6 +828,11 @@ private fun QuickEventEntryRow(
             }
             fieldValues.filter { it.value.isNotBlank() }.forEach { value ->
                 Text("${value.label}: ${value.value}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (linksOpen) {
+                com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                    com.gernalix.personalhub.contracts.database.HubEntityRef("timer", "quick_event_entry", entry.id.toString()),
+                )
             }
         }
     }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
+import com.gernalix.personalhub.core.hubcontext.WorkflowyHubBridge
 
 /**
  * Battery-friendly Places alert engine.
@@ -73,7 +74,10 @@ class PlaceAlertEngine(
                 firedAtMs = firedAtMs,
             )
             val notificationId = (rule.id + ":" + placeUuid).hashCode() and Int.MAX_VALUE
-            if (!AlertNotificationDispatcher.post(appContext, notificationId, fire, emitTaskerBroadcast)) continue
+            val linkedUrl = WorkflowyHubBridge.notificationUrl(
+                appContext, HubEntityRef("places", "alert", rule.id),
+            )
+            if (!AlertNotificationDispatcher.post(appContext, notificationId, fire, emitTaskerBroadcast, linkedUrl)) continue
 
             val keepEnabled = rule.scope != AlertScope.ONE_TIME.name
             alertDao.markFired(rule.id, firedAtMs, keepEnabled)

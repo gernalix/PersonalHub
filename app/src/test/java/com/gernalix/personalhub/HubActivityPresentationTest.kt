@@ -20,6 +20,54 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class HubActivityPresentationTest {
     @Test
+    fun gitTechnicalWritesShareOneLogicalRow() {
+        val first = GitHistoryItem(
+            id = "one", occurredAt = 1L, author = "user", source = "app", reason = null,
+            groupId = "logical", table = "sessions", operation = "INSERT", rowKey = "1",
+            changedColumns = "name", historyPath = "h", commitSha = "c", revertedBy = null,
+        )
+        val derived = first.copy(id = "two", table = "hub_context_members", changedColumns = "position")
+        assertEquals(1, groupGitHistoryRows(listOf(first, derived)).size)
+        assertFalse(displayableGitHistoryGroup(listOf(derived)))
+        assertTrue(displayableGitHistoryGroup(listOf(first, derived)))
+        assertFalse(displayableGitHistoryGroup(listOf(first.copy(
+            table = "hub_tags", operation = "UPDATE", changedColumns = "usage_count,provenance,updated_at",
+        ))))
+        assertNull(humanFieldLabel("Provenance"))
+        assertNull(humanFieldLabel("Position"))
+        assertNull(humanFieldLabel("Usage Count"))
+        assertNull(humanFieldLabel("Entity Kind"))
+        assertNull(humanFieldLabel("Stock Current"))
+        assertNull(humanFieldLabel("Timestamp Utc"))
+        val workflowy = first.copy(
+            table = "hub_resources", operation = "INSERT", changedColumns = "value,kind,position",
+            displayAfter = "{\"value\":\"https://workflowy.com/#/59d823cea257\"}",
+        )
+        val (_, text) = humanizeGitHistoryGroup(listOf(workflowy, derived)) { "PersonalHub" }
+        assertEquals("Linked Workflowy node", text.title)
+        assertFalse(text.searchText.contains("position", ignoreCase = true))
+    }
+
+    @Test
+    fun fallbackWorkflowyContextIsOneHumanAction() {
+        val row = activity(
+            moduleId = "hub", action = "episode_created", entityKind = "episode",
+            entityLabel = "Workflowy", sourceTable = "hub_contexts",
+        )
+        val text = humanizeActivity(row, "Workflowy", "PersonalHub")
+        assertEquals("Linked Workflowy node", text.title)
+        assertFalse(text.searchText.contains("hub_contexts"))
+    }
+
+    @Test
+    fun localDayGroupsUseTodayAndYesterday() {
+        val zone = ZoneId.of("Europe/Copenhagen")
+        val today = LocalDateTime.of(2026, 9, 26, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val yesterday = LocalDateTime.of(2026, 9, 25, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals("Today", historyDayLabel(today, today, zone, Locale.ENGLISH))
+        assertEquals("Yesterday", historyDayLabel(yesterday, today, zone, Locale.ENGLISH))
+    }
+    @Test
     fun gitHistoryProjectionIsHumanAndSearchesBothSides() {
         val item = GitHistoryItem(
             id = "technical-id", occurredAt = 1L, author = "technical-author", source = "backend",
@@ -155,10 +203,11 @@ class HubActivityPresentationTest {
     }
 
     @Test
-    fun groupedUndoIsEnabledOnlyWhenExactlyOneSafeCandidateExists() {
+    fun groupedUndoNeverReversesOnlyOneTechnicalSubwrite() {
         val safe = activity(id = "safe", reversible = true)
         val other = activity(id = "other", reversible = false)
-        assertEquals("safe", safeUndoActivityId(listOf(safe, other)))
+        assertNull(safeUndoActivityId(listOf(safe, other)))
+        assertEquals("safe", safeUndoActivityId(listOf(safe)))
 
         val secondSafe = activity(id = "second", reversible = true)
         assertNull(safeUndoActivityId(listOf(safe, secondSafe)))
@@ -190,6 +239,7 @@ class HubActivityPresentationTest {
         groupId: String? = null,
         reversible: Boolean = false,
         status: String = HubActivityStatus.ACTIVE,
+        sourceTable: String = "test_table",
     ) = HubActivityEntity(
         id = id,
         occurredAt = 1_790_000_000_000L,
@@ -199,7 +249,7 @@ class HubActivityPresentationTest {
         entityId = entityId,
         entityLabel = entityLabel,
         detailKey = detailKey,
-        sourceTable = "test_table",
+        sourceTable = sourceTable,
         payloadKind = payloadKind,
         payloadColumns = payloadColumns,
         beforePayload = beforePayload,

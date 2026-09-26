@@ -67,9 +67,10 @@ object TimeFenceTimerScheduler {
         fireAtMs: Long,
         title: String,
         message: String,
+        ruleId: Long,
     ) {
         if (fireAtMs <= System.currentTimeMillis()) return
-        val pi = randomAlertPendingIntent(context, identity, fireAtMs, title, message)
+        val pi = randomAlertPendingIntent(context, identity, fireAtMs, title, message, ruleId)
         val showPi = alarmClockShowIntent(
             context = context,
             requestCode = (identity.hashCode() xor fireAtMs.hashCode()),
@@ -79,7 +80,7 @@ object TimeFenceTimerScheduler {
     }
 
     fun cancelRandomAlert(context: Context, identity: String, fireAtMs: Long) {
-        cancelPendingIntent(context, randomAlertPendingIntent(context, identity, fireAtMs, "", ""))
+        cancelPendingIntent(context, randomAlertPendingIntent(context, identity, fireAtMs, "", "", -1L))
     }
 
     fun cancelLegacyTimerAlert(
@@ -190,6 +191,7 @@ object TimeFenceTimerScheduler {
         fireAtMs: Long,
         title: String,
         message: String,
+        ruleId: Long,
     ): PendingIntent {
         val profileId = DatabaseProfiles.activeProfileId(context)
         val intent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
@@ -198,6 +200,7 @@ object TimeFenceTimerScheduler {
             putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, profileId)
             putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TITLE, title)
             putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TEXT, message)
+            putExtra(TimeFenceTimerReceiver.EXTRA_ALERT_RULE_ID, ruleId)
             putExtra(TimeFenceTimerReceiver.EXTRA_NOTIFICATION_ID, (identity.hashCode() xor fireAtMs.hashCode()))
         }
         return PendingIntent.getBroadcast(

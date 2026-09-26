@@ -170,6 +170,9 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
                             }
                         }) { Text("Delete if unused") }
                     }
+                    com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                        com.gernalix.personalhub.contracts.database.HubEntityRef("tags", "tag", selected.id),
+                    )
                 }
                 item {
                     Text("Aliases", style = MaterialTheme.typography.titleMedium)

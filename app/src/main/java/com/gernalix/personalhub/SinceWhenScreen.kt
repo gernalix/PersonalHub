@@ -62,6 +62,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
     val counters by dao.observeAll().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf<SinceWhenCounterEntity?>(null) }
+    var linkedCounterId by remember { mutableStateOf<Long?>(null) }
     var showCreate by remember { mutableStateOf(false) }
     var migrationReady by remember { mutableStateOf(false) }
     var migrationFailed by remember { mutableStateOf(false) }
@@ -141,6 +142,14 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
                                 }
                             }
                             counter.description.takeIf(String::isNotBlank)?.let { Text(it) }
+                            TextButton(onClick = { linkedCounterId = if (linkedCounterId == counter.id) null else counter.id }) {
+                                Text(stringResource(com.gernalix.personalhub.core.hubcontext.R.string.hub_context_links_title))
+                            }
+                            if (linkedCounterId == counter.id) {
+                                com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                                    HubEntityRef("since_when", "counter", counter.id.toString()),
+                                )
+                            }
                             sourceLabels[counter.id]?.let { (label, target) ->
                                 Text(
                                     "↳ ${stringResource(sourceTypeRes(counter.sourceEntityType))}: $label",

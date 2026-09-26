@@ -9,6 +9,7 @@ import com.gernalix.sostanze.data.SubstanceEntity
 import com.gernalix.sostanze.data.IntakeHubView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 
 class SubstanceHubAdapter(private val context: Context) : HubEntityAdapter {
     override val moduleId = "substances"
@@ -113,4 +114,33 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
     }
 
     private fun IntakeHubView.summary() = HubEntitySummary(HubEntityRef(moduleId, entityKind, intake.id.toString()), substanceName, "${intake.dose} ${intake.doseUnit}", attributes = mapOf("time_ms" to intake.timestampMs.toString()))
+}
+
+class PrescriptionHubAdapter(private val context: Context) : HubEntityAdapter {
+    override val moduleId = "substances"
+    override val entityKind = "prescription"
+    override val capabilities = setOf("health", "prescription", "contextual")
+    private val dao get() = PersonalHubDatabase.get(context).dao()
+
+    override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let { dao.prescriptionById(it) } != null
+    override suspend fun lifecycle(canonicalId: String) =
+        if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
+
+    override suspend fun summaries(canonicalIds: Set<String>): Map<String, HubEntitySummary> =
+        canonicalIds.mapNotNull { raw ->
+            val prescription = raw.toLongOrNull()?.let { dao.prescriptionById(it) } ?: return@mapNotNull null
+            val substance = dao.substanceById(prescription.substanceId) ?: return@mapNotNull null
+            raw to HubEntitySummary(HubEntityRef(moduleId, entityKind, raw), substance.name,
+                "${prescription.doseMg} mg")
+        }.toMap()
+
+    override suspend fun search(query: String, limit: Int): List<HubEntitySummary> {
+        val rows = dao.observePrescriptions().first()
+        return summaries(rows.map { it.id.toString() }.toSet()).values
+            .filter { it.label.contains(query.trim(), ignoreCase = true) }.take(limit)
+    }
+
+    override suspend fun openTarget(canonicalId: String): HubOpenTarget? =
+        if (exists(canonicalId)) HubOpenTarget(HubDeepLinkContract.moduleUri("substances").toString(),
+            "com.gernalix.sostanze.MainActivity") else null
 }

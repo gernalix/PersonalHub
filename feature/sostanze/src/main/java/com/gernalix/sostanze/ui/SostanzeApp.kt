@@ -110,7 +110,6 @@ import kotlinx.coroutines.launch
 
 private enum class AppTab {
     Home,
-    History,
     Stock,
     Prescriptions,
     Interactions,
@@ -144,7 +143,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     var homeTagIds by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
     var homeNoTags by rememberSaveable { mutableStateOf(false) }
     var stockQuery by rememberSaveable { mutableStateOf("") }
-    var historyQuery by rememberSaveable { mutableStateOf("") }
     var editingSubstance by remember { mutableStateOf<SubstanceEntity?>(null) }
     var deleteSubstance by remember { mutableStateOf<SubstanceEntity?>(null) }
     var historySubstanceId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -217,17 +215,14 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
             }
         },
         floatingActionButton = {
-            if (tab != AppTab.History) {
                 FloatingActionButton(onClick = {
                     when (tab) {
                         AppTab.Home -> editingSubstance = viewModel.defaultNewSubstance()
                         AppTab.Stock -> state.substances.firstOrNull { !it.archived }?.let { stockDialog = it }
                         AppTab.Prescriptions -> { prescriptionInitialName = ""; creatingPrescription = true }
                         AppTab.Interactions -> state.substances.firstOrNull { !it.archived }?.let { interactionRuleDraft = null; interactionDialog = it }
-                        AppTab.History -> Unit
                     }
                 }) { Text("+", style = MaterialTheme.typography.titleLarge) }
-            }
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -289,13 +284,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                             context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
                         }
                     },
-                )
-                AppTab.History -> HistoryScreen(
-                    rows = state.history.filter { it.substanceName.contains(historyQuery, true) },
-                    query = historyQuery,
-                    onQueryChange = { historyQuery = it },
-                    onEdit = { editingHistory = it },
-                    onDelete = { deletingHistory = it },
                 )
                 AppTab.Stock -> StockScreen(
                     rows = state.stockRows.filter { it.substance.name.contains(stockQuery, true) },
@@ -418,7 +406,9 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
         SubstanceHistoryDialog(
             title = state.substances.firstOrNull { it.id == id }?.name.orEmpty(),
             rows = viewModel.historyFor(id, state),
-            onDismiss = { historySubstanceId = null }
+            onDismiss = { historySubstanceId = null },
+            onEdit = { editingHistory = it },
+            onDelete = { deletingHistory = it },
         )
     }
     deleteSubstance?.let { substance ->
@@ -437,7 +427,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
 @Composable
 private fun tabTitle(tab: AppTab): String = when (tab) {
     AppTab.Home -> stringResource(R.string.tab_home)
-    AppTab.History -> stringResource(R.string.tab_history)
     AppTab.Stock -> stringResource(R.string.tab_stock)
     AppTab.Prescriptions -> stringResource(R.string.tab_prescriptions)
     AppTab.Interactions -> stringResource(R.string.tab_interactions)
@@ -615,7 +604,7 @@ private fun DoseActionButton(
                             DropdownMenuItem(text = { Text(stringResource(R.string.restore)) }, onClick = { menuOpen = false; onRestore() })
                         }
                         DropdownMenuItem(text = { Text(stringResource(R.string.stock)) }, onClick = { menuOpen = false; onStock() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.history)) }, onClick = { menuOpen = false; onHistory() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.manage_intakes)) }, onClick = { menuOpen = false; onHistory() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.random_alerts_enabled)) }, onClick = { menuOpen = false; onRandomAlerts() })
                         DropdownMenuItem(text = { Text(stringResource(R.string.undo_last_tap)) }, onClick = { menuOpen = false; onUndo() })
                         if (onCreateSinceWhen != null) {
@@ -757,37 +746,23 @@ private fun StockScreen(
 }
 
 @Composable
-private fun HistoryScreen(
+private fun SubstanceHistoryDialog(
+    title: String,
     rows: List<HistoryUi>,
-    query: String,
-    onQueryChange: (String) -> Unit,
+    onDismiss: () -> Unit,
     onEdit: (HistoryUi) -> Unit,
     onDelete: (HistoryUi) -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        item { SearchBox(query, onQueryChange) }
-        items(rows, key = { it.id }) { row ->
-            HistoryRow(row, { onEdit(row) }, { onDelete(row) })
-        }
-    }
-}
-
-@Composable
-private fun SubstanceHistoryDialog(title: String, rows: List<HistoryUi>, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.history_for, title)) },
+        title = { Text(stringResource(R.string.manage_intakes_for, title)) },
         text = {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 itemsIndexed(rows, key = { index, row -> "${row.substanceName}:${row.timestampMs}:${row.ghost}:$index" }) { _, row ->
-                    HistoryRow(row)
+                    HistoryRow(row, { onEdit(row) }, { onDelete(row) })
                 }
             }
         },
@@ -824,6 +799,7 @@ private fun PrescriptionScreen(
     onEdit: (PrescriptionUi) -> Unit,
     onDelete: (PrescriptionUi) -> Unit,
 ) {
+    var linkedPrescriptionId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
         contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp),
@@ -840,6 +816,7 @@ private fun PrescriptionScreen(
         item { SectionTitle(stringResource(R.string.prescription_history)) }
         items(rows, key = { it.prescription.id }) { row ->
             ElevatedCard(Modifier.fillMaxWidth()) {
+                Column {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(row.substanceName, fontWeight = FontWeight.SemiBold)
@@ -851,6 +828,17 @@ private fun PrescriptionScreen(
                     }
                     IconButton(onClick = { onEdit(row) }, modifier = Modifier.size(48.dp)) { Text("✎") }
                     IconButton(onClick = { onDelete(row) }, modifier = Modifier.size(48.dp)) { Text("🗑") }
+                }
+                TextButton(onClick = {
+                    linkedPrescriptionId = if (linkedPrescriptionId == row.prescription.id) null else row.prescription.id
+                }) { Text(stringResource(com.gernalix.personalhub.core.hubcontext.R.string.hub_context_links_title)) }
+                if (linkedPrescriptionId == row.prescription.id) {
+                    com.gernalix.personalhub.core.hubcontext.HubContextLinks(
+                        com.gernalix.personalhub.contracts.database.HubEntityRef(
+                            "substances", "prescription", row.prescription.id.toString(),
+                        ),
+                    )
+                }
                 }
             }
         }

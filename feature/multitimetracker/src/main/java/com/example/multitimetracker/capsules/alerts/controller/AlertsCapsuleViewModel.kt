@@ -26,9 +26,14 @@ import com.gernalix.personalhub.core.alerts.AlertNotificationDispatcher
 import com.gernalix.personalhub.core.alerts.AlertDomain
 import com.gernalix.personalhub.core.alerts.AlertFire
 import com.gernalix.personalhub.core.alerts.AlertTaskerBridge
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.hubcontext.WorkflowyHubBridge
+import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -169,9 +174,16 @@ class AlertsCapsuleViewModel(
     private fun showInAppPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long): Boolean {
         showNotificationOverride?.let { return it(ruleId, title, message) }
         val context = getContext()
-        if (context != null && AlertLinkPolicy.linkOnlyUriOrNull(message) != null) {
+        if (context != null) {
+            val linkedUrl = if (WorkflowyIntegrationSettings.isEnabled(context)) runBlocking(Dispatchers.IO) {
+                WorkflowyHubBridge.notificationUrl(context, HubEntityRef("timer", "alert", ruleId.toString()))
+            } else null
+            if (linkedUrl == null && AlertLinkPolicy.linkOnlyUriOrNull(message) == null) {
+                showTimerAlertPrompt(ruleId, sessionId, title, message, firedAtMs)
+                return true
+            }
             val notificationId = ("timer-alert:" + ruleId + ":" + sessionId).hashCode() and Int.MAX_VALUE
-            if (AlertNotificationDispatcher.postNotification(context, notificationId, title, message)) {
+            if (AlertNotificationDispatcher.postNotification(context, notificationId, title, message, linkedUrl)) {
                 return true
             }
         }
@@ -500,6 +512,7 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
                     fireAtMs = fireAtMs,
                     title = ctx.getString(R.string.random_alert_timer_title),
                     message = rule.message,
+                    ruleId = rule.id,
                 )
             }
         }

@@ -62,14 +62,17 @@ class HubHistorySearchQaDeviceTest {
         composeRule.onNodeWithText(searchLabel).performClick()
         composeRule.onNodeWithTag("history-module-filter").assertIsDisplayed()
         waitForText(seed.placeName)
+        composeRule.onNodeWithText(historyDayLabel(System.currentTimeMillis())).assertIsDisplayed()
 
         composeRule.onNodeWithTag("history-query")
             .performTextReplacement(seed.hiddenBeforeNote)
         waitForText(seed.placeName)
 
         val places = context.getString(R.string.module_places)
+        composeRule.onNodeWithTag("history-module-filter").performClick()
         composeRule.onNode(hasText(places) and hasClickAction()).performClick()
         waitForText(seed.placeName, present = false)
+        composeRule.onNodeWithTag("history-module-filter").performClick()
         composeRule.onNode(hasText(places) and hasClickAction()).performClick()
         waitForText(seed.placeName)
         composeRule.onNodeWithTag("history-from")

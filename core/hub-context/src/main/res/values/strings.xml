@@ -55,6 +55,13 @@
     <string name="hub_permalink_copied">PersonalHub link copied.</string>
     <string name="hub_attach_workflowy">+ Workflowy link</string>
     <string name="hub_workflowy_title">Workflowy</string>
+    <string name="hub_workflowy_link_auto">Link node (auto)</string>
+    <string name="hub_workflowy_link_manual">Link node (manual)</string>
+    <string name="hub_workflowy_open_node">Open node</string>
+    <string name="hub_workflowy_delink_node">Delink node</string>
+    <string name="hub_workflowy_delete_node">Delete node</string>
+    <string name="hub_workflowy_delete_title">Delete Workflowy node?</string>
+    <string name="hub_workflowy_delete_confirm">This permanently deletes the remote node and removes its PersonalHub link.</string>
     <string name="hub_workflowy_url">Workflowy URL</string>
     <string name="hub_workflowy_invalid">Enter a valid workflowy.com URL.</string>
     <string name="hub_workflowy_exists">This Workflowy URL is already linked here.</string>

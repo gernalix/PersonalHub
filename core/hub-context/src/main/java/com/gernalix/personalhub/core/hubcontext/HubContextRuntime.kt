@@ -20,6 +20,7 @@ data class HubTemporalFact(
 )
 
 object HubContextRuntime {
+    internal fun workflowyContext(): Context? = appContext
     const val TIMER_ACTIVITY_TYPE = "timer_activity"
     const val FINANCE_TRANSACTION_CONTEXT_TYPE = "finance_transaction_context"
     const val FINANCE_RECURRENCE_CONTEXT_TYPE = "finance_recurrence_context"
@@ -121,6 +122,7 @@ object HubContextRuntime {
     }
 
     suspend fun context(contextId: String) = requireRepository().context(contextId)
+    suspend fun deleteContext(contextId: String) = requireRepository().deleteContext(contextId)
     suspend fun titledContexts() = requireRepository().titledViews()
     suspend fun contexts(ref: HubEntityRef) = requireRepository().viewsFor(ref)
     suspend fun contextTypes() = requireRepository().types()

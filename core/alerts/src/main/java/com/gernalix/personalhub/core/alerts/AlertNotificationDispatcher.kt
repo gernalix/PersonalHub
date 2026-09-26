@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
+import com.gernalix.personalhub.core.hubcontext.WorkflowyLinkPolicy
 
 object AlertNotificationDispatcher {
     const val CHANNEL_ID = "personalhub_alerts_v1"
@@ -14,12 +16,14 @@ object AlertNotificationDispatcher {
         notificationId: Int,
         fire: AlertFire,
         emitTaskerBroadcast: Boolean = false,
+        linkedUrl: String? = null,
     ): Boolean {
         val posted = postNotification(
             context = context,
             notificationId = notificationId,
             title = fire.title,
             message = fire.message,
+            linkedUrl = linkedUrl,
         )
         if (posted && emitTaskerBroadcast) AlertTaskerBridge.emit(context, fire)
         return posted
@@ -30,12 +34,14 @@ object AlertNotificationDispatcher {
         notificationId: Int,
         title: String,
         message: String,
+        linkedUrl: String? = null,
     ): Boolean {
         ensureChannel(context)
         val contentIntent = contentPendingIntent(
             context = context,
             notificationId = notificationId,
             message = message,
+            linkedUrl = linkedUrl,
             fallbackIntent = launchAppIntent(context),
         )
 
@@ -65,8 +71,10 @@ object AlertNotificationDispatcher {
         notificationId: Int,
         message: String,
         fallbackIntent: Intent? = null,
+        linkedUrl: String? = null,
     ): PendingIntent {
-        val chosen = directLinkIntentOrNull(context, message)
+        val chosen = linkedUrl?.let { directUriIntentOrNull(context, android.net.Uri.parse(it)) }
+            ?: directLinkIntentOrNull(context, message)
             ?: fallbackIntent
             ?: launchAppIntent(context)
 
@@ -80,6 +88,12 @@ object AlertNotificationDispatcher {
 
     fun directLinkIntentOrNull(context: Context, message: String): Intent? {
         val link = AlertLinkPolicy.linkOnlyUriOrNull(message) ?: return null
+        return directUriIntentOrNull(context, link)
+    }
+
+    private fun directUriIntentOrNull(context: Context, link: android.net.Uri): Intent? {
+        if (WorkflowyLinkPolicy.normalize(link.toString()) != null &&
+            !WorkflowyIntegrationSettings.isEnabled(context)) return null
         val base = Intent(Intent.ACTION_VIEW, link).apply {
             addCategory(Intent.CATEGORY_BROWSABLE)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
