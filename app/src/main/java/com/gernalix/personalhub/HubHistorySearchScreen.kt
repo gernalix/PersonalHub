@@ -59,6 +59,11 @@ import com.gernalix.personalhub.core.database.HubActivityUndoEffect
 import com.gernalix.personalhub.core.database.HubActivityUndoEngine
 import com.gernalix.personalhub.core.database.HubActivityUndoResult
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.formatHubDateTime
 import com.gernalix.personalhub.core.hubcontext.parseHubDateTime
@@ -69,13 +74,17 @@ import org.json.JSONObject
 private const val ACTIVITY_SEARCH_LIMIT = 2_500
 
 private data class ActivityUiItem(
-    val activity: HubActivityEntity,
-    val navigationRef: HubEntityRef?,
+    val id: String,
+    val occurredAt: Long,
+    val moduleId: String,
     val title: String,
     val detail: String?,
     val searchText: String,
     val relatedCount: Int,
+    val navigationRef: HubEntityRef?,
     val undoActivityId: String?,
+    val activity: HubActivityEntity? = null,
+    val git: GitHistoryItem? = null,
 )
 
 private data class ParsedHistoryBoundary(
@@ -97,6 +106,9 @@ fun HubHistorySearchScreen(
 ) {
     val context = LocalContext.current
     val database = remember(context) { PersonalHubDatabase.get(context) }
+    val gitEnabled = remember(context) {
+        runCatching { GitDataSettings.configuration(context).enabled }.getOrDefault(false)
+    }
     val coroutineScope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val modules = remember { HubModule.entries.toList() }
@@ -137,18 +149,49 @@ fun HubHistorySearchScreen(
         (scopeModuleId == null && selectedSet != allModuleIds)
 
     suspend fun refreshVisibleEntries(debounceQuery: Boolean = false) {
-        if (initialEventId != null) {
-            val row = database.activityDao().byId(initialEventId)
-            eventMissing = row == null
-            entries = row?.let { resolveActivityItems(context, listOf(it)) }.orEmpty()
-            return
-        }
         eventMissing = false
         if (!parsedFrom.valid || !parsedTo.valid || invalidRange || selectedSet.isEmpty()) {
             entries = emptyList()
             return
         }
         if (debounceQuery && query.isNotBlank()) delay(60)
+        if (gitEnabled) {
+            val rows = withContext(Dispatchers.IO) { GitHistory.recentForDisplay(context.applicationContext, limit = 1000) }
+            val humanized = rows.map { item ->
+                val moduleId = gitHistoryModule(item.table)
+                val text = humanizeGitHistory(item, moduleDisplayName(context, moduleId))
+                ActivityUiItem(
+                    id = item.id,
+                    occurredAt = item.occurredAt,
+                    moduleId = moduleId,
+                    title = text.title,
+                    detail = text.detail,
+                    searchText = text.searchText,
+                    relatedCount = 1,
+                    navigationRef = null,
+                    undoActivityId = null,
+                    git = item,
+                )
+            }
+            val needle = normalizeHistorySearchText(query)
+            entries = humanized.filter { item ->
+                (scopeModuleId == null || item.moduleId == scopeModuleId) &&
+                    (item.moduleId in selectedSet || (scopeModuleId == null && selectedSet == allModuleIds)) &&
+                    (parsedFrom.value == null || item.occurredAt >= parsedFrom.value!!) &&
+                    (parsedTo.value == null || item.occurredAt <= parsedTo.value!!) &&
+                    (initialEventId == null || item.id == initialEventId) &&
+                    (initialEntityId == null || item.git?.rowKey == initialEntityId) &&
+                    (needle.isBlank() || normalizeHistorySearchText(item.searchText).contains(needle))
+            }.sortedWith(compareByDescending<ActivityUiItem> { it.occurredAt }.thenByDescending { it.id })
+            eventMissing = initialEventId != null && entries.isEmpty()
+            return
+        }
+        if (initialEventId != null) {
+            val row = database.activityDao().byId(initialEventId)
+            eventMissing = row == null
+            entries = row?.let { resolveActivityItems(context, listOf(it)) }.orEmpty()
+            return
+        }
         val rows = database.activityDao().search(
             moduleIds = selectedSet.sorted(),
             allModules = if (scopeModuleId == null && selectedSet == allModuleIds) 1 else 0,
@@ -323,12 +366,28 @@ fun HubHistorySearchScreen(
                     modifier = Modifier.weight(1f).testTag("history-results"),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(entries, key = { it.activity.groupId ?: it.activity.id }) { item ->
+                    items(entries, key = { it.id }) { item ->
                         ActivityCard(
                             item = item,
-                            moduleName = moduleDisplayName(context, item.activity.moduleId),
+                            moduleName = moduleDisplayName(context, item.moduleId),
                             onOpen = { coroutineScope.launch { openActivityTarget(context, item) } },
                             onUndo = {
+                                val gitItem = item.git
+                                if (gitItem != null) {
+                                    coroutineScope.launch {
+                                        val result = withContext(Dispatchers.IO) {
+                                            runCatching {
+                                                val preview = GitHistory.previewRevert(context.applicationContext, gitItem.id)
+                                                check(preview.safe) { preview.blockingReason ?: "Undo unavailable" }
+                                                GitHistory.revertEvent(context.applicationContext, gitItem.id)
+                                            }
+                                        }
+                                        snackbar.showSnackbar(context.getString(
+                                            if (result.isSuccess) R.string.activity_undo_success else R.string.activity_undo_not_supported,
+                                        ))
+                                        refreshVisibleEntries()
+                                    }
+                                }
                                 val undoId = item.undoActivityId
                                 if (undoId != null) coroutineScope.launch {
                                     when (val result = HubActivityUndoEngine.undo(database, undoId)) {
@@ -367,8 +426,8 @@ private fun ActivityCard(
     onUndo: () -> Unit,
 ) {
     val activity = item.activity
-    val canOpen = item.navigationRef != null || moduleFor(activity.moduleId) != null
-    var expanded by rememberSaveable(activity.id) { mutableStateOf(false) }
+    val canOpen = activity != null && (item.navigationRef != null || moduleFor(item.moduleId) != null)
+    var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -386,7 +445,7 @@ private fun ActivityCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 Text(
-                    text = "${item.title} · $moduleName · ${historyDateLabel(activity.occurredAt)}",
+                    text = "${item.title} · $moduleName · ${historyDateLabel(item.occurredAt)}",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
@@ -395,7 +454,7 @@ private fun ActivityCard(
                 )
                 OutlinedButton(
                     onClick = onUndo,
-                    enabled = item.undoActivityId != null,
+                    enabled = item.undoActivityId != null || (item.git != null && item.git.revertedBy == null),
                     modifier = Modifier.testTag("history-undo"),
                 ) {
                     Text("↩️")
@@ -410,11 +469,12 @@ private fun ActivityCard(
                 )
             }
 
-            when (activity.status) {
+            when (activity?.status) {
                 HubActivityStatus.REVERTED ->
                     AssistChip(onClick = {}, label = { Text(stringResource(R.string.activity_status_reverted)) })
                 HubActivityStatus.CONFLICT ->
                     AssistChip(onClick = {}, label = { Text(stringResource(R.string.activity_status_conflict)) })
+                else -> Unit
             }
 
             if (expanded) {
@@ -425,7 +485,7 @@ private fun ActivityCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (item.undoActivityId == null && activity.status == HubActivityStatus.ACTIVE) {
+                if (item.undoActivityId == null && item.git == null && activity?.status == HubActivityStatus.ACTIVE) {
                     Text(
                         text = stringResource(R.string.activity_status_non_reversible),
                         style = MaterialTheme.typography.labelSmall,
@@ -476,13 +536,16 @@ private suspend fun resolveActivityItems(
             .takeIf(List<String>::isNotEmpty)
             ?.joinToString("\n")
         ActivityUiItem(
-            activity = primary,
+            id = primary.groupId ?: primary.id,
+            occurredAt = primary.occurredAt,
+            moduleId = primary.moduleId,
             navigationRef = group.mapNotNull(::navigationRef).firstOrNull(),
             title = texts.first().title,
             detail = detail,
             searchText = texts.joinToString(" ") { it.searchText },
             relatedCount = group.size,
             undoActivityId = safeUndoActivityId(group),
+            activity = primary,
         )
     }
 }
@@ -530,7 +593,7 @@ private suspend fun openActivityTarget(context: Context, item: ActivityUiItem) {
         context.startActivity(intent)
         return
     }
-    moduleFor(item.activity.moduleId)?.let { module ->
+    moduleFor(item.moduleId)?.let { module ->
         context.startActivity(LauncherShortcutsCapsule.moduleIntent(context, module))
     }
 }
