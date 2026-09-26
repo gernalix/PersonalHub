@@ -56,7 +56,7 @@ class PersonalHubApplication : Application(), Configuration.Provider {
     }
 }
 
-private fun initializeHubContextRuntime(context: android.content.Context) {
+internal fun initializeHubContextRuntime(context: android.content.Context) {
     HubContextRuntime.initialize(
         context.applicationContext,
         listOf(

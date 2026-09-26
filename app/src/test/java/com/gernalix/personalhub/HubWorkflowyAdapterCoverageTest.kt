@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class HubWorkflowyAdapterCoverageTest {
     @Test fun sharedWorkflowyCapabilityHasEveryRequiredEntityKind() {
-        ApplicationProvider.getApplicationContext<PersonalHubApplication>()
+        initializeHubContextRuntime(ApplicationProvider.getApplicationContext())
         val actual = HubContextRuntime.adapters().map { it.moduleId to it.entityKind }.toSet()
         val required = setOf(
             "timer" to "session",
