@@ -46,6 +46,27 @@ class WorkflowyIntegrationTest {
     }
 
     @Test
+    fun deepLinkResolutionAcceptsOnlyNodeLinks() {
+        assertEquals("59d823cea257", WorkflowyLinkPolicy.shortId("https://workflowy.com/#/59d823cea257"))
+        assertNull(WorkflowyLinkPolicy.shortId("https://workflowy.com/#/today"))
+        assertNull(WorkflowyLinkPolicy.shortId("https://workflowy.com/#/59d823cea257/child"))
+        assertNull(WorkflowyLinkPolicy.shortId("https://workflowy.com.evil.example/#/59d823cea257"))
+        assertEquals(
+            "2af3dd5c-7b2e-5248-bbee-59d823cea257",
+            WorkflowyApiClient.parseResolvedNodeId(
+                """{"node":{"id":"2af3dd5c-7b2e-5248-bbee-59d823cea257"}}""",
+                "59d823cea257",
+            ),
+        )
+        runCatching {
+            WorkflowyApiClient.parseResolvedNodeId(
+                """{"node":{"id":"2af3dd5c-7b2e-5248-bbee-59d823cea257"}}""",
+                "48b075ae05ff",
+            )
+        }.onSuccess { error("Expected mismatched node to fail") }
+    }
+
+    @Test
     fun createResponseRequiresItemId() {
         assertEquals(
             "2af3dd5c-7b2e-5248-bbee-59d823cea257",
