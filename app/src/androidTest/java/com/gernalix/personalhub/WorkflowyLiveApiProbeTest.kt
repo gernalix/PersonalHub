@@ -54,37 +54,36 @@ class WorkflowyLiveApiProbeTest {
 
     @Test
     fun createTrulyEmptyNodeProbe() {
-        val token = apiKey()
-        val body = JSONObject()
-            .put("parent_id", "today")
-            .put("name", "")
-            .put("position", "top")
-            .toString()
-        val result = request("POST", "https://workflowy.com/api/v1/nodes", token, body)
-        val out = File(context.filesDir, "workflowy-live-empty.txt")
-        if (result.first in 200..299) {
-            val id = JSONObject(result.second).getString("item_id")
-            val link = WorkflowyLinkPolicy.deepLink(id)
-            out.writeText("ACCEPTED\n$id\n$link\n")
-        } else {
-            out.writeText("REJECTED\n${result.first}\n${result.second.take(500)}\n")
-        }
+        val created = runBlocking { WorkflowyApiClient.createEmptyNode(context) }
+        File(context.filesDir, "workflowy-live-empty.txt")
+            .writeText("ACCEPTED\n${created.id}\n${created.deepLink}\n")
+        val node = request("GET", "https://workflowy.com/api/v1/nodes/${created.id}", apiKey())
+        assertEquals(200, node.first)
+        assertEquals("", JSONObject(node.second).getJSONObject("node").getString("name"))
+        val today = request("GET", "https://workflowy.com/api/v1/nodes/today", apiKey())
+        assertEquals(JSONObject(today.second).getJSONObject("node").getString("id"),
+            JSONObject(node.second).getJSONObject("node").getString("parent_id"))
     }
 
     @Test
     fun focusEmptyNodeProbe() {
-        assertTrue(WorkflowyHubBridge.open(context, "https://workflowy.com/#/48b075ae05ff"))
+        val lines = File(context.filesDir, "workflowy-live-empty.txt").readLines()
+        assertTrue(WorkflowyHubBridge.open(context, lines[2]))
         Thread.sleep(1500)
     }
 
     @Test
     fun resolveDeepLinkAndDeleteEmptyProbe() {
-        val fullId = "2a5f8d2a-d537-4167-a2b0-48b075ae05ff"
-        val resolved = request("GET", "https://workflowy.com/api/v1/nodes/$fullId", apiKey())
-        if (resolved.first == 404) return
-        assertEquals(200, resolved.first)
-        runBlocking { WorkflowyApiClient.deleteNode(context, fullId) }
-        assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/$fullId", apiKey()).first)
+        val lines = File(context.filesDir, "workflowy-live-empty.txt").readLines()
+        val fullId = lines[1]
+        try {
+            assertEquals(fullId, runBlocking { WorkflowyApiClient.resolveDeepLink(context, lines[2]) })
+            runBlocking { WorkflowyApiClient.deleteFromDeepLink(context, lines[2]) }
+            assertEquals(404, request("GET", "https://workflowy.com/api/v1/nodes/$fullId", apiKey()).first)
+        } finally {
+            runCatching { runBlocking { WorkflowyApiClient.deleteNode(context, fullId) } }
+            File(context.filesDir, "workflowy-live-empty.txt").delete()
+        }
     }
 
     private fun apiKey(): String {
