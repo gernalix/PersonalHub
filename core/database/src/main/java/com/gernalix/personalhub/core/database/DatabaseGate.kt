@@ -89,6 +89,11 @@ class GatedOpenHelperFactory : SupportSQLiteOpenHelper.Factory {
 }
 
 private class GatedDatabase(private val delegate: SupportSQLiteDatabase) : SupportSQLiteDatabase by delegate {
+    private fun <T> mutateWithContext(block: () -> T): T = DatabaseGate.mutate {
+        val created = GitDataTracking.ensureAutomaticEditContext(delegate)
+        try { block() } finally { if (created) GitDataTracking.clearEditContext(delegate) }
+    }
+
     private fun beginMutating(block: () -> Unit) {
         DatabaseGate.begin { block() }
         try {
@@ -113,17 +118,17 @@ private class GatedDatabase(private val delegate: SupportSQLiteDatabase) : Suppo
     override fun endTransaction() = DatabaseGate.end(
         beforeOutermostMutatingEnd = { GitDataTracking.clearEditContextIfInstalled(delegate) },
     ) { delegate.endTransaction() }
-    override fun execSQL(sql: String) = DatabaseGate.mutate { delegate.execSQL(sql) }
-    override fun execSQL(sql: String, bindArgs: Array<out Any?>) = DatabaseGate.mutate { delegate.execSQL(sql, bindArgs) }
-    override fun insert(table: String, conflictAlgorithm: Int, values: ContentValues) = DatabaseGate.mutate { delegate.insert(table, conflictAlgorithm, values) }
-    override fun delete(table: String, whereClause: String?, whereArgs: Array<out Any?>?) = DatabaseGate.mutate { delegate.delete(table, whereClause, whereArgs) }
-    override fun update(table: String, conflictAlgorithm: Int, values: ContentValues, whereClause: String?, whereArgs: Array<out Any?>?) = DatabaseGate.mutate { delegate.update(table, conflictAlgorithm, values, whereClause, whereArgs) }
+    override fun execSQL(sql: String) = mutateWithContext { delegate.execSQL(sql) }
+    override fun execSQL(sql: String, bindArgs: Array<out Any?>) = mutateWithContext { delegate.execSQL(sql, bindArgs) }
+    override fun insert(table: String, conflictAlgorithm: Int, values: ContentValues) = mutateWithContext { delegate.insert(table, conflictAlgorithm, values) }
+    override fun delete(table: String, whereClause: String?, whereArgs: Array<out Any?>?) = mutateWithContext { delegate.delete(table, whereClause, whereArgs) }
+    override fun update(table: String, conflictAlgorithm: Int, values: ContentValues, whereClause: String?, whereArgs: Array<out Any?>?) = mutateWithContext { delegate.update(table, conflictAlgorithm, values, whereClause, whereArgs) }
     override fun compileStatement(sql: String): SupportSQLiteStatement {
         val statement = delegate.compileStatement(sql)
         return object : SupportSQLiteStatement by statement {
-            override fun execute() = DatabaseGate.mutate { statement.execute() }
-            override fun executeInsert() = DatabaseGate.mutate { statement.executeInsert() }
-            override fun executeUpdateDelete() = DatabaseGate.mutate { statement.executeUpdateDelete() }
+            override fun execute() = mutateWithContext { statement.execute() }
+            override fun executeInsert() = mutateWithContext { statement.executeInsert() }
+            override fun executeUpdateDelete() = mutateWithContext { statement.executeUpdateDelete() }
         }
     }
 }

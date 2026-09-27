@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventDraft
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoResolver
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoTarget
 import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
 import java.util.UUID
 import org.json.JSONObject
@@ -24,7 +26,7 @@ class MutationEventStoreTest {
     @Test
     fun capturePersistsSemanticChangesAndGroupsOneDatabaseTransaction() = withDatabase { database ->
         val db = database.openHelper.writableDatabase
-        assertFalse("mutation_events" in SyncJournal.tables(db))
+        assertTrue("mutation_events" in SyncJournal.tables(db))
         val first = UUID.randomUUID().toString()
         val second = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
@@ -49,6 +51,13 @@ class MutationEventStoreTest {
         assertEquals(creates[0].transactionId, creates[1].transactionId)
         assertEquals(setOf(1, 2), creates.map { it.sequence }.toSet())
         val update = events.single { it.eventType == "places.place.updated" }
+        val backingGroup = db.query(
+            "SELECT group_id FROM hub_activity_log WHERE action='place_updated' AND entity_id=? LIMIT 1",
+            arrayOf(first),
+        ).use { cursor -> assertTrue(cursor.moveToFirst()); cursor.getString(0) }
+        assertEquals(update.transactionId, backingGroup)
+        assertTrue(MutationUndoResolver.resolve(db, update.transactionId, gitEnabled = false) is MutationUndoTarget.Activity)
+        assertNull(MutationUndoResolver.resolve(db, creates.first().transactionId, gitEnabled = false))
         assertEquals(setOf("nickname"), JSONObject(update.beforeJson!!).keys().asSequence().toSet())
         assertEquals("Home", JSONObject(update.beforeJson).getString("nickname"))
         assertEquals("Casa", JSONObject(update.afterJson!!).getString("nickname"))

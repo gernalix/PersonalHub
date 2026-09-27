@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database.capsules.mutationevents
 
+import android.database.Cursor
 import androidx.sqlite.db.SupportSQLiteDatabase
 import org.json.JSONObject
 import java.util.UUID
@@ -130,16 +131,25 @@ object MutationEventStore {
             arrayOf(limit),
         ).use { cursor ->
             buildList {
-                while (cursor.moveToNext()) add(MutationEvent(
-                    eventId = cursor.getString(0), occurredAt = cursor.getLong(1),
-                    transactionId = cursor.getString(2), sequence = cursor.getInt(3),
-                    module = cursor.getString(4), eventType = cursor.getString(5),
-                    entityType = cursor.getString(6), entityId = cursor.getString(7),
-                    actorType = cursor.getString(8), actorSource = cursor.getString(9),
-                    beforeJson = cursor.getString(10), afterJson = cursor.getString(11),
-                    contextJson = cursor.getString(12), schemaVersion = cursor.getInt(13),
-                ))
+                while (cursor.moveToNext()) add(read(cursor))
             }
         }
     }
+
+    fun byTransaction(db: SupportSQLiteDatabase, transactionId: String): List<MutationEvent> = db.query(
+        """SELECT event_id,occurred_at,transaction_id,sequence,module,event_type,entity_type,
+            entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version
+            FROM mutation_events WHERE transaction_id=? ORDER BY sequence""".trimIndent(),
+        arrayOf(transactionId),
+    ).use { cursor -> buildList { while (cursor.moveToNext()) add(read(cursor)) } }
+
+    private fun read(cursor: Cursor) = MutationEvent(
+        eventId = cursor.getString(0), occurredAt = cursor.getLong(1),
+        transactionId = cursor.getString(2), sequence = cursor.getInt(3),
+        module = cursor.getString(4), eventType = cursor.getString(5),
+        entityType = cursor.getString(6), entityId = cursor.getString(7),
+        actorType = cursor.getString(8), actorSource = cursor.getString(9),
+        beforeJson = cursor.getString(10), afterJson = cursor.getString(11),
+        contextJson = cursor.getString(12), schemaVersion = cursor.getInt(13),
+    )
 }

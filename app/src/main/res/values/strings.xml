@@ -14,6 +14,7 @@
     <string name="home_audit_log_help">Technical provenance and raw changes</string>
     <string name="audit_title">Audit log</string>
     <string name="audit_git_source">Current Git Data audit history, newest first.</string>
+    <string name="audit_mutation_source">Semantic mutation events, newest first. Legacy Git audit follows.</string>
     <string name="audit_search_hint">Search audit log</string>
     <string name="audit_git_disabled">Git Data is disabled, so no authoritative technical audit stream is available.</string>
     <string name="home_data_explorer">Data</string>

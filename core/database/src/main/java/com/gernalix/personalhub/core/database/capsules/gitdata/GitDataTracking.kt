@@ -51,6 +51,7 @@ object GitDataTracking {
         "history_audit_log",
         "history_actions",
         "hub_activity_log",
+        "mutation_events",
     )
 
     fun tables(db: SupportSQLiteDatabase): List<String> =
@@ -267,18 +268,20 @@ object GitDataTracking {
         db.execSQL("DELETE FROM $CONTEXT_TABLE WHERE id=1")
     }
 
-    fun ensureAutomaticEditContext(db: SupportSQLiteDatabase) {
-        if (!tableExists(db, CONTEXT_TABLE)) return
+    /** Returns true only when this call created a context that its caller must clear. */
+    fun ensureAutomaticEditContext(db: SupportSQLiteDatabase): Boolean {
+        if (!tableExists(db, CONTEXT_TABLE)) return false
         val alreadySet = db.query(
             "SELECT 1 FROM $CONTEXT_TABLE WHERE id=1 LIMIT 1",
         ).use { it.moveToFirst() }
-        if (alreadySet) return
+        if (alreadySet) return false
         setEditContext(
             db = db,
             author = "user",
             source = "ui",
             groupId = "txn:" + java.util.UUID.randomUUID().toString(),
         )
+        return true
     }
 
     fun clearEditContextIfInstalled(db: SupportSQLiteDatabase) {
