@@ -66,6 +66,8 @@ class HubActivityPresentationTest {
         val yesterday = LocalDateTime.of(2026, 9, 25, 12, 0).atZone(zone).toInstant().toEpochMilli()
         assertEquals("Today", historyDayLabel(today, today, zone, Locale.ENGLISH))
         assertEquals("Yesterday", historyDayLabel(yesterday, today, zone, Locale.ENGLISH))
+        assertEquals("Today", historyDayLabel(today, today, zone, Locale.ITALIAN))
+        assertEquals("Yesterday", historyDayLabel(yesterday, today, zone, Locale.ITALIAN))
     }
     @Test
     fun gitHistoryProjectionIsHumanAndSearchesBothSides() {

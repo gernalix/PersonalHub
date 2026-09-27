@@ -52,9 +52,9 @@ internal fun historyDayLabel(
     val date = Instant.ofEpochMilli(epochMs).atZone(zoneId).toLocalDate()
     val today = Instant.ofEpochMilli(todayMs).atZone(zoneId).toLocalDate()
     return when (date) {
-        today -> if (locale.language == "it") "Oggi" else "Today"
-        today.minusDays(1) -> if (locale.language == "it") "Ieri" else "Yesterday"
-        else -> DateTimeFormatter.ofPattern("d MMM yyyy", locale).format(date)
+        today -> "Today"
+        today.minusDays(1) -> "Yesterday"
+        else -> DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH).format(date)
     }
 }
 
