@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_alerts">Avvisi</string>
+    <string name="home_alerts_help">Avvisi Timer e Luoghi</string>
+</resources>

@@ -104,6 +104,7 @@ import com.example.multitimetracker.ui.components.AppSettingsDialog
 import com.example.multitimetracker.ui.components.AlertPopupHost
 import com.example.multitimetracker.ui.components.LocalOpenAppMenu
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
+import com.gernalix.personalhub.core.alerts.UnifiedAlertsRoute
 
 private enum class Tab { NOW, QUICK_EVENTS, TAGS, ALERT, CHAINS }
 private enum class DrawerDestination {
@@ -131,6 +132,7 @@ private const val TRACE_TAB_QUICK_EVENTS = "mtt_bench_tab_quick_events"
 @Composable
 fun AppRoot(
     vm: MainViewModel,
+    alertRequest: UnifiedAlertsRoute.Request? = null,
     hubSessionId: Long? = null,
     onHubSessionDismiss: () -> Unit = {},
     pendingQuickEventTarget: QuickEventTarget? = null,
@@ -156,6 +158,7 @@ fun AppRoot(
     }
 
     VarTabScaffold(
+        alertRequest = alertRequest,
         state = state,
         tagsState = tagsState,
         alertsState = alertsState,
@@ -208,6 +211,7 @@ fun AppRoot(
 
 @Composable
 private fun VarTabScaffold(
+    alertRequest: UnifiedAlertsRoute.Request?,
     state: UiState,
     tagsState: TagsUiState,
     alertsState: AlertsUiState,
@@ -224,6 +228,15 @@ private fun VarTabScaffold(
     onHubQuickEventEntryDismiss: () -> Unit,
 ) {
     val tabState = remember { mutableStateOf(Tab.NOW) }
+    var alertsFilter by remember { mutableStateOf(alertRequest?.filter ?: UnifiedAlertsRoute.Filter.TIMER) }
+    var alertPlaceId by remember { mutableStateOf(alertRequest?.placeId) }
+    LaunchedEffect(alertRequest) {
+        if (alertRequest != null) {
+            alertsFilter = alertRequest.filter
+            alertPlaceId = alertRequest.placeId
+            tabState.value = Tab.ALERT
+        }
+    }
     var showSettings by remember { mutableStateOf(false) }
     var showDevTools by remember { mutableStateOf(false) }
     var showDevReport by remember { mutableStateOf(false) }
@@ -548,7 +561,11 @@ if (developerSurfaceEnabled && showDevReport) {
             DrawerDestination.HISTORY_SEARCH -> {
                 context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("timer")).setPackage(context.packageName))
             }
-            DrawerDestination.ALERTS -> tabState.value = Tab.ALERT
+            DrawerDestination.ALERTS -> {
+                alertsFilter = UnifiedAlertsRoute.Filter.TIMER
+                alertPlaceId = null
+                tabState.value = Tab.ALERT
+            }
             DrawerDestination.CHAINS -> tabState.value = Tab.CHAINS
             DrawerDestination.STATISTICS -> showStatistics = true
             DrawerDestination.SETTINGS -> showSettings = true
@@ -592,11 +609,16 @@ if (developerSurfaceEnabled && showDevReport) {
                                 NavigationDrawerItem(
                                     selected = isDrawerItemSelected(item.destination),
                                     onClick = {
-                                        scope.launch {
-                                            drawerState.close()
-                                            drawerContentMounted = false
+                                        if (item.destination == DrawerDestination.ALERTS) {
+                                            openDrawerDestination(item.destination)
+                                            scope.launch { drawerState.close() }
+                                        } else {
+                                            scope.launch {
+                                                drawerState.close()
+                                                drawerContentMounted = false
+                                                openDrawerDestination(item.destination)
+                                            }
                                         }
-                                        openDrawerDestination(item.destination)
                                     },
                                     icon = {
                                         Icon(
@@ -741,7 +763,9 @@ if (developerSurfaceEnabled && showDevReport) {
                         AlertsScreen(
                             modifier = Modifier.padding(inner),
                             state = alertsState,
-                            onAddTimeFenceRule = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow ->
+                            initialFilter = alertsFilter,
+                            initialPlaceId = alertPlaceId,
+                            onAddTimeFenceRule = { msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow, enabled ->
                                 vm.alertsCapsule.addTimeFenceRule(
                                     message = msg,
                                     trigger = trigger,
@@ -753,6 +777,7 @@ if (developerSurfaceEnabled && showDevReport) {
                                     randomAlertsEnabled = randomEnabled,
                                     randomAlertsCount = randomCount,
                                     randomAlertsWindow = randomWindow,
+                                    isEnabled = enabled,
                                 )
                             },
                             onUpdateTimeFenceRule = { id, msg, trigger, scope, matchMode, tagIds, cooldownMs, delivery, randomEnabled, randomCount, randomWindow ->

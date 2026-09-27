@@ -31,6 +31,7 @@ class PlaceAlertRepository(
                 matchMode = draft.matchMode.name,
                 message = draft.message.trim(),
                 scope = draft.scope.name,
+                enabled = draft.enabled,
                 cooldownMs = draft.cooldownMs.coerceAtLeast(0L),
                 createdAt = now,
                 updatedAt = now,
@@ -59,6 +60,7 @@ class PlaceAlertRepository(
                 matchMode = draft.matchMode.name,
                 message = draft.message.trim(),
                 scope = draft.scope.name,
+                enabled = draft.enabled,
                 cooldownMs = draft.cooldownMs.coerceAtLeast(0L),
                 updatedAt = System.currentTimeMillis(),
             )

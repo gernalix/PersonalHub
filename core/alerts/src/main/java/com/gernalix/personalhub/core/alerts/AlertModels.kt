@@ -51,6 +51,7 @@ data class PlaceAlertDraft(
     val matchMode: AlertMatchMode = AlertMatchMode.ALL,
     val scope: AlertScope = AlertScope.ALWAYS,
     val cooldownMs: Long = 0L,
+    val enabled: Boolean = true,
 )
 
 data class AlertFire(

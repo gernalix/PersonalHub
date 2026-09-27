@@ -29,6 +29,40 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class TimeFenceAlarmReconciliationTest {
     @Test
+    fun timerAlertCrudPreservesTriggerMatchScopeAndEnabled() {
+        val tag = tag(notificationType = TimedTagNotificationType.NONE)
+        val vm = AlertsCapsuleViewModel(
+            hostStateFlow = MutableStateFlow(AlertsHostState(tags = listOf(tag), tagLastUsedMsByTagId = emptyMap())),
+            runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            getContext = { null },
+            resolveSessionStartAtMs = { _, _ -> null },
+            getTags = { listOf(tag) },
+            getRunningSessions = { emptyList() },
+            persist = {}, persistAsync = {}, scheduleAutoBackup = {},
+            logUserEvent = { _, _, _, _, _, _ -> },
+            logSystemEvent = { _, _, _, _, _ -> },
+        )
+        assertTrue(vm.addTimeFenceRule("Timer alert", TimeFenceTrigger.ON_START,
+            scope = TimeFenceScope.ALWAYS, tagIds = setOf(tag.id), isEnabled = false))
+        val created = vm.rules().single()
+        assertFalse(created.isEnabled)
+        assertTrue(vm.updateTimeFenceRule(created.id, "Edited", TimeFenceTrigger.ON_STOP,
+            TimeFenceDelivery.NOTIFICATION, TimeFenceScope.ONE_TIME, TimeFenceMatchMode.OR,
+            setOf(tag.id), 30_000L))
+        val edited = vm.rules().single()
+        assertEquals(TimeFenceTrigger.ON_STOP, edited.trigger)
+        assertEquals(TimeFenceMatchMode.OR, edited.matchMode)
+        assertEquals(TimeFenceScope.ONE_TIME, edited.scope)
+        assertFalse(edited.isEnabled)
+        vm.setTimeFenceRuleEnabled(created.id, true)
+        assertTrue(vm.rules().single().isEnabled)
+        vm.deleteTimeFenceRule(created.id)
+        assertTrue(vm.rules().single().isDeleted)
+        vm.restoreTimeFenceRule(created.id)
+        assertFalse(vm.rules().single().isDeleted)
+    }
+
+    @Test
     fun legacyDelayIsIgnoredAndMatchingEventQueuesImmediatePrompt() {
         val tag = tag(notificationType = TimedTagNotificationType.NONE)
         val vm = AlertsCapsuleViewModel(

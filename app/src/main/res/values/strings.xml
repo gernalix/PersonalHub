@@ -5,6 +5,8 @@
     <string name="home_history_search_help">Search history and changes</string>
     <string name="home_context_help">Link entities</string>
     <string name="home_tags">Tags</string>
+    <string name="home_alerts">Alerts</string>
+    <string name="home_alerts_help">Timer and Places alerts</string>
     <string name="home_tags_help">Browse and manage tags</string>
     <string name="home_audit_log">Audit log</string>
     <string name="home_audit_log_help">History, changes and undo</string>

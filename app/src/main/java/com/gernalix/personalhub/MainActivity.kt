@@ -47,6 +47,7 @@ import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
 import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
 import com.gernalix.personalhub.core.hubcontext.HubContextComposerScreen
+import com.gernalix.personalhub.core.alerts.UnifiedAlertsRoute
 
 class MainActivity : ComponentActivity() {
     private var launcherGeneration by mutableStateOf(0)
@@ -147,6 +148,11 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             item(key = "home-tags") {
                 HomeActionTile("🏷️", R.string.home_tags, R.string.home_tags_help) {
                     context.startActivity(Intent(context, HubTagsActivity::class.java))
+                }
+            }
+            item(key = "home-alerts") {
+                HomeActionTile("🔔", R.string.home_alerts, R.string.home_alerts_help) {
+                    context.startActivity(UnifiedAlertsRoute.intent(context))
                 }
             }
             item(key = "home-audit") {

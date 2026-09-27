@@ -45,6 +45,25 @@ class AlertMatchingTest {
     }
 
     @Test
+    fun placeTagRuleMatchesEveryMatchingPlaceRegardlessOfEditorOrigin() {
+        val rule = AlertRuleSpec(
+            domain = AlertDomain.PLACE,
+            trigger = AlertTrigger.PLACE_BOTH,
+            targetKind = AlertTargetKind.TAGS,
+            requiredTagIds = setOf("coffee", "work"),
+            matchMode = AlertMatchMode.ANY,
+        )
+        for (placeId in listOf("origin-place", "other-place")) {
+            assertTrue(AlertMatching.ruleMatches(rule,
+                AlertEventSpec(AlertDomain.PLACE, AlertTrigger.PLACE_CHECK_IN,
+                    entityId = placeId, tagIds = setOf("work")), nowMs = 1_000L))
+        }
+        assertFalse(AlertMatching.ruleMatches(rule,
+            AlertEventSpec(AlertDomain.PLACE, AlertTrigger.PLACE_CHECK_IN,
+                entityId = "unrelated", tagIds = setOf("other")), nowMs = 1_000L))
+    }
+
+    @Test
     fun entityTargetRequiresTheExactPlaceAndCooldownIsEnforced() {
         val rule = AlertRuleSpec(
             domain = AlertDomain.PLACE,

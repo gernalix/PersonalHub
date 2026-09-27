@@ -239,6 +239,7 @@ class AlertsCapsuleViewModel(
         randomAlertsEnabled: Boolean = false,
         randomAlertsCount: Int = 0,
         randomAlertsWindow: RandomAlertWindow = RandomAlertWindow.DAY,
+        isEnabled: Boolean = true,
     ): Boolean {
         val msg = message.trim()
         if (msg.isBlank()) return false
@@ -259,6 +260,7 @@ class AlertsCapsuleViewModel(
                 matchMode = matchMode,
                 tagIds = tagIds,
                 timerMinutes = 0,
+                isEnabled = isEnabled,
                 cooldownMs = max(0L, cooldownMs)
             )
             val created = withRandomAlertPlan(createdBase, randomAlertsEnabled, randomAlertsCount, randomAlertsWindow)

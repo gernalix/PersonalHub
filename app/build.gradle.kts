@@ -188,6 +188,7 @@ tasks.configureEach {
 dependencies {
     implementation(project(":contracts:database"))
     implementation(project(":core:database"))
+    implementation(project(":core:alerts"))
     implementation(project(":core:hub-context"))
     implementation(project(":core:ui"))
     implementation(project(":feature:luoghi"))
