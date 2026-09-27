@@ -58,6 +58,7 @@ import com.example.multitimetracker.ui.util.TagSelectionOrder
 import com.example.multitimetracker.ui.util.formatDuration
 import com.gernalix.personalhub.alerts.AlertRuleEntity
 import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.core.alerts.AlertText
 import com.gernalix.personalhub.core.alerts.AlertMatchMode
 import com.gernalix.personalhub.core.alerts.AlertScope
 import com.gernalix.personalhub.core.alerts.AlertTargetKind
@@ -114,7 +115,7 @@ fun AlertsScreen(
         modifier = modifier,
         topBar = {
             Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.alerts_unified_title), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                Text(alertText(R.string.alerts_unified_title, R.string.alerts_unified_title_it), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                 IconButton(onClick = { showTrash = true }) {
                     Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.show_trash))
                 }
@@ -160,7 +161,7 @@ fun AlertsScreen(
                         val tagNames = rule.tagIds.mapNotNull { id -> state.tags.firstOrNull { it.id == id }?.name }
                         UnifiedAlertCard(
                             entityRef = HubEntityRef("timer", "alert", rule.id.toString()),
-                            domain = stringResource(R.string.alerts_domain_timer),
+                            domain = alertText(R.string.alerts_domain_timer, R.string.alerts_domain_timer_it),
                             message = rule.message,
                             details = listOf(
                                 if (rule.trigger == TimeFenceTrigger.ON_START) stringResource(R.string.alert_trigger_start) else stringResource(R.string.alert_trigger_end),
@@ -179,18 +180,18 @@ fun AlertsScreen(
                     items(placeRules, key = { "places-${it.id}" }) { rule ->
                         val target = if (rule.targetKind == AlertTargetKind.ENTITY.name) {
                             places.places.firstOrNull { it.uuid == rule.entityId }?.let { it.nickname.ifBlank { it.address.orEmpty() } }
-                                ?: stringResource(R.string.alerts_missing_place)
+                                ?: alertText(R.string.alerts_missing_place, R.string.alerts_missing_place_it)
                         } else {
                             places.targets[rule.id].orEmpty().mapNotNull { id -> places.tags.firstOrNull { it.id == id }?.name }
-                                .joinToString(", ").ifBlank { stringResource(R.string.alerts_places_tags) }
+                                .joinToString(", ").ifBlank { alertText(R.string.alerts_places_tags, R.string.alerts_places_tags_it) }
                         }
                         UnifiedAlertCard(
                             entityRef = HubEntityRef("places", "alert", rule.id),
-                            domain = stringResource(R.string.alerts_domain_places),
+                            domain = alertText(R.string.alerts_domain_places, R.string.alerts_domain_places_it),
                             message = rule.message,
                             details = listOf(
                                 placeTriggerLabel(rule.trigger), target,
-                                if (rule.targetKind == AlertTargetKind.ENTITY.name) stringResource(R.string.alerts_specific_place)
+                                if (rule.targetKind == AlertTargetKind.ENTITY.name) alertText(R.string.alerts_specific_place, R.string.alerts_specific_place_it)
                                 else if (rule.matchMode == AlertMatchMode.ANY.name) stringResource(R.string.alert_match_any)
                                 else stringResource(R.string.alert_match_all),
                                 if (rule.scope == AlertScope.ONE_TIME.name) stringResource(R.string.alert_scope_one_time) else stringResource(R.string.alert_scope_always),
@@ -209,14 +210,14 @@ fun AlertsScreen(
     if (showDomainPicker) {
         AlertDialog(
             onDismissRequest = { showDomainPicker = false },
-            title = { Text(stringResource(R.string.alerts_choose_domain)) },
+            title = { Text(alertText(R.string.alerts_choose_domain, R.string.alerts_choose_domain_it)) },
             text = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { showDomainPicker = false; editing = EditingAlert.Timer(null) }) {
-                        Text(stringResource(R.string.alerts_domain_timer))
+                        Text(alertText(R.string.alerts_domain_timer, R.string.alerts_domain_timer_it))
                     }
                     TextButton(onClick = { showDomainPicker = false; editing = EditingAlert.Places(null) }) {
-                        Text(stringResource(R.string.alerts_domain_places))
+                        Text(alertText(R.string.alerts_domain_places, R.string.alerts_domain_places_it))
                     }
                 }
             },
@@ -284,16 +285,16 @@ fun AlertsScreen(
 
 @Composable
 private fun filterLabel(filter: UnifiedAlertsRoute.Filter): String = when (filter) {
-    UnifiedAlertsRoute.Filter.ALL -> stringResource(R.string.alerts_filter_all)
-    UnifiedAlertsRoute.Filter.TIMER -> stringResource(R.string.alerts_domain_timer)
-    UnifiedAlertsRoute.Filter.PLACES -> stringResource(R.string.alerts_domain_places)
+    UnifiedAlertsRoute.Filter.ALL -> alertText(R.string.alerts_filter_all, R.string.alerts_filter_all_it)
+    UnifiedAlertsRoute.Filter.TIMER -> alertText(R.string.alerts_domain_timer, R.string.alerts_domain_timer_it)
+    UnifiedAlertsRoute.Filter.PLACES -> alertText(R.string.alerts_domain_places, R.string.alerts_domain_places_it)
 }
 
 @Composable
 private fun placeTriggerLabel(trigger: String): String = when (trigger) {
-    AlertTrigger.PLACE_CHECK_IN.name -> stringResource(R.string.alerts_check_in)
-    AlertTrigger.PLACE_CHECK_OUT.name -> stringResource(R.string.alerts_check_out)
-    AlertTrigger.PLACE_BOTH.name -> stringResource(R.string.alerts_both)
+    AlertTrigger.PLACE_CHECK_IN.name -> alertText(R.string.alerts_check_in, R.string.alerts_check_in_it)
+    AlertTrigger.PLACE_CHECK_OUT.name -> alertText(R.string.alerts_check_out, R.string.alerts_check_out_it)
+    AlertTrigger.PLACE_BOTH.name -> alertText(R.string.alerts_both, R.string.alerts_both_it)
     else -> trigger
 }
 
@@ -404,7 +405,7 @@ private fun UnifiedAlertEditor(
                 Modifier.heightIn(max = 530.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(stringResource(if (isTimer) R.string.alerts_domain_timer else R.string.alerts_domain_places))
+                Text(if (isTimer) alertText(R.string.alerts_domain_timer, R.string.alerts_domain_timer_it) else alertText(R.string.alerts_domain_places, R.string.alerts_domain_places_it))
                 OutlinedTextField(message, { message = it }, label = { Text(stringResource(R.string.messaggio)) }, modifier = Modifier.fillMaxWidth().testTag("alerts-message"))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.alert_status_enabled), Modifier.weight(1f))
@@ -452,8 +453,8 @@ private fun UnifiedAlertEditor(
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(targetKind == AlertTargetKind.ENTITY, { targetKind = AlertTargetKind.ENTITY }, label = { Text(stringResource(R.string.alerts_specific_place)) })
-                        FilterChip(targetKind == AlertTargetKind.TAGS, { targetKind = AlertTargetKind.TAGS }, label = { Text(stringResource(R.string.alerts_places_tags)) })
+                        FilterChip(targetKind == AlertTargetKind.ENTITY, { targetKind = AlertTargetKind.ENTITY }, label = { Text(alertText(R.string.alerts_specific_place, R.string.alerts_specific_place_it)) })
+                        FilterChip(targetKind == AlertTargetKind.TAGS, { targetKind = AlertTargetKind.TAGS }, label = { Text(alertText(R.string.alerts_places_tags, R.string.alerts_places_tags_it)) })
                     }
                     if (targetKind == AlertTargetKind.ENTITY) {
                         places.places.forEach { target ->
@@ -466,7 +467,7 @@ private fun UnifiedAlertEditor(
                         }
                     }
                 }
-                if (saveError) Text(stringResource(R.string.alerts_save_failed), color = MaterialTheme.colorScheme.error)
+                if (saveError) Text(alertText(R.string.alerts_save_failed, R.string.alerts_save_failed_it), color = MaterialTheme.colorScheme.error)
             }
         },
     )
@@ -499,3 +500,6 @@ private fun TimerTagPicker(tags: List<Tag>, selected: Set<Long>, onToggle: (Long
         }
     }
 }
+
+@Composable
+private fun alertText(english: Int, italian: Int): String = AlertText.get(LocalContext.current, english, italian)
