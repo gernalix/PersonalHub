@@ -11,6 +11,7 @@ object MutationEventCapture {
         val key: String,
         val label: String?,
         val fields: List<String>,
+        val predicate: String? = null,
     )
 
     private val sources = listOf(
@@ -21,6 +22,7 @@ object MutationEventCapture {
         Source("intake_events", "substances", "intake", "id", null, listOf("substance_id", "dose", "dose_unit", "quantity", "timestamp_utc")),
         Source("finance_transactions", "money", "transaction", "id", null, listOf("amount", "currency", "notes", "occurredAt", "accountId", "titleId", "placeId")),
         Source("contact_fields", "people", "field", "id", null, listOf("contact_id", "field_type", "value", "description", "is_primary")),
+        Source("hub_resources", "workflowy", "link", "id", "title", listOf("title", "value"), "value LIKE '%workflowy.com/%'"),
     )
 
     fun install(db: SupportSQLiteDatabase) {
@@ -44,12 +46,29 @@ object MutationEventCapture {
         val action = when (operation) { "INSERT" -> "created"; "UPDATE" -> "updated"; else -> "deleted" }
         val row = if (operation == "DELETE") "OLD" else "NEW"
         val changed = source.fields.joinToString(" OR ") { "OLD.`$it` IS NOT NEW.`$it`" }
-        val condition = if (operation == "UPDATE") " WHEN $changed" else ""
+        val predicate = source.predicate?.let { filter ->
+            when (operation) {
+                "INSERT" -> "NEW.$filter"
+                "DELETE" -> "OLD.$filter"
+                else -> "(NEW.$filter OR OLD.$filter)"
+            }
+        }
+        val condition = when {
+            operation == "UPDATE" && predicate != null -> " WHEN ($changed) AND $predicate"
+            operation == "UPDATE" -> " WHEN $changed"
+            predicate != null -> " WHEN $predicate"
+            else -> ""
+        }
         val transactionId = "COALESCE((SELECT group_id FROM hub_git_edit_context WHERE id=1),lower(hex(randomblob(16))))"
         val sequence = "(SELECT COALESCE(MAX(sequence),0)+1 FROM mutation_events WHERE transaction_id=$transactionId)"
         val actor = "COALESCE((SELECT actor FROM hub_git_edit_context WHERE id=1),'user')"
         val sourceName = "COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1),'personalhub')"
-        val label = source.label?.let { "json_object('name',$row.`$it`)" } ?: "'{}'"
+        val label = when (source.table) {
+            "intake_events" -> "json_object('name',(SELECT name FROM substances WHERE id=$row.substance_id))"
+            "finance_transactions" -> "json_object('name',(SELECT name FROM finance_titles WHERE id=$row.titleId))"
+            "contact_fields" -> "json_object('name',CASE WHEN $row.field_type='name' THEN $row.value ELSE (SELECT value FROM contact_fields WHERE contact_id=$row.contact_id AND field_type='name' LIMIT 1) END)"
+            else -> source.label?.let { "json_object('name',$row.`$it`)" } ?: "'{}'"
+        }
         return """CREATE TRIGGER `$name` AFTER $operation ON `${source.table}`$condition BEGIN
             INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
                 entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)

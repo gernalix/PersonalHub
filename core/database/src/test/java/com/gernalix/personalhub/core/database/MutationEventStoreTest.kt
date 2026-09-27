@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventDraft
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore
+import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
 import java.util.UUID
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -23,6 +24,7 @@ class MutationEventStoreTest {
     @Test
     fun capturePersistsSemanticChangesAndGroupsOneDatabaseTransaction() = withDatabase { database ->
         val db = database.openHelper.writableDatabase
+        assertFalse("mutation_events" in SyncJournal.tables(db))
         val first = UUID.randomUUID().toString()
         val second = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
@@ -74,6 +76,24 @@ class MutationEventStoreTest {
         assertEquals(2, deleted.sequence)
         assertNull(deleted.afterJson)
         assertEquals("Work", JSONObject(deleted.beforeJson!!).getString("name"))
+    }
+
+    @Test
+    fun workflowyResourceCapturesOneLinkFactWithNameSnapshot() = withDatabase { database ->
+        val db = database.openHelper.writableDatabase
+        val id = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        db.execSQL(
+            """INSERT INTO hub_resources(id,kind,title,value,persistedPermission,createdAt,updatedAt)
+                VALUES(?, 'url', 'Workflowy · Study', 'https://workflowy.com/#/abc123', 0, ?, ?)""".trimIndent(),
+            arrayOf<Any?>(id, now, now),
+        )
+        val event = MutationEventStore.recent(db).single { it.eventType == "workflowy.link.created" }
+        assertEquals("Workflowy · Study", JSONObject(event.contextJson).getString("name"))
+        db.execSQL("DELETE FROM hub_resources WHERE id=?", arrayOf(id))
+        val deleted = MutationEventStore.recent(db).single { it.eventType == "workflowy.link.deleted" }
+        assertEquals("Workflowy · Study", JSONObject(deleted.beforeJson!!).getString("title"))
+        assertNull(deleted.afterJson)
     }
 
     private fun withDatabase(block: (PersonalHubDatabase) -> Unit) {
