@@ -380,7 +380,7 @@ class LuoghiHomeViewModel(
     private suspend fun refreshPlaceAlertDataNow() {
         val tags = container.places.listTags()
         val rules = container.alerts.listRules()
-        val targets = container.alerts.placeTagTargets(rules.map { it.id })
+        val targets = container.alerts.targets(rules.map { it.id })
         mutableState.update {
             it.copy(
                 placeTags = tags,

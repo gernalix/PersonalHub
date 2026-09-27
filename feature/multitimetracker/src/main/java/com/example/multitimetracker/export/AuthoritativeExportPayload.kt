@@ -151,7 +151,7 @@ internal object AuthoritativeExportPayloadBuilder {
             .groupBy { it.childId }
             .mapValues { (_, edges) -> edges.map { it.parentId }.toSet() },
         lifePeriods = snapshot.lifePeriods,
-        timeFenceRules = snapshot.timeFenceRules,
+        timeFenceRules = emptyList(),
         chains = snapshot.chains,
         activeChainRun = snapshot.activeChainRun,
         quickEventTemplates = snapshot.quickEventTemplates,

@@ -2,29 +2,6 @@ package com.gernalix.personalhub.core.database
 
 import androidx.room.*
 
-@Entity(tableName = "audit_events", indices = [Index(value = ["ts_ms", "id"], name = "idx_audit_events_ts", orders = [Index.Order.DESC, Index.Order.DESC]), Index(value = ["action", "ts_ms"], name = "idx_audit_events_action_ts", orders = [Index.Order.ASC, Index.Order.DESC]), Index(value = ["is_system", "undone_at_ms", "id"], name = "idx_audit_events_visible_id", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC]), Index(value = ["entity_type", "entity_id", "undone_at_ms", "id"], name = "idx_audit_events_entity_undo_id", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.DESC])])
-data class TimerAuditEvents(
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val `id`: Long,
-    @ColumnInfo(name = "ts_ms")
-    val `ts_ms`: Long,
-    @ColumnInfo(name = "is_system", defaultValue = "0")
-    val `is_system`: Long,
-    @ColumnInfo(name = "action")
-    val `action`: String,
-    @ColumnInfo(name = "entity_type")
-    val `entity_type`: String?,
-    @ColumnInfo(name = "entity_id")
-    val `entity_id`: Long?,
-    @ColumnInfo(name = "summary")
-    val `summary`: String,
-    @ColumnInfo(name = "payload_json")
-    val `payload_json`: String?,
-    @ColumnInfo(name = "undone_at_ms")
-    val `undone_at_ms`: Long?,
-)
-
 @Entity(tableName = "integrity_stats", primaryKeys = ["id"])
 data class TimerIntegrityStats(
     @ColumnInfo(name = "id")

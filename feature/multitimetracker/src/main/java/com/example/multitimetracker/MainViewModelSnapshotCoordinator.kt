@@ -352,7 +352,7 @@ internal class MainViewModelSnapshotCoordinator(
                 closedSessions = snapshot.closedSessions,
                 tagSessions = snapshot.tagSessions,
                 lifePeriods = snapshot.lifePeriods,
-                timeFenceRules = snapshot.timeFenceRules,
+                timeFenceRules = emptyList(),
                 installAtMs = snapshot.installAtMs,
                 appUsageMs = snapshot.appUsageMs,
                 activeSessionStart = snapshot.activeSessionStart,
@@ -475,7 +475,7 @@ internal class MainViewModelSnapshotCoordinator(
         replaceTags(prepared.tags)
         replaceSessionsRuntime(prepared.sessions.runtimeState)
         replaceLifePeriods(snap.lifePeriods)
-        replaceTimeFenceRules(snap.timeFenceRules)
+        replaceTimeFenceRules(emptyList())
         replaceQuickEvents(snap.toQuickEventsSnapshot())
         replaceChains(snap.toChainsSnapshot())
         replaceTagParentsByChild(tagParentsByChild)
@@ -487,7 +487,7 @@ internal class MainViewModelSnapshotCoordinator(
 
         reconcileTimeFenceAlarms(
             context = context,
-            rules = snap.timeFenceRules,
+            rules = emptyList(),
             sessions = prepared.sessions.runtimeState.runningSessions,
             tags = prepared.tags,
             nowMs = System.currentTimeMillis(),

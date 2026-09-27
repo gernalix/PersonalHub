@@ -1,6 +1,13 @@
 package com.gernalix.personalhub.core.alerts
 
-enum class AlertDomain { TIMER, PLACE }
+enum class AlertDomain(val moduleId: String, val displayName: String) {
+    TIMER("timer", "Timer"),
+    PLACE("places", "Places");
+
+    companion object {
+        fun fromModuleId(moduleId: String): AlertDomain? = entries.firstOrNull { it.moduleId == moduleId }
+    }
+}
 
 enum class AlertTrigger {
     TIMER_START,

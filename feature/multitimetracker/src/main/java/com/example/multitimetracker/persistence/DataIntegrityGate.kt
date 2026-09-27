@@ -122,7 +122,6 @@ object DataIntegrityGate {
         if (!hasTable("snapshot")) missing += "snapshot table missing"
         if (!hasTable(SnapshotSqlite.SESSIONS_TABLE)) missing += "${SnapshotSqlite.SESSIONS_TABLE} table missing"
         if (!hasTable(SnapshotSqlite.SESSION_TAGS_TABLE)) missing += "${SnapshotSqlite.SESSION_TAGS_TABLE} table missing"
-        if (!hasTable(SnapshotSqlite.AUDIT_TABLE)) missing += "${SnapshotSqlite.AUDIT_TABLE} table missing"
         return missing
     }
 

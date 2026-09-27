@@ -26,6 +26,8 @@ import com.gernalix.personalhub.core.alerts.AlertNotificationDispatcher
 import com.gernalix.personalhub.core.alerts.AlertDomain
 import com.gernalix.personalhub.core.alerts.AlertFire
 import com.gernalix.personalhub.core.alerts.AlertTaskerBridge
+import com.gernalix.personalhub.core.alerts.AlertDeliveryKind
+import com.gernalix.personalhub.core.alerts.AlertFiringRecorder
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.WorkflowyHubBridge
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
@@ -34,6 +36,7 @@ import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -86,7 +89,7 @@ internal fun hasDuplicateTimeFenceRuleForTriggerAndTags(
  */
 class AlertsCapsuleViewModel(
     hostStateFlow: StateFlow<AlertsHostState>,
-    runtimeScope: CoroutineScope,
+    private val runtimeScope: CoroutineScope,
     private val getContext: () -> Context?,
     private val resolveSessionStartAtMs: (Long, Long) -> Long?,
     private val getTags: () -> List<Tag>,
@@ -106,6 +109,35 @@ class AlertsCapsuleViewModel(
     private val ruleMutationLock = Any()
     private val liveRules = MutableStateFlow<List<TimeFenceRule>>(emptyList())
     private val preFencePrompts = MutableStateFlow<List<PreFencePrompt>>(emptyList())
+
+    init {
+        reloadCanonicalRules()
+    }
+
+    private fun repositoryOrNull(): TimerAlertRepository? =
+        getContext()?.let { TimerAlertRepository(it.applicationContext) }
+
+    private fun reloadCanonicalRules() {
+        val repository = repositoryOrNull() ?: return
+        runtimeScope.launch(Dispatchers.IO) {
+            replaceRules(repository.list())
+        }
+    }
+
+    private fun saveCanonical(rule: TimeFenceRule) {
+        val repository = repositoryOrNull() ?: return
+        runtimeScope.launch(Dispatchers.IO) { repository.save(rule) }
+    }
+
+    private fun saveCanonical(rules: Collection<TimeFenceRule>) {
+        val repository = repositoryOrNull() ?: return
+        runtimeScope.launch(Dispatchers.IO) { rules.forEach { repository.save(it) } }
+    }
+
+    private fun purgeCanonical(ruleId: Long) {
+        val repository = repositoryOrNull() ?: return
+        runtimeScope.launch(Dispatchers.IO) { repository.purge(ruleId) }
+    }
     val uiState: StateFlow<AlertsUiState> = combine(hostStateFlow, liveRules, preFencePrompts) { host, currentRules, prompts ->
         AlertsUiState(
             tags = host.tags,
@@ -156,7 +188,11 @@ class AlertsCapsuleViewModel(
     fun rules(): List<TimeFenceRule> = liveRules.value
 
     fun replaceTimeFenceRules(newRules: List<TimeFenceRule>) {
-        replaceRules(newRules)
+        if (repositoryOrNull() == null) {
+            replaceRules(newRules)
+        } else {
+            reloadCanonicalRules()
+        }
     }
 
     fun showTimerAlertPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long) {
@@ -171,8 +207,16 @@ class AlertsCapsuleViewModel(
         )
     }
 
-    private fun showInAppPrompt(ruleId: Long, sessionId: Long, title: String, message: String, firedAtMs: Long): Boolean {
-        showNotificationOverride?.let { return it(ruleId, title, message) }
+    private fun deliverTimerAlert(
+        ruleId: Long,
+        sessionId: Long,
+        title: String,
+        message: String,
+        firedAtMs: Long,
+    ): AlertDeliveryKind? {
+        showNotificationOverride?.let {
+            return if (it(ruleId, title, message)) AlertDeliveryKind.NOTIFICATION else null
+        }
         val context = getContext()
         if (context != null) {
             val linkedUrl = if (WorkflowyIntegrationSettings.isEnabled(context)) runBlocking(Dispatchers.IO) {
@@ -180,15 +224,15 @@ class AlertsCapsuleViewModel(
             } else null
             if (linkedUrl == null && AlertLinkPolicy.linkOnlyUriOrNull(message) == null) {
                 showTimerAlertPrompt(ruleId, sessionId, title, message, firedAtMs)
-                return true
+                return AlertDeliveryKind.IN_APP_PROMPT
             }
             val notificationId = ("timer-alert:" + ruleId + ":" + sessionId).hashCode() and Int.MAX_VALUE
             if (AlertNotificationDispatcher.postNotification(context, notificationId, title, message, linkedUrl)) {
-                return true
+                return AlertDeliveryKind.NOTIFICATION
             }
         }
         showTimerAlertPrompt(ruleId, sessionId, title, message, firedAtMs)
-        return true
+        return AlertDeliveryKind.IN_APP_PROMPT
     }
 
     fun reconcileSnapshotRuntimeAlarms(
@@ -279,8 +323,7 @@ class AlertsCapsuleViewModel(
             )
         }
 
-        persistAsync()
-        scheduleAutoBackup()
+        saveCanonical(rule)
         return true
     }
 
@@ -339,8 +382,7 @@ class AlertsCapsuleViewModel(
             )
         }
 
-        persistAsync()
-        scheduleAutoBackup()
+        newRules.firstOrNull { it.id == ruleId }?.let(::saveCanonical)
         return true
     }
 
@@ -371,8 +413,7 @@ class AlertsCapsuleViewModel(
             true
         )
     }
-    persistAsync()
-    scheduleAutoBackup()
+    newRules.firstOrNull { it.id == ruleId }?.let(::saveCanonical)
 }
 
 fun restoreTimeFenceRule(ruleId: Long) {
@@ -394,8 +435,7 @@ fun restoreTimeFenceRule(ruleId: Long) {
             false
         )
     }
-    persistAsync()
-    scheduleAutoBackup()
+    newRules.firstOrNull { it.id == ruleId }?.let(::saveCanonical)
 }
 
 fun purgeTimeFenceRule(ruleId: Long) {
@@ -416,8 +456,7 @@ fun purgeTimeFenceRule(ruleId: Long) {
             false
         )
     }
-    persistAsync()
-    scheduleAutoBackup()
+    purgeCanonical(ruleId)
 }
 
 fun purgeAllDeletedTimeFenceRules() {
@@ -439,8 +478,7 @@ fun purgeAllDeletedTimeFenceRules() {
             false
         )
     }
-    persistAsync()
-    scheduleAutoBackup()
+    trashed.forEach { purgeCanonical(it.id) }
 }
 fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
         val beforeRules = rules()
@@ -483,8 +521,7 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
             )
         }
 
-        persistAsync()
-        scheduleAutoBackup()
+        newRules.firstOrNull { it.id == ruleId }?.let(::saveCanonical)
     }
 
     private fun withRandomAlertPlan(
@@ -568,39 +605,35 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
                 ) ?: continue
                 val title = match.title
 
-                if (!showInAppPrompt(r.id, ev.sessionId, title, r.message, nowMs)) continue
-                getContext()?.let { context ->
-                    AlertTaskerBridge.emit(
-                        context,
-                        AlertFire(
-                            ruleId = r.id.toString(),
-                            domain = AlertDomain.TIMER,
-                            trigger = when (ev.trigger) {
-                                TimeFenceTrigger.ON_START -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_START
-                                TimeFenceTrigger.ON_STOP -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_STOP
-                            },
-                            entityId = ev.sessionId.toString(),
-                            tagIds = ev.sessionTagIds.mapTo(linkedSetOf()) { it.toString() },
-                            tagNames = ev.sessionTagIds.mapNotNullTo(linkedSetOf()) { tagNameById[it] },
-                            title = title,
-                            message = r.message,
-                            firedAtMs = nowMs,
-                        ),
-                    )
-                }
-                logSystemEvent(
-                    "ALERT_FIRED",
-                    "TIME_FENCE_RULE",
-                    r.id,
-                    "Alert fired",
-                    JSONObject()
-                        .put("ruleId", r.id)
-                        .put("sessionId", ev.sessionId)
-                        .put("trigger", ev.trigger.name)
-                        .put("delivery", TimeFenceDelivery.NOTIFICATION.name)
+                val delivery = deliverTimerAlert(r.id, ev.sessionId, title, r.message, nowMs) ?: continue
+                val fire = AlertFire(
+                    ruleId = r.id.toString(),
+                    domain = AlertDomain.TIMER,
+                    trigger = when (ev.trigger) {
+                        TimeFenceTrigger.ON_START -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_START
+                        TimeFenceTrigger.ON_STOP -> com.gernalix.personalhub.core.alerts.AlertTrigger.TIMER_STOP
+                    },
+                    entityId = ev.sessionId.toString(),
+                    tagIds = ev.sessionTagIds.mapTo(linkedSetOf()) { it.toString() },
+                    tagNames = ev.sessionTagIds.mapNotNullTo(linkedSetOf()) { tagNameById[it] },
+                    title = title,
+                    message = r.message,
+                    firedAtMs = nowMs,
                 )
+                getContext()?.let { context ->
+                    AlertTaskerBridge.emit(context, fire)
+                    runBlocking(Dispatchers.IO) {
+                        AlertFiringRecorder.recordSuccessfulDelivery(
+                            context = context,
+                            fire = fire,
+                            entityLabel = ev.sessionTitle,
+                            delivery = delivery,
+                            keepEnabled = r.scope != TimeFenceScope.ONE_TIME,
+                        )
+                    }
+                }
 
-                // Update rule state (last fired + optional one-time disable)
+                // Update runtime cache after the canonical firing transaction succeeds.
                 val updated = when (r.scope) {
                     TimeFenceScope.ONE_TIME -> r.copy(isEnabled = false, lastFiredAtMs = nowMs)
                     TimeFenceScope.ALWAYS -> r.copy(lastFiredAtMs = nowMs)
@@ -613,8 +646,6 @@ fun setTimeFenceRuleEnabled(ruleId: Long, enabled: Boolean) {
 
         if (changed) {
             replaceRules(newRules)
-            persistAsync()
-            scheduleAutoBackup()
         }
 
         if (BuildConfig.DEBUG) {

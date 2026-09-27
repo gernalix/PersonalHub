@@ -256,10 +256,13 @@ object DatabaseVault {
         val sourceVersion = runCatching {
             SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
         }.getOrElse { return@withLock fail("Database is unreadable; existing data was preserved") }
-        if (sourceVersion != PersonalHubDatabase.SCHEMA_VERSION) {
+        if (!PersonalHubDatabaseMigrations.canMigrateFrom(sourceVersion)) {
             return@withLock fail("Database schema $sourceVersion is unsupported; schema ${PersonalHubDatabase.SCHEMA_VERSION} is required. Existing data was preserved")
         }
         return@withLock runCatching {
+            if (sourceVersion != PersonalHubDatabase.SCHEMA_VERSION) {
+                PersonalHubDatabase.get(context).openHelper.writableDatabase
+            }
             validate(context, target)
             pass().also { ready -> if (ready) cleanupCompletedStartupRollbacks(context) }
         }.getOrElse { fail("Database validation failed; existing data was preserved") }

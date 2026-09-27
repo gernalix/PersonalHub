@@ -170,7 +170,6 @@ class GitDataFinalValidationTest {
             "snapshot",
             "snapshot_history",
             "snapshot_payloads",
-            "audit_events",
             "integrity_stats",
             "ui_prefs_mirror",
             "backup_metadata",

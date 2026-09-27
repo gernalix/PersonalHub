@@ -99,7 +99,7 @@ class HubActivityPresentationTest {
             "saved_search_tags", "tags", "contact_tags", "places", "place_aliases", "place_links",
             "place_events", "check_in_attempts", "check_in_attempt_candidates", "place_geofence_configs",
             "place_geofence_transition_log", "place_tags", "place_tag_cross_ref", "alert_rules",
-            "alert_place_tag_targets", "substances", "intake_events", "stock_adjustments", "prescriptions",
+            "alert_rule_targets", "alert_firings", "substances", "intake_events", "stock_adjustments", "prescriptions",
             "interaction_rules", "interaction_targets", "settings", "macros", "macro_items", "app_state",
             "correction_events", "word_entries", "wordpulse_sessions", "pvt_results", "quick_event_entries",
             "quick_event_entry_field_values", "quick_event_entry_tags", "quick_event_macro_actions",
@@ -121,8 +121,12 @@ class HubActivityPresentationTest {
                 displayAfter = "{\"name\":\"Example\"}",
             )
             val text = humanizeGitHistory(item, gitHistoryModule(table))
-            assertTrue("$table must render its human entity type", text.title.contains(type))
-            assertFalse("$table must not leak its raw table name", text.title.contains(table))
+            if (table != "alert_firings") {
+                assertTrue("$table must render its human entity type", text.title.contains(type))
+            }
+            if ('_' in table) {
+                assertFalse("$table must not leak its raw table name", text.title.contains(table))
+            }
         }
         assertEquals("substances", gitHistoryModule("macros"))
         assertEquals("wordpulse", gitHistoryModule("app_state"))
@@ -130,7 +134,8 @@ class HubActivityPresentationTest {
         assertEquals("people", gitHistoryModule("people_photos"))
 
         GIT_HISTORY_ENTITY_TYPES.forEach { (table, expectedType) ->
-            listOf("INSERT", "UPDATE", "DELETE").forEach { operation ->
+            val operations = if (table == "alert_firings") listOf("INSERT") else listOf("INSERT", "UPDATE", "DELETE")
+            operations.forEach { operation ->
                 val item = GitHistoryItem(
                     id = "$table-$operation",
                     occurredAt = 1L,
@@ -147,7 +152,11 @@ class HubActivityPresentationTest {
                     revertedBy = null,
                 )
                 val text = humanizeGitHistory(item, "PersonalHub")
-                assertTrue("$table/$operation must name its human entity type", text.title.contains(expectedType))
+                if (table == "alert_firings") {
+                    assertTrue(text.title.startsWith("Alert fired"))
+                } else {
+                    assertTrue("$table/$operation must name its human entity type", text.title.contains(expectedType))
+                }
                 if ('_' in table) {
                     assertFalse("$table/$operation must not expose raw snake_case table names", text.title.contains(table))
                 }
@@ -271,6 +280,30 @@ class HubActivityPresentationTest {
         assertFalse(text.detail.orEmpty().contains(epoch))
     }
 
+    @Test
+    fun alertFiringHistoryIsEnglishAndCarriesEventEntityTagsAndDelivery() {
+        val item = GitHistoryItem(
+            id = "fire-1",
+            occurredAt = 1L,
+            author = "system",
+            source = "alerts",
+            reason = null,
+            groupId = null,
+            table = "alert_firings",
+            operation = "INSERT",
+            rowKey = "fire-1",
+            changedColumns = "domain,trigger,entity_label,tag_names,delivery,message",
+            historyPath = "h",
+            commitSha = "c",
+            revertedBy = null,
+            displayAfter = "{\"domain\":\"timer\",\"trigger\":\"TIMER_START\",\"entity_label\":\"Work session\",\"tag_names\":\"Work, Deep focus\",\"delivery\":\"notification\",\"message\":\"Take a break\"}",
+        )
+
+        assertEquals("timer", gitHistoryModule(item))
+        val text = humanizeGitHistory(item, "Timer")
+        assertEquals("Alert fired · Timer · session started · Work session", text.title)
+        assertEquals("Tags: Work, Deep focus\nDelivery: notification\nMessage: Take a break", text.detail)
+    }
     @Test
     fun groupingKeepsUngroupedRowsSeparateAndCombinesSharedGroup() {
         val groupedA = activity(id = "a", groupId = "group-1")

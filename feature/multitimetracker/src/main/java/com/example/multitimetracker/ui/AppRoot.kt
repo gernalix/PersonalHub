@@ -105,6 +105,7 @@ import com.example.multitimetracker.ui.components.AlertPopupHost
 import com.example.multitimetracker.ui.components.LocalOpenAppMenu
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.core.alerts.UnifiedAlertsRoute
+import com.gernalix.personalhub.core.alerts.AlertDomain
 
 private enum class Tab { NOW, QUICK_EVENTS, TAGS, ALERT, CHAINS }
 private enum class DrawerDestination {
@@ -228,12 +229,12 @@ private fun VarTabScaffold(
     onHubQuickEventEntryDismiss: () -> Unit,
 ) {
     val tabState = remember { mutableStateOf(Tab.NOW) }
-    var alertsFilter by remember { mutableStateOf(alertRequest?.filter ?: UnifiedAlertsRoute.Filter.TIMER) }
-    var alertPlaceId by remember { mutableStateOf(alertRequest?.placeId) }
+    var alertsFilter by remember { mutableStateOf<AlertDomain?>(alertRequest?.domain ?: AlertDomain.TIMER) }
+    var alertPlaceId by remember { mutableStateOf(alertRequest?.entityId) }
     LaunchedEffect(alertRequest) {
         if (alertRequest != null) {
-            alertsFilter = alertRequest.filter
-            alertPlaceId = alertRequest.placeId
+            alertsFilter = alertRequest.domain
+            alertPlaceId = alertRequest.entityId
             tabState.value = Tab.ALERT
         }
     }
@@ -562,7 +563,7 @@ if (developerSurfaceEnabled && showDevReport) {
                 context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("timer")).setPackage(context.packageName))
             }
             DrawerDestination.ALERTS -> {
-                alertsFilter = UnifiedAlertsRoute.Filter.TIMER
+                alertsFilter = AlertDomain.TIMER
                 alertPlaceId = null
                 tabState.value = Tab.ALERT
             }

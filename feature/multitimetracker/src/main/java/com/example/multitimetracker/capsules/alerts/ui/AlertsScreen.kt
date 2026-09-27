@@ -59,6 +59,7 @@ import com.example.multitimetracker.ui.util.formatDuration
 import com.gernalix.personalhub.alerts.AlertRuleEntity
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.alerts.AlertText
+import com.gernalix.personalhub.core.alerts.AlertDomain
 import com.gernalix.personalhub.core.alerts.AlertMatchMode
 import com.gernalix.personalhub.core.alerts.AlertScope
 import com.gernalix.personalhub.core.alerts.AlertTargetKind
@@ -80,7 +81,7 @@ private sealed interface EditingAlert {
 fun AlertsScreen(
     modifier: Modifier = Modifier,
     state: AlertsUiState,
-    initialFilter: UnifiedAlertsRoute.Filter = UnifiedAlertsRoute.Filter.TIMER,
+    initialFilter: AlertDomain? = AlertDomain.TIMER,
     initialPlaceId: String? = null,
     onAddTimeFenceRule: (String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery, Boolean, Int, RandomAlertWindow, Boolean) -> Boolean,
     onUpdateTimeFenceRule: (Long, String, TimeFenceTrigger, TimeFenceScope, TimeFenceMatchMode, Set<Long>, Long, TimeFenceDelivery, Boolean, Int, RandomAlertWindow) -> Boolean,
@@ -124,9 +125,9 @@ fun AlertsScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = {
                 when (filter) {
-                    UnifiedAlertsRoute.Filter.ALL -> showDomainPicker = true
-                    UnifiedAlertsRoute.Filter.TIMER -> editing = EditingAlert.Timer(null)
-                    UnifiedAlertsRoute.Filter.PLACES -> editing = EditingAlert.Places(null)
+                    null -> showDomainPicker = true
+                    AlertDomain.TIMER -> editing = EditingAlert.Timer(null)
+                    AlertDomain.PLACE -> editing = EditingAlert.Places(null)
                 }
             }, modifier = Modifier.testTag("alerts-add")) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.aggiungi))
@@ -135,19 +136,19 @@ fun AlertsScreen(
     ) { inner ->
         Column(Modifier.fillMaxSize().padding(inner)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                UnifiedAlertsRoute.Filter.entries.forEach { option ->
+                (listOf<AlertDomain?>(null) + AlertDomain.entries).forEach { option ->
                     FilterChip(
                         selected = filter == option,
                         onClick = { filter = option },
                         label = { Text(filterLabel(option)) },
-                        modifier = Modifier.testTag("alerts-filter-${option.name.lowercase()}"),
+                        modifier = Modifier.testTag("alerts-filter-" + (option?.moduleId ?: "all")),
                     )
                 }
             }
             if (when (filter) {
-                    UnifiedAlertsRoute.Filter.ALL -> timerRules.isEmpty() && placeRules.isEmpty()
-                    UnifiedAlertsRoute.Filter.TIMER -> timerRules.isEmpty()
-                    UnifiedAlertsRoute.Filter.PLACES -> placeRules.isEmpty()
+                    null -> timerRules.isEmpty() && placeRules.isEmpty()
+                    AlertDomain.TIMER -> timerRules.isEmpty()
+                    AlertDomain.PLACE -> placeRules.isEmpty()
                 }) {
                 Text(stringResource(R.string.alerts_empty_title), Modifier.padding(16.dp))
             }
@@ -156,7 +157,7 @@ fun AlertsScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (filter != UnifiedAlertsRoute.Filter.PLACES) {
+                if (filter != AlertDomain.PLACE) {
                     items(timerRules, key = { "timer-${it.id}" }) { rule ->
                         val tagNames = rule.tagIds.mapNotNull { id -> state.tags.firstOrNull { it.id == id }?.name }
                         UnifiedAlertCard(
@@ -176,7 +177,7 @@ fun AlertsScreen(
                         )
                     }
                 }
-                if (filter != UnifiedAlertsRoute.Filter.TIMER) {
+                if (filter != AlertDomain.TIMER) {
                     items(placeRules, key = { "places-${it.id}" }) { rule ->
                         val target = if (rule.targetKind == AlertTargetKind.ENTITY.name) {
                             places.places.firstOrNull { it.uuid == rule.entityId }?.let { it.nickname.ifBlank { it.address.orEmpty() } }
@@ -213,11 +214,16 @@ fun AlertsScreen(
             title = { Text(alertText(R.string.alerts_choose_domain, R.string.alerts_choose_domain_it)) },
             text = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { showDomainPicker = false; editing = EditingAlert.Timer(null) }) {
-                        Text(alertText(R.string.alerts_domain_timer, R.string.alerts_domain_timer_it))
-                    }
-                    TextButton(onClick = { showDomainPicker = false; editing = EditingAlert.Places(null) }) {
-                        Text(alertText(R.string.alerts_domain_places, R.string.alerts_domain_places_it))
+                    AlertDomain.entries.forEach { domain ->
+                        TextButton(onClick = {
+                            showDomainPicker = false
+                            editing = when (domain) {
+                                AlertDomain.TIMER -> EditingAlert.Timer(null)
+                                AlertDomain.PLACE -> EditingAlert.Places(null)
+                            }
+                        }) {
+                            Text(domain.displayName)
+                        }
                     }
                 }
             },
@@ -284,11 +290,8 @@ fun AlertsScreen(
 }
 
 @Composable
-private fun filterLabel(filter: UnifiedAlertsRoute.Filter): String = when (filter) {
-    UnifiedAlertsRoute.Filter.ALL -> alertText(R.string.alerts_filter_all, R.string.alerts_filter_all_it)
-    UnifiedAlertsRoute.Filter.TIMER -> alertText(R.string.alerts_domain_timer, R.string.alerts_domain_timer_it)
-    UnifiedAlertsRoute.Filter.PLACES -> alertText(R.string.alerts_domain_places, R.string.alerts_domain_places_it)
-}
+private fun filterLabel(filter: AlertDomain?): String =
+    filter?.displayName ?: alertText(R.string.alerts_filter_all, R.string.alerts_filter_all_it)
 
 @Composable
 private fun placeTriggerLabel(trigger: String): String = when (trigger) {

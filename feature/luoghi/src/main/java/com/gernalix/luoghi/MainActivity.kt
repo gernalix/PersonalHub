@@ -51,6 +51,7 @@ import com.gernalix.luoghi.ui.home.HomeScreen
 import com.gernalix.luoghi.ui.place.PlaceDetailScreen
 import com.gernalix.luoghi.ui.place.PlaceEditorDialog
 import com.gernalix.personalhub.core.alerts.UnifiedAlertsRoute
+import com.gernalix.personalhub.core.alerts.AlertDomain
 import com.gernalix.luoghi.ui.theme.LuoghiTheme
 import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
@@ -237,7 +238,7 @@ private fun LuoghiNavigation(
                 onAddManualVisit = { manualVisitPlaceId = item.place.uuid },
                 onAlerts = {
                     context.startActivity(
-                        UnifiedAlertsRoute.intent(context, UnifiedAlertsRoute.Filter.PLACES, item.place.uuid)
+                        UnifiedAlertsRoute.intent(context, AlertDomain.PLACE, item.place.uuid)
                     )
                 },
                 onGeofenceSettings = { geofencePlaceId = item.place.uuid },

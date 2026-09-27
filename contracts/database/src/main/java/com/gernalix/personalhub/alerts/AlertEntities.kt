@@ -4,14 +4,12 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import com.gernalix.personalhub.contracts.database.HubTagEntity
 
 /**
- * Canonical alert-rule persistence for domains stored in personalhub.db.
+ * Canonical alert-rule persistence shared by every PersonalHub module that supports alerts.
  *
- * Places uses this table today. Timer keeps its existing snapshot persistence for compatibility and
- * adapts those rules to the shared evaluator; Timer tags and Places tags therefore remain completely
- * separate namespaces.
+ * Domain-specific options live in [configJson]. Tag/selector targets are normalized in
+ * [AlertRuleTargetEntity]. All successful deliveries are appended to [AlertFiringEntity].
  */
 @Entity(
     tableName = "alert_rules",
@@ -37,14 +35,15 @@ data class AlertRuleEntity(
     val enabled: Boolean = true,
     @ColumnInfo(name = "cooldown_ms") val cooldownMs: Long = 0L,
     @ColumnInfo(name = "last_fired_at") val lastFiredAt: Long? = null,
+    @ColumnInfo(name = "config_json", defaultValue = "'{}'") val configJson: String = "{}",
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "deleted_at") val deletedAt: Long? = null,
 )
 
 @Entity(
-    tableName = "alert_place_tag_targets",
-    primaryKeys = ["rule_id", "place_tag_id"],
+    tableName = "alert_rule_targets",
+    primaryKeys = ["rule_id", "target_id"],
     foreignKeys = [
         ForeignKey(
             entity = AlertRuleEntity::class,
@@ -52,16 +51,33 @@ data class AlertRuleEntity(
             childColumns = ["rule_id"],
             onDelete = ForeignKey.CASCADE,
         ),
-        ForeignKey(
-            entity = HubTagEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["place_tag_id"],
-            onDelete = ForeignKey.CASCADE,
-        ),
     ],
-    indices = [Index("rule_id"), Index("place_tag_id")],
+    indices = [Index("rule_id"), Index("target_id")],
 )
-data class AlertPlaceTagTargetEntity(
+data class AlertRuleTargetEntity(
     @ColumnInfo(name = "rule_id") val ruleId: String,
-    @ColumnInfo(name = "place_tag_id") val placeTagId: String,
+    @ColumnInfo(name = "target_id") val targetId: String,
+)
+
+@Entity(
+    tableName = "alert_firings",
+    primaryKeys = ["id"],
+    indices = [
+        Index("rule_id"),
+        Index("domain"),
+        Index("entity_id"),
+        Index(value = ["fired_at", "id"], orders = [Index.Order.DESC, Index.Order.DESC]),
+    ],
+)
+data class AlertFiringEntity(
+    val id: String,
+    @ColumnInfo(name = "rule_id") val ruleId: String,
+    val domain: String,
+    val trigger: String,
+    @ColumnInfo(name = "entity_id") val entityId: String? = null,
+    @ColumnInfo(name = "entity_label") val entityLabel: String? = null,
+    @ColumnInfo(name = "tag_names") val tagNames: String = "",
+    val delivery: String,
+    val message: String,
+    @ColumnInfo(name = "fired_at") val firedAt: Long,
 )

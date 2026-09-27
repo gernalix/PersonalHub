@@ -30,7 +30,7 @@ object DatabaseStartupGate {
             }.getOrNull()
         } else null
         val requiredVersion = PersonalHubDatabase.SCHEMA_VERSION
-        if (file.isFile && currentVersion != requiredVersion) {
+        if (file.isFile && !PersonalHubDatabaseMigrations.canMigrateFrom(currentVersion)) {
             return DatabaseStartupStatus(
                 ready = false,
                 currentVersion = currentVersion,

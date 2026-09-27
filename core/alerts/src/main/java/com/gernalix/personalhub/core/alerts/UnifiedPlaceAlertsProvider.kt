@@ -25,7 +25,7 @@ class UnifiedPlaceAlertsProvider(
         val rules = repository.listRules().filter { it.deletedAt == null }
         return UnifiedPlaceAlertsSnapshot(
             rules = rules,
-            targets = repository.placeTagTargets(rules.map { it.id }),
+            targets = repository.targets(rules.map { it.id }),
             places = database.placeDao().listPlaces(),
             tags = database.hubTagDao().allTags().filter {
                 !it.archived && (it.namespace == HubTagNamespaces.PLACES || it.isGlobal)

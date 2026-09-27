@@ -4,7 +4,9 @@ import android.content.Context
 import com.example.multitimetracker.TimeFenceRestoreReceiver
 import com.example.multitimetracker.TimeFenceTimerScheduler
 import com.example.multitimetracker.core.session.DefaultSessionCore
-import com.example.multitimetracker.persistence.SnapshotStore
+import com.example.multitimetracker.capsules.alerts.core.TimerAlertRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 
 /** Host boundary for retiring and rebuilding profile-scoped Timer runtime state. */
 object TimerProfileRuntime {
@@ -12,7 +14,7 @@ object TimerProfileRuntime {
         val app = context.applicationContext
         runCatching { DefaultSessionCore(app).readRunningSessions() }.getOrDefault(emptyList())
             .forEach { TimeFenceTimerScheduler.cancelTimedSession(app, it.id) }
-        SnapshotStore.load(app)?.timeFenceRules.orEmpty().forEach { rule ->
+        runBlocking(Dispatchers.IO) { TimerAlertRepository(app).live() }.forEach { rule ->
             val identity = rule.randomAlertIdentity.ifBlank { "timer-alert-${rule.id}" }
             rule.randomAlertScheduledAtMs.forEach { fireAt ->
                 TimeFenceTimerScheduler.cancelRandomAlert(app, identity, fireAt)

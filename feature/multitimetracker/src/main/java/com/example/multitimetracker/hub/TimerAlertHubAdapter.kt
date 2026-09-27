@@ -1,7 +1,7 @@
 package com.example.multitimetracker.hub
 
 import android.content.Context
-import com.example.multitimetracker.persistence.SnapshotStore
+import com.example.multitimetracker.capsules.alerts.core.TimerAlertRepository
 import com.gernalix.personalhub.contracts.database.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,7 +12,7 @@ class TimerAlertHubAdapter(private val context: Context) : HubEntityAdapter {
     override val entityKind = "alert"
     override val capabilities = setOf("alert", "contextual")
     private suspend fun rules() = withContext(Dispatchers.IO) {
-        SnapshotStore.load(context.applicationContext)?.timeFenceRules.orEmpty().filterNot { it.isDeleted }
+        TimerAlertRepository(context.applicationContext).live()
     }
     private suspend fun rule(id: String) = rules().firstOrNull { it.id.toString() == id }
     override suspend fun exists(canonicalId: String) = rule(canonicalId) != null

@@ -28,15 +28,15 @@ class PlaceAlertEngine(
         ) { "Only explicit Places check-in/out events are supported" }
 
         val alertDao = database.alertDao()
-        val rules = alertDao.activeRules(AlertDomain.PLACE.name)
+        val rules = alertDao.activeRules(AlertDomain.PLACE.moduleId)
         if (rules.isEmpty()) return 0
 
         val place = database.placeDao().getPlace(placeUuid) ?: return 0
         val actualTags = SharedTagEngine(database).tags(HubEntityRef("places", "place", placeUuid))
         val actualTagIds = actualTags.mapTo(linkedSetOf()) { it.id }
-        val tagTargets = alertDao.placeTagTargets(rules.map { it.id })
+        val tagTargets = alertDao.targets(rules.map { it.id })
             .groupBy { it.ruleId }
-            .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.placeTagId } }
+            .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.targetId } }
         val event = AlertEventSpec(
             domain = AlertDomain.PLACE,
             trigger = eventTrigger,
@@ -80,7 +80,14 @@ class PlaceAlertEngine(
             if (!AlertNotificationDispatcher.post(appContext, notificationId, fire, emitTaskerBroadcast, linkedUrl)) continue
 
             val keepEnabled = rule.scope != AlertScope.ONE_TIME.name
-            alertDao.markFired(rule.id, firedAtMs, keepEnabled)
+            AlertFiringRecorder.recordSuccessfulDelivery(
+                context = appContext,
+                fire = fire,
+                entityLabel = place.nickname.takeIf { it.isNotBlank() } ?: place.address,
+                delivery = AlertDeliveryKind.NOTIFICATION,
+                keepEnabled = keepEnabled,
+                database = database,
+            )
             firedCount += 1
         }
         return firedCount

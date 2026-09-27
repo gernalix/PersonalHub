@@ -110,7 +110,7 @@ object QuickSessionRunner {
                 tags = tags2,
                 closedSessions = closedSessions,
                 tagSessions = tagSessions,
-                timeFenceRules = snapshot?.timeFenceRules ?: emptyList(),
+                timeFenceRules = emptyList(),
                 installAtMs = installAtMs,
                 appUsageMs = appUsageMs,
                 activeSessionStart = snapshot?.activeSessionStart ?: emptyMap(),

@@ -11,6 +11,7 @@ import com.gernalix.personalhub.core.alerts.PlaceAlertDraft
 import com.gernalix.personalhub.core.alerts.PlaceAlertRepository
 import com.gernalix.personalhub.core.alerts.UnifiedPlaceAlertsProvider
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.alerts.AlertFiringEntity
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -20,7 +21,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class PlaceAlertPersistenceDeviceTest {
-    @TableProbe("alert_rules", "alert_place_tag_targets")
+    @TableProbe("alert_rules", "alert_rule_targets", "alert_firings")
     @Test fun alertRuleAndTagTargetsPersistThroughRepository() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         check(context.packageName == "com.gernalix.personalhub.qa")
@@ -36,11 +37,31 @@ class PlaceAlertPersistenceDeviceTest {
             val draft = PlaceAlertDraft(marker, AlertTrigger.PLACE_CHECK_IN, AlertTargetKind.TAGS, placeTagIds = setOf(tagId))
             val ruleId = repo.create(draft)
             assertEquals(marker, owner.alertDao().getRule(ruleId)?.message)
-            assertEquals(setOf(tagId), repo.placeTagTargets(listOf(ruleId))[ruleId])
+            assertEquals(setOf(tagId), repo.targets(listOf(ruleId))[ruleId])
+            val firedAt = System.currentTimeMillis()
+            owner.alertDao().recordSuccessfulDelivery(
+                AlertFiringEntity(
+                    id = UUID.randomUUID().toString(),
+                    ruleId = ruleId,
+                    domain = "places",
+                    trigger = AlertTrigger.PLACE_CHECK_IN.name,
+                    entityId = placeId,
+                    entityLabel = marker,
+                    tagNames = marker,
+                    delivery = "notification",
+                    message = marker,
+                    firedAt = firedAt,
+                ),
+                keepEnabled = true,
+            )
+            val firing = owner.alertDao().recentFirings("places", 1).single()
+            assertEquals(placeId, firing.entityId)
+            assertEquals(marker, firing.tagNames)
+            assertEquals(firedAt, owner.alertDao().getRule(ruleId)?.lastFiredAt)
             assertTrue(repo.update(ruleId, draft.copy(message = "${marker}Edited", trigger = AlertTrigger.PLACE_CHECK_OUT)))
             assertEquals("${marker}Edited", owner.alertDao().getRule(ruleId)?.message)
             assertEquals(1L, owner.openHelper.readableDatabase.query(
-                "SELECT count(*) FROM alert_place_tag_targets WHERE rule_id=?", arrayOf(ruleId),
+                "SELECT count(*) FROM alert_rule_targets WHERE rule_id=?", arrayOf(ruleId),
             ).use { it.moveToFirst(); it.getLong(0) })
             assertTrue(repo.delete(ruleId))
             assertEquals(false, owner.alertDao().getRule(ruleId)?.enabled)

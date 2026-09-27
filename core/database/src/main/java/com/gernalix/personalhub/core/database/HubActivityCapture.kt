@@ -196,7 +196,7 @@ object HubActivityCapture {
         createInternalTables(db)
         rowSpecs.forEach { spec -> if (tableExists(db, spec.table)) installRowSpec(db, spec, appVersion) }
         if (tableExists(db, "contact_events")) installPeopleBridge(db, appVersion)
-        if (tableExists(db, "audit_events")) installTimerBridge(db, appVersion)
+        if (tableExists(db, "alert_rules") && tableExists(db, "alert_firings")) installAlertsBridge(db, appVersion)
         if (tableExists(db, "history_audit_log")) installPlacesBridge(db, appVersion)
     }
 
@@ -210,8 +210,11 @@ object HubActivityCapture {
         listOf(
             "hub_activity_bridge_people",
             "hub_activity_people_creation_label",
-            "hub_activity_bridge_timer",
             "hub_activity_bridge_places",
+            "hub_activity_alert_rule_insert",
+            "hub_activity_alert_rule_update",
+            "hub_activity_alert_rule_delete",
+            "hub_activity_alert_firing_insert",
         ).forEach { trigger ->
             db.execSQL("DROP TRIGGER IF EXISTS `" + trigger + "`")
         }
@@ -367,34 +370,88 @@ object HubActivityCapture {
         )
     }
 
-    private fun installTimerBridge(db: SupportSQLiteDatabase, appVersion: Long) {
-        db.execSQL("DROP TRIGGER IF EXISTS `hub_activity_bridge_timer`")
-        db.execSQL(
-            """
-            CREATE TRIGGER `hub_activity_bridge_timer` AFTER INSERT ON `audit_events`
-            BEGIN
-                ${insertSql(
-                    appVersion,
-                    "timer",
-                    "lower(NEW.action)",
-                    null,
-                    "CASE WHEN NEW.entity_id IS NULL THEN NULL ELSE CAST(NEW.entity_id AS TEXT) END",
-                    "NULLIF(NEW.summary,'')",
-                    "NEW.entity_type",
-                    "NEW.payload_json",
-                    "CASE WHEN NEW.is_system=1 THEN 'system' ELSE 'user' END",
-                    "NEW.is_system",
-                    "audit_events",
-                    "CAST(NEW.id AS TEXT)",
-                    HubActivityPayloadKind.TIMER_AUDIT_V1,
-                    null,
-                    "NULL",
-                    "NEW.payload_json",
-                    "0",
-                )}
-            END
-            """.trimIndent(),
+    private fun installAlertsBridge(db: SupportSQLiteDatabase, appVersion: Long) {
+        fun activity(
+            domainSql: String,
+            actionSql: String,
+            entityIdSql: String,
+            entityLabelSql: String,
+            detailValueSql: String,
+            sourceTable: String,
+            sourceRowKeySql: String,
+            systemSql: String,
+            origin: String,
+        ): String = insertSql(
+            appVersion = appVersion,
+            moduleId = "__dynamic_alert_domain__",
+            actionSql = actionSql,
+            entityKind = "alert",
+            entityIdSql = entityIdSql,
+            entityLabelSql = entityLabelSql,
+            detailKeySql = "'event'",
+            detailValueSql = detailValueSql,
+            origin = origin,
+            systemSql = systemSql,
+            sourceTable = sourceTable,
+            sourceRowKeySql = sourceRowKeySql,
+            payloadKind = null,
+            payloadColumns = null,
+            beforePayloadSql = "NULL",
+            afterPayloadSql = "NULL",
+            reversibleSql = "0",
+        ).replace(sqlString("__dynamic_alert_domain__"), domainSql)
+
+        val ruleJsonNew =
+            "json_object('trigger',NEW.trigger,'target_kind',NEW.target_kind,'match_mode',NEW.match_mode,'scope',NEW.scope,'enabled',NEW.enabled,'message',NEW.message)"
+        val ruleJsonOld =
+            "json_object('trigger',OLD.trigger,'target_kind',OLD.target_kind,'match_mode',OLD.match_mode,'scope',OLD.scope,'enabled',OLD.enabled,'message',OLD.message)"
+        val firingJson =
+            "json_object('trigger',NEW.trigger,'tag_names',NEW.tag_names,'delivery',NEW.delivery,'message',NEW.message,'entity_label',NEW.entity_label)"
+
+        listOf(
+            "hub_activity_alert_rule_insert",
+            "hub_activity_alert_rule_update",
+            "hub_activity_alert_rule_delete",
+            "hub_activity_alert_firing_insert",
+        ).forEach { db.execSQL("DROP TRIGGER IF EXISTS `" + it + "`") }
+
+        val insertRule = activity(
+            "NEW.domain", "'alert_created'", "NEW.id", "NULLIF(NEW.message,'')",
+            ruleJsonNew, "alert_rules", "NEW.id", "0", "user",
         )
+        db.execSQL("""CREATE TRIGGER `hub_activity_alert_rule_insert` AFTER INSERT ON `alert_rules`
+            BEGIN
+            $insertRule
+            END""".trimIndent())
+
+        val updateRule = activity(
+            "NEW.domain",
+            "CASE WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN 'alert_deleted' WHEN OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN 'alert_restored' ELSE 'alert_updated' END",
+            "NEW.id", "NULLIF(NEW.message,'')", ruleJsonNew, "alert_rules", "NEW.id", "0", "user",
+        )
+        db.execSQL("""CREATE TRIGGER `hub_activity_alert_rule_update` AFTER UPDATE ON `alert_rules`
+            BEGIN
+            $updateRule
+            END""".trimIndent())
+
+        val deleteRule = activity(
+            "OLD.domain", "'alert_deleted'", "OLD.id", "NULLIF(OLD.message,'')",
+            ruleJsonOld, "alert_rules", "OLD.id", "0", "user",
+        )
+        db.execSQL("""CREATE TRIGGER `hub_activity_alert_rule_delete` BEFORE DELETE ON `alert_rules`
+            BEGIN
+            $deleteRule
+            END""".trimIndent())
+
+        val fire = activity(
+            "NEW.domain", "'alert_fired'", "NEW.rule_id",
+            "COALESCE(NULLIF(NEW.entity_label,''),NULLIF(NEW.message,''))",
+            firingJson, "alert_firings", "NEW.id", "1", "system",
+        )
+        db.execSQL("""CREATE TRIGGER `hub_activity_alert_firing_insert` AFTER INSERT ON `alert_firings`
+            BEGIN
+            $fire
+            END""".trimIndent())
     }
 
     private fun installPlacesBridge(db: SupportSQLiteDatabase, appVersion: Long) {

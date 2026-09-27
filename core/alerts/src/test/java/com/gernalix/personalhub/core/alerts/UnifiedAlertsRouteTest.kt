@@ -15,12 +15,12 @@ class UnifiedAlertsRouteTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test fun homeTimerAndPlacesUseOneAlertsRoute() {
-        assertEquals(UnifiedAlertsRoute.Request(UnifiedAlertsRoute.Filter.ALL),
+        assertEquals(UnifiedAlertsRoute.Request(null),
             UnifiedAlertsRoute.parse(UnifiedAlertsRoute.intent(context)))
-        assertEquals(UnifiedAlertsRoute.Request(UnifiedAlertsRoute.Filter.TIMER),
-            UnifiedAlertsRoute.parse(UnifiedAlertsRoute.intent(context, UnifiedAlertsRoute.Filter.TIMER)))
-        assertEquals(UnifiedAlertsRoute.Request(UnifiedAlertsRoute.Filter.PLACES, "place-1"),
-            UnifiedAlertsRoute.parse(UnifiedAlertsRoute.intent(context, UnifiedAlertsRoute.Filter.PLACES, "place-1")))
+        assertEquals(UnifiedAlertsRoute.Request(AlertDomain.TIMER),
+            UnifiedAlertsRoute.parse(UnifiedAlertsRoute.intent(context, AlertDomain.TIMER)))
+        assertEquals(UnifiedAlertsRoute.Request(AlertDomain.PLACE, "place-1"),
+            UnifiedAlertsRoute.parse(UnifiedAlertsRoute.intent(context, AlertDomain.PLACE, "place-1")))
     }
 
     @Test fun unrelatedTimerDeepLinksDoNotOpenAlerts() {

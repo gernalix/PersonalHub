@@ -162,7 +162,7 @@ fun HubHistorySearchScreen(
             val rows = withContext(Dispatchers.IO) { GitHistory.recentForDisplay(context.applicationContext, limit = 1000) }
             val humanized = groupGitHistoryRows(rows).filter(::displayableGitHistoryGroup).map { group ->
                 val (item, text) = humanizeGitHistoryGroup(group) { module -> moduleDisplayName(context, module) }
-                val moduleId = gitHistoryModule(item.table)
+                val moduleId = gitHistoryModule(item)
                 ActivityUiItem(
                     id = item.groupId ?: item.id,
                     occurredAt = item.occurredAt,

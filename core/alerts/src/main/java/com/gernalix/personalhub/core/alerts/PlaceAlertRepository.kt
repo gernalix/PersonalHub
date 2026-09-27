@@ -1,7 +1,7 @@
 package com.gernalix.personalhub.core.alerts
 
 import android.content.Context
-import com.gernalix.personalhub.alerts.AlertPlaceTagTargetEntity
+import com.gernalix.personalhub.alerts.AlertRuleTargetEntity
 import com.gernalix.personalhub.alerts.AlertRuleEntity
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.flow.Flow
@@ -13,9 +13,9 @@ class PlaceAlertRepository(
 ) {
     private val dao = database.alertDao()
 
-    fun observeRules(): Flow<List<AlertRuleEntity>> = dao.observeRules(AlertDomain.PLACE.name)
+    fun observeRules(): Flow<List<AlertRuleEntity>> = dao.observeRules(AlertDomain.PLACE.moduleId)
 
-    suspend fun listRules(): List<AlertRuleEntity> = dao.listRules(AlertDomain.PLACE.name)
+    suspend fun listRules(): List<AlertRuleEntity> = dao.listRules(AlertDomain.PLACE.moduleId)
 
     suspend fun create(draft: PlaceAlertDraft): String {
         validate(draft)
@@ -24,7 +24,7 @@ class PlaceAlertRepository(
         dao.upsertRule(
             AlertRuleEntity(
                 id = id,
-                domain = AlertDomain.PLACE.name,
+                domain = AlertDomain.PLACE.moduleId,
                 trigger = draft.trigger.name,
                 targetKind = draft.targetKind.name,
                 entityId = draft.placeId?.takeIf { draft.targetKind == AlertTargetKind.ENTITY },
@@ -37,11 +37,11 @@ class PlaceAlertRepository(
                 updatedAt = now,
             )
         )
-        dao.clearPlaceTagTargets(id)
+        dao.clearTargets(id)
         if (draft.targetKind == AlertTargetKind.TAGS) {
-            dao.insertPlaceTagTargets(
+            dao.insertTargets(
                 draft.placeTagIds.sorted().map { tagId ->
-                    AlertPlaceTagTargetEntity(ruleId = id, placeTagId = tagId)
+                    AlertRuleTargetEntity(ruleId = id, targetId = tagId)
                 }
             )
         }
@@ -51,7 +51,7 @@ class PlaceAlertRepository(
     suspend fun update(ruleId: String, draft: PlaceAlertDraft): Boolean {
         validate(draft)
         val existing = dao.getRule(ruleId) ?: return false
-        if (existing.domain != AlertDomain.PLACE.name) return false
+        if (existing.domain != AlertDomain.PLACE.moduleId) return false
         dao.upsertRule(
             existing.copy(
                 trigger = draft.trigger.name,
@@ -65,11 +65,11 @@ class PlaceAlertRepository(
                 updatedAt = System.currentTimeMillis(),
             )
         )
-        dao.clearPlaceTagTargets(ruleId)
+        dao.clearTargets(ruleId)
         if (draft.targetKind == AlertTargetKind.TAGS) {
-            dao.insertPlaceTagTargets(
+            dao.insertTargets(
                 draft.placeTagIds.sorted().map { tagId ->
-                    AlertPlaceTagTargetEntity(ruleId = ruleId, placeTagId = tagId)
+                    AlertRuleTargetEntity(ruleId = ruleId, targetId = tagId)
                 }
             )
         }
@@ -82,11 +82,11 @@ class PlaceAlertRepository(
     suspend fun delete(ruleId: String): Boolean =
         dao.softDelete(ruleId, System.currentTimeMillis()) > 0
 
-    suspend fun placeTagTargets(ruleIds: List<String>): Map<String, Set<String>> {
+    suspend fun targets(ruleIds: List<String>): Map<String, Set<String>> {
         if (ruleIds.isEmpty()) return emptyMap()
-        return dao.placeTagTargets(ruleIds)
+        return dao.targets(ruleIds)
             .groupBy { it.ruleId }
-            .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.placeTagId } }
+            .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.targetId } }
     }
 
     private fun validate(draft: PlaceAlertDraft) {

@@ -35,7 +35,6 @@ object SnapshotSqlite {
     private const val MAX_AUDIT_EVENT_ROWS = 1500
     private const val MIN_VACUUM_RECLAIM_BYTES = 8L * 1024L * 1024L
 
-    internal const val AUDIT_TABLE = "audit_events"
 
     // Session-only scaffolding (not yet used by the app logic).
     internal const val SESSIONS_TABLE = "sessions"
@@ -146,21 +145,6 @@ object SnapshotSqlite {
         ensureSnapshotHistorySchema(db)
         db.execSQL(
             """
-            CREATE TABLE IF NOT EXISTS $AUDIT_TABLE (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              ts_ms INTEGER NOT NULL,
-              is_system INTEGER NOT NULL DEFAULT 0,
-              action TEXT NOT NULL,
-              entity_type TEXT,
-              entity_id INTEGER,
-              summary TEXT NOT NULL,
-              payload_json TEXT,
-              undone_at_ms INTEGER
-            );
-            """.trimIndent()
-        )
-        db.execSQL(
-            """
             CREATE TABLE IF NOT EXISTS ui_prefs_mirror (
               id INTEGER PRIMARY KEY CHECK(id = 1),
               json TEXT NOT NULL,
@@ -169,7 +153,6 @@ object SnapshotSqlite {
             """.trimIndent()
         )
         IntegrityStatsSqlite.ensureTable(db)
-        createAuditIndexes(db)
         createQuickEventSchema(db)
         createExportUtcViews(db)
     }
@@ -179,13 +162,6 @@ object SnapshotSqlite {
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SESSIONS_TABLE}_running ON $SESSIONS_TABLE(deleted_at_ms, end_ms, start_ms DESC);")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SESSIONS_TABLE}_updated ON $SESSIONS_TABLE(updated_at_ms DESC, id DESC);")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_${SESSIONS_TABLE}_visible_id ON $SESSIONS_TABLE(deleted_at_ms, id DESC);")
-    }
-
-    private fun createAuditIndexes(db: SQLiteDatabase) {
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_${AUDIT_TABLE}_ts ON $AUDIT_TABLE(ts_ms DESC, id DESC);")
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_${AUDIT_TABLE}_action_ts ON $AUDIT_TABLE(action, ts_ms DESC);")
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_${AUDIT_TABLE}_visible_id ON $AUDIT_TABLE(is_system, undone_at_ms, id DESC);")
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_${AUDIT_TABLE}_entity_undo_id ON $AUDIT_TABLE(entity_type, entity_id, undone_at_ms, id DESC);")
     }
 
     internal fun createQuickEventSchema(db: SQLiteDatabase) {
@@ -223,15 +199,6 @@ object SnapshotSqlite {
             CREATE VIEW IF NOT EXISTS export_snapshot_payloads_utc_z AS
             SELECT id, hash, json, created_at_ms, ${utc("created_at_ms", "created_at_utc_z")}, size_bytes
             FROM snapshot_payloads;
-            """.trimIndent()
-        )
-        create(
-            """
-            CREATE VIEW IF NOT EXISTS export_audit_events_utc_z AS
-            SELECT id, ts_ms, ${utc("ts_ms", "ts_utc_z")},
-                   is_system, action, entity_type, entity_id, summary, payload_json,
-                   undone_at_ms, ${utc("undone_at_ms", "undone_at_utc_z")}
-            FROM audit_events;
             """.trimIndent()
         )
         create(
@@ -622,9 +589,8 @@ object SnapshotSqlite {
 
             val hadSnapshot = hasTable(TABLE)
             val hadHistory = hasTable(HISTORY_TABLE)
-            val hadAudit = hasTable(AUDIT_TABLE)
             val hadUiPrefsMirror = hasTable("ui_prefs_mirror")
-            if (!hadSnapshot || !hadHistory || !hadAudit || !hadUiPrefsMirror) changed = true
+            if (!hadSnapshot || !hadHistory || !hadUiPrefsMirror) changed = true
             createBaseSchema(db)
             db.setTransactionSuccessful()
         } finally {
@@ -738,7 +704,6 @@ object SnapshotSqlite {
             )
             if (sessionRuntimeIndexes.any { !hasIndex(it) }) changed = true
             createSessionIndexes(db)
-            createAuditIndexes(db)
 
             // v317 DATA HARDENING:
             // Some older DBs may have a session_tags table without the composite PRIMARY KEY.
@@ -1133,11 +1098,9 @@ object SnapshotSqlite {
         var changed = false
         try {
             ensureSnapshotHistorySchema(db)
-            createAuditIndexes(db)
             db.beginTransaction()
             try {
                 changed = trimSnapshotHistoryLocked(db) || changed
-                changed = trimAuditEventsLocked(db) || changed
                 changed = deleteOrphanSnapshotPayloadsLocked(db) || changed
                 db.setTransactionSuccessful()
             } finally {
@@ -1179,19 +1142,6 @@ object SnapshotSqlite {
 
         val deleted = db.delete(HISTORY_TABLE, "id < ?", arrayOf(boundaryId.toString()))
         return deleted > 0
-    }
-
-    private fun trimAuditEventsLocked(db: SQLiteDatabase): Boolean {
-        val total = db.rawQuery("SELECT COUNT(*) FROM $AUDIT_TABLE", emptyArray()).use { c ->
-            if (c.moveToFirst()) c.getLong(0) else 0L
-        }
-        if (total <= MAX_AUDIT_EVENT_ROWS) return false
-
-        val cutoffId = db.rawQuery(
-            "SELECT id FROM $AUDIT_TABLE ORDER BY id DESC LIMIT 1 OFFSET ${MAX_AUDIT_EVENT_ROWS - 1}",
-            emptyArray()
-        ).use { c -> if (c.moveToFirst()) c.getLong(0) else null } ?: return false
-        return db.delete(AUDIT_TABLE, "id < ?", arrayOf(cutoffId.toString())) > 0
     }
 
     private fun deleteOrphanSnapshotPayloadsLocked(db: SQLiteDatabase): Boolean {

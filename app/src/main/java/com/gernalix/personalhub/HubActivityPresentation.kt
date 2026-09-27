@@ -87,7 +87,7 @@ internal fun humanizeGitHistoryGroup(
         row.table in setOf("hub_resources", "hub_contexts") &&
             listOf(row.displayBefore, row.displayAfter).any { it?.contains("workflowy", ignoreCase = true) == true }
     }
-    val parts = semantic.map { humanizeGitHistory(it, moduleLabel(gitHistoryModule(it.table))) }
+    val parts = semantic.map { humanizeGitHistory(it, moduleLabel(gitHistoryModule(it))) }
     val title = if (workflowy) {
         if (group.any { it.operation.equals("INSERT", true) }) "Linked Workflowy node"
         else "Removed Workflowy link"
@@ -380,7 +380,7 @@ private val GIT_PEOPLE_TABLES = setOf(
 private val GIT_PLACES_TABLES = setOf(
     "places", "place_aliases", "place_links", "place_events", "check_in_attempts",
     "check_in_attempt_candidates", "place_geofence_configs", "place_geofence_transition_log",
-    "place_tags", "place_tag_cross_ref", "alert_rules", "alert_place_tag_targets",
+    "place_tags", "place_tag_cross_ref",
     "history_audit_log", "history_actions", "global_stats_state", "route_distance_cache",
 )
 
@@ -397,13 +397,15 @@ private val GIT_TIMER_TABLES = setOf(
     "sessions", "session_tags", "quick_event_entries", "quick_event_entry_field_values",
     "quick_event_entry_tags", "quick_event_macro_actions", "quick_event_macro_tags",
     "quick_event_macros", "quick_event_template_fields", "quick_event_template_tags",
-    "quick_event_templates", "audit_events", "integrity_stats", "snapshot", "snapshot_history",
+    "quick_event_templates", "integrity_stats", "snapshot", "snapshot_history",
     "snapshot_payloads", "ui_prefs_mirror",
 )
 
 private val GIT_TAG_TABLES = setOf(
     "hub_tags", "hub_tag_aliases", "hub_tag_assignments", "hub_tag_parents", "hub_saved_tag_filters",
 )
+
+private val GIT_ALERT_TABLES = setOf("alert_rules", "alert_rule_targets", "alert_firings")
 
 internal fun gitHistoryModule(table: String): String = when {
     table.startsWith("finance_") -> "soldi"
@@ -414,6 +416,17 @@ internal fun gitHistoryModule(table: String): String = when {
     table in GIT_TIMER_TABLES -> "timer"
     table in GIT_TAG_TABLES -> "tags"
     else -> "hub"
+}
+
+internal fun gitHistoryModule(
+    item: com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem,
+): String {
+    if (item.table in GIT_ALERT_TABLES) {
+        val payload = item.displayAfter ?: item.displayBefore
+        val domain = runCatching { JSONObject(payload.orEmpty()).optString("domain") }.getOrNull()
+        if (!domain.isNullOrBlank()) return domain
+    }
+    return gitHistoryModule(item.table)
 }
 
 internal val GIT_HISTORY_ENTITY_TYPES = mapOf(
@@ -453,7 +466,6 @@ internal val GIT_HISTORY_ENTITY_TYPES = mapOf(
     "place_tags" to "place tag",
     "place_tag_cross_ref" to "place-tag link",
     "alert_rules" to "alert",
-    "alert_place_tag_targets" to "place alert target",
     "substances" to "substance",
     "intake_events" to "intake",
     "stock_adjustments" to "stock adjustment",
@@ -492,8 +504,10 @@ internal val GIT_HISTORY_ENTITY_TYPES = mapOf(
     "hub_tag_parents" to "tag hierarchy link",
     "hub_saved_tag_filters" to "saved tag filter",
     "hub_resources" to "resource",
+    "alert_rules" to "alert",
+    "alert_rule_targets" to "alert target",
+    "alert_firings" to "alert firing",
     "since_when_counters" to "counter",
-    "audit_events" to "timer audit event",
     "history_audit_log" to "place audit event",
     "history_actions" to "history action",
     "hub_activity_log" to "activity event",
@@ -537,7 +551,37 @@ internal fun humanizeGitHistory(
 ): HumanActivityText {
     val before = runCatching { JSONObject(item.displayBefore.orEmpty()) }.getOrNull()
     val after = runCatching { JSONObject(item.displayAfter.orEmpty()) }.getOrNull()
-    val objectName = listOf("name", "nickname", "title", "label", "display_name", "alias", "text", "query", "summary")
+    if (item.table == "alert_firings") {
+        val data = after ?: before ?: JSONObject()
+        val domain = data.optString("domain").takeIf(String::isNotBlank) ?: moduleLabel.lowercase(Locale.ROOT)
+        val domainLabel = when (domain) {
+            "timer" -> "Timer"
+            "places" -> "Places"
+            "substances" -> "Substances"
+            else -> domain.replaceFirstChar(Char::uppercase)
+        }
+        val trigger = when (data.optString("trigger")) {
+            "TIMER_START" -> "session started"
+            "TIMER_STOP" -> "session stopped"
+            "PLACE_CHECK_IN" -> "check-in"
+            "PLACE_CHECK_OUT" -> "check-out"
+            "PLACE_BOTH" -> "check-in/out"
+            else -> "event"
+        }
+        val entity = cleanHumanValue(data.optString("entity_label"))
+        val tags = cleanHumanValue(data.optString("tag_names"))
+        val delivery = cleanHumanValue(data.optString("delivery"))
+        val message = cleanHumanValue(data.optString("message"))
+        val subject = entity?.let { " · " + it }.orEmpty()
+        val title = "Alert fired · " + domainLabel + " · " + trigger + subject
+        val detail = listOfNotNull(
+            tags?.let { "Tags: " + it },
+            delivery?.let { "Delivery: " + it.replace('_', ' ') },
+            message?.let { "Message: " + it },
+        ).joinToString("\n").takeIf(String::isNotBlank)
+        return HumanActivityText(title, detail, listOfNotNull(title, detail).joinToString(" "))
+    }
+    val objectName = listOf("name", "nickname", "title", "label", "display_name", "alias", "text", "query", "summary", "message")
         .firstNotNullOfOrNull { key -> cleanHumanValue(after?.optString(key)) ?: cleanHumanValue(before?.optString(key)) }
     val type = gitHistoryEntityType(item.table)
     val changes = item.changedColumns.split(',').mapNotNull { key ->

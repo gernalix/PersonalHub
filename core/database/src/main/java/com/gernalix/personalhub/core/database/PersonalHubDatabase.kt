@@ -55,7 +55,8 @@ import java.security.MessageDigest
     com.gernalix.luoghi.data.PlaceTagEntity::class,
     com.gernalix.luoghi.data.PlaceTagCrossRef::class,
     com.gernalix.personalhub.alerts.AlertRuleEntity::class,
-    com.gernalix.personalhub.alerts.AlertPlaceTagTargetEntity::class,
+    com.gernalix.personalhub.alerts.AlertRuleTargetEntity::class,
+    com.gernalix.personalhub.alerts.AlertFiringEntity::class,
     com.gernalix.sostanze.data.SubstanceEntity::class,
     com.gernalix.sostanze.data.IntakeEventEntity::class,
     com.gernalix.sostanze.data.StockAdjustmentEntity::class,
@@ -71,7 +72,6 @@ import java.security.MessageDigest
     com.wordpulse.app.data.WordEntry::class,
     com.wordpulse.app.data.WordSession::class,
     com.wordpulse.app.data.PvtResultEntity::class,
-    com.gernalix.personalhub.core.database.TimerAuditEvents::class,
     com.gernalix.personalhub.core.database.TimerIntegrityStats::class,
     com.gernalix.personalhub.core.database.TimerQuickEventEntries::class,
     com.gernalix.personalhub.core.database.TimerQuickEventEntryFieldValues::class,
@@ -98,7 +98,7 @@ import java.security.MessageDigest
     SinceWhenCounterEntity::class,
     SinceWhenMigrationState::class,
 
-], version = 23, exportSchema = true)
+], version = 24, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -119,7 +119,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 23
+        const val SCHEMA_VERSION = 24
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -152,6 +152,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
             return Room.databaseBuilder(context, PersonalHubDatabase::class.java, name)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
+                .addMigrations(PersonalHubDatabaseMigrations.MIGRATION_23_24)
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         val appVersion = runCatching {

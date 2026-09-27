@@ -7,6 +7,9 @@ import com.example.multitimetracker.capsules.alerts.core.buildLegacyTimerAlertCl
 import com.example.multitimetracker.capsules.alerts.core.executeLegacyTimerAlertCleanup
 import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.persistence.SnapshotStore
+import com.example.multitimetracker.capsules.alerts.core.TimerAlertRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 
 class TimeFenceRestoreReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -21,13 +24,14 @@ class TimeFenceRestoreReceiver : BroadcastReceiver() {
     fun restoreActiveProfile(context: Context) {
         val appContext = context.applicationContext
         val snapshot = SnapshotStore.load(appContext) ?: return
+        val rules = runBlocking(Dispatchers.IO) { TimerAlertRepository(appContext).live() }
         val runningSessions = runCatching {
             DefaultSessionCore(appContext).readRunningSessions()
         }.getOrDefault(emptyList())
         executeLegacyTimerAlertCleanup(
             context = appContext,
             cleanup = buildLegacyTimerAlertCleanup(
-                rules = snapshot.timeFenceRules,
+                rules = rules,
                 sessions = runningSessions,
             ),
         )
@@ -36,7 +40,7 @@ class TimeFenceRestoreReceiver : BroadcastReceiver() {
             tags = snapshot.tags,
             nowMs = System.currentTimeMillis(),
         )
-        snapshot.timeFenceRules
+        rules
             .filter { it.isEnabled && !it.isDeleted && it.randomAlertsEnabled }
             .forEach { rule ->
                 val identity = rule.randomAlertIdentity.ifBlank { "timer-alert-${rule.id}" }
