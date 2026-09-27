@@ -52,9 +52,9 @@ internal fun historyDayLabel(
     val date = Instant.ofEpochMilli(epochMs).atZone(zoneId).toLocalDate()
     val today = Instant.ofEpochMilli(todayMs).atZone(zoneId).toLocalDate()
     return when (date) {
-        today -> if (locale.language == "it") "Oggi" else "Today"
-        today.minusDays(1) -> if (locale.language == "it") "Ieri" else "Yesterday"
-        else -> DateTimeFormatter.ofPattern("d MMM yyyy", locale).format(date)
+        today -> "Today"
+        today.minusDays(1) -> "Yesterday"
+        else -> DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH).format(date)
     }
 }
 
@@ -372,17 +372,163 @@ internal fun humanFieldLabel(raw: String?): String? {
 }
 
 
+private val GIT_PEOPLE_TABLES = setOf(
+    "contacts", "contact_fields", "contact_events", "contact_initiatives", "contact_messaging_links",
+    "saved_searches", "saved_search_tags", "tags", "contact_tags", "people_photos",
+)
+
+private val GIT_PLACES_TABLES = setOf(
+    "places", "place_aliases", "place_links", "place_events", "check_in_attempts",
+    "check_in_attempt_candidates", "place_geofence_configs", "place_geofence_transition_log",
+    "place_tags", "place_tag_cross_ref", "alert_rules", "alert_place_tag_targets",
+    "history_audit_log", "history_actions", "global_stats_state", "route_distance_cache",
+)
+
+private val GIT_SUBSTANCES_TABLES = setOf(
+    "substances", "intake_events", "stock_adjustments", "prescriptions", "interaction_rules",
+    "interaction_targets", "settings", "macros", "macro_items", "notification_state",
+)
+
+private val GIT_WORDPULSE_TABLES = setOf(
+    "app_state", "correction_events", "word_entries", "wordpulse_sessions", "pvt_results",
+)
+
+private val GIT_TIMER_TABLES = setOf(
+    "sessions", "session_tags", "quick_event_entries", "quick_event_entry_field_values",
+    "quick_event_entry_tags", "quick_event_macro_actions", "quick_event_macro_tags",
+    "quick_event_macros", "quick_event_template_fields", "quick_event_template_tags",
+    "quick_event_templates", "audit_events", "integrity_stats", "snapshot", "snapshot_history",
+    "snapshot_payloads", "ui_prefs_mirror",
+)
+
+private val GIT_TAG_TABLES = setOf(
+    "hub_tags", "hub_tag_aliases", "hub_tag_assignments", "hub_tag_parents", "hub_saved_tag_filters",
+)
+
 internal fun gitHistoryModule(table: String): String = when {
     table.startsWith("finance_") -> "soldi"
-    table.startsWith("wordpulse_") -> "wordpulse"
-    table == "contacts" || table.startsWith("contact_") || table.startsWith("people_") -> "people"
-    table.startsWith("timer_") || table.startsWith("time_") || table.startsWith("session") ||
-        table == "audit_events" -> "timer"
-    table.startsWith("place") || table.startsWith("route_") || table.startsWith("visit_") -> "places"
-    table.startsWith("substance") || table.startsWith("intake_") || table.startsWith("stock_") ||
-        table.startsWith("prescription") || table.startsWith("macro") -> "substances"
-    table.startsWith("hub_tag") -> "tags"
+    table in GIT_PEOPLE_TABLES -> "people"
+    table in GIT_PLACES_TABLES -> "places"
+    table in GIT_SUBSTANCES_TABLES -> "substances"
+    table in GIT_WORDPULSE_TABLES -> "wordpulse"
+    table in GIT_TIMER_TABLES -> "timer"
+    table in GIT_TAG_TABLES -> "tags"
     else -> "hub"
+}
+
+internal val GIT_HISTORY_ENTITY_TYPES = mapOf(
+    "finance_accounts" to "account",
+    "finance_products" to "product",
+    "finance_titles" to "title",
+    "finance_chains" to "chain",
+    "finance_stores" to "store",
+    "finance_transactions" to "transaction",
+    "finance_tags" to "finance tag",
+    "finance_transaction_tags" to "transaction tag",
+    "finance_transfers" to "transfer",
+    "finance_macros" to "finance macro",
+    "finance_recurrences" to "recurrence",
+    "finance_recurrence_tags" to "recurrence tag",
+    "finance_recurrence_overrides" to "recurrence override",
+    "finance_attachments" to "attachment",
+    "finance_photo_index" to "photo",
+    "finance_owned_items" to "owned item",
+    "contacts" to "person",
+    "contact_fields" to "person field",
+    "contact_events" to "person event",
+    "contact_initiatives" to "initiative",
+    "contact_messaging_links" to "messaging link",
+    "saved_searches" to "saved search",
+    "saved_search_tags" to "saved-search tag",
+    "tags" to "person tag",
+    "contact_tags" to "person tag",
+    "places" to "place",
+    "place_aliases" to "place alias",
+    "place_links" to "place link",
+    "place_events" to "visit",
+    "check_in_attempts" to "check-in attempt",
+    "check_in_attempt_candidates" to "check-in candidate",
+    "place_geofence_configs" to "geofence",
+    "place_geofence_transition_log" to "geofence transition",
+    "place_tags" to "place tag",
+    "place_tag_cross_ref" to "place-tag link",
+    "alert_rules" to "alert",
+    "alert_place_tag_targets" to "place alert target",
+    "substances" to "substance",
+    "intake_events" to "intake",
+    "stock_adjustments" to "stock adjustment",
+    "prescriptions" to "prescription",
+    "interaction_rules" to "interaction rule",
+    "interaction_targets" to "interaction target",
+    "settings" to "substance setting",
+    "macros" to "substance macro",
+    "macro_items" to "macro item",
+    "app_state" to "WordPulse state",
+    "correction_events" to "correction",
+    "word_entries" to "word entry",
+    "wordpulse_sessions" to "typing session",
+    "pvt_results" to "reaction test",
+    "quick_event_entries" to "quick event",
+    "quick_event_entry_field_values" to "quick-event field",
+    "quick_event_entry_tags" to "quick-event tag",
+    "quick_event_macro_actions" to "quick-event macro action",
+    "quick_event_macro_tags" to "quick-event macro tag",
+    "quick_event_macros" to "quick-event macro",
+    "quick_event_template_fields" to "quick-event template field",
+    "quick_event_template_tags" to "quick-event template tag",
+    "quick_event_templates" to "quick-event template",
+    "session_tags" to "session tag",
+    "sessions" to "session",
+    "people_photos" to "person photo",
+    "hub_preferences" to "preference",
+    "hub_entity_bindings" to "entity link",
+    "hub_context_types" to "context type",
+    "hub_context_type_fields" to "context field",
+    "hub_contexts" to "context",
+    "hub_context_members" to "context member",
+    "hub_tags" to "tag",
+    "hub_tag_aliases" to "tag alias",
+    "hub_tag_assignments" to "tag assignment",
+    "hub_tag_parents" to "tag hierarchy link",
+    "hub_saved_tag_filters" to "saved tag filter",
+    "hub_resources" to "resource",
+    "since_when_counters" to "counter",
+    "audit_events" to "timer audit event",
+    "history_audit_log" to "place audit event",
+    "history_actions" to "history action",
+    "hub_activity_log" to "activity event",
+    "snapshot" to "timer snapshot",
+    "snapshot_history" to "timer snapshot history",
+    "snapshot_payloads" to "timer snapshot payload",
+    "integrity_stats" to "timer integrity state",
+    "ui_prefs_mirror" to "timer preference",
+    "backup_metadata" to "backup metadata",
+    "global_stats_state" to "place statistics state",
+    "route_distance_cache" to "route distance",
+    "notification_state" to "notification state",
+)
+
+internal fun gitHistoryEntityType(table: String): String =
+    GIT_HISTORY_ENTITY_TYPES[table] ?: humanizeAuditTableName(table)
+
+private fun humanizeAuditTableName(table: String): String {
+    val stripped = table
+        .removePrefix("finance_")
+        .removePrefix("wordpulse_")
+        .removePrefix("contact_")
+        .removePrefix("place_")
+        .removePrefix("quick_event_")
+        .removePrefix("hub_")
+    val words = stripped.split('_').filter(String::isNotBlank).toMutableList()
+    if (words.isEmpty()) return "item"
+    val last = words.last()
+    words[words.lastIndex] = when {
+        last.endsWith("ies") && last.length > 3 -> last.dropLast(3) + "y"
+        last.endsWith("ses") && last.length > 3 -> last.dropLast(2)
+        last.endsWith("s") && !last.endsWith("ss") && last.length > 1 -> last.dropLast(1)
+        else -> last
+    }
+    return words.joinToString(" ")
 }
 
 internal fun humanizeGitHistory(
@@ -391,22 +537,9 @@ internal fun humanizeGitHistory(
 ): HumanActivityText {
     val before = runCatching { JSONObject(item.displayBefore.orEmpty()) }.getOrNull()
     val after = runCatching { JSONObject(item.displayAfter.orEmpty()) }.getOrNull()
-    val objectName = listOf("name", "nickname", "title", "label")
+    val objectName = listOf("name", "nickname", "title", "label", "display_name", "alias", "text", "query", "summary")
         .firstNotNullOfOrNull { key -> cleanHumanValue(after?.optString(key)) ?: cleanHumanValue(before?.optString(key)) }
-    val type = when (item.table) {
-        "places" -> "place"
-        "finance_accounts" -> "account"
-        "finance_transactions" -> "transaction"
-        "intake_events" -> "intake"
-        "stock_adjustments" -> "stock adjustment"
-        "contact_events" -> "person event"
-        "contacts" -> "person"
-        "substances" -> "substance"
-        "prescriptions" -> "prescription"
-        "sessions" -> "session"
-        "hub_tags" -> "tag"
-        else -> "item"
-    }
+    val type = gitHistoryEntityType(item.table)
     val changes = item.changedColumns.split(',').mapNotNull { key ->
         val label = humanFieldLabel(key) ?: return@mapNotNull null
         val oldValue = cleanHumanValue(before?.opt(key)?.takeUnless { it == JSONObject.NULL }?.toString())
