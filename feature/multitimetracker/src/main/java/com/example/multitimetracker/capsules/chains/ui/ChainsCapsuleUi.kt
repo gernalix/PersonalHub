@@ -395,12 +395,11 @@ private fun StepEditorDialog(
 
                 Text(text = stringResource(R.string.chain_step_tags), style = MaterialTheme.typography.titleSmall)
 
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text(stringResource(R.string.cerca_tag)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = stringResource(R.string.cerca_tag),
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)) {

@@ -302,12 +302,11 @@ fun HubHistorySearchScreen(
                     }
                 }
 
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth().testTag("history-query"),
-                    label = { Text(stringResource(R.string.activity_search_hint)) },
-                    singleLine = true,
+                    label = stringResource(R.string.activity_search_hint),
                 )
 
                 if (filtersDirty) {

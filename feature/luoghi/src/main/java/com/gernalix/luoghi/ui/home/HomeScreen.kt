@@ -252,19 +252,17 @@ private fun CheckInDiagnosticsContent(attempts: List<CheckInAttemptDiagnostic>) 
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = outcomeFilter,
                     onValueChange = { outcomeFilter = it },
                     modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.checkin_diagnostics_outcome_filter)) },
+                    label = stringResource(R.string.checkin_diagnostics_outcome_filter),
                 )
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = placeFilter,
                     onValueChange = { placeFilter = it },
                     modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.checkin_diagnostics_place_filter)) },
+                    label = stringResource(R.string.checkin_diagnostics_place_filter),
                 )
             }
         filteredAttempts.take(5).forEach { diagnostic ->

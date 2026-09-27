@@ -668,22 +668,13 @@ private fun SessionTagPickerDialog(
                     }
                 }
 
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = query,
                     onValueChange = onQueryChange,
-                    label = { Text(stringResource(R.string.cerca_tag)) },
-                    singleLine = true,
+                    label = stringResource(R.string.cerca_tag),
                     enabled = enabled,
-                    trailingIcon = {
-                        if (query.isNotBlank()) {
-                            IconButton(onClick = { onQueryChange("") }) {
-                                Icon(Icons.Filled.Close, contentDescription = null)
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
+                    modifier = Modifier.fillMaxWidth(),
+                    focusRequester = focusRequester,
                 )
 
                 if (showAddTagAction) {

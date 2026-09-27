@@ -126,8 +126,6 @@ class SostanzeRepository(private val db: PersonalHubDatabase) {
             if (!substance.stockUnit.equals(substance.doseUnit, ignoreCase = true) || !requestedUnit.equals(substance.doseUnit, ignoreCase = true)) return@withTransaction IntakeOutcome.UnsupportedUnits
             val appliedDose = substance.dosePerIntake * quantity
             if (substance.dosePerIntake <= 0.0 || !appliedDose.isFinite()) return@withTransaction IntakeOutcome.InvalidQuantity
-            val stockTolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(substance.stockCurrent), kotlin.math.abs(appliedDose))
-            if (!substance.prn && appliedDose - substance.stockCurrent > stockTolerance) return@withTransaction IntakeOutcome.InsufficientStock
             val plans = dao.allSubstances().map { it.toPlan() }
             val intakes = dao.recentIntakes().map { it.toRecord() }
             val rules = dao.allInteractionRules().map { it.toPlan(dao.allInteractionTargets()) }

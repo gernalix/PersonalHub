@@ -421,21 +421,20 @@ fun TagsCapsuleUi(
                     }
 
                     if (isTagSearchVisible) {
-                        OutlinedTextField(
-                            value = tagSearchQuery,
-                            onValueChange = { tagSearchQuery = it },
-                            label = { Text(stringResource(R.string.cerca_tag)) },
-                            singleLine = true,
-                            trailingIcon = {
-                                IconButton(onClick = { collapseTagSearch() }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.chiudi)
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            com.gernalix.personalhub.core.ui.HubSearchField(
+                                value = tagSearchQuery,
+                                onValueChange = { tagSearchQuery = it },
+                                label = stringResource(R.string.cerca_tag),
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = { collapseTagSearch() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.chiudi)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1294,12 +1293,11 @@ private fun TagBrowserDialog(
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = query,
                     onValueChange = onQueryChange,
-                    label = { Text(stringResource(R.string.cerca_tag)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = stringResource(R.string.cerca_tag),
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 if (tags.isEmpty()) {
@@ -1494,12 +1492,11 @@ private fun EditTagParentsDialog(
         title = { Text(stringResource(R.string.padri_di_child_name, child.name)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text(stringResource(R.string.cerca_tag)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = stringResource(R.string.cerca_tag),
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
                 if (candidates.isEmpty()) {

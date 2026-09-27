@@ -651,7 +651,6 @@ fun SuperContactsApp(
             onTagClick = viewModel::setActiveTagFilter,
             onTagFiltersChange = viewModel::setActiveTagFilters,
             onClearTagFilter = viewModel::clearTagFilter,
-            onClearSearchAndTags = viewModel::clearSearchAndTags,
             onSaveCurrentSearch = viewModel::saveCurrentSearch,
             onApplySavedSearch = viewModel::applySavedSearch,
             onCopySavedSearchDeepLink = { search ->
@@ -722,7 +721,6 @@ private fun ContactListScreen(
     onTagClick: (ContactTag) -> Unit,
     onTagFiltersChange: (List<ContactTag>) -> Unit,
     onClearTagFilter: () -> Unit,
-    onClearSearchAndTags: () -> Unit,
     onSaveCurrentSearch: (String) -> Unit,
     onApplySavedSearch: (SavedSearch) -> Unit,
     onCopySavedSearchDeepLink: (SavedSearch) -> Unit,
@@ -897,22 +895,12 @@ private fun ContactListScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = uiState.searchQuery,
                     onValueChange = onQueryChange,
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(R.string.search)) },
-                    singleLine = true,
-                    trailingIcon = {
-                        if (uiState.searchQuery.isNotBlank() || uiState.activeTagFilters.isNotEmpty()) {
-                            IconButton(
-                                onClick = onClearSearchAndTags,
-                                modifier = Modifier.testTag("home-filter-reset"),
-                            ) {
-                                Text("X")
-                            }
-                        }
-                    },
+                    placeholder = stringResource(R.string.search),
+                    clearButtonTestTag = "home-filter-reset",
                 )
                 TagFilterButton(
                     activeCount = uiState.activeTagFilters.size,
@@ -1491,14 +1479,13 @@ private fun HomeTagFilterDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("home-tag-filter-search"),
-                    label = { Text(stringResource(R.string.home_tag_filter_search)) },
-                    singleLine = true,
+                    label = stringResource(R.string.home_tag_filter_search),
                 )
                 if (availableTags.isEmpty()) {
                     Text(

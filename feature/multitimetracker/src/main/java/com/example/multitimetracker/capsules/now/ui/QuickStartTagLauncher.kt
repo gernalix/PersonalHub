@@ -127,27 +127,15 @@ internal fun QuickStartTagLauncher(
             }
         }
 
-        OutlinedTextField(
+        com.gernalix.personalhub.core.ui.HubSearchField(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("quick_start_search"),
-            singleLine = true,
-            label = { Text(stringResource(R.string.cerca_tag)) },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            trailingIcon = if (query.isNotBlank()) {
-                {
-                    IconButton(
-                        onClick = { query = "" },
-                        modifier = Modifier.testTag("quick_start_search_clear"),
-                    ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.annulla))
-                    }
-                }
-            } else {
-                null
-            },
+            label = stringResource(R.string.cerca_tag),
+            showSearchIcon = true,
+            clearButtonTestTag = "quick_start_search_clear",
         )
 
         Text(

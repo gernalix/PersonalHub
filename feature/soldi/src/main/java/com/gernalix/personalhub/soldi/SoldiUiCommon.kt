@@ -217,15 +217,14 @@ internal fun PersonAutocomplete(people: List<PersonChoice>, personId: Long?, onS
     var query by remember(personId, selected?.name) { mutableStateOf(selected?.name.orEmpty()) }
     var focused by remember { mutableStateOf(false) }
     Column {
-        OutlinedTextField(
+        com.gernalix.personalhub.core.ui.HubSearchField(
             value = query,
             onValueChange = {
                 query = it
                 if (selected?.name?.equals(it, ignoreCase = true) != true) onSelect(null)
             },
-            label = { Text("Persona") },
+            label = "Persona",
             modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
-            singleLine = true,
         )
         if (focused && query.isNotBlank()) {
             people.filter { it.name.contains(query, ignoreCase = true) && it.id != personId }.take(5).forEach { person ->

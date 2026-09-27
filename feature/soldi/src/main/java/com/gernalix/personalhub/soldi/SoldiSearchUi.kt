@@ -240,12 +240,11 @@ internal fun SoldiSearchScreen(
             TextButton(onClick = onPhotos) { Text("📷") }
         }
         HorizontalDivider()
-        OutlinedTextField(
+        com.gernalix.personalhub.core.ui.HubSearchField(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth().padding(12.dp),
-            singleLine = true,
-            label = { Text("Cerca in tutte le transazioni e nelle foto") },
+            label = "Cerca in tutte le transazioni e nelle foto",
         )
         if (results.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -48,12 +48,11 @@ fun <T : Any> TrashListDialog(
         title = title,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                com.gernalix.personalhub.core.ui.HubSearchField(
                     modifier = Modifier.fillMaxWidth(),
                     value = query,
                     onValueChange = onQueryChange,
-                    label = { Text(stringResource(searchLabelResId)) },
-                    singleLine = true
+                    label = stringResource(searchLabelResId),
                 )
 
                 if (items.isEmpty()) {

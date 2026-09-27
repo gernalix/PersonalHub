@@ -8,13 +8,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 
 @Composable
 fun HubLoadingPane(
@@ -54,14 +64,45 @@ fun HubMessagePane(
 fun HubSearchField(
     value: String,
     onValueChange: (String) -> Unit,
-    label: String,
     modifier: Modifier = Modifier,
+    label: String? = null,
+    placeholder: String? = null,
+    showSearchIcon: Boolean = false,
+    clearButtonTestTag: String? = null,
+    focusRequester: FocusRequester? = null,
+    enabled: Boolean = true,
 ) {
+    val activeFocusRequester = focusRequester ?: remember { FocusRequester() }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().focusRequester(activeFocusRequester),
+        enabled = enabled,
         singleLine = true,
-        label = { Text(label) },
+        label = label?.let { text -> { Text(text) } },
+        placeholder = placeholder?.let { text -> { Text(text) } },
+        leadingIcon = if (showSearchIcon) {
+            { Icon(Icons.Filled.Search, contentDescription = null) }
+        } else {
+            null
+        },
+        trailingIcon = if (value.isNotEmpty()) {
+            {
+                IconButton(
+                    onClick = {
+                        onValueChange("")
+                        activeFocusRequester.requestFocus()
+                    },
+                    modifier = clearButtonTestTag?.let { Modifier.testTag(it) } ?: Modifier,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.search_clear),
+                    )
+                }
+            }
+        } else {
+            null
+        },
     )
 }
