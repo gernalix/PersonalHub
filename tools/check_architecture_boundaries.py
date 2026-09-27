@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
+import json
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -282,6 +283,47 @@ module_history_routes = {
 for owner, route_literal in module_history_routes.items():
     if not any(route_literal in path.read_text() for path in source_files.get(owner, [])):
         errors.append(f"{owner} does not expose the shared module History/Search route")
+
+# Every persistent non-operational table must have an explicit human History label.
+# This makes schema growth fail closed: a new audited table cannot silently degrade to "item".
+history_presentation = ROOT / "app/src/main/java/com/gernalix/personalhub/HubActivityPresentation.kt"
+schema_dir = ROOT / "core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase"
+if history_presentation.is_file() and schema_dir.is_dir():
+    schema_files = [path for path in schema_dir.glob("*.json") if path.stem.isdigit()]
+    if schema_files:
+        latest_schema = max(schema_files, key=lambda path: int(path.stem))
+        schema = json.loads(latest_schema.read_text())
+        schema_tables = {entity["tableName"] for entity in schema["database"]["entities"]}
+        operational_history_tables = {
+            "hub_generation",
+            "hub_sync_pending",
+            "hub_sync_known",
+            "sync_meta",
+            "sync_queue",
+            "sync_shadow",
+            "since_when_migration_state",
+        }
+        presentation_text = history_presentation.read_text()
+        try:
+            mapping_block = presentation_text.split(
+                "internal val GIT_HISTORY_ENTITY_TYPES = mapOf(", 1
+            )[1].split(
+                ")\n\ninternal fun gitHistoryEntityType", 1
+            )[0]
+        except IndexError:
+            errors.append("History presentation lacks canonical Git audit entity-type mapping")
+        else:
+            mapped_tables = set(
+                re.findall(r'"([^"]+)"\s+to\s+"[^"]+"', mapping_block)
+            )
+            missing_history_formatters = sorted(
+                schema_tables - operational_history_tables - mapped_tables
+            )
+            if missing_history_formatters:
+                errors.append(
+                    "Git audit tables lack explicit human History formatter: "
+                    + ", ".join(missing_history_formatters)
+                )
 
 # String-based component routing must not smuggle implementation class names around import checks.
 # Public Android entrypoints are stable host aliases owned by feature manifests.

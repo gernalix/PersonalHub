@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="home_context">Context</string>
-    <string name="home_history_search">History &amp; Search</string>
-    <string name="home_history_search_help">Search history and changes</string>
+    <string name="home_history_search">History</string>
+    <string name="home_history_search_help">Readable history and search</string>
     <string name="home_context_help">Link entities</string>
     <string name="home_tags">Tags</string>
     <string name="home_alerts">Alerts</string>
@@ -11,10 +11,11 @@
     <string name="home_alerts_help_it">Avvisi Timer e Luoghi</string>
     <string name="home_tags_help">Browse and manage tags</string>
     <string name="home_audit_log">Audit log</string>
-    <string name="home_audit_log_help">History, changes and undo</string>
+    <string name="home_audit_log_help">Technical provenance and raw changes</string>
     <string name="audit_title">Audit log</string>
     <string name="audit_git_source">Current Git Data audit history, newest first.</string>
     <string name="audit_search_hint">Search audit log</string>
+    <string name="audit_git_disabled">Git Data is disabled, so no authoritative technical audit stream is available.</string>
     <string name="home_data_explorer">Data</string>
     <string name="home_data_explorer_help">SQL and advanced exploration</string>
     <string name="data_explorer_title">Data explorer</string>
@@ -143,7 +144,7 @@
     <string name="module_soldi">Soldi</string>
     <string name="module_soldi_subtitle">Transactions and products</string>
 
-    <string name="activity_title">History &amp; Search</string>
+    <string name="activity_title">History</string>
     <string name="activity_modules_selected">Modules %1$d/%2$d</string>
     <string name="activity_back">Back</string>
     <string name="activity_from">From</string>

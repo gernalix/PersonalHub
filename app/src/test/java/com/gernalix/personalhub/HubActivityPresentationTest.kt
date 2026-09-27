@@ -87,6 +87,52 @@ class HubActivityPresentationTest {
         assertEquals("places", gitHistoryModule(item.table))
     }
     @Test
+    fun everyCurrentSemanticAuditTableHasAnExplicitHumanFormatter() {
+        val tables = setOf(
+            "finance_accounts", "finance_products", "finance_titles", "finance_chains", "finance_stores",
+            "finance_transactions", "finance_tags", "finance_transaction_tags", "finance_transfers",
+            "finance_macros", "finance_recurrences", "finance_recurrence_tags", "finance_recurrence_overrides",
+            "finance_attachments", "finance_photo_index", "finance_owned_items", "contacts", "contact_fields",
+            "contact_events", "contact_initiatives", "contact_messaging_links", "saved_searches",
+            "saved_search_tags", "tags", "contact_tags", "places", "place_aliases", "place_links",
+            "place_events", "check_in_attempts", "check_in_attempt_candidates", "place_geofence_configs",
+            "place_geofence_transition_log", "place_tags", "place_tag_cross_ref", "alert_rules",
+            "alert_place_tag_targets", "substances", "intake_events", "stock_adjustments", "prescriptions",
+            "interaction_rules", "interaction_targets", "settings", "macros", "macro_items", "app_state",
+            "correction_events", "word_entries", "wordpulse_sessions", "pvt_results", "quick_event_entries",
+            "quick_event_entry_field_values", "quick_event_entry_tags", "quick_event_macro_actions",
+            "quick_event_macro_tags", "quick_event_macros", "quick_event_template_fields",
+            "quick_event_template_tags", "quick_event_templates", "session_tags", "sessions", "people_photos",
+            "hub_preferences", "hub_entity_bindings", "hub_context_types", "hub_context_type_fields",
+            "hub_contexts", "hub_context_members", "hub_tags", "hub_tag_aliases", "hub_tag_assignments",
+            "hub_tag_parents", "hub_saved_tag_filters", "hub_resources", "since_when_counters",
+        )
+        assertTrue(tables.all(GIT_HISTORY_ENTITY_TYPES::containsKey))
+        tables.forEach { table ->
+            val type = gitHistoryEntityType(table)
+            assertFalse("$table must not fall back to a generic item", type == "item")
+            assertFalse("$table type must be human-readable", type.contains('_'))
+        }
+        assertEquals("substances", gitHistoryModule("macros"))
+        assertEquals("wordpulse", gitHistoryModule("app_state"))
+        assertEquals("timer", gitHistoryModule("quick_event_templates"))
+        assertEquals("people", gitHistoryModule("people_photos"))
+    }
+
+    @Test
+    fun futureUnknownAuditTableStillGetsAHumanFallback() {
+        val item = GitHistoryItem(
+            id = "future", occurredAt = 1L, author = "user", source = "ui", reason = null,
+            groupId = null, table = "future_feature_events", operation = "INSERT", rowKey = "1",
+            changedColumns = "name", historyPath = "h", commitSha = "c", revertedBy = null,
+            displayAfter = "{\"name\":\"Example\"}",
+        )
+        assertEquals("future feature event", gitHistoryEntityType(item.table))
+        val text = humanizeGitHistory(item, "PersonalHub")
+        assertEquals("Created future feature event “Example” · Name: — → Example", text.title)
+    }
+
+    @Test
     fun dateLabelUsesCompactLocalizedWeekdayFormat() {
         val zone = ZoneId.of("Europe/Copenhagen")
         val epoch = LocalDateTime.of(2026, 9, 24, 12, 0)

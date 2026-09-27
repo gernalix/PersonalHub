@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +93,10 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         SinceWhenScreen(onBack = { topDestination = null })
         return
     }
+    if (topDestination == "history") {
+        HubHistorySearchScreen(onBack = { topDestination = null })
+        return
+    }
     if (topDestination == "audit") {
         HubAuditLogScreen(onBack = { topDestination = null })
         return
@@ -125,6 +130,12 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            TextButton(
+                onClick = { topDestination = "audit" },
+                modifier = Modifier.testTag("home-audit-button"),
+            ) {
+                Text(stringResource(R.string.audit_title))
+            }
             HomeAutoExportStatusIndicator()
         }
         LazyVerticalGrid(
@@ -160,8 +171,8 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                     context.startActivity(UnifiedAlertsRoute.intent(context))
                 }
             }
-            item(key = "home-audit") {
-                HomeActionTile("🔍", R.string.home_history_search, R.string.home_history_search_help) { topDestination = "audit" }
+            item(key = "home-history") {
+                HomeActionTile("📜", R.string.home_history_search, R.string.home_history_search_help) { topDestination = "history" }
             }
             item(key = "home-since-when") {
                 HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }

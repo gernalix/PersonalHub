@@ -114,6 +114,22 @@ class HubHistorySearchQaDeviceTest {
     }
 
     @Test
+    fun auditButtonIsSeparateFromTheHumanHistoryTile() {
+        val context = qaContext()
+        composeRule.setContent {
+            PersonalHubTheme {
+                Surface {
+                    PersonalHubApp()
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("home-audit-button").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.audit_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag("history-module-filter").assertDoesNotExist()
+    }
+
+    @Test
     fun moduleScopeIsImmutableAndHasNoModuleFilter() {
         val context = qaContext()
         PersonalHubDatabase.get(context)
