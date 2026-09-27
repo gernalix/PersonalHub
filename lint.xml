@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- A native locale must be complete for the module that declares it. -->
+    <issue id="MissingTranslation" severity="error" />
+</lint>
