@@ -128,6 +128,31 @@ class HubActivityPresentationTest {
         assertEquals("wordpulse", gitHistoryModule("app_state"))
         assertEquals("timer", gitHistoryModule("quick_event_templates"))
         assertEquals("people", gitHistoryModule("people_photos"))
+
+        GIT_HISTORY_ENTITY_TYPES.forEach { (table, expectedType) ->
+            listOf("INSERT", "UPDATE", "DELETE").forEach { operation ->
+                val item = GitHistoryItem(
+                    id = "$table-$operation",
+                    occurredAt = 1L,
+                    author = "user",
+                    source = "ui",
+                    reason = null,
+                    groupId = null,
+                    table = table,
+                    operation = operation,
+                    rowKey = "1",
+                    changedColumns = "",
+                    historyPath = "h",
+                    commitSha = "c",
+                    revertedBy = null,
+                )
+                val text = humanizeGitHistory(item, "PersonalHub")
+                assertTrue("$table/$operation must name its human entity type", text.title.contains(expectedType))
+                if ('_' in table) {
+                    assertFalse("$table/$operation must not expose raw snake_case table names", text.title.contains(table))
+                }
+            }
+        }
     }
 
     @Test
