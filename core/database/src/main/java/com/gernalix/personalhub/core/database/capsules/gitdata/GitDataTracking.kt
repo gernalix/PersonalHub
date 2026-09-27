@@ -268,7 +268,6 @@ object GitDataTracking {
     }
 
     fun ensureAutomaticEditContext(db: SupportSQLiteDatabase) {
-        if (!active) return
         if (!tableExists(db, CONTEXT_TABLE)) return
         val alreadySet = db.query(
             "SELECT 1 FROM $CONTEXT_TABLE WHERE id=1 LIMIT 1",
@@ -283,7 +282,6 @@ object GitDataTracking {
     }
 
     fun clearEditContextIfInstalled(db: SupportSQLiteDatabase) {
-        if (!active) return
         val installed = db.query(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
             arrayOf(CONTEXT_TABLE),

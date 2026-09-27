@@ -7,6 +7,8 @@ import com.gernalix.personalhub.core.database.capsules.sync.*
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryStore
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventCapture
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -154,6 +156,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
                     override fun onOpen(db: SupportSQLiteDatabase) {
+                        MutationEventStore.install(db)
                         val appVersion = runCatching {
                             androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
                                 context.packageManager.getPackageInfo(context.packageName, 0),
@@ -187,6 +190,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                             GitDataTracking.uninstall(db)
                             HubActivityCapture.install(db, appVersion)
                         }
+                        MutationEventCapture.install(db)
                         val installedDirty = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'hub_dirty_%'").use { cursor ->
                             buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
                         }
