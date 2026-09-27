@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.soldi
 
+import com.gernalix.personalhub.core.ui.HubFeedbackHost
+
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -228,7 +230,7 @@ internal fun SoldiV2Screen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { HubFeedbackHost(snackbar) },
         topBar = {
             if (editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null && !searchOpen) {
                 if (bottom == BottomDestination.HOME) {

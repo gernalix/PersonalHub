@@ -1,5 +1,7 @@
 package com.example.multitimetracker.ui.util
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.content.Context
 import android.widget.Toast
 import kotlin.random.Random
@@ -64,6 +66,6 @@ object RewardToastManager {
             else -> "${lifetime} task totali"
         }
 
-        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        HubFeedback.makeText(context, msg, Toast.LENGTH_SHORT).show()
     }
 }

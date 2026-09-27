@@ -6,6 +6,8 @@
 
 package com.example.multitimetracker.ui.components
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -167,7 +169,7 @@ fun SessionEditDialog(
         val isSelected = selectedEffective.contains(id)
         if (!isSelected) {
             if (tag.isTimedTag() && timedTagsCount(selectedEffective - id) > 0) {
-                Toast.makeText(context, context.getString(R.string.timed_tag_single_per_session), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(context, context.getString(R.string.timed_tag_single_per_session), Toast.LENGTH_SHORT).show()
                 return
             }
             val withParents = TagHierarchy.closure(setOf(id), tagParentsByChild)
@@ -231,7 +233,7 @@ fun SessionEditDialog(
                             if (readOnly) return@IconButton
                             if (isSavingMeta) return@IconButton
                             if (timedTagsCount(selectedEffective) > 1) {
-                                Toast.makeText(context, context.getString(R.string.timed_tag_single_per_session), Toast.LENGTH_SHORT).show()
+                                HubFeedback.makeText(context, context.getString(R.string.timed_tag_single_per_session), Toast.LENGTH_SHORT).show()
                                 return@IconButton
                             }
                             isSavingMeta = true
@@ -531,7 +533,7 @@ fun SessionEditDialog(
                                 onSaveTimes(session.id, startMs, null)
                                 showTimesDialog = false
                             } else {
-                                Toast.makeText(context, context.getString(R.string.start_time_cannot_be_future), Toast.LENGTH_SHORT).show()
+                                HubFeedback.makeText(context, context.getString(R.string.start_time_cannot_be_future), Toast.LENGTH_SHORT).show()
                             }
                         } else if (endMs >= startMs) {
                             onSaveTimes(session.id, startMs, endMs)

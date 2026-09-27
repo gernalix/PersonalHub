@@ -4,6 +4,8 @@
 
 package com.example.multitimetracker.widget
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -55,7 +57,7 @@ class QuickSessionWidgetClickActivity : Activity() {
         val configuredProfile = appCtx.getSharedPreferences("quick_task_widget_prefs", Context.MODE_PRIVATE)
             .getString("profile_$appWidgetId", null)
         if (configuredProfile != DatabaseProfiles.activeProfileId(appCtx)) {
-            Toast.makeText(appCtx, getString(R.string.widget_quick_event_unavailable), Toast.LENGTH_SHORT).show()
+            HubFeedback.makeText(appCtx, getString(R.string.widget_quick_event_unavailable), Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -66,7 +68,7 @@ class QuickSessionWidgetClickActivity : Activity() {
         // Open the app (user can immediately see/stop the running session).
         if (result is QuickSessionRunner.Result.Success) {
             vibrateStrong(appCtx)
-            Toast.makeText(appCtx, getString(R.string.quick_session_started), Toast.LENGTH_SHORT).show()
+            HubFeedback.makeText(appCtx, getString(R.string.quick_session_started), Toast.LENGTH_SHORT).show()
             startActivity(
                 Intent(appCtx, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -74,7 +76,7 @@ class QuickSessionWidgetClickActivity : Activity() {
                 }
             )
         } else {
-            Toast.makeText(appCtx, getString(R.string.quick_session_start_failed), Toast.LENGTH_SHORT).show()
+            HubFeedback.makeText(appCtx, getString(R.string.quick_session_start_failed), Toast.LENGTH_SHORT).show()
         }
 
         // Close immediately (no UI).

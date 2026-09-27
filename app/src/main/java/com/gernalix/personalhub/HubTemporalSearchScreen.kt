@@ -1,5 +1,7 @@
 package com.gernalix.personalhub
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -431,5 +433,5 @@ fun HubTemporalSearchScreen(
 private fun copyTemporalLink(context: Context, value: String) {
     context.getSystemService(ClipboardManager::class.java)
         ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.temporal_title), value))
-    Toast.makeText(context, R.string.deep_link_copied, Toast.LENGTH_SHORT).show()
+    HubFeedback.makeText(context, R.string.deep_link_copied, Toast.LENGTH_SHORT).show()
 }

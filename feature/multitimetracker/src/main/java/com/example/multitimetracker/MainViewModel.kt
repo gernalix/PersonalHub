@@ -2,6 +2,8 @@
 // v470
 package com.example.multitimetracker
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import com.example.multitimetracker.util.CapsuleWriteApi
 
 import com.example.multitimetracker.R
@@ -173,7 +175,7 @@ private fun logAppVersionIfNeeded(context: Context) {
                 1 -> ctx.getString(R.string.reward_toast_hour_count, hourCount)
                 else -> ctx.getString(R.string.reward_toast_generic_good, todayCount)
             }
-            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+            HubFeedback.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
         }
 
         sp.edit()
@@ -339,13 +341,13 @@ private fun logAppVersionIfNeeded(context: Context) {
                 }
             }
             override fun showTagAlreadyExists(context: Context) {
-                Toast.makeText(context, context.getString(R.string.tag_already_exists), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(context, context.getString(R.string.tag_already_exists), Toast.LENGTH_SHORT).show()
             }
             override fun showTagHierarchyCycleNotAllowed(context: Context) {
-                Toast.makeText(context, context.getString(R.string.tag_hierarchy_cycle_not_allowed), Toast.LENGTH_LONG).show()
+                HubFeedback.makeText(context, context.getString(R.string.tag_hierarchy_cycle_not_allowed), Toast.LENGTH_LONG).show()
             }
             override fun showSessionWriteFailed(context: Context) {
-                Toast.makeText(context, context.getString(R.string.session_write_failed), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(context, context.getString(R.string.session_write_failed), Toast.LENGTH_SHORT).show()
             }
             override fun logUserEvent(
                 action: String,
@@ -394,17 +396,17 @@ private fun logAppVersionIfNeeded(context: Context) {
             override fun scheduleAutoBackup() = this@MainViewModel.scheduleAutoBackup()
             override fun showWriteFailed(context: Context) {
                 viewModelScope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.quick_event_write_failed), Toast.LENGTH_SHORT).show()
+                    HubFeedback.makeText(context, context.getString(R.string.quick_event_write_failed), Toast.LENGTH_SHORT).show()
                 }
             }
             override fun showDeleteFailed(context: Context) {
                 viewModelScope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.quick_event_delete_failed), Toast.LENGTH_SHORT).show()
+                    HubFeedback.makeText(context, context.getString(R.string.quick_event_delete_failed), Toast.LENGTH_SHORT).show()
                 }
             }
             override fun showTargetRecorded(context: Context, title: String) {
                 viewModelScope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.quick_event_recorded, title), Toast.LENGTH_SHORT).show()
+                    HubFeedback.makeText(context, context.getString(R.string.quick_event_recorded, title), Toast.LENGTH_SHORT).show()
                 }
             }
             override fun addTag(name: String) {
@@ -460,10 +462,10 @@ private fun logAppVersionIfNeeded(context: Context) {
             override fun scheduleAutoBackup() = this@MainViewModel.scheduleAutoBackup()
             override fun persist() = this@MainViewModel.persist()
             override fun showSessionWriteFailed(context: Context) {
-                Toast.makeText(context, context.getString(R.string.session_write_failed), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(context, context.getString(R.string.session_write_failed), Toast.LENGTH_SHORT).show()
             }
             override fun showSessionDeleteFailed(context: Context) {
-                Toast.makeText(context, context.getString(R.string.session_delete_failed), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(context, context.getString(R.string.session_delete_failed), Toast.LENGTH_SHORT).show()
             }
             override fun onCreatedOnMain(
                 created: com.example.multitimetracker.model.SessionUi,
@@ -746,7 +748,7 @@ private var initialized = false
             setPersistenceFailureReport = { report -> _persistenceFailureReport.value = report },
             onSnapshotReloaded = { context -> notifyCapsuleRuntimeChanged(context, CapsuleRuntimeChange.SNAPSHOT_RELOAD) },
             showPersistenceFailureToast = { ctx ->
-                Toast.makeText(ctx, ctx.getString(R.string.session_write_failed), Toast.LENGTH_LONG).show()
+                HubFeedback.makeText(ctx, ctx.getString(R.string.session_write_failed), Toast.LENGTH_LONG).show()
             },
         )
     }
