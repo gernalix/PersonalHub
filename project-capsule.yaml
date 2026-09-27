@@ -1,0 +1,105 @@
+schema_version: c2.project-capsule.v1
+identity:
+  project_id: 49
+  slug: personalhub
+  repository_id: R0049
+scope:
+  purpose: Android personal information hub with local-first feature modules and one canonical Room database.
+  boundaries:
+    - C2 owns task lifecycle and repository integration.
+    - MegaVault owns cross-project identity and repository inventory.
+    - PersonalHub owns app behavior and its local data contract.
+repository:
+  canonical_workdir: /home/daniele/projects/PersonalHub
+  branch_policy: main is canonical; changes use isolated task branches and the repository single writer for integration.
+architecture:
+  summary: The Android app composes feature capsules over shared contracts and core services; personalhub.db is the sole writable runtime database.
+  entrypoints:
+    - app/src/main/java/com/gernalix/personalhub/MainActivity.kt
+    - settings.gradle.kts
+  important_paths:
+    - app
+    - contracts
+    - core
+    - feature
+    - docs/ARCHITECTURE.md
+    - .codex/CODE_MAP.tsv
+data:
+  schema: Room owns personalhub.db; the current exported schema is version 23 at core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/23.json.
+  migrations: The APK does not perform historical migrations; use the checked-in external migration tools and docs/DATABASE_SCHEMA_UPGRADES.md before any schema-incompatible install.
+runtime:
+  services: []
+  timers: []
+  containers: []
+devices:
+  - Android emulator for routine UI and functional QA.
+  - Physical Android devices only when acceptance requires real hardware or a device-specific check.
+dependencies:
+  - name: Android SDK and Gradle wrapper
+    purpose: Build, lint and test the Android application.
+  - name: Python 3 and PyYAML
+    purpose: Run the standalone Project Capsule v1 validator and its focused tests.
+  - name: Room
+    purpose: Own the canonical local SQLite database and exported schema.
+  - name: MegaVault
+    purpose: Cross-project identity, canonical repository and shared operational context.
+  - name: codex-roadmap
+    purpose: C2 work-item lifecycle and Project Capsule v1 contract.
+commands:
+  setup: {not_applicable: 'The checked-in Gradle wrapper and declared Android toolchain provide the project setup entrypoint.'}
+  build: {argv: [./gradlew, assembleDebug], cwd: .}
+  test_targeted: {argv: [python3, -m, unittest, discover, -s, tests, -p, test_project_capsule.py], cwd: .}
+  test_full: {argv: [./gradlew, check], cwd: .}
+  lint: {argv: [./gradlew, lintDebug], cwd: .}
+  deploy_install: {not_applicable: 'Installation requires a selected device, exact artifact and the PersonalHub device gates in AGENTS.md.'}
+  smoke: {not_applicable: 'Device smoke requires an explicit target serial and built APK; see AGENTS.md and docs/ANDROID_EMULATOR.md.'}
+  verify:
+    fast: {argv: [python3, tools/project_capsule.py, --repo, ., --mode, FAST], cwd: .}
+    full: {argv: [python3, tools/project_capsule.py, --repo, ., --mode, FULL], cwd: .}
+safety:
+  invariants:
+    - personalhub.db is the only writable runtime database; SAF, Datasette and Git are backup, replica or explicit recovery paths.
+    - Preserve existing device data; APK installation does not migrate the database.
+    - Keep feature implementation private behind capsule APIs and shared contracts.
+  risky_operations:
+    - Schema-incompatible installation requires an externally validated database migration and rollback copy.
+    - Physical-device and destructive tests follow AGENTS.md and docs/DESTRUCTIVE_TEST_GUARDRAIL.md.
+    - Never clear app data or uninstall as a migration fallback.
+  recovery:
+    - Use the validated import/recovery flow described in docs/ARCHITECTURE.md.
+    - Use the external database migration and rollback procedure in docs/DATABASE_SCHEMA_UPGRADES.md.
+acceptance:
+  - Capsule identity agrees with the MegaVault project and canonical repository records.
+  - FAST verifies identity, schema, mapped paths, commands and freshness without running project commands.
+  - FULL runs only declared safe local validation hooks.
+  - Changed files have an explicit minimum verification mapping.
+references:
+  megavault: /home/daniele/MegaVault/megavault.sqlite
+  c2: https://github.com/gernalix/codex-roadmap/blob/main/docs/project-capsule/README.md
+freshness:
+  reviewed_commit: 5ce494cf5fdbbe5d928a07aef322fcfc2e64add7
+  watch_paths:
+    - app
+    - contracts
+    - core
+    - feature
+    - docs/ARCHITECTURE.md
+    - docs/DATABASE_SCHEMA_UPGRADES.md
+    - .github/workflows
+    - AGENTS.md
+    - build.gradle.kts
+    - settings.gradle.kts
+    - gradle.properties
+    - gradle
+artifacts:
+  agents: AGENTS.md
+  architecture: docs/ARCHITECTURE.md
+  database_schema: core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/23.json
+validation_hooks:
+  - id: project-capsule-contract
+    argv: [python3, -m, unittest, discover, -s, tests, -p, test_project_capsule.py]
+    cwd: .
+    safe: true
+change_verification:
+  - paths: [project-capsule.yaml, tools/project_capsule.py, docs/project-capsule/**, tests/test_project_capsule.py]
+    commands: [test_targeted]
