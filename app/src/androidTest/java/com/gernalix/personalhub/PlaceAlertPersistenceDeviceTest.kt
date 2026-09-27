@@ -5,9 +5,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.core.alerts.AlertTargetKind
+import com.gernalix.personalhub.core.alerts.AlertMatchMode
 import com.gernalix.personalhub.core.alerts.AlertTrigger
 import com.gernalix.personalhub.core.alerts.PlaceAlertDraft
 import com.gernalix.personalhub.core.alerts.PlaceAlertRepository
+import com.gernalix.personalhub.core.alerts.UnifiedPlaceAlertsProvider
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -42,6 +44,30 @@ class PlaceAlertPersistenceDeviceTest {
             ).use { it.moveToFirst(); it.getLong(0) })
             assertTrue(repo.delete(ruleId))
             assertEquals(false, owner.alertDao().getRule(ruleId)?.enabled)
+
+            val provider = UnifiedPlaceAlertsProvider(context, owner)
+            val entityDraft = PlaceAlertDraft(marker, AlertTrigger.PLACE_BOTH, AlertTargetKind.ENTITY,
+                placeId = placeId, enabled = false)
+            assertTrue(provider.save(null, entityDraft, false))
+            val entity = provider.snapshot().rules.single { it.message == marker }
+            assertEquals(placeId, entity.entityId)
+            assertEquals(false, entity.enabled)
+            assertTrue(provider.setEnabled(entity.id, true))
+            assertTrue(provider.save(entity.id, entityDraft.copy(message = "${marker}Edited"), true))
+            assertEquals(true, provider.snapshot().rules.single { it.id == entity.id }.enabled)
+
+            val tagsDraft = PlaceAlertDraft(marker, AlertTrigger.PLACE_CHECK_OUT, AlertTargetKind.TAGS,
+                placeTagIds = setOf(tagId), matchMode = AlertMatchMode.ANY)
+            assertTrue(provider.save(null, tagsDraft, true))
+            val tagged = provider.snapshot().rules.single { it.message == marker }
+            assertEquals(null, tagged.entityId)
+            assertEquals(AlertMatchMode.ANY.name, tagged.matchMode)
+            assertEquals(setOf(tagId), provider.snapshot().targets[tagged.id])
+            assertTrue(provider.save(tagged.id, tagsDraft.copy(matchMode = AlertMatchMode.ALL), true))
+            assertEquals(AlertMatchMode.ALL.name, provider.snapshot().rules.single { it.id == tagged.id }.matchMode)
+            assertTrue(provider.delete(entity.id))
+            assertTrue(provider.delete(tagged.id))
+            assertTrue(provider.snapshot().rules.isEmpty())
         } finally {
             owner.close()
             context.deleteDatabase(name)

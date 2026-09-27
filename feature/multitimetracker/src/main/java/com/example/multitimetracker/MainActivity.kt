@@ -42,6 +42,7 @@ import com.example.multitimetracker.ui.AppRoot
 import com.example.multitimetracker.ui.theme.MultiTimeTrackerTheme
 import com.example.multitimetracker.widget.QuickEventWidgetDeepLink
 import com.example.multitimetracker.widget.QuickSessionWidgetProvider
+import com.gernalix.personalhub.core.alerts.UnifiedAlertsRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private var hubSessionId by mutableStateOf<Long?>(null)
     private var hubQuickEventEntryId by mutableStateOf<Long?>(null)
     private var pendingQuickEventTarget by mutableStateOf<QuickEventTarget?>(null)
+    private var alertRequest by mutableStateOf<UnifiedAlertsRoute.Request?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         StartupPerfTrace.activityOnCreateStart()
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
                     onHubQuickEventEntryDismiss = { hubQuickEventEntryId = null },
                     pendingQuickEventTarget = pendingQuickEventTarget,
                     onPendingQuickEventTargetConsumed = { pendingQuickEventTarget = null },
+                    alertRequest = alertRequest,
                 )
             }
         }
@@ -80,6 +83,7 @@ class MainActivity : ComponentActivity() {
         hubSessionId = intent.hubSessionId()
         hubQuickEventEntryId = intent.hubQuickEventEntryId()
         pendingQuickEventTarget = QuickEventWidgetDeepLink.requestFrom(intent)
+        alertRequest = UnifiedAlertsRoute.parse(intent)
     }
 }
 
@@ -99,6 +103,7 @@ private fun MultiTimeTrackerApp(
     onHubQuickEventEntryDismiss: () -> Unit,
     pendingQuickEventTarget: QuickEventTarget?,
     onPendingQuickEventTargetConsumed: () -> Unit,
+    alertRequest: UnifiedAlertsRoute.Request?,
     vm: MainViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -224,6 +229,7 @@ private fun MultiTimeTrackerApp(
         onHubSessionDismiss = onHubSessionDismiss,
         pendingQuickEventTarget = pendingQuickEventTarget,
         onPendingQuickEventTargetConsumed = onPendingQuickEventTargetConsumed,
+        alertRequest = alertRequest,
         hubQuickEventEntryId = hubQuickEventEntryId,
         onHubQuickEventEntryDismiss = onHubQuickEventEntryDismiss,
     )

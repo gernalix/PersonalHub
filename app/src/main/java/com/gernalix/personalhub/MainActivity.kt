@@ -47,6 +47,8 @@ import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.gernalix.personalhub.capsules.shortcuts.HubModule
 import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
 import com.gernalix.personalhub.core.hubcontext.HubContextComposerScreen
+import com.gernalix.personalhub.core.alerts.UnifiedAlertsRoute
+import com.gernalix.personalhub.core.alerts.AlertText
 
 class MainActivity : ComponentActivity() {
     private var launcherGeneration by mutableStateOf(0)
@@ -149,6 +151,15 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                     context.startActivity(Intent(context, HubTagsActivity::class.java))
                 }
             }
+            item(key = "home-alerts") {
+                HomeActionTile(
+                    "🔔",
+                    AlertText.get(context, R.string.home_alerts, R.string.home_alerts_it),
+                    AlertText.get(context, R.string.home_alerts_help, R.string.home_alerts_help_it),
+                ) {
+                    context.startActivity(UnifiedAlertsRoute.intent(context))
+                }
+            }
             item(key = "home-audit") {
                 HomeActionTile("🔍", R.string.home_history_search, R.string.home_history_search_help) { topDestination = "audit" }
             }
@@ -175,6 +186,11 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
 
 @Composable
 private fun HomeActionTile(icon: String, titleRes: Int, subtitleRes: Int, onClick: () -> Unit) {
+    HomeActionTile(icon, stringResource(titleRes), stringResource(subtitleRes), onClick)
+}
+
+@Composable
+private fun HomeActionTile(icon: String, title: String, subtitle: String, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -191,9 +207,9 @@ private fun HomeActionTile(icon: String, titleRes: Int, subtitleRes: Int, onClic
         ) {
             Text(icon, style = MaterialTheme.typography.headlineSmall)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium)
+                Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    stringResource(subtitleRes),
+                    subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
