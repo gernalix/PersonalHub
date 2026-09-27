@@ -112,6 +112,15 @@ class HubActivityPresentationTest {
             val type = gitHistoryEntityType(table)
             assertFalse("$table must not fall back to a generic item", type == "item")
             assertFalse("$table type must be human-readable", type.contains('_'))
+            val item = GitHistoryItem(
+                id = "audit-$table", occurredAt = 1L, author = "user", source = "ui", reason = null,
+                groupId = null, table = table, operation = "INSERT", rowKey = "1",
+                changedColumns = "name", historyPath = "h", commitSha = "c", revertedBy = null,
+                displayAfter = "{\"name\":\"Example\"}",
+            )
+            val text = humanizeGitHistory(item, gitHistoryModule(table))
+            assertTrue("$table must render its human entity type", text.title.contains(type))
+            assertFalse("$table must not leak its raw table name", text.title.contains(table))
         }
         assertEquals("substances", gitHistoryModule("macros"))
         assertEquals("wordpulse", gitHistoryModule("app_state"))
