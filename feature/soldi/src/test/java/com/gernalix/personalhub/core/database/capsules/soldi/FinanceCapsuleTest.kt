@@ -41,7 +41,6 @@ class FinanceCapsuleTest {
         finance.saveTransaction(d.copy(id = first, amount = "-15", tags = "weekly"))
         assertEquals(created, db.financeDao().transaction(first)!!.createdAt)
         assertEquals("-15", db.financeDao().transaction(first)!!.amount)
-        assertTrue(scalar(db, "SELECT count(*) FROM hub_sync_pending WHERE table_name='finance_transactions'") == 2L)
         val generation = scalar(db, "SELECT generation FROM hub_generation")
         rejects { finance.saveTransaction(d.copy(title = "Rollback product", placeId = "missing")) }
         assertEquals(generation, scalar(db, "SELECT generation FROM hub_generation"))

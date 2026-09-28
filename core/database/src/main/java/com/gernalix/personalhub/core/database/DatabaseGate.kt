@@ -2,7 +2,6 @@ package com.gernalix.personalhub.core.database
 
 import android.content.ContentValues
 import android.content.Context
-import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import androidx.sqlite.db.*
@@ -29,7 +28,6 @@ object DatabaseGate {
     fun afterMutation() {
         if (privileged.get() != true) autoExportContext?.let {
             HubAutoExport.requestIfDirty(it)
-            DatasetteSync.checkForChanges(it)
             GitDataSync.checkForChanges(it)
         }
     }

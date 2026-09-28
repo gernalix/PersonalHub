@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.core.database.capsules.soldi.*
 import com.gernalix.personalhub.soldi.receipt.*
@@ -568,16 +567,6 @@ internal fun SoldiV2Screen(
                             showMore = false
                             context.startActivity(
                                 Intent(Intent.ACTION_VIEW, HubDeepLinkContract.moduleHistoryUri("soldi")).setPackage(context.packageName),
-                            )
-                        },
-                    )
-                    ListItem(
-                        headlineContent = { Text("Esplora dati") },
-                        supportingContent = { Text("Datasette · transazioni") },
-                        modifier = Modifier.clickable {
-                            showMore = false
-                            context.startActivity(
-                                DataExplorerContract.intent(context.packageName, "finance_transactions"),
                             )
                         },
                     )

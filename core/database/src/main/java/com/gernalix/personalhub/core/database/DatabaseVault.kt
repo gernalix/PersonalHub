@@ -660,7 +660,7 @@ object DatabaseVault {
     }
 
     /** Returns only after verified replacement; caller must restart the process before allowing further edits. */
-    fun importDatabase(context: Context, uri: Uri) = GitDataSync.pauseSync { DatasetteSync.pauseUploads { operations.withLock {
+    fun importDatabase(context: Context, uri: Uri) = GitDataSync.pauseSync { operations.withLock {
         val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
         target.parentFile!!.mkdirs()
         val stage = File(target.parentFile, "personalhub-import-${UUID.randomUUID()}.db")
@@ -680,17 +680,10 @@ object DatabaseVault {
                 val backup = File(target.parentFile, "$PRE_IMPORT_BACKUP_PREFIX${UUID.randomUUID()}$PRE_IMPORT_BACKUP_SUFFIX")
                 try {
                     snapshot(context, backup)
-                    // Preserve this installation's sent/uncertain identities across file replacement.
-                    // Imported data can omit rows that still need remote tombstones.
                     SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READWRITE).use { imported ->
                         imported.execSQL("ATTACH DATABASE ? AS previous", arrayOf(backup.path))
                         imported.beginTransaction()
                         try {
-                            imported.execSQL("DELETE FROM hub_sync_pending")
-                            imported.execSQL("DELETE FROM hub_sync_known")
-                            imported.execSQL("INSERT OR IGNORE INTO hub_sync_known SELECT table_name,row_key FROM previous.hub_sync_known")
-                            imported.execSQL("INSERT OR IGNORE INTO hub_sync_known SELECT table_name,row_key FROM previous.hub_sync_pending")
-
                             // Git metadata belongs to this installation, never to the imported
                             // payload. Clear any imported projection first.
                             listOf(
@@ -728,7 +721,6 @@ object DatabaseVault {
                         } finally { imported.endTransaction() }
                         imported.execSQL("DETACH DATABASE previous")
                     }
-                    DatasetteSettings.requireFull(context)
                     PersonalHubDatabase.closeInstance()
                     writeImportMarker(context, backup)
                     sidecars(target)
@@ -750,7 +742,7 @@ object DatabaseVault {
                 }
             }
         } finally { stage.delete(); sidecars(stage) }
-    } } }
+    } }
 
     internal fun snapshotProfileCopy(context: Context, file: File) = operations.withLock {
         file.parentFile?.mkdirs()
@@ -789,8 +781,7 @@ object DatabaseVault {
         currentProfileFile: File,
         targetProfileFile: File,
     ) = GitDataSync.pauseSync {
-        DatasetteSync.pauseUploads {
-            operations.withLock {
+        operations.withLock {
                 require(targetProfileFile.isFile) { "Profile database is missing" }
                 val target = context.getDatabasePath(PersonalHubDatabase.DB_NAME)
                 val stage = File(target.parentFile, "personalhub-profile-${UUID.randomUUID()}.db")
@@ -834,7 +825,6 @@ object DatabaseVault {
                     stage.delete()
                     sidecars(stage)
                 }
-            }
         }
     }
 

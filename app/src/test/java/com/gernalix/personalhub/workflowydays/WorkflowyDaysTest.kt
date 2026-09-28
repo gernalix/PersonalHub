@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -44,11 +45,12 @@ class WorkflowyDaysTest {
     }
 
     @Test
-    fun datasetteArrayShapeIsAccepted() {
-        val days = WorkflowyDaysFeed.parse(
-            """[{"date":"2026-09-03","node_id":"c4c46cee-ffb6-567b-ab14-595722f50038","imported_at":"2026-09-12T00:00:00Z"}]""",
-        )
-        assertEquals(LocalDate.of(2026, 9, 3), days.single().date)
+    fun bareArrayFeedIsRejected() {
+        assertThrows(org.json.JSONException::class.java) {
+            WorkflowyDaysFeed.parse(
+                """[{"date":"2026-09-03","node_id":"c4c46cee-ffb6-567b-ab14-595722f50038"}]""",
+            )
+        }
     }
 
     @Test

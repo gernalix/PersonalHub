@@ -37,7 +37,7 @@ changes/<timestamp>-g<generation>.json
 
 `state/manifest.json` is the authoritative materialized-state index for a Git revision. `changes/` may be used as an incremental hint, but correctness must be recoverable from the manifest plus state shards. History is optional input for historical notes/audit views and must not be confused with current state.
 
-No Android credential, Keystore value, Datasette token, Git token, SAF grant, widget preference or other device-local configuration is expected in this projection.
+No Android credential, Keystore value, Git token, SAF grant, widget preference or other device-local configuration is expected in this projection.
 
 ## PersonalHub responsibilities
 
@@ -45,7 +45,7 @@ PersonalHub is responsible only for its existing Git Data contract:
 
 - publish the current canonical database state in deterministic Git-friendly form;
 - publish semantic history and content-addressed BLOBs where applicable;
-- keep Git Data independent from Datasette and SAF backup;
+- keep Git Data independent from SAF backup;
 - keep secrets and device-local transport configuration out of Git Data.
 
 PersonalHub must not add:
@@ -58,7 +58,7 @@ PersonalHub must not add:
 - feature-level projection providers;
 - a runtime dependency on an Obsidian app or vault.
 
-A missing, stale or broken external projector must have zero effect on PersonalHub writes, reads, sync, restore, Datasette or backup.
+A missing, stale or broken external projector must have zero effect on PersonalHub writes, reads, Git History, restore or backup.
 
 ## Maintained module coverage
 
@@ -149,14 +149,9 @@ title: "Carlo Visda"
 
 The projector may maintain its own manifest/state outside user-authored notes. It must never delete or overwrite unrelated manual files in the vault.
 
-## Relationship to Datasette
+## Relationship to the PersonalHub app
 
-Datasette and Obsidian are independent derived views:
-
-- Datasette is for exhaustive structured/tabular exploration, SQL, filtering and aggregation.
-- Obsidian is for readable documents, Properties, wikilinks, backlinks and graph navigation.
-
-Neither is a runtime datastore for PersonalHub, and neither replaces the other.
+The Obsidian vault is an external, read-only projection of Git Data. The PersonalHub app does not bundle or configure an Obsidian or Datasette viewer; the former PH Datasette integration is retired.
 
 ## Testing contract for the external projector
 

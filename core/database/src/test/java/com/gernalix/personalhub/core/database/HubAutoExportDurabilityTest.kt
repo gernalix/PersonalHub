@@ -69,23 +69,6 @@ class HubAutoExportDurabilityTest {
     }
 
     @Test
-    fun internalSyncBookkeepingDoesNotScheduleExportWhenGenerationIsClean() {
-        configureFolderPreference()
-        val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
-        val current = DatabaseVault.currentGeneration(context)
-        DatabaseVault.preferences(context).edit().putLong("exported_generation", current).commit()
-        scheduler.autoExportRequests = 0
-
-        db.execSQL(
-            "INSERT OR REPLACE INTO hub_sync_known(table_name,row_key) VALUES(?,?)",
-            arrayOf("contacts", "already-synced"),
-        )
-
-        assertEquals(current, DatabaseVault.currentGeneration(context))
-        assertEquals(0, scheduler.autoExportRequests)
-    }
-
-    @Test
     fun missingSafFolderDoesNotCreateUnrecoverableWork() {
         val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
 

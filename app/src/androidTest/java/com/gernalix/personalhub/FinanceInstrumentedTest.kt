@@ -151,7 +151,7 @@ class FinanceInstrumentedTest {
         scenario.close()
     }
 
-    @Test fun syntheticCrudPersistsAndReachesAutoExportAndSyncJournal() = runBlocking {
+    @Test fun syntheticCrudPersistsAndReachesAutoExport() = runBlocking {
         guard()
         val db = PersonalHubDatabase.get(context)
         val finance = FinanceCapsule(db)
@@ -167,11 +167,9 @@ class FinanceInstrumentedTest {
             assertEquals("-3.75", record.amount)
             assertFalse(record.fromReceipt)
         } finally { reopened.close() }
-        assertEquals(1, scalar("SELECT count(*) FROM hub_sync_pending WHERE table_name='finance_transactions'"))
         finance.deleteTransaction(id)
         exportedCount(0)
         assertEquals(0, scalar("SELECT count(*) FROM finance_transaction_tags"))
-        assertEquals(1, scalar("SELECT count(*) FROM hub_sync_pending WHERE table_name='finance_transactions'"))
         // Leave one explicitly synthetic record for UI/read/reopen QA; original Soldi has never been read.
         finance.saveTransaction(TransactionDraft(title = "QA UI transaction", amount = "-10", fromReceipt = true))
         exportedCount(1)

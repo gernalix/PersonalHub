@@ -120,14 +120,5 @@
             android:name=".DatabaseActivity"
             android:exported="false" />
 
-        <activity
-            android:name=".DataExplorerActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="com.gernalix.personalhub.action.DATA_EXPLORER" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity>
     </application>
 </manifest>

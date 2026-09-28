@@ -177,11 +177,6 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             item(key = "home-since-when") {
                 HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }
             }
-            item(key = "home-data") {
-                HomeActionTile("🗃️", R.string.home_data_explorer, R.string.home_data_explorer_help) {
-                    context.startActivity(Intent(context, DataExplorerActivity::class.java))
-                }
-            }
             item(key = "home-settings") {
                 HomeActionTile("⚙️", R.string.settings_title, R.string.home_settings_help) { showSettings = true }
             }

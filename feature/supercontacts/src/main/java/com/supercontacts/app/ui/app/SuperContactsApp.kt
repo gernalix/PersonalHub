@@ -130,7 +130,6 @@ import com.supercontacts.app.data.repository.AddressSuggestion
 import com.supercontacts.app.data.repository.AppContainer
 import com.supercontacts.app.data.repository.ContactDetail
 import com.supercontacts.app.data.repository.ContactDeepLink
-import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.HubContextLinks
@@ -835,16 +834,6 @@ private fun ContactListScreen(
             TopAppBar(
                 title = {},
                 actions = {
-                    EmojiToolbarButton(
-                        emoji = "🗃️",
-                        contentDescription = "Datasette",
-                        testTag = "home-action-data-explorer",
-                        onClick = {
-                            context.startActivity(
-                                DataExplorerContract.intent(context.packageName, "contacts"),
-                            )
-                        },
-                    )
                     EmojiToolbarButton(
                         emoji = "🔎",
                         contentDescription = stringResource(R.string.messaging_scan_all),

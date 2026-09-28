@@ -17,22 +17,6 @@
     <string name="audit_mutation_source">Semantic mutation events, newest first. Legacy Git audit follows.</string>
     <string name="audit_search_hint">Search audit log</string>
     <string name="audit_git_disabled">Git Data is disabled, so no authoritative technical audit stream is available.</string>
-    <string name="home_data_explorer">Data</string>
-    <string name="home_data_explorer_help">SQL and advanced exploration</string>
-    <string name="data_explorer_title">Data explorer</string>
-    <string name="data_explorer_description">Explore PersonalHub with Datasette. Local mode uses a detached database snapshot; remote mode opens the authenticated read-only presentation database.</string>
-    <string name="data_explorer_read_only">Exploration is read-only. PersonalHub remains the only source of truth for writes, validation, Activity logging and undo.</string>
-    <string name="data_explorer_local">Open local Datasette Lite</string>
-    <string name="data_explorer_local_unavailable">The offline Datasette Lite runtime is not bundled in this build yet.</string>
-    <string name="data_explorer_snapshot_generation">Snapshot generation: %1$d</string>
-    <string name="data_explorer_remote_section">Remote Datasette</string>
-    <string name="data_explorer_remote_database">Presentation database</string>
-    <string name="data_explorer_remote_save">Save</string>
-    <string name="data_explorer_remote">Open remote</string>
-    <string name="data_explorer_remote_browser">Open remote in browser</string>
-    <string name="data_explorer_remote_unconfigured">Configure Datasette sync first; the explorer reuses only its HTTPS server address, never the mobile sync token.</string>
-    <string name="data_explorer_error">Data explorer operation failed.</string>
-    <string name="data_explorer_back">Back</string>
     <string name="temporal_title">Search by time</string>
     <string name="temporal_back">Back</string>
     <string name="temporal_from">From (YYYY-MM-DD HH:MM)</string>
@@ -126,22 +110,6 @@
     <string name="git_data_sync_retry">Git data sync failed; local data is safe and the operation will retry when appropriate.</string>
     <string name="git_data_sync_complete">Git data sync is up to date.</string>
     <string name="git_data_sync_error">Git data sync failed. Check the repository, token, compatibility, and network connection.</string>
-    <string name="datasette_sync_title">Datasette sync</string>
-    <string name="datasette_enable">Enable sync</string>
-    <string name="datasette_description">Optional outbound replica. When enabled, all current local data and later changes are sent to Datasette for remote browsing/analysis. Datasette never writes back into PersonalHub. Local changes remain saved while offline.</string>
-    <string name="datasette_connection">Connection settings</string>
-    <string name="datasette_url">Base URL (HTTPS)</string>
-    <string name="datasette_database">Database name</string>
-    <string name="datasette_table">Table name</string>
-    <string name="datasette_token">Access token</string>
-    <string name="datasette_token_saved">A token is saved securely. Leave blank to keep it.</string>
-    <string name="datasette_save">Save connection</string>
-    <string name="datasette_off">Sync is off. No data is sent.</string>
-    <string name="datasette_sending">Sending pending changes…</string>
-    <string name="datasette_complete">All queued changes sent.</string>
-    <string name="datasette_retry">Changes are saved locally. Connection failed; sync will retry automatically.</string>
-    <string name="datasette_waiting">Waiting to sync.</string>
-    <string name="datasette_error">Unable to save. Check the HTTPS address, database, table and access token.</string>
     <string name="module_soldi">Soldi</string>
     <string name="module_soldi_subtitle">Transactions and products</string>
 
@@ -285,9 +253,6 @@
     <string name="data_setup_saf_title">Backup folder</string>
     <string name="data_setup_backup_role">BACKUP — phone → folder automatically</string>
     <string name="data_setup_saf_body">Choose a folder to keep checked copies after changes. Selecting a folder does not load its data. To use a backup, choose Import and review it first.</string>
-    <string name="data_setup_datasette_title">Datasette</string>
-    <string name="data_setup_replica_role">ONLINE COPY — phone → Datasette</string>
-    <string name="data_setup_datasette_body">Use this optional service to browse a copy online. It never loads data into the app. To enable uploads, enter the service address and its upload key.</string>
     <string name="data_setup_git_title">Git data history</string>
     <string name="data_setup_history_role">VERSION HISTORY — phone → Git</string>
     <string name="data_setup_git_body">Use this optional service to keep past versions. Normal sync never replaces your phone data. Restore and applying a patch each require a separate action.</string>
@@ -297,9 +262,6 @@
     <string name="data_setup_configured">Configured (optional service is off)</string>
     <string name="data_setup_not_configured">Not configured — this is fine</string>
     <string name="data_setup_enabled">Enabled</string>
-    <string name="datasette_direction_notice">PersonalHub sends a copy to Datasette. It never loads data from Datasette.</string>
-    <string name="datasette_connection_help">Enter your Datasette service address and the destination for uploaded data. These settings do not change which phone data the app uses.</string>
-    <string name="datasette_token_help">The upload key lets this phone send data to Datasette. It stays encrypted on this phone and is not included in backups.</string>
     <string name="git_data_sync_direction_notice">Normal sync sends history to Git. Only the separate Restore action below can replace phone data.</string>
     <string name="git_data_sync_token_help">Enter the address of your private Git data repository and a key that lets this phone access it. The key stays encrypted on this phone and is not included in backups or commits.</string>
 

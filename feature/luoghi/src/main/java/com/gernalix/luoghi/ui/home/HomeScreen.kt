@@ -49,7 +49,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.luoghi.CHECKIN_BUTTON_TAG
 import com.gernalix.luoghi.CheckInHomeState
 import com.gernalix.luoghi.CheckInMessage
@@ -107,11 +106,6 @@ fun HomeScreen(
                             Icons.Outlined.Search,
                             contentDescription = stringResource(R.string.history_search),
                         )
-                    }
-                    IconButton(
-                        onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "places")) },
-                    ) {
-                        Icon(Icons.Outlined.Storage, contentDescription = "Datasette")
                     }
                     IconButton(onClick = onNewPlace) {
                         Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.new_place))

@@ -77,7 +77,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.personalhub.core.ui.HubTimeFormat
 import com.gernalix.sostanze.R
 import com.gernalix.sostanze.data.SubstanceEntity
@@ -190,11 +189,6 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                             },
                         ) {
                             Text("🔍")
-                        }
-                        TextButton(
-                            onClick = { context.startActivity(DataExplorerContract.intent(context.packageName, "substances")) },
-                        ) {
-                            Text("Data")
                         }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             IconButton(onClick = { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {

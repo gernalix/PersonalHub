@@ -89,8 +89,6 @@ class HubContextVerticalSliceTest {
         PersonalHubDatabase.closeInstance()
         initialize()
         assertEquals(otherPlace.ref.canonicalId, HubContextRuntime.temporalFacts().single().placeId)
-        assertTrue(PersonalHubDatabase.get(context).openHelper.readableDatabase.query("SELECT count(*) FROM hub_sync_pending WHERE table_name LIKE 'hub_context%'").use { it.moveToFirst(); it.getInt(0) } > 0)
-
         HubContextRuntime.saveTimerLinks(sessionId, setOf(person.ref.canonicalId), null)
         assertTrue(HubContextRuntime.temporalFacts().isEmpty())
         DefaultSessionCore(context).softDeleteSession(sessionId)

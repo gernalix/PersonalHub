@@ -136,6 +136,23 @@ class SyncJournalTest {
         }
     }
 
+    @Test fun compositePrimaryKeyEncodingRoundTripsTypedValues() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val owner = PersonalHubDatabase.openTemporary(context, "sync-key-helper-test.db")
+        try {
+            val db = owner.openHelper.writableDatabase
+            db.execSQL("CREATE TABLE sync_key_fixture (text_key TEXT NOT NULL, number_key INTEGER NOT NULL, PRIMARY KEY(text_key, number_key))")
+            db.execSQL("INSERT INTO sync_key_fixture VALUES ('a:b''c', 42)")
+            val keys = SyncJournal.primaryKeys(db, "sync_key_fixture")
+            assertEquals(listOf("text_key", "number_key"), keys)
+            val encoded = db.query("SELECT ${SyncJournal.keyExpression(keys)} FROM sync_key_fixture").use {
+                assertTrue(it.moveToFirst())
+                it.getString(0)
+            }
+            assertArrayEquals(arrayOf("a:b'c", 42L), SyncJournal.keyValues(encoded))
+        } finally { owner.close(); context.deleteDatabase("sync-key-helper-test.db") }
+    }
+
     @Test fun gitTrackingIgnoresNoOpUpdatesButRecordsRealUpdates() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val owner = PersonalHubDatabase.openTemporary(context, "git-noop-update-test.db")

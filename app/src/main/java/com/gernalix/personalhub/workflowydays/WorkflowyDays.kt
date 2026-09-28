@@ -17,7 +17,6 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
-import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -33,9 +32,8 @@ data class WorkflowyDay(val date: LocalDate, val nodeId: String) {
 /**
  * App-private store deliberately kept outside PersonalHubDatabase.
  *
- * Downloaded Workflowy metadata must not enter the generic Datasette upload journal and be
- * echoed back to the server. This tiny DB is still internal app data, but has one owner and one
- * direction: remote Workflowy index -> PersonalHub.
+ * This tiny DB is internal app data with one owner and one direction:
+ * remote Workflowy index -> PersonalHub.
  */
 object WorkflowyDaysStore {
     private const val DB_NAME = "workflowy_days.db"
@@ -128,17 +126,13 @@ object WorkflowyDaysStore {
 object WorkflowyDaysFeed {
     private val uuid = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
-    /** Accepts the compact VM feed or Datasette `_shape=array` rows from workflowy_days. */
+    /** Accepts the compact HTTPS JSON feed for workflowy_days. */
     fun parse(raw: String): List<WorkflowyDay> {
         val text = raw.trim()
         require(text.isNotEmpty()) { "Empty Workflowy-days feed" }
-        val rows = if (text.startsWith("[")) {
-            JSONArray(text)
-        } else {
-            val root = JSONObject(text)
-            require(root.getInt("schema_version") == 1) { "Unsupported Workflowy-days schema" }
-            root.getJSONArray("workflowy_days")
-        }
+        val root = JSONObject(text)
+        require(root.getInt("schema_version") == 1) { "Unsupported Workflowy-days schema" }
+        val rows = root.getJSONArray("workflowy_days")
 
         val unique = linkedMapOf<Pair<LocalDate, String>, WorkflowyDay>()
         repeat(rows.length()) { index ->
@@ -156,7 +150,7 @@ object WorkflowyDaysFeed {
     }
 }
 
-/** One-way, optional downloader. It is intentionally independent from DatasetteSync. */
+/** One-way, optional downloader for the Workflowy day index. */
 object WorkflowyDaysSync {
     private const val PREFS = "workflowy_days_sync"
     private const val KEY_URL = "feed_url"

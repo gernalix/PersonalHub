@@ -60,34 +60,11 @@ object SyncJournal {
         return "CREATE TRIGGER `hub_sync_${table}_$op` AFTER $op ON `$table` BEGIN $body END"
     }
 
-    fun install(db: SupportSQLiteDatabase) {
-        val installed = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger'").use { cursor ->
-            buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
+    /** Disable upload triggers left by older installations without deleting their stored rows. */
+    fun retireUploadTriggers(db: SupportSQLiteDatabase) {
+        val names = db.query("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'hub_sync_%'").use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
         }
-        fun normalized(sql: String) = sql.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
-        tables(db).forEach { table ->
-            val keys = primaryKeys(db, table)
-            check(keys.isNotEmpty()) { "Sync requires a primary key" }
-            listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                val name = "hub_sync_${table}_$op"
-                val expected = trigger(table, keys, op)
-                if (installed[name]?.let(::normalized) != normalized(expected)) {
-                    db.execSQL("DROP TRIGGER IF EXISTS `$name`")
-                    db.execSQL(expected)
-                }
-            }
-        }
-    }
-
-    fun enqueueAll(db: SupportSQLiteDatabase) {
-        db.beginTransaction()
-        try {
-            // Known identities include deletions and requests whose response was lost.
-            db.execSQL("INSERT OR IGNORE INTO hub_sync_pending SELECT table_name,row_key,1 FROM hub_sync_known")
-            tables(db).forEach { table ->
-                db.execSQL("INSERT OR IGNORE INTO hub_sync_pending SELECT '$table',${keyExpression(primaryKeys(db, table))},1 FROM `$table`")
-            }
-            db.setTransactionSuccessful()
-        } finally { db.endTransaction() }
+        names.forEach { name -> db.execSQL("DROP TRIGGER IF EXISTS `${name.replace("`", "``")}`") }
     }
 }

@@ -13,7 +13,6 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.Until
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.database.DatabasePreferences
-import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -111,7 +110,7 @@ class PersistenceUiRegressionDeviceTest {
         )
     }
 
-    @TableProbe("quick_event_entries", "hub_generation", "hub_sync_pending")
+    @TableProbe("quick_event_entries", "hub_generation")
     @Test fun timerEventCreateEditReopenReadbackAndCleanup() {
         val title = marker("Timer")
         var id: Long? = null
@@ -126,13 +125,6 @@ class PersistenceUiRegressionDeviceTest {
             id = oneId("quick_event_entries", "title", title)
             assertNotNull("Timer event did not persist", id)
             assertTrue(scalar("SELECT generation FROM hub_generation WHERE id=1") > generationBefore)
-            val pendingKeys = db.query(
-                "SELECT row_key FROM hub_sync_pending WHERE table_name='quick_event_entries'",
-            ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
-            assertTrue("Sync journal missed Timer entry", pendingKeys.any {
-                SyncJournal.keyValues(it).single() == id
-            })
-
             tapText(title)
             setFirstEditor("${title}Edited")
             tapText("Save")
