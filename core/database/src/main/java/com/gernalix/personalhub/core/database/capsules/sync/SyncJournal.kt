@@ -63,7 +63,7 @@ object SyncJournal {
     /** Disable upload triggers left by older installations without deleting their stored rows. */
     fun retireUploadTriggers(db: SupportSQLiteDatabase) {
         val names = db.query("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'hub_sync_%'").use { cursor ->
-            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+            buildList { while (cursor.moveToNext()) cursor.getString(0).takeIf { it.startsWith("hub_sync_") }?.let(::add) }
         }
         names.forEach { name -> db.execSQL("DROP TRIGGER IF EXISTS `${name.replace("`", "``")}`") }
     }
