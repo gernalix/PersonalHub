@@ -51,6 +51,19 @@ class SemanticHistoryPresentationTest {
         }
     }
 
+    @Test
+    fun timerTagLinkIsVisibleInSameActionAndUsesHistoricalTagName() {
+        val row = semanticHistoryRows(listOf(
+            event("session-action", 1, "timer", "timer.session.created", "session", null,
+                """{"title":"Walk"}""", """{"name":"Walk"}"""),
+            event("session-action", 2, "timer", "timer.session.tag_added", "session", null,
+                """{"tag":{"id":21,"name":"Exercise"}}""", """{"name":"Walk"}"""),
+        )).single()
+        assertEquals("Created session “Walk”", row.text.title)
+        assertTrue(row.text.detail.orEmpty().contains("Added tag “Exercise” to session “Walk”"))
+        assertTrue(row.text.searchText.contains("Exercise"))
+    }
+
     private fun event(
         transaction: String, sequence: Int, module: String, type: String, entity: String,
         before: String?, after: String?, context: String, actor: String = "user",

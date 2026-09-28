@@ -18,7 +18,9 @@ internal fun semanticHistoryRows(events: List<MutationEvent>): List<SemanticHist
         val rendered = visible.mapNotNull { event -> renderSemanticEvent(event)?.let { event to it } }
         val primary = rendered.maxByOrNull { (event, _) -> semanticPriority(event) } ?: return@mapNotNull null
         val text = primary.second
-        val detail = rendered.mapNotNull { it.second.detail }.distinct().take(4).joinToString(" · ").takeIf(String::isNotBlank)
+        val detail = rendered.flatMap { (event, text) ->
+            listOfNotNull(text.title.takeIf { event.eventId != primary.first.eventId }, text.detail)
+        }.distinct().take(4).joinToString(" · ").takeIf(String::isNotBlank)
         SemanticHistoryRow(
             transactionId = transactionId,
             occurredAt = group.maxOf(MutationEvent::occurredAt),
@@ -37,6 +39,7 @@ private fun semanticPriority(event: MutationEvent): Int = when (event.eventType)
     "substances.intake.created" -> 90
     "people.person.created", "people.person.deleted", "people.person.archived" -> 85
     "timer.session.created", "timer.session.updated", "timer.session.deleted" -> 80
+    "timer.session.tag_added", "timer.session.tag_removed" -> 75
     "people.field.created", "people.field.updated", "people.field.deleted" -> 70
     "places.place.created", "places.place.updated", "places.place.deleted" -> 60
     "tags.tag.created", "tags.tag.updated", "tags.tag.deleted" -> 50
@@ -61,6 +64,12 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
             if (name == "Workflowy") "Removed Workflowy link" else "Removed Workflowy link for $quoted"
         "timer.session.created" -> "Created session $quoted"
         "timer.session.deleted" -> "Deleted session $quoted"
+        "timer.session.tag_added", "timer.session.tag_removed" -> {
+            val tag = (after ?: before)?.optJSONObject("tag")?.optString("name")?.let(::cleanHumanValue) ?: return null
+            val verb = if (event.eventType.endsWith("tag_added")) "Added" else "Removed"
+            val direction = if (verb == "Added") "to" else "from"
+            "$verb tag “$tag” $direction session $quoted"
+        }
         "timer.session.updated" -> {
             if (before?.has("title") == true && after?.has("title") == true) {
                 val old = cleanHumanValue(before.optString("title")) ?: return null

@@ -41,7 +41,29 @@ object MutationEventCapture {
         if (listOf("hub_contexts", "hub_context_members", "hub_entity_bindings", "hub_resources").all { tableExists(db, it) }) {
             installWorkflowyAssociation(db)
         }
+        if (listOf("session_tags", "sessions", "tags").all { tableExists(db, it) }) installSessionTags(db)
         if (tableExists(db, "contact_events") && tableExists(db, "contact_fields")) installPeopleActions(db)
+    }
+
+    private fun installSessionTags(db: SupportSQLiteDatabase) {
+        val group = "COALESCE((SELECT group_id FROM hub_git_edit_context WHERE id=1),lower(hex(randomblob(16))))"
+        val sequence = "(SELECT COALESCE(MAX(sequence),0)+1 FROM mutation_events WHERE transaction_id=$group)"
+        val actor = "COALESCE((SELECT actor FROM hub_git_edit_context WHERE id=1),'user')"
+        val source = "COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1),'personalhub')"
+        listOf("INSERT" to "tag_added", "DELETE" to "tag_removed").forEach { (operation, action) ->
+            val row = if (operation == "INSERT") "NEW" else "OLD"
+            val tag = "json_object('tag',json_object('id',$row.tag_id,'name',(SELECT name FROM tags WHERE id=$row.tag_id)))"
+            val name = "json_object('name',(SELECT title FROM sessions WHERE id=$row.session_id))"
+            val trigger = "mutation_session_tags_$operation"
+            db.execSQL("DROP TRIGGER IF EXISTS `$trigger`")
+            db.execSQL("""CREATE TRIGGER `$trigger` BEFORE $operation ON session_tags BEGIN
+                INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
+                    entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
+                VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
+                    $group,$sequence,'timer','timer.session.$action','session',CAST($row.session_id AS TEXT),$actor,$source,
+                    ${if (operation == "INSERT") "NULL" else tag},${if (operation == "DELETE") "NULL" else tag},$name,1);
+            END""".trimIndent())
+        }
     }
 
     private fun installPeopleActions(db: SupportSQLiteDatabase) {

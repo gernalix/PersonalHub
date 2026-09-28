@@ -90,6 +90,27 @@ class MutationEventStoreTest {
     }
 
     @Test
+    fun timerTagRelationKeepsSessionAndTagNameSnapshots() = withDatabase { database ->
+        val db = database.openHelper.writableDatabase
+        val now = System.currentTimeMillis()
+        db.execSQL("INSERT INTO sessions(id,title,start_ms,end_ms,expected_end_ms,created_at_ms,updated_at_ms,deleted_at_ms) VALUES(11,'Walk',?,NULL,NULL,?,?,NULL)",
+            arrayOf<Any?>(now, now, now))
+        db.execSQL("INSERT INTO tags(id,name,normalized_name,created_at) VALUES(21,'Exercise','exercise',?)", arrayOf<Any?>(now))
+        db.execSQL("INSERT INTO session_tags(session_id,tag_id) VALUES(11,21)")
+        db.execSQL("UPDATE tags SET name='Fitness' WHERE id=21")
+        db.execSQL("DELETE FROM session_tags WHERE session_id=11 AND tag_id=21")
+        val events = MutationEventStore.recent(db).filter { it.eventType.startsWith("timer.session.tag_") }
+        assertEquals(2, events.size)
+        val added = events.single { it.eventType == "timer.session.tag_added" }
+        val removed = events.single { it.eventType == "timer.session.tag_removed" }
+        assertEquals("Walk", JSONObject(added.contextJson).getString("name"))
+        assertEquals("Exercise", JSONObject(added.afterJson!!).getJSONObject("tag").getString("name"))
+        assertEquals("Fitness", JSONObject(removed.beforeJson!!).getJSONObject("tag").getString("name"))
+        assertNull(added.beforeJson)
+        assertNull(removed.afterJson)
+    }
+
+    @Test
     fun workflowyResourceCapturesOneLinkFactWithNameSnapshot() = withDatabase { database ->
         val db = database.openHelper.writableDatabase
         val id = UUID.randomUUID().toString()
