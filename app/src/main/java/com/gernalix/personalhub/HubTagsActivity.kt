@@ -121,7 +121,12 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
             Text("Tags", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier)
         }
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text("Search tags") })
+        com.gernalix.personalhub.core.ui.HubSearchField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = "Search tags",
+        )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(namespace == null, { namespace = null }, label = { Text("All") })
             HubTagNamespaces.all.sorted().forEach { value ->

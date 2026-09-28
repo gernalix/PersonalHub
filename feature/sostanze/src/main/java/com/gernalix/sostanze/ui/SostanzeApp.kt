@@ -899,12 +899,11 @@ private fun InteractionScreen(
 
 @Composable
 private fun SearchBox(query: String, onQueryChange: (String) -> Unit) {
-    OutlinedTextField(
+    com.gernalix.personalhub.core.ui.HubSearchField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        label = { Text(stringResource(R.string.search)) }
+        label = stringResource(R.string.search),
     )
 }
 

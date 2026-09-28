@@ -554,15 +554,14 @@ private fun ExploreTab(
     onSelectWord: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        OutlinedTextField(
+        com.gernalix.personalhub.core.ui.HubSearchField(
             value = searchQuery,
             onValueChange = onSearchChanged,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("word-search-input"),
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            placeholder = { Text("Search") },
+            showSearchIcon = true,
+            placeholder = "Search",
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SearchMode.entries.forEach { mode ->

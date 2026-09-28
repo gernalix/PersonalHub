@@ -600,20 +600,13 @@ private fun QuickEventSearchAndFilters(
     onShowArchivedChange: (Boolean) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
+        com.gernalix.personalhub.core.ui.HubSearchField(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            trailingIcon = {
-                if (query.isNotBlank()) {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.quick_event_clear_search))
-                    }
-                }
-            },
-            label = { Text(stringResource(R.string.quick_event_search)) }
+            label = stringResource(R.string.quick_event_search),
+            showSearchIcon = true,
+            clearButtonTestTag = "quick-event-search-clear",
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = onOpenFilters) {
@@ -1396,7 +1389,12 @@ private fun QuickEventTagPickerDialog(
         title = { Text(stringResource(R.string.quick_event_tags)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.cerca_tag)) })
+                com.gernalix.personalhub.core.ui.HubSearchField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.cerca_tag),
+                )
                 if (canAdd) OutlinedButton(onClick = { onAddTag(cleanQuery) }) { Text(stringResource(R.string.add_tag_with_query, cleanQuery)) }
                 if (orderedTags.isEmpty()) Text(stringResource(R.string.nessun_tag)) else TagSelectionFlow(tags = orderedTags, selectedIds = selectedIds, onToggle = onToggle, emphasizeTimedDuration = true)
             }
