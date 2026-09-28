@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -25,6 +26,7 @@ import com.gernalix.personalhub.capsules.shortcuts.HubModule
 import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
 import com.gernalix.personalhub.core.database.HubActivityStatus
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore
 import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -48,6 +50,10 @@ class HubHistorySearchQaDeviceTest {
     fun globalHistorySearchFiltersHiddenDiffAndUndoAreLive() {
         val context = qaContext()
         val seed = seedReversiblePlaceUpdate(context)
+        val semanticUpdate = MutationEventStore.recent(seed.database.openHelper.readableDatabase)
+            .single { it.eventType == "places.place.updated" && it.entityId == seed.placeId }
+        assertTrue(semanticUpdate.beforeJson.orEmpty().contains(seed.hiddenBeforeNote))
+        assertTrue(semanticUpdate.afterJson.orEmpty().contains("hidden-after-"))
         composeRule.setContent {
             PersonalHubTheme {
                 Surface {
@@ -81,6 +87,9 @@ class HubHistorySearchQaDeviceTest {
         composeRule.onNodeWithTag("history-from").performTextClearance()
         waitForText(seed.placeName)
 
+        composeRule.waitUntil(timeoutMillis = 7_000L) {
+            runCatching { composeRule.onNodeWithTag("history-undo").assertIsEnabled(); true }.getOrDefault(false)
+        }
         composeRule.onNodeWithTag("history-undo").performClick()
         composeRule.waitUntil(timeoutMillis = 7_000L) {
             runBlocking {
