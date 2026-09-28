@@ -54,6 +54,14 @@ class WorkflowyDaysTest {
     }
 
     @Test
+    fun legacyArrayEndpointCannotBeConfigured() {
+        WorkflowyIntegrationSettings.setEnabled(context, true)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            WorkflowyDaysSync.configure(context, "https://example.test/workflowy_days.json?_shape=array")
+        }
+    }
+
+    @Test
     fun duplicateDateWithDifferentNodesIsPreservedAndMarkedAmbiguous() {
         val days = WorkflowyDaysFeed.parse(
             """

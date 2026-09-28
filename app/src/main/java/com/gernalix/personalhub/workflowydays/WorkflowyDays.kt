@@ -163,9 +163,21 @@ object WorkflowyDaysSync {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    private fun isLegacyDatasetteFeed(url: String): Boolean =
+        Uri.parse(url).getQueryParameter("_shape")?.equals("array", ignoreCase = true) == true
+
+    private fun retireLegacyFeed(context: Context, url: String?): Boolean {
+        if (url == null || !isLegacyDatasetteFeed(url)) return false
+        prefs(context).edit().putBoolean(KEY_ENABLED, false).putString(KEY_STATUS, "unsupported_feed").apply()
+        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(PERIODIC_WORK)
+        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(NOW_WORK)
+        return true
+    }
+
     fun configure(context: Context, feedUrl: String, enabled: Boolean = true) {
         if (enabled) require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         require(feedUrl.startsWith("https://")) { "Workflowy-days feed must use HTTPS" }
+        require(!isLegacyDatasetteFeed(feedUrl)) { "Legacy array feed is no longer supported" }
         prefs(context).edit().putString(KEY_URL, feedUrl).putBoolean(KEY_ENABLED, enabled).apply()
         if (enabled) {
             ensureScheduled(context)
@@ -178,7 +190,11 @@ object WorkflowyDaysSync {
     fun setEnabled(context: Context, enabled: Boolean) {
         if (enabled) require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         val preferences = prefs(context)
-        if (enabled) require(!preferences.getString(KEY_URL, null).isNullOrBlank()) { "Workflowy-days feed URL is not configured" }
+        if (enabled) {
+            val url = preferences.getString(KEY_URL, null)
+            require(!url.isNullOrBlank()) { "Workflowy-days feed URL is not configured" }
+            require(!isLegacyDatasetteFeed(url)) { "Legacy array feed is no longer supported" }
+        }
         preferences.edit().putBoolean(KEY_ENABLED, enabled).apply()
         if (enabled) {
             ensureScheduled(context)
@@ -212,6 +228,7 @@ object WorkflowyDaysSync {
             return
         }
         val preferences = prefs(context)
+        if (retireLegacyFeed(context, preferences.getString(KEY_URL, null))) return
         if (!preferences.getBoolean(KEY_ENABLED, false) || preferences.getString(KEY_URL, null).isNullOrBlank()) return
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
         val request = PeriodicWorkRequestBuilder<WorkflowyDaysWorker>(24, TimeUnit.HOURS)
@@ -228,6 +245,7 @@ object WorkflowyDaysSync {
     fun requestNow(context: Context) {
         if (!WorkflowyIntegrationSettings.isEnabled(context)) return
         val preferences = prefs(context)
+        if (retireLegacyFeed(context, preferences.getString(KEY_URL, null))) return
         if (!preferences.getBoolean(KEY_ENABLED, false) || preferences.getString(KEY_URL, null).isNullOrBlank()) return
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
@@ -251,6 +269,7 @@ object WorkflowyDaysSync {
         val preferences = prefs(context)
         if (!preferences.getBoolean(KEY_ENABLED, false)) return true
         val url = preferences.getString(KEY_URL, null)?.takeIf { it.isNotBlank() } ?: return true
+        if (retireLegacyFeed(context, url)) return true
         preferences.edit().putString(KEY_STATUS, "downloading").apply()
 
         var connection: HttpURLConnection? = null
