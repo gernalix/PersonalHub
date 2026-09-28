@@ -49,7 +49,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
@@ -77,6 +76,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.gernalix.personalhub.core.ui.HubFeedback
+import com.gernalix.personalhub.core.ui.HubFeedbackHost
 import com.gernalix.personalhub.core.ui.HubTimeFormat
 import com.gernalix.sostanze.R
 import com.gernalix.sostanze.data.SubstanceEntity
@@ -175,7 +176,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
     val restoreNameMessage = stringResource(R.string.restore_existing_name)
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -240,7 +241,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                         val successMessage = successRecordedMessage(recordedMessage, substance.name)
                         viewModel.recordIntake(substance.id) { outcome, token ->
                             if (outcome is IntakeOutcome.Recorded) {
-                                Toast.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
+                                HubFeedback.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
                             } else {
                                 scope.launch {
                                     val message = when (outcome) {
@@ -262,7 +263,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                         val successMessage = successRecordedMessage(recordedMessage, macro.macro.name)
                         viewModel.recordMacro(macro.macro.id) { outcomes, token ->
                             if (token != null && outcomes.any { it is IntakeOutcome.Recorded }) {
-                                Toast.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
+                                HubFeedback.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
                             }
                         }
                     },

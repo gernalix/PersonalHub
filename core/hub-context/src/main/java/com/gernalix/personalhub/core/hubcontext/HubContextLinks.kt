@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
+import com.gernalix.personalhub.core.ui.HubFeedback
 import kotlinx.coroutines.launch
 
 @Composable
@@ -126,7 +127,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                         workflowyBusy = true
                         runCatching { WorkflowyHubBridge.deleteLinkedNode(context, anchor, target) }
                             .onSuccess { workflowyDeleteRef = null; refresh() }
-                            .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                            .onFailure { HubFeedback.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
                         workflowyBusy = false
                     }
                 }) { Text(stringResource(R.string.hub_workflowy_delete_node)) }
@@ -171,7 +172,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                                         workflowyBusy = true
                                         runCatching { WorkflowyHubBridge.createEmptyAndOpen(context, anchor) }
                                             .onSuccess { refresh() }
-                                            .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                                            .onFailure { HubFeedback.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
                                         workflowyBusy = false
                                     }
                                 },
@@ -196,7 +197,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                                             workflowyBusy = true
                                             runCatching { WorkflowyHubBridge.delink(context, anchor, node.ref) }
                                                 .onSuccess { refresh() }
-                                                .onFailure { Toast.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
+                                                .onFailure { HubFeedback.makeText(context, it.message ?: workflowyNoteFailedMessage, Toast.LENGTH_LONG).show() }
                                             workflowyBusy = false
                                         }
                                     },
@@ -305,5 +306,5 @@ private fun ExistingWorkflowyLinkDialog(
 private fun copyHubLink(context: android.content.Context, value: String) {
     context.getSystemService(ClipboardManager::class.java)
         ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.hub_copy_personalhub_link), value))
-    Toast.makeText(context, R.string.hub_permalink_copied, Toast.LENGTH_SHORT).show()
+    HubFeedback.makeText(context, R.string.hub_permalink_copied, Toast.LENGTH_SHORT).show()
 }

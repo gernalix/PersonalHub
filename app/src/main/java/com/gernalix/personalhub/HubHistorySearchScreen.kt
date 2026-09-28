@@ -30,8 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.gernalix.personalhub.core.ui.HubFeedbackHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -265,7 +265,7 @@ fun HubHistorySearchScreen(
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { contentPadding ->
+    Scaffold(snackbarHost = { HubFeedbackHost(snackbar) }) { contentPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

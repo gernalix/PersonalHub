@@ -28,6 +28,7 @@ androidComponents {
 dependencies {
     api(project(":contracts:database"))
     implementation(project(":core:database"))
+    implementation(project(":core:ui"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)
