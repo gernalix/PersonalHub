@@ -97,10 +97,29 @@ class MutationEventStoreTest {
                 VALUES(?, 'url', 'Workflowy · Study', 'https://workflowy.com/#/abc123', 0, ?, ?)""".trimIndent(),
             arrayOf<Any?>(id, now, now),
         )
-        val event = MutationEventStore.recent(db).single { it.eventType == "workflowy.link.created" }
+        val event = MutationEventStore.recent(db).single { it.eventType == "hub.resource.created" }
         assertEquals("Workflowy · Study", JSONObject(event.contextJson).getString("name"))
+        val anchorBinding = UUID.randomUUID().toString()
+        val resourceBinding = UUID.randomUUID().toString()
+        val linkContext = UUID.randomUUID().toString()
+        db.execSQL("INSERT INTO hub_entity_bindings(id,module_id,entity_kind,canonical_id,lifecycle,updated_at) VALUES(?, 'places', 'place', 'place-1', 'active', ?)",
+            arrayOf<Any?>(anchorBinding, now))
+        db.execSQL("INSERT INTO hub_entity_bindings(id,module_id,entity_kind,canonical_id,lifecycle,updated_at) VALUES(?, 'hub', 'resource', ?, 'active', ?)",
+            arrayOf<Any?>(resourceBinding, id, now))
+        db.execSQL("INSERT INTO hub_contexts(id,context_type_id,title,created_at,updated_at) VALUES(?,NULL,'Workflowy',?,?)",
+            arrayOf<Any?>(linkContext, now, now))
+        db.execSQL("INSERT INTO hub_context_members(context_id,entity_id,role,position) VALUES(?,?,'',0)",
+            arrayOf<Any?>(linkContext, anchorBinding))
+        db.execSQL("INSERT INTO hub_context_members(context_id,entity_id,role,position) VALUES(?,?,'',1)",
+            arrayOf<Any?>(linkContext, resourceBinding))
+        val association = MutationEventStore.recent(db).single { it.eventType == "workflowy.link.assigned" }
+        assertEquals("places", association.module)
+        assertEquals("Workflowy · Study", JSONObject(association.contextJson).getString("name"))
+        db.execSQL("DELETE FROM hub_contexts WHERE id=?", arrayOf(linkContext))
+        val unlinked = MutationEventStore.recent(db).single { it.eventType == "workflowy.link.unlinked" }
+        assertEquals("places", unlinked.module)
         db.execSQL("DELETE FROM hub_resources WHERE id=?", arrayOf(id))
-        val deleted = MutationEventStore.recent(db).single { it.eventType == "workflowy.link.deleted" }
+        val deleted = MutationEventStore.recent(db).single { it.eventType == "hub.resource.deleted" }
         assertEquals("Workflowy · Study", JSONObject(deleted.beforeJson!!).getString("title"))
         assertNull(deleted.afterJson)
     }

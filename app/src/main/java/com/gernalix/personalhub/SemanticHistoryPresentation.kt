@@ -33,7 +33,7 @@ internal fun semanticHistoryRows(events: List<MutationEvent>): List<SemanticHist
     }.sortedWith(compareByDescending<SemanticHistoryRow> { it.occurredAt }.thenByDescending { it.transactionId })
 
 private fun semanticPriority(event: MutationEvent): Int = when (event.eventType) {
-    "workflowy.link.created", "workflowy.link.deleted" -> 100
+    "workflowy.link.assigned", "workflowy.link.unlinked" -> 110
     "substances.intake.created" -> 90
     "timer.session.created", "timer.session.updated", "timer.session.deleted" -> 80
     "people.field.created", "people.field.updated", "people.field.deleted" -> 70
@@ -54,8 +54,10 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
     val name = cleanHumanValue(rawName?.removePrefix("Workflowy · ")) ?: return null
     val quoted = "“$name”"
     val title = when (event.eventType) {
-        "workflowy.link.created" -> "Linked $quoted to Workflowy"
-        "workflowy.link.deleted" -> "Removed Workflowy link for $quoted"
+        "workflowy.link.assigned" ->
+            if (name == "Workflowy") "Linked Workflowy node" else "Linked $quoted to Workflowy"
+        "workflowy.link.unlinked" ->
+            if (name == "Workflowy") "Removed Workflowy link" else "Removed Workflowy link for $quoted"
         "timer.session.created" -> "Created session $quoted"
         "timer.session.deleted" -> "Deleted session $quoted"
         "timer.session.updated" -> {

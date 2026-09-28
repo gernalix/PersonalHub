@@ -16,12 +16,15 @@ class SemanticHistoryPresentationTest {
     fun oneActionWithDerivedWritesProducesOneHumanRowAndSearchesBeforeAfter() {
         val rows = semanticHistoryRows(listOf(
             event("tx", 1, "tags", "tags.tag.updated", "tag", """{"name":"Old"}""", """{"name":"New"}""", """{"name":"New"}"""),
-            event("tx", 2, "workflowy", "workflowy.link.created", "link", null,
+            event("tx", 2, "hub", "hub.resource.created", "resource", null,
                 """{"title":"Workflowy · Study","value":"https://workflowy.com/#/abc123"}""", """{"name":"Workflowy · Study"}"""),
+            event("tx", 4, "places", "workflowy.link.assigned", "link", null,
+                """{"name":"Workflowy · Study"}""", """{"name":"Workflowy · Study"}"""),
             event("tx", 3, "tags", "tags.tag.updated", "tag", """{"usage_count":1}""", """{"usage_count":2}""", """{"name":"New"}""", actor = "system"),
         ))
         assertEquals(1, rows.size)
         assertEquals("Linked “Study” to Workflowy", rows.single().text.title)
+        assertEquals("places", rows.single().module)
         assertTrue(rows.single().text.searchText.contains("Old"))
         assertTrue(rows.single().text.searchText.contains("New"))
         assertFalse(rows.single().text.searchText.contains("usage_count"))
