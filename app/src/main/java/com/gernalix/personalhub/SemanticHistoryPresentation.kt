@@ -50,11 +50,11 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
     val before = event.beforeJson?.let(::JSONObject)
     val after = event.afterJson?.let(::JSONObject)
     val context = JSONObject(event.contextJson)
-    val rawName = context.optString("name").takeIf(String::isNotBlank)
-        ?: after?.optString("name")?.takeIf(String::isNotBlank)
-        ?: before?.optString("name")?.takeIf(String::isNotBlank)
-        ?: after?.optString("title")?.takeIf(String::isNotBlank)
-        ?: before?.optString("title")?.takeIf(String::isNotBlank)
+    val rawName = semanticString(context, "name")
+        ?: semanticString(after, "name")
+        ?: semanticString(before, "name")
+        ?: semanticString(after, "title")
+        ?: semanticString(before, "title")
     val name = cleanHumanValue(rawName?.removePrefix("Workflowy · ")) ?: return null
     val quoted = "“$name”"
     val title = when (event.eventType) {
@@ -65,7 +65,7 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
         "timer.session.created" -> "Created session $quoted"
         "timer.session.deleted" -> "Deleted session $quoted"
         "timer.session.tag_added", "timer.session.tag_removed" -> {
-            val tag = (after ?: before)?.optJSONObject("tag")?.optString("name")?.let(::cleanHumanValue) ?: return null
+            val tag = semanticString((after ?: before)?.optJSONObject("tag"), "name")?.let(::cleanHumanValue) ?: return null
             val verb = if (event.eventType.endsWith("tag_added")) "Added" else "Removed"
             val direction = if (verb == "Added") "to" else "from"
             "$verb tag “$tag” $direction session $quoted"
@@ -113,6 +113,9 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
     }.take(3).toList().joinToString(" · ").takeIf(String::isNotBlank) else null
     return HumanActivityText(title, changes, listOfNotNull(title, changes).joinToString(" "))
 }
+
+private fun semanticString(json: JSONObject?, key: String): String? =
+    json?.opt(key)?.takeUnless { it == JSONObject.NULL }?.toString()?.takeIf(String::isNotBlank)
 
 private fun semanticFieldLabel(key: String): String? = when (key) {
     "name", "title", "nickname" -> "Name"

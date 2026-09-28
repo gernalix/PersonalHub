@@ -64,6 +64,9 @@ import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoResolver
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
@@ -87,6 +90,10 @@ private data class ActivityUiItem(
     val undoActivityId: String?,
     val activity: HubActivityEntity? = null,
     val git: GitHistoryItem? = null,
+    val semanticTransactionId: String? = null,
+    val semanticEventIds: Set<String> = emptySet(),
+    val semanticEntityIds: Set<String> = emptySet(),
+    val semanticEntityKinds: Set<String> = emptySet(),
 )
 
 private data class ParsedHistoryBoundary(
@@ -137,6 +144,7 @@ fun HubHistorySearchScreen(
     var entries by remember { mutableStateOf<List<ActivityUiItem>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var eventMissing by remember(initialEventId) { mutableStateOf(false) }
+    var undoRevision by remember { mutableStateOf(0) }
 
     val selectedSet = remember(selectedModuleIds) { selectedModuleIds.toSet() }
     val parsedFrom = remember(fromText) { parseHistoryBoundary(fromText) }
@@ -153,14 +161,42 @@ fun HubHistorySearchScreen(
 
     suspend fun refreshVisibleEntries(debounceQuery: Boolean = false) {
         eventMissing = false
-        if (!parsedFrom.valid || !parsedTo.valid || invalidRange || selectedSet.isEmpty()) {
+        if (!parsedFrom.valid || !parsedTo.valid || invalidRange || (selectedSet.isEmpty() && initialEventId == null)) {
             entries = emptyList()
             return
         }
         if (debounceQuery && query.isNotBlank()) delay(60)
-        if (gitEnabled) {
+        val semantic = withContext(Dispatchers.IO) {
+            val db = database.openHelper.readableDatabase
+            val source = if (initialEventId == null) MutationEventStore.recent(db, limit = 10_000)
+                else MutationEventStore.byId(db, initialEventId)?.let { MutationEventStore.byTransaction(db, it.transactionId) }.orEmpty()
+            semanticHistoryRows(source).map { row ->
+                val primary = row.events.firstOrNull { it.module == row.module && it.entityId != null }
+                ActivityUiItem(
+                    id = "semantic-${row.transactionId}",
+                    occurredAt = row.occurredAt,
+                    moduleId = row.module,
+                    title = row.text.title,
+                    detail = row.text.detail,
+                    searchText = row.text.searchText,
+                    relatedCount = row.events.size,
+                    navigationRef = primary?.entityId?.let { HubEntityRef(row.module, primary.entityType, it) },
+                    undoActivityId = null,
+                    semanticTransactionId = row.transactionId,
+                    semanticEventIds = row.events.mapTo(mutableSetOf()) { it.eventId },
+                    semanticEntityIds = row.events.mapNotNullTo(mutableSetOf()) { it.entityId },
+                    semanticEntityKinds = row.events.mapTo(mutableSetOf()) { it.entityType },
+                )
+            }
+        }
+        // Earlier installations have only the prior audit stores. Keep those rows until the
+        // first persisted semantic event, and keep direct links to old audit IDs working.
+        val semanticStart = withContext(Dispatchers.IO) {
+            MutationEventStore.oldestOccurredAt(database.openHelper.readableDatabase)
+        }
+        val legacy = if (gitEnabled) {
             val rows = withContext(Dispatchers.IO) { GitHistory.recentForDisplay(context.applicationContext, limit = 1000) }
-            val humanized = groupGitHistoryRows(rows).filter(::displayableGitHistoryGroup).map { group ->
+            groupGitHistoryRows(rows).filter(::displayableGitHistoryGroup).map { group ->
                 val (item, text) = humanizeGitHistoryGroup(group) { module -> moduleDisplayName(context, module) }
                 val moduleId = gitHistoryModule(item.table)
                 ActivityUiItem(
@@ -176,39 +212,39 @@ fun HubHistorySearchScreen(
                     git = item,
                 )
             }
-            val needle = normalizeHistorySearchText(query)
-            entries = humanized.filter { item ->
-                (scopeModuleId == null || item.moduleId == scopeModuleId) &&
-                    (item.moduleId in selectedSet || (scopeModuleId == null && selectedSet == allModuleIds)) &&
-                    (parsedFrom.value == null || item.occurredAt >= parsedFrom.value!!) &&
-                    (parsedTo.value == null || item.occurredAt <= parsedTo.value!!) &&
-                    (initialEventId == null || item.id == initialEventId || item.git?.id == initialEventId) &&
-                    (initialEntityId == null || item.git?.rowKey == initialEntityId) &&
-                    (needle.isBlank() || normalizeHistorySearchText(item.searchText).contains(needle))
-            }.sortedWith(compareByDescending<ActivityUiItem> { it.occurredAt }.thenByDescending { it.id })
-            eventMissing = initialEventId != null && entries.isEmpty()
-            return
+        } else {
+            val rows = if (initialEventId != null) database.activityDao().byId(initialEventId)?.let(::listOf).orEmpty()
+            else database.activityDao().search(
+                moduleIds = selectedSet.sorted(),
+                allModules = if (scopeModuleId == null && selectedSet == allModuleIds) 1 else 0,
+                includeSystem = 0,
+                fromMs = parsedFrom.value,
+                toMs = parsedTo.value,
+                entityKind = initialEntityKind,
+                entityId = initialEntityId,
+                limit = ACTIVITY_SEARCH_LIMIT,
+            )
+            resolveActivityItems(context, rows)
         }
-        if (initialEventId != null) {
-            val row = database.activityDao().byId(initialEventId)
-            eventMissing = row == null
-            entries = row?.let { resolveActivityItems(context, listOf(it)) }.orEmpty()
-            return
-        }
-        val rows = database.activityDao().search(
-            moduleIds = selectedSet.sorted(),
-            allModules = if (scopeModuleId == null && selectedSet == allModuleIds) 1 else 0,
-            includeSystem = 0,
-            fromMs = parsedFrom.value,
-            toMs = parsedTo.value,
-            entityKind = initialEntityKind,
-            entityId = initialEntityId,
-            limit = ACTIVITY_SEARCH_LIMIT,
-        )
-        val humanized = resolveActivityItems(context, rows)
         val needle = normalizeHistorySearchText(query)
-        entries = if (needle.isBlank()) humanized
-        else humanized.filter { normalizeHistorySearchText(it.searchText).contains(needle) }
+        entries = (semantic + legacy.filter { initialEventId != null || semanticStart == null || it.occurredAt < semanticStart })
+            .filter { item ->
+                if (initialEventId != null) {
+                    item.semanticEventIds.contains(initialEventId) || item.git?.id == initialEventId ||
+                        item.activity?.id == initialEventId || item.id == initialEventId
+                } else {
+                    (scopeModuleId == null || item.moduleId == scopeModuleId) &&
+                        (item.moduleId in selectedSet || (scopeModuleId == null && selectedSet == allModuleIds)) &&
+                        (parsedFrom.value == null || item.occurredAt >= parsedFrom.value!!) &&
+                        (parsedTo.value == null || item.occurredAt <= parsedTo.value!!) &&
+                        (initialEntityKind == null || item.semanticTransactionId == null ||
+                            initialEntityKind in item.semanticEntityKinds) &&
+                        (initialEntityId == null || item.semanticEntityIds.contains(initialEntityId) ||
+                            item.git?.rowKey == initialEntityId || item.activity?.entityId == initialEntityId) &&
+                        (needle.isBlank() || normalizeHistorySearchText(item.searchText).contains(needle))
+                }
+            }.sortedWith(compareByDescending<ActivityUiItem> { it.occurredAt }.thenByDescending { it.id })
+        eventMissing = initialEventId != null && entries.isEmpty()
     }
 
     LaunchedEffect(
@@ -363,10 +399,47 @@ fun HubHistorySearchScreen(
                         ActivityCard(
                             item = activityRow,
                             moduleName = moduleDisplayName(context, activityRow.moduleId),
+                            undoRevision = undoRevision,
                             onOpen = { coroutineScope.launch { openActivityTarget(context, activityRow) } },
                             onUndo = {
-                                val gitItem = activityRow.git
-                                if (gitItem != null) {
+                                val semanticTransaction = activityRow.semanticTransactionId
+                                if (semanticTransaction != null) {
+                                    coroutineScope.launch {
+                                        val target = withContext(Dispatchers.IO) {
+                                            MutationUndoResolver.resolve(database.openHelper.readableDatabase, semanticTransaction, gitEnabled)
+                                        }
+                                        val success = when (target) {
+                                            is MutationUndoTarget.Git -> withContext(Dispatchers.IO) {
+                                                runCatching {
+                                                    val preview = GitHistory.previewRevert(context.applicationContext, target.gitEventId)
+                                                    check(preview.safe) { preview.blockingReason ?: "Undo unavailable" }
+                                                    GitHistory.revertEvent(context.applicationContext, target.gitEventId)
+                                                }.isSuccess
+                                            }
+                                            is MutationUndoTarget.Activity -> {
+                                                when (val result = HubActivityUndoEngine.undo(database, target.activityId)) {
+                                                    is HubActivityUndoResult.Success -> {
+                                                        result.entityRef?.let { ref ->
+                                                            when (result.effect) {
+                                                                HubActivityUndoEffect.DELETED -> HubContextRuntime.canonicalDeletedIfInitialized(ref)
+                                                                HubActivityUndoEffect.LIFECYCLE_CHANGED -> HubContextRuntime.canonicalLifecycleChangedIfInitialized(ref)
+                                                            }
+                                                        }
+                                                        true
+                                                    }
+                                                    is HubActivityUndoResult.Conflict -> false
+                                                }
+                                            }
+                                            null -> false
+                                        }
+                                        snackbar.showSnackbar(context.getString(
+                                            if (success) R.string.activity_undo_success else R.string.activity_undo_not_supported,
+                                        ))
+                                        undoRevision++
+                                        refreshVisibleEntries()
+                                    }
+                                } else if (activityRow.git != null) {
+                                    val gitItem = activityRow.git
                                     coroutineScope.launch {
                                         val result = withContext(Dispatchers.IO) {
                                             runCatching {
@@ -378,11 +451,11 @@ fun HubHistorySearchScreen(
                                         snackbar.showSnackbar(context.getString(
                                             if (result.isSuccess) R.string.activity_undo_success else R.string.activity_undo_not_supported,
                                         ))
+                                        undoRevision++
                                         refreshVisibleEntries()
                                     }
-                                }
-                                val undoId = activityRow.undoActivityId
-                                if (undoId != null) coroutineScope.launch {
+                                } else if (activityRow.undoActivityId != null) coroutineScope.launch {
+                                    val undoId = activityRow.undoActivityId
                                     when (val result = HubActivityUndoEngine.undo(database, undoId)) {
                                         is HubActivityUndoResult.Success -> {
                                             result.entityRef?.let { ref ->
@@ -394,10 +467,12 @@ fun HubHistorySearchScreen(
                                                 }
                                             }
                                             snackbar.showSnackbar(context.getString(R.string.activity_undo_success))
+                                            undoRevision++
                                             refreshVisibleEntries()
                                         }
                                         is HubActivityUndoResult.Conflict -> {
                                             snackbar.showSnackbar(context.getString(result.reason.messageRes()))
+                                            undoRevision++
                                             refreshVisibleEntries()
                                         }
                                     }
@@ -416,15 +491,35 @@ fun HubHistorySearchScreen(
 private fun ActivityCard(
     item: ActivityUiItem,
     moduleName: String,
+    undoRevision: Int,
     onOpen: () -> Unit,
     onUndo: () -> Unit,
 ) {
     val activity = item.activity
     val context = LocalContext.current
     var gitUndoSafe by remember(item.id) { mutableStateOf(false) }
-    val canOpen = activity != null && (item.navigationRef != null || moduleFor(item.moduleId) != null)
+    var semanticUndoSafe by remember(item.id) { mutableStateOf(false) }
+    val canOpen = item.navigationRef != null || moduleFor(item.moduleId) != null
     var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
-    LaunchedEffect(item.git?.id, expanded) {
+    LaunchedEffect(item.semanticTransactionId, undoRevision) {
+        semanticUndoSafe = false
+        val transactionId = item.semanticTransactionId ?: return@LaunchedEffect
+        semanticUndoSafe = withContext(Dispatchers.IO) {
+                val target = MutationUndoResolver.resolve(
+                    PersonalHubDatabase.get(context).openHelper.readableDatabase,
+                    transactionId,
+                    GitDataSettings.configuration(context).enabled,
+                )
+                when (target) {
+                    is MutationUndoTarget.Activity -> true
+                    is MutationUndoTarget.Git -> runCatching {
+                        GitHistory.previewRevert(context.applicationContext, target.gitEventId).safe
+                    }.getOrDefault(false)
+                    null -> false
+                }
+        }
+    }
+    LaunchedEffect(item.git?.id, expanded, undoRevision) {
         gitUndoSafe = false
         val git = item.git ?: return@LaunchedEffect
         if (expanded && git.revertedBy == null) {
@@ -459,7 +554,7 @@ private fun ActivityCard(
                 )
                 OutlinedButton(
                     onClick = onUndo,
-                    enabled = item.undoActivityId != null || gitUndoSafe,
+                    enabled = item.undoActivityId != null || gitUndoSafe || semanticUndoSafe,
                     modifier = Modifier.testTag("history-undo"),
                 ) {
                     Text("↩️")
@@ -490,7 +585,8 @@ private fun ActivityCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (item.undoActivityId == null && item.git == null && activity?.status == HubActivityStatus.ACTIVE) {
+                if (item.undoActivityId == null && item.git == null && !semanticUndoSafe &&
+                    (activity?.status == HubActivityStatus.ACTIVE || item.semanticTransactionId != null)) {
                     Text(
                         text = stringResource(R.string.activity_status_non_reversible),
                         style = MaterialTheme.typography.labelSmall,

@@ -64,6 +64,15 @@ class SemanticHistoryPresentationTest {
         assertTrue(row.text.searchText.contains("Exercise"))
     }
 
+    @Test
+    fun unnamedTechnicalFactDoesNotRenderAsNull() {
+        val rows = semanticHistoryRows(listOf(event(
+            "unnamed", 1, "people", "people.person.created", "person", null,
+            """{"name":null}""", """{"name":null}""",
+        )))
+        assertTrue(rows.isEmpty())
+    }
+
     private fun event(
         transaction: String, sequence: Int, module: String, type: String, entity: String,
         before: String?, after: String?, context: String, actor: String = "user",
