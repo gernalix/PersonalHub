@@ -27,25 +27,37 @@ object MutationEventCapture {
 
     fun install(db: SupportSQLiteDatabase) {
         MutationEventStore.install(db)
-        sources.filter { tableExists(db, it.table) }.forEach { source ->
+        val existingTables = db.query("SELECT name FROM sqlite_master WHERE type='table'").use { cursor ->
+            buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) }
+        }
+        sources.filter { it.table in existingTables }.forEach { source ->
             val columns = columns(db, source.table)
             check(source.key in columns && source.fields.all { it in columns }) {
                 "Mutation source schema changed: ${source.table}"
             }
-            listOf("INSERT", "UPDATE", "DELETE").forEach { operation ->
-                val name = "mutation_${source.table}_$operation"
-                db.execSQL("DROP TRIGGER IF EXISTS `$name`")
-                db.execSQL(trigger(name, source, operation))
-            }
         }
-        if (listOf("hub_contexts", "hub_context_members", "hub_entity_bindings", "hub_resources").all { tableExists(db, it) }) {
-            installWorkflowyAssociation(db)
+        expectedSql(existingTables).forEach { (name, sql) ->
+            db.execSQL("DROP TRIGGER IF EXISTS `$name`")
+            db.execSQL(sql)
         }
-        if (listOf("session_tags", "sessions", "tags").all { tableExists(db, it) }) installSessionTags(db)
-        if (tableExists(db, "contact_events") && tableExists(db, "contact_fields")) installPeopleActions(db)
     }
 
-    private fun installSessionTags(db: SupportSQLiteDatabase) {
+    /** Also used by DatabaseVault: imported snapshots must contain only our exact trigger SQL. */
+    fun expectedSql(existingTables: Set<String>): Map<String, String> = buildMap {
+        sources.filter { it.table in existingTables }.forEach { source ->
+            listOf("INSERT", "UPDATE", "DELETE").forEach { operation ->
+                val name = "mutation_${source.table}_$operation"
+                put(name, trigger(name, source, operation))
+            }
+        }
+        if (listOf("hub_contexts", "hub_context_members", "hub_entity_bindings", "hub_resources").all { it in existingTables }) {
+            putAll(workflowyAssociationSql())
+        }
+        if (listOf("session_tags", "sessions", "tags").all { it in existingTables }) putAll(sessionTagSql())
+        if ("contact_events" in existingTables && "contact_fields" in existingTables) putAll(peopleActionSql())
+    }
+
+    private fun sessionTagSql(): Map<String, String> = buildMap {
         val group = "COALESCE((SELECT group_id FROM hub_git_edit_context WHERE id=1),lower(hex(randomblob(16))))"
         val sequence = "(SELECT COALESCE(MAX(sequence),0)+1 FROM mutation_events WHERE transaction_id=$group)"
         val actor = "COALESCE((SELECT actor FROM hub_git_edit_context WHERE id=1),'user')"
@@ -55,8 +67,7 @@ object MutationEventCapture {
             val tag = "json_object('tag',json_object('id',$row.tag_id,'name',(SELECT name FROM tags WHERE id=$row.tag_id)))"
             val name = "json_object('name',(SELECT title FROM sessions WHERE id=$row.session_id))"
             val trigger = "mutation_session_tags_$operation"
-            db.execSQL("DROP TRIGGER IF EXISTS `$trigger`")
-            db.execSQL("""CREATE TRIGGER `$trigger` BEFORE $operation ON session_tags BEGIN
+            put(trigger, """CREATE TRIGGER `$trigger` BEFORE $operation ON session_tags BEGIN
                 INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
                     entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
                 VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
@@ -66,11 +77,10 @@ object MutationEventCapture {
         }
     }
 
-    private fun installPeopleActions(db: SupportSQLiteDatabase) {
+    private fun peopleActionSql(): Map<String, String> {
         val group = "COALESCE((SELECT group_id FROM hub_git_edit_context WHERE id=1),lower(hex(randomblob(16))))"
         val label = "(SELECT value FROM contact_fields WHERE contact_id=NEW.contact_id AND field_type='name' LIMIT 1)"
-        db.execSQL("DROP TRIGGER IF EXISTS mutation_people_action")
-        db.execSQL("""CREATE TRIGGER mutation_people_action AFTER INSERT ON contact_events
+        return mapOf("mutation_people_action" to """CREATE TRIGGER mutation_people_action AFTER INSERT ON contact_events
             WHEN lower(NEW.entity_type)='contact' AND lower(NEW.action_type) IN ('created','deleted','archived')
             BEGIN
               INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
@@ -86,7 +96,7 @@ object MutationEventCapture {
             END""".trimIndent())
     }
 
-    private fun installWorkflowyAssociation(db: SupportSQLiteDatabase) {
+    private fun workflowyAssociationSql(): Map<String, String> {
         val group = "COALESCE((SELECT group_id FROM hub_git_edit_context WHERE id=1),lower(hex(randomblob(16))))"
         val sequence = "(SELECT COALESCE(MAX(sequence),0)+1 FROM mutation_events WHERE transaction_id=$group)"
         val actor = "COALESCE((SELECT actor FROM hub_git_edit_context WHERE id=1),'user')"
@@ -100,9 +110,7 @@ object MutationEventCapture {
             AND r.value LIKE '%workflowy.com/%' LIMIT 1)""".replace("\n", " ")
         val newResource = resource("NEW.context_id", "title")
         val oldResource = resource("OLD.id", "title")
-        db.execSQL("DROP TRIGGER IF EXISTS mutation_workflowy_assigned")
-        db.execSQL("DROP TRIGGER IF EXISTS mutation_workflowy_unlinked")
-        db.execSQL("""CREATE TRIGGER mutation_workflowy_assigned AFTER INSERT ON hub_context_members
+        val assigned = """CREATE TRIGGER mutation_workflowy_assigned AFTER INSERT ON hub_context_members
             WHEN NEW.position=1 AND (SELECT title FROM hub_contexts WHERE id=NEW.context_id)='Workflowy'
                 AND ${resource("NEW.context_id", "id")} IS NOT NULL
             BEGIN
@@ -112,8 +120,8 @@ object MutationEventCapture {
                 $group,$sequence,${anchor("NEW.context_id", "module_id")},'workflowy.link.assigned',
                 'link',${anchor("NEW.context_id", "canonical_id")},$actor,$source,
                 NULL,json_object('name',$newResource),json_object('name',$newResource),1);
-            END""".trimIndent())
-        db.execSQL("""CREATE TRIGGER mutation_workflowy_unlinked BEFORE DELETE ON hub_contexts
+            END""".trimIndent()
+        val unlinked = """CREATE TRIGGER mutation_workflowy_unlinked BEFORE DELETE ON hub_contexts
             WHEN OLD.title='Workflowy' AND ${resource("OLD.id", "id")} IS NOT NULL
             BEGIN
               INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
@@ -122,7 +130,8 @@ object MutationEventCapture {
                 $group,$sequence,${anchor("OLD.id", "module_id")},'workflowy.link.unlinked',
                 'link',${anchor("OLD.id", "canonical_id")},$actor,$source,
                 json_object('name',$oldResource),NULL,json_object('name',$oldResource),1);
-            END""".trimIndent())
+            END""".trimIndent()
+        return mapOf("mutation_workflowy_assigned" to assigned, "mutation_workflowy_unlinked" to unlinked)
     }
 
     private fun trigger(name: String, source: Source, operation: String): String {
@@ -173,9 +182,6 @@ object MutationEventCapture {
         }
         return "json('{' || rtrim(${parts.joinToString(" || ") { "($it)" }}, ',') || '}')"
     }
-
-    private fun tableExists(db: SupportSQLiteDatabase, name: String): Boolean =
-        db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", arrayOf(name)).use { it.moveToFirst() }
 
     private fun columns(db: SupportSQLiteDatabase, table: String): Set<String> =
         db.query("PRAGMA table_info(`$table`)").use { cursor ->

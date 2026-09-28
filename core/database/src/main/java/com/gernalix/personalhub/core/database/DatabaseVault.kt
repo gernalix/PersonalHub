@@ -5,6 +5,7 @@ import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryStore
+import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventCapture
 import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
@@ -328,13 +329,19 @@ object DatabaseVault {
             requireNoSaluteRows("hub_sync_pending", "table_name LIKE 'health_%'")
             requireNoSaluteRows("hub_sync_known", "table_name LIKE 'health_%'")
             requireNoSaluteRows("hub_tags", "namespace='salute'")
+            val mutationTriggers = MutationEventCapture.expectedSql(databaseTables)
             db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
                 while (c.moveToNext()) {
                     val name = c.getString(0); val table = c.getString(1)
+                    val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
+                    if (name in mutationTriggers) {
+                        val expected = mutationTriggers.getValue(name)
+                        require(sql == expected.replace(Regex("\\s+"), " ").trim()) { "Incompatible database trigger: $name" }
+                        continue
+                    }
                     val op = name.substringAfterLast('_')
                     if (name.startsWith("hub_activity_") && table in tables) continue
                     require(table in databaseTables && op in listOf("INSERT", "UPDATE", "DELETE")) { "Unexpected database trigger: $name" }
-                    val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
                     val expected = when (name) {
                         "hub_dirty_${table}_$op" -> {
                             // Older Timer sync tables can retain valid generation triggers from
