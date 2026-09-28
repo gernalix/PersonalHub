@@ -41,6 +41,27 @@ object MutationEventCapture {
         if (listOf("hub_contexts", "hub_context_members", "hub_entity_bindings", "hub_resources").all { tableExists(db, it) }) {
             installWorkflowyAssociation(db)
         }
+        if (tableExists(db, "contact_events") && tableExists(db, "contact_fields")) installPeopleActions(db)
+    }
+
+    private fun installPeopleActions(db: SupportSQLiteDatabase) {
+        val group = "COALESCE((SELECT group_id FROM hub_git_edit_context WHERE id=1),lower(hex(randomblob(16))))"
+        val label = "(SELECT value FROM contact_fields WHERE contact_id=NEW.contact_id AND field_type='name' LIMIT 1)"
+        db.execSQL("DROP TRIGGER IF EXISTS mutation_people_action")
+        db.execSQL("""CREATE TRIGGER mutation_people_action AFTER INSERT ON contact_events
+            WHEN lower(NEW.entity_type)='contact' AND lower(NEW.action_type) IN ('created','deleted','archived')
+            BEGIN
+              INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
+                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
+              VALUES(lower(hex(randomblob(16))),NEW.occurred_at,$group,
+                (SELECT COALESCE(MAX(sequence),0)+1 FROM mutation_events WHERE transaction_id=$group),
+                'people','people.person.' || lower(NEW.action_type),'person',CAST(NEW.contact_id AS TEXT),
+                COALESCE((SELECT actor FROM hub_git_edit_context WHERE id=1),'user'),
+                COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1),'personalhub'),
+                CASE WHEN lower(NEW.action_type)='created' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":false}' ELSE json_object('name',$label) END,
+                CASE WHEN lower(NEW.action_type)='deleted' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":true}' ELSE json_object('name',$label) END,
+                json_object('name',$label),1);
+            END""".trimIndent())
     }
 
     private fun installWorkflowyAssociation(db: SupportSQLiteDatabase) {

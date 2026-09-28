@@ -124,6 +124,31 @@ class MutationEventStoreTest {
         assertNull(deleted.afterJson)
     }
 
+    @Test
+    fun peopleDeletionKeepsNameAfterCanonicalContactIsDeleted() = withDatabase { database ->
+        val db = database.openHelper.writableDatabase
+        val now = System.currentTimeMillis()
+        db.execSQL("INSERT INTO contacts(public_id,created_at,updated_at,deleted_at,archived_at) VALUES('semantic-person',?,?,NULL,NULL)",
+            arrayOf<Any?>(now, now))
+        val contactId = db.query("SELECT id FROM contacts WHERE public_id='semantic-person'").use {
+            assertTrue(it.moveToFirst()); it.getLong(0)
+        }
+        db.execSQL(
+            """INSERT INTO contact_fields(contact_id,field_type,value,normalized_value,sort_value,added_at,edited_at,position,is_primary,source,latitude,longitude,country_code,description)
+                VALUES(?,'name','Mario Rossi','mario rossi','mario rossi',?,NULL,0,0,'manual',NULL,NULL,NULL,NULL)""".trimIndent(),
+            arrayOf<Any?>(contactId, now),
+        )
+        db.execSQL(
+            """INSERT INTO contact_events(contact_id,entity_type,action_type,event_type,field_type,old_value,new_value,occurred_at,metadata_json)
+                VALUES(?,'Contact','Deleted','contact_delete',NULL,NULL,NULL,?,NULL)""".trimIndent(),
+            arrayOf<Any?>(contactId, now),
+        )
+        db.execSQL("UPDATE contacts SET deleted_at=? WHERE id=?", arrayOf<Any?>(now, contactId))
+        val deleted = MutationEventStore.recent(db).single { it.eventType == "people.person.deleted" }
+        assertEquals("Mario Rossi", JSONObject(deleted.beforeJson!!).getString("name"))
+        assertNull(deleted.afterJson)
+    }
+
     private fun withDatabase(block: (PersonalHubDatabase) -> Unit) {
         val name = "mutation-events-${UUID.randomUUID()}.db"
         val database = PersonalHubDatabase.openTemporary(context, name)

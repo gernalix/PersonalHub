@@ -73,8 +73,7 @@ object MutationEventStore {
     /** Caller keeps this in the same database transaction as the domain write. */
     fun append(db: SupportSQLiteDatabase, draft: MutationEventDraft): MutationEvent {
         require(draft.transactionId.isNotBlank() && draft.module.isNotBlank() && draft.entityType.isNotBlank())
-        require(draft.eventType.startsWith("${draft.module}."))
-        require(draft.eventType.count { it == '.' } >= 2)
+        require(Regex("[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*").matches(draft.eventType))
         require(draft.actorType in setOf("user", "system", "import", "migration", "sync", "automation"))
         val before = draft.beforeJson?.let(::JSONObject)
         val after = draft.afterJson?.let(::JSONObject)

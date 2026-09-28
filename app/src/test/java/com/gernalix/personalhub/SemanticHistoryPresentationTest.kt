@@ -40,8 +40,10 @@ class SemanticHistoryPresentationTest {
                 """{"dose":54,"dose_unit":"mg","timestamp_utc":"2026-09-27T20:00:00Z"}""", """{"name":"Test"}"""),
             event("people", 1, "people", "people.field.created", "field", null,
                 """{"field_type":"name","value":"Mario Rossi"}""", """{"name":"Mario Rossi"}"""),
+            event("deleted-person", 1, "people", "people.person.deleted", "person",
+                """{"name":"Mario Rossi"}""", null, """{"name":"Mario Rossi"}"""),
         ))
-        assertEquals(setOf("Created session “Study”", "Recorded 54 mg of “Test”", "Created person “Mario Rossi”"),
+        assertEquals(setOf("Created session “Study”", "Recorded 54 mg of “Test”", "Created person “Mario Rossi”", "Deleted person “Mario Rossi”"),
             rows.map { it.text.title }.toSet())
         rows.forEach { row ->
             assertFalse(row.text.searchText.contains("1790550000000"))

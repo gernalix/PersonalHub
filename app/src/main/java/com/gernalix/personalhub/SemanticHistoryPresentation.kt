@@ -35,6 +35,7 @@ internal fun semanticHistoryRows(events: List<MutationEvent>): List<SemanticHist
 private fun semanticPriority(event: MutationEvent): Int = when (event.eventType) {
     "workflowy.link.assigned", "workflowy.link.unlinked" -> 110
     "substances.intake.created" -> 90
+    "people.person.created", "people.person.deleted", "people.person.archived" -> 85
     "timer.session.created", "timer.session.updated", "timer.session.deleted" -> 80
     "people.field.created", "people.field.updated", "people.field.deleted" -> 70
     "places.place.created", "places.place.updated", "places.place.deleted" -> 60
@@ -85,6 +86,9 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
         "tags.tag.created" -> "Created tag $quoted"
         "tags.tag.updated" -> "Updated tag $quoted"
         "tags.tag.deleted" -> "Deleted tag $quoted"
+        "people.person.created" -> "Created person $quoted"
+        "people.person.deleted" -> "Deleted person $quoted"
+        "people.person.archived" -> "Archived person $quoted"
         "people.field.created" -> if (after?.optString("field_type") == "name") "Created person $quoted" else return null
         "people.field.updated" -> if (after?.has("value") == true && before?.has("value") == true) "Updated person $quoted" else return null
         "money.transaction.created" -> "Recorded transaction $quoted"
