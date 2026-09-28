@@ -19,7 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,7 +37,7 @@ object HubFeedback {
 /** Keeps snackbar actions while using the same compact, bottom-aligned presentation. */
 @Composable
 fun HubFeedbackHost(hostState: SnackbarHostState, modifier: Modifier = Modifier) {
-    val dismissLabel = LocalContext.current.getString(R.string.feedback_dismiss)
+    val dismissLabel = stringResource(R.string.feedback_dismiss)
     SnackbarHost(hostState = hostState, modifier = modifier) { data ->
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
