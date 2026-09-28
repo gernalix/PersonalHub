@@ -1,5 +1,7 @@
 package com.example.multitimetracker.ui.components
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -168,7 +170,7 @@ private fun AlertPopupCard(
 
 private fun openAlertLink(context: Context, url: String) {
     if (!isAllowedAlertLink(url)) {
-        Toast.makeText(context, context.getString(R.string.alert_link_open_failed), Toast.LENGTH_SHORT).show()
+        HubFeedback.makeText(context, context.getString(R.string.alert_link_open_failed), Toast.LENGTH_SHORT).show()
         return
     }
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
@@ -178,8 +180,8 @@ private fun openAlertLink(context: Context, url: String) {
     try {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, context.getString(R.string.alert_link_open_failed), Toast.LENGTH_SHORT).show()
+        HubFeedback.makeText(context, context.getString(R.string.alert_link_open_failed), Toast.LENGTH_SHORT).show()
     } catch (_: SecurityException) {
-        Toast.makeText(context, context.getString(R.string.alert_link_open_failed), Toast.LENGTH_SHORT).show()
+        HubFeedback.makeText(context, context.getString(R.string.alert_link_open_failed), Toast.LENGTH_SHORT).show()
     }
 }

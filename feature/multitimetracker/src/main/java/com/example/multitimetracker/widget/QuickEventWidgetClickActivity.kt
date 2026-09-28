@@ -1,5 +1,7 @@
 package com.example.multitimetracker.widget
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
@@ -40,16 +42,16 @@ class QuickEventWidgetClickActivity : Activity() {
 
         when (result) {
             is QuickEventWidgetTapResult.Recorded -> {
-                Toast.makeText(appCtx, getString(R.string.quick_event_recorded, result.title), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(appCtx, getString(R.string.quick_event_recorded, result.title), Toast.LENGTH_SHORT).show()
                 QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
             }
             is QuickEventWidgetTapResult.NeedsInput -> openTimerForCompletion(result.target)
             QuickEventWidgetTapResult.Unavailable -> {
-                Toast.makeText(appCtx, getString(R.string.widget_quick_event_unavailable), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(appCtx, getString(R.string.widget_quick_event_unavailable), Toast.LENGTH_SHORT).show()
                 QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
             }
             QuickEventWidgetTapResult.Failed -> {
-                Toast.makeText(appCtx, getString(R.string.quick_event_write_failed), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(appCtx, getString(R.string.quick_event_write_failed), Toast.LENGTH_SHORT).show()
                 QuickEventWidgetProvider.updateOne(appCtx, appWidgetId)
             }
         }

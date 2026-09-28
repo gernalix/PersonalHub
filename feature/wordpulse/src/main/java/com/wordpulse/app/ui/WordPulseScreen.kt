@@ -1,5 +1,7 @@
 package com.wordpulse.app.ui
 
+import com.gernalix.personalhub.core.ui.HubFeedbackHost
+
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,7 +52,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
@@ -351,7 +352,7 @@ internal fun WordPulseScreen(
                     }
                 }
 
-                SnackbarHost(
+                HubFeedbackHost(
                     hostState = snackbarHostState,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

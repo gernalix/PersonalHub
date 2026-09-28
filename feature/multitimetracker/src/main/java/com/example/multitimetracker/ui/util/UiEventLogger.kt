@@ -1,5 +1,7 @@
 package com.example.multitimetracker.ui.util
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
@@ -23,7 +25,7 @@ object UiEventLogger {
         payload: JSONObject? = null,
         length: Int = Toast.LENGTH_SHORT
     ) {
-        runCatching { Toast.makeText(context, message, length).show() }
+        runCatching { HubFeedback.makeText(context, message, length).show() }
             .onFailure { Log.e("UiEventLogger", "toast show failed", it) }
 
     }

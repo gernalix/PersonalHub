@@ -2,6 +2,10 @@
 
 package com.supercontacts.app.ui.app
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
+import com.gernalix.personalhub.core.ui.HubFeedbackHost
+
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -74,7 +78,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -827,7 +830,7 @@ private fun ContactListScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {},
@@ -2115,7 +2118,7 @@ private fun ContactDetailScreen(
     }
     BackHandler(onBack = onBack)
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {},
@@ -2562,7 +2565,7 @@ private fun ContactInitiativeScreen(
     var deleteTarget by remember { mutableStateOf<ContactInitiative?>(null) }
     BackHandler(onBack = onBack)
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.initiative_contact)) },
@@ -2650,7 +2653,7 @@ private fun GlobalInitiativeScreen(
     onBack: () -> Unit,
 ) {
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.initiative_global)) },
@@ -2947,7 +2950,7 @@ private fun InitiativeDayViewScreen(
     onBack: () -> Unit,
 ) {
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.initiative_day_view)) },
@@ -3291,7 +3294,7 @@ private fun ContactEditScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(title) },
@@ -5868,24 +5871,24 @@ private fun openLink(context: Context, value: String) {
 
 private fun copyContactDeepLink(context: Context, detail: ContactDetail) {
     if (detail.publicId.isBlank()) {
-        Toast.makeText(context, context.getString(R.string.deep_link_invalid), Toast.LENGTH_SHORT).show()
+        HubFeedback.makeText(context, context.getString(R.string.deep_link_invalid), Toast.LENGTH_SHORT).show()
         return
     }
     val link = ContactDeepLink.create(detail.publicId)
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.copy_deep_link), link))
-    Toast.makeText(context, context.getString(R.string.deep_link_copied), Toast.LENGTH_SHORT).show()
+    HubFeedback.makeText(context, context.getString(R.string.deep_link_copied), Toast.LENGTH_SHORT).show()
 }
 
 private fun copySavedSearchDeepLink(context: Context, search: SavedSearch) {
     if (search.publicId.isBlank()) {
-        Toast.makeText(context, context.getString(R.string.deep_link_invalid), Toast.LENGTH_SHORT).show()
+        HubFeedback.makeText(context, context.getString(R.string.deep_link_invalid), Toast.LENGTH_SHORT).show()
         return
     }
     val link = ContactDeepLink.createSavedSearch(search.publicId)
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.copy_deep_link), link))
-    Toast.makeText(context, context.getString(R.string.deep_link_copied), Toast.LENGTH_SHORT).show()
+    HubFeedback.makeText(context, context.getString(R.string.deep_link_copied), Toast.LENGTH_SHORT).show()
 }
 
 private fun openPhoneDialer(context: Context, phone: String) {
@@ -5917,7 +5920,7 @@ private fun openEmail(context: Context, email: String) {
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { context.startActivity(intent) }
         .onFailure {
-            Toast.makeText(context, context.getString(R.string.email_app_unavailable), Toast.LENGTH_SHORT).show()
+            HubFeedback.makeText(context, context.getString(R.string.email_app_unavailable), Toast.LENGTH_SHORT).show()
         }
 }
 

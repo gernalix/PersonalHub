@@ -1,5 +1,7 @@
 package com.gernalix.sostanze.widget
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Intent
@@ -33,15 +35,15 @@ class SubstancesWidgetClickActivity : Activity() {
 
         when (result) {
             is SubstancesWidgetTapResult.Recorded -> {
-                Toast.makeText(appCtx, getString(R.string.recorded, result.title), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(appCtx, getString(R.string.recorded, result.title), Toast.LENGTH_SHORT).show()
                 SubstancesWidgetProvider.updateOne(appCtx, appWidgetId)
             }
             SubstancesWidgetTapResult.Unavailable -> {
-                Toast.makeText(appCtx, getString(R.string.widget_substances_unavailable), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(appCtx, getString(R.string.widget_substances_unavailable), Toast.LENGTH_SHORT).show()
                 SubstancesWidgetProvider.updateOne(appCtx, appWidgetId)
             }
             SubstancesWidgetTapResult.Failed -> {
-                Toast.makeText(appCtx, getString(R.string.widget_substances_write_failed), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(appCtx, getString(R.string.widget_substances_write_failed), Toast.LENGTH_SHORT).show()
                 SubstancesWidgetProvider.updateOne(appCtx, appWidgetId)
             }
         }

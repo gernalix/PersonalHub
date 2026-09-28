@@ -3,6 +3,8 @@
 @file:android.annotation.SuppressLint("LocalContextGetResourceValueCall")
 
 package com.example.multitimetracker.ui
+
+import com.gernalix.personalhub.core.ui.HubFeedback
 import android.content.Intent
 import android.os.Trace
 import android.widget.Toast
@@ -362,7 +364,7 @@ if (developerSurfaceEnabled && showDevReport) {
             TextButton(onClick = {
                 val cm = context.getSystemService(android.content.ClipboardManager::class.java)
                 cm?.setPrimaryClip(android.content.ClipData.newPlainText("dev_report", devReport))
-                Toast.makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                HubFeedback.makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
             }) {
                 Text(stringResource(R.string.copy))
             }
@@ -396,7 +398,7 @@ if (developerSurfaceEnabled && showDevReport) {
                 TextButton(onClick = {
                     val cm = context.getSystemService(android.content.ClipboardManager::class.java)
                     cm?.setPrimaryClip(ClipData.newPlainText("persistence_failure", report))
-                    Toast.makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
+                    HubFeedback.makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
                 }) {
                     Text(stringResource(R.string.copy))
                 }
@@ -414,7 +416,7 @@ if (developerSurfaceEnabled && showDevReport) {
         },
         onReloadFromSnapshot = {
             vm.reloadFromSnapshot(context)
-            Toast.makeText(context, context.getString(R.string.dev_tools_reloaded), Toast.LENGTH_SHORT).show()
+            HubFeedback.makeText(context, context.getString(R.string.dev_tools_reloaded), Toast.LENGTH_SHORT).show()
         }
     )
 }
@@ -443,7 +445,7 @@ if (developerSurfaceEnabled && showDevReport) {
                         if (txtToCopy.isNotBlank()) {
                             val cm = context.getSystemService(android.content.ClipboardManager::class.java)
                             cm?.setPrimaryClip(android.content.ClipData.newPlainText("diagnostics", txtToCopy))
-                            Toast.makeText(context, context.getString(R.string.diagnostics_copied), Toast.LENGTH_SHORT).show()
+                            HubFeedback.makeText(context, context.getString(R.string.diagnostics_copied), Toast.LENGTH_SHORT).show()
                         }
                     }
                 ) { Text(stringResource(R.string.diagnostics_copy)) }

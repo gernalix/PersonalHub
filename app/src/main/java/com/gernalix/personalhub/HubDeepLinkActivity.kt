@@ -2,6 +2,8 @@
 
 package com.gernalix.personalhub
 
+import com.gernalix.personalhub.core.ui.HubFeedback
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -202,7 +204,7 @@ private fun ContextDeepLink(contextId: String, onBack: () -> Unit) {
                             scope.launch {
                                 val intent = resolveEntityIntent(androidContext, summary.ref, HubDeepLinkContract.ACTION_VIEW)
                                 if (intent == null || runCatching { androidContext.startActivity(intent) }.isFailure) {
-                                    Toast.makeText(androidContext, R.string.deep_link_cannot_open, Toast.LENGTH_SHORT).show()
+                                    HubFeedback.makeText(androidContext, R.string.deep_link_cannot_open, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -254,5 +256,5 @@ private fun DeepLinkErrorScreen(messageRes: Int, onBack: () -> Unit) {
 private fun copyText(context: Context, label: String, value: String) {
     val clipboard = context.getSystemService(ClipboardManager::class.java)
     clipboard?.setPrimaryClip(ClipData.newPlainText(label, value))
-    Toast.makeText(context, R.string.deep_link_copied, Toast.LENGTH_SHORT).show()
+    HubFeedback.makeText(context, R.string.deep_link_copied, Toast.LENGTH_SHORT).show()
 }

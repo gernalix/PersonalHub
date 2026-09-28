@@ -6,6 +6,8 @@
 
 package com.example.multitimetracker.capsules.now.ui
 
+import com.gernalix.personalhub.core.ui.HubFeedbackHost
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
@@ -25,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
@@ -224,7 +225,7 @@ fun NowScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        snackbarHost = { HubFeedbackHost(hostState = snackbarHostState) },
     ) { padding ->
         Box(
             modifier = Modifier
