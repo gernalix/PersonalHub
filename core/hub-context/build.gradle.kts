@@ -15,6 +15,16 @@ android {
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
+androidComponents {
+    onVariants { variant ->
+        val variantName = variant.name.replaceFirstChar(Char::uppercaseChar)
+        tasks.matching {
+            it.name == "bundleLibCompileToJar$variantName" ||
+                it.name == "bundleLibRuntimeToJar$variantName"
+        }.configureEach { dependsOn("compile${variantName}Kotlin") }
+    }
+}
+
 dependencies {
     api(project(":contracts:database"))
     implementation(project(":core:database"))
