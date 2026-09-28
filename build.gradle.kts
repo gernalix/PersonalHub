@@ -1,3 +1,6 @@
+import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.dsl.LibraryExtension
+
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
@@ -5,6 +8,23 @@ plugins {
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.ksp) apply false
+}
+
+private fun org.gradle.api.Project.configureTranslationLint() {
+    extensions.configure<ApplicationExtension>("android") {
+        lint.lintConfig = rootProject.file("lint.xml")
+    }
+}
+
+private fun org.gradle.api.Project.configureLibraryTranslationLint() {
+    extensions.configure<LibraryExtension>("android") {
+        lint.lintConfig = rootProject.file("lint.xml")
+    }
+}
+
+subprojects {
+    pluginManager.withPlugin("com.android.application") { configureTranslationLint() }
+    pluginManager.withPlugin("com.android.library") { configureLibraryTranslationLint() }
 }
 
 val checkArchitectureBoundaries = tasks.register<Exec>("checkArchitectureBoundaries") {
