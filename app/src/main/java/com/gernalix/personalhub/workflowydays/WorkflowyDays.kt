@@ -168,7 +168,9 @@ object WorkflowyDaysSync {
 
     private fun retireLegacyFeed(context: Context, url: String?): Boolean {
         if (url == null || !isLegacyDatasetteFeed(url)) return false
-        prefs(context).edit().putBoolean(KEY_ENABLED, false).putString(KEY_STATUS, "unsupported_feed").apply()
+        val preferences = prefs(context)
+        if (!preferences.getBoolean(KEY_ENABLED, false)) return false
+        preferences.edit().putBoolean(KEY_ENABLED, false).putString(KEY_STATUS, "unsupported_feed").apply()
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork(PERIODIC_WORK)
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork(NOW_WORK)
         return true
