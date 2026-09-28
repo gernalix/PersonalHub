@@ -165,6 +165,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                         val gitHistoryEnabled = runCatching {
                             GitDataSettings.configuration(context).enabled
                         }.getOrDefault(false)
+                        SyncJournal.retireUploadTriggers(db)
                         val manifestPrefs = context.getSharedPreferences("hub_open_manifest", Context.MODE_PRIVATE)
                         fun manifest() = "v2:$appVersion:$gitHistoryEnabled:${schemaFingerprint(db)}"
                         if (manifestPrefs.getString(name, null) == manifest()) {
@@ -178,7 +179,6 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                             }
                         }
                         val tables = SyncJournal.tables(db)
-                        SyncJournal.install(db)
                         if (gitHistoryEnabled) {
                             HubActivityCapture.uninstall(db)
                             GitHistoryStore.install(db)

@@ -27,8 +27,6 @@ import com.gernalix.personalhub.core.database.ImportRolledBack
 import com.gernalix.personalhub.core.database.DatabaseProfileInitMode
 import com.gernalix.personalhub.core.database.DatabaseProfiles
 import com.gernalix.personalhub.core.database.DatabaseVault
-import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSettings
-import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import kotlinx.coroutines.Dispatchers
@@ -51,11 +49,9 @@ fun HubSettings(onBack: () -> Unit) {
                 onOpenDatabase = {
                     context.startActivity(Intent(context, DatabaseActivity::class.java))
                 },
-                onOpenDatasette = { page = "sync" },
                 onOpenGit = { page = "git-data" },
             )
         }
-        "sync" -> SyncSettings { page = "root" }
         "git-data" -> GitDataSyncSettings(onBack = { page = "root" })
         "workflowy" -> WorkflowyIntegrationSettingsScreen { page = "root" }
         "workflowy-days" -> WorkflowyDaysSettings { page = "root" }
@@ -78,7 +74,6 @@ fun HubSettings(onBack: () -> Unit) {
                 OutlinedButton(onClick = { page = "profiles" }) { Text(stringResource(R.string.database_profiles_title)) }
                 HorizontalDivider()
                 Text(stringResource(R.string.settings_optional_services_section), style = MaterialTheme.typography.titleMedium)
-                OutlinedButton(onClick = { page = "sync" }) { Text(stringResource(R.string.datasette_sync_title)) }
                 OutlinedButton(onClick = { page = "git-data" }) { Text(stringResource(R.string.git_data_sync_title)) }
                 Row(
                     Modifier.fillMaxWidth(),
@@ -280,15 +275,11 @@ private fun SettingsPage(title: Int, onBack: () -> Unit, content: @Composable Co
 private fun DataSetupGuide(
     onBack: () -> Unit,
     onOpenDatabase: () -> Unit,
-    onOpenDatasette: () -> Unit,
     onOpenGit: () -> Unit,
 ) {
     val context = LocalContext.current
     val activeProfile = remember { DatabaseProfiles.active(context) }
     val safConfigured = remember { DatabaseVault.folder(context) != null }
-    val datasette = remember {
-        runCatching { DatasetteSettings.configuration(context) }.getOrNull()
-    }
     val git = remember {
         runCatching { GitDataSettings.configuration(context) }.getOrNull()
     }
@@ -317,19 +308,6 @@ private fun DataSetupGuide(
         )
         DataRoleCard(
             number = 3,
-            title = stringResource(R.string.data_setup_datasette_title),
-            role = stringResource(R.string.data_setup_replica_role),
-            body = stringResource(R.string.data_setup_datasette_body),
-            status = stringResource(
-                if (datasette?.enabled == true) R.string.data_setup_enabled
-                else if (datasette?.hasToken == true) R.string.data_setup_configured
-                else R.string.data_setup_not_configured,
-            ),
-            action = stringResource(R.string.data_setup_configure),
-            onAction = onOpenDatasette,
-        )
-        DataRoleCard(
-            number = 4,
             title = stringResource(R.string.data_setup_git_title),
             role = stringResource(R.string.data_setup_history_role),
             body = stringResource(R.string.data_setup_git_body),
@@ -373,92 +351,6 @@ private fun DataRoleCard(
         }
     }
 }
-
-@Composable
-private fun SyncSettings(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var config by remember { mutableStateOf(runCatching { DatasetteSettings.configuration(context) }.getOrNull()) }
-    var connection by rememberSaveable { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(config == null) }
-    var state by remember { mutableStateOf("idle") }
-    LaunchedEffect(Unit) { while (true) { state = DatasetteSync.status(context); delay(1000) } }
-    BackHandler { if (connection) connection = false else onBack() }
-    if (connection) {
-        ConnectionSettings(onBack = { connection = false }, onSaved = {
-            config = DatasetteSettings.configuration(context)
-            failed = false
-            connection = false
-        })
-        return
-    }
-    SettingsPage(R.string.datasette_sync_title, onBack) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(R.string.datasette_enable), Modifier.weight(1f))
-            Switch(checked = config?.enabled == true, enabled = !busy && config != null && (config?.hasToken == true), onCheckedChange = { enabled ->
-                busy = true
-                scope.launch {
-                    failed = withContext(Dispatchers.IO) { runCatching { DatasetteSync.setEnabled(context, enabled) }.isFailure }
-                    config = runCatching { DatasetteSettings.configuration(context) }.getOrNull()
-                    busy = false
-                }
-            })
-        }
-        Text(stringResource(R.string.datasette_description))
-        Text(
-            stringResource(R.string.datasette_direction_notice),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedButton(onClick = { connection = true }, enabled = !busy) { Text(stringResource(R.string.datasette_connection)) }
-        Text(stringResource(if (config?.enabled != true) R.string.datasette_off else when (state) {
-            "sending" -> R.string.datasette_sending
-            "complete" -> R.string.datasette_complete
-            "retry" -> R.string.datasette_retry
-            else -> R.string.datasette_waiting
-        }))
-        if (busy) CircularProgressIndicator()
-        if (failed) Text(stringResource(R.string.datasette_error), color = MaterialTheme.colorScheme.error)
-    }
-}
-
-@Composable
-private fun ConnectionSettings(onBack: () -> Unit, onSaved: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val initial = remember { runCatching { DatasetteSettings.configuration(context) }.getOrNull() }
-    var url by remember { mutableStateOf(initial?.baseUrl ?: "") }
-    var database by remember { mutableStateOf(initial?.database ?: "") }
-    var table by remember { mutableStateOf(initial?.table ?: "") }
-    // Credentials never enter saved-instance state, preferences, logs or database exports.
-    var token by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(false) }
-    SettingsPage(R.string.datasette_connection, onBack) {
-        Text(stringResource(R.string.datasette_connection_help))
-        Text(
-            stringResource(R.string.datasette_token_help),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedTextField(url, { url = it }, label = { Text(stringResource(R.string.datasette_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(database, { database = it }, label = { Text(stringResource(R.string.datasette_database)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(table, { table = it }, label = { Text(stringResource(R.string.datasette_table)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(token, { token = it }, label = { Text(stringResource(R.string.datasette_token)) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-        if (initial?.hasToken == true) Text(stringResource(R.string.datasette_token_saved))
-        Button(enabled = !busy, onClick = {
-            busy = true
-            scope.launch {
-                failed = withContext(Dispatchers.IO) { runCatching { DatasetteSync.save(context, url, database.trim(), table.trim(), token) }.isFailure }
-                busy = false
-                if (!failed) { token = ""; onSaved() }
-            }
-        }) { Text(stringResource(R.string.datasette_save)) }
-        if (failed) Text(stringResource(R.string.datasette_error), color = MaterialTheme.colorScheme.error)
-    }
-}
-
 
 @Composable
 private fun GitDataSyncSettings(onBack: () -> Unit) {

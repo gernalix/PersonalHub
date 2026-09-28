@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="workflowy_days_title">Workflowy days</string>
-    <string name="workflowy_days_description">Downloads the compact Workflowy Calendar day index without adding it to the PersonalHub upload sync. Use an HTTPS JSON feed or a Datasette _shape=array endpoint for workflowy_days.</string>
+    <string name="workflowy_days_description">Downloads the compact Workflowy Calendar day index from an HTTPS JSON feed for workflowy_days.</string>
     <string name="workflowy_days_feed_url">Workflowy days feed URL</string>
     <string name="workflowy_days_save">Save connection</string>
     <string name="workflowy_days_enable">Automatic daily sync</string>
     <string name="workflowy_days_off">Automatic sync is off</string>
+    <string name="workflowy_days_legacy_feed">The previous feed format is no longer supported. Enter a compact HTTPS JSON feed URL to resume.</string>
     <string name="workflowy_days_waiting">Waiting for the next sync</string>
     <string name="workflowy_days_downloading">Downloading Workflowy days…</string>
     <string name="workflowy_days_complete">Workflowy days are up to date</string>

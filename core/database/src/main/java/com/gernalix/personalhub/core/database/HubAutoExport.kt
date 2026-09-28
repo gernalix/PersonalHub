@@ -62,7 +62,6 @@ object HubAutoExport {
         scheduler.cancelLegacyWork(app)
         scheduler.enqueuePeriodicRecovery(app)
         requestIfDirty(app)
-        com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync.checkForChanges(app)
         started = true
     }
     fun dirty(context: Context): Boolean {

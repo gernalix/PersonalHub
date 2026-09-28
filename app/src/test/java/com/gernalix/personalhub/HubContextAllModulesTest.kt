@@ -113,7 +113,6 @@ class HubContextAllModulesTest {
         )
         assertEquals("transaction", HubContextRuntime.contextType("finance-template")!!.second.single().acceptedEntityKind)
 
-        assertTrue(db.openHelper.readableDatabase.query("SELECT count(*) FROM hub_sync_pending WHERE table_name IN ('hub_contexts','hub_context_members','hub_resources')").use { it.moveToFirst(); it.getInt(0) > 0 })
         PersonalHubDatabase.closeInstance()
         HubContextRuntime.initialize(context, listOf(people, timer, places, soldi, substances, words, resources))
         assertEquals(7, requireNotNull(HubContextRuntime.context(contextId)).members.size)

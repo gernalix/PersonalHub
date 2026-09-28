@@ -94,7 +94,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.gernalix.personalhub.contracts.database.DataExplorerContract
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.wordpulse.app.BuildConfig
 import com.wordpulse.app.data.SessionSummaryRow
@@ -293,7 +292,6 @@ internal fun WordPulseScreen(
                             onClearInput()
                             restoreTypingFocus()
                         },
-                        onDataExplorer = { context.startActivity(DataExplorerContract.intent(context.packageName, "word_entries")) },
                         onHistory = {
                             context.startActivity(
                                 Intent(
@@ -399,7 +397,6 @@ private fun Header(
     currentSessionId: String?,
     onStartNewSession: () -> Unit,
     onClearInput: () -> Unit,
-    onDataExplorer: () -> Unit,
     onHistory: () -> Unit,
     onDeleteAllData: () -> Unit,
 ) {
@@ -427,9 +424,6 @@ private fun Header(
                 }
                 IconButton(onClick = onClearInput, modifier = Modifier.testTag("clear-input-button")) {
                     Icon(Icons.Filled.Clear, contentDescription = "Clear current input")
-                }
-                IconButton(onClick = onDataExplorer, modifier = Modifier.testTag("data-explorer-button")) {
-                    Icon(Icons.Filled.Storage, contentDescription = "Datasette")
                 }
                 IconButton(onClick = onHistory, modifier = Modifier.testTag("history-search-button")) {
                     Icon(Icons.Filled.History, contentDescription = "History and search")

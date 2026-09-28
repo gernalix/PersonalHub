@@ -27,15 +27,13 @@ PersonalHub can request approximate or precise foreground location when you use 
 
 PersonalHub stores its application database and related state locally on your device. You can export or import the PersonalHub database using the app's backup controls. Android system backup is disabled for the application package; exports are created only through app functionality you invoke or configure.
 
-## Optional synchronization
+## Synchronization and external copies
 
-PersonalHub includes optional Datasette synchronization. It is off unless you configure it. If enabled, PersonalHub can send the current data set and subsequent changes to the HTTPS endpoint, database and table that you provide. The access token is treated as a credential and is not intentionally included in database exports or application logs.
-
-Data sent to a server that you configure is also subject to that server's retention, access and privacy practices. PersonalHub does not control a third-party or self-hosted endpoint selected by you.
+The current PersonalHub app does not include Datasette synchronization or another automatic database replica. Database export and import are user-directed backup operations. Git Data features, when configured, use the repository and actions selected by the user; copied data is subject to that repository's retention, access and privacy practices.
 
 ## External services
 
-Some user-invoked features can contact external services needed to provide their requested functionality, such as mapping, place/address lookup or other network-backed lookups. Requests may necessarily expose ordinary network metadata such as your IP address to the service provider. PersonalHub does not intentionally send the app's complete local database to such services unless you explicitly configure synchronization as described above.
+Some user-invoked features can contact external services needed to provide their requested functionality, such as mapping, place/address lookup or other network-backed lookups. Requests may necessarily expose ordinary network metadata such as your IP address to the service provider. These services do not receive the app's complete local database through the current PersonalHub app.
 
 ## Advertising, sale of data and developer analytics
 
@@ -47,11 +45,11 @@ PersonalHub requests Android permissions only for features that need them. Permi
 
 ## Security
 
-PersonalHub uses Android application sandboxing for local data and HTTPS for the optional Datasette synchronization endpoint. No software or storage method can guarantee absolute security; keep your device and any configured synchronization endpoint appropriately secured.
+PersonalHub uses Android application sandboxing for local data and HTTPS for network features that you explicitly configure or invoke. No software or storage method can guarantee absolute security; keep your device and any configured repository appropriately secured.
 
 ## Retention and deletion
 
-Local PersonalHub data remains on your device until you delete it through app/device controls, replace it through an import, clear the application's storage, or uninstall the app. Data copied to an export file remains until you delete that file. Data sent to a synchronization endpoint remains according to the policy and configuration of that endpoint.
+Local PersonalHub data remains on your device until you delete it through app/device controls, replace it through an import, clear the application's storage, or uninstall the app. Data copied to an export file remains until you delete that file. Data copied to a configured Git repository remains according to that repository's policy and configuration.
 
 PersonalHub does not provide a developer-hosted account system in the Google Play build, so there is no separate PersonalHub cloud account to delete.
 

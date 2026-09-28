@@ -7,13 +7,13 @@ import android.os.Trace
 import android.util.Log
 import android.view.Choreographer
 import androidx.work.Configuration
+import androidx.work.WorkManager
 import com.example.multitimetracker.api.TimerStartupApi
 import com.example.multitimetracker.hub.TimerSessionHubAdapter
 import com.example.multitimetracker.hub.TimerQuickEventEntryHubAdapter
 import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.core.database.DatabaseVault
 import com.gernalix.personalhub.core.database.HubAutoExport
-import com.gernalix.personalhub.core.database.capsules.sync.DatasetteSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.ResourceHubAdapter
@@ -36,6 +36,10 @@ class PersonalHubApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         if (Application.getProcessName() != packageName) return
+        // Existing installations may still have uploads scheduled by an older release.
+        listOf("personalhub-datasette", "personalhub-datasette-recovery").forEach {
+            WorkManager.getInstance(this).cancelUniqueWork(it)
+        }
         traceStartup("PH.workflowyShareState") { WorkflowyShareActivity.syncEnabled(this) }
 
         traceStartup("PH.recoverInterruptedImport") {
@@ -120,9 +124,6 @@ private object PostFirstFrameStartup {
                             }
                             runStep("auto-export", "PH.bg.autoExport") {
                                 HubAutoExport.start(app)
-                            }
-                            runStep("Datasette sync", "PH.bg.datasetteSync") {
-                                DatasetteSync.start(app)
                             }
                             runStep("Git data sync", "PH.bg.gitDataSync") {
                                 GitDataSync.start(app)

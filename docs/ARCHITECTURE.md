@@ -3,16 +3,14 @@
 ## Data authority and remote-copy contract
 
 For all writable PersonalHub modules, the active local `personalhub.db` is the **only runtime
-source of truth**. SQLite, SAF, Datasette and Git are not peers and must never compete to populate
-the application:
+source of truth**. SQLite, SAF and Git are not peers and must never compete to populate the
+application:
 
 - **Local SQLite / `personalhub.db` — authoritative.** Every writable module reads and writes the
   active database profile.
 - **SAF folder — backup/export.** Automatic export publishes verified database copies. Nothing is
   read back automatically. An inbound SAF database is accepted only through the explicit validated
   Import flow, which atomically replaces the active database and keeps rollback state.
-- **Datasette — outbound replica.** The mobile app sends row-level state/tombstones for remote
-  browsing and analysis. Datasette never hydrates or overwrites `personalhub.db`.
 - **Git data — outbound versioned history plus explicit recovery/control.** Background sync publishes
   deterministic state/history and may read verified patch metadata. It does not silently
   restore remote state. Full inbound replacement requires an explicit Restore from Git action;
@@ -22,8 +20,8 @@ the application:
   Obsidian never reads the live Android database, never writes PersonalHub state and must remain
   operationally independent from the app. See `docs/OBSIDIAN_ARCHIVE.md`.
 
-Credentials for Datasette and Git are device-local Android-Keystore-encrypted connection material,
-not application data. They must not enter SQLite, SAF exports, Git payloads, logs or saved UI state.
+Git connection credentials are device-local Android-Keystore-encrypted connection material, not
+application data. They must not enter SQLite, SAF exports, Git payloads, logs or saved UI state.
 
 See also `docs/GIT_DATA_HISTORY.md` for the optional Git-backed semantic history, Time Machine, patch and restore architecture.
 
@@ -85,13 +83,13 @@ The neutral Hub layer stores stable bindings to canonical module records and N-a
 
 Deleting a Context cascades only its membership rows. Removing a member that would leave fewer than two is rejected. Canonical archives update binding lifecycle without removing history. Canonical deletion removes an unused binding, but a referenced binding becomes an explicit `DELETED` tombstone so historical Contexts never disappear silently.
 
-Original identifiers, relationships, epoch timestamps, UTC strings, timer snapshots/history, configuration rows, and the remote-sync outbox are retained. WordPulse's session table is `wordpulse_sessions` to avoid collision with timer `sessions`. WorkManager's own scheduling database is operational metadata, not a feature data store.
+Original identifiers, relationships, epoch timestamps, UTC strings, timer snapshots/history and configuration rows are retained. WordPulse's session table is `wordpulse_sessions` to avoid collision with timer `sessions`. WorkManager's own scheduling database is operational metadata, not a feature data store.
 
 `people_photos` stores one BLOB per contact photo field, with foreign keys to the person and field, the original reference, MIME type, SHA-256, and timestamp. Cropped photos are transient until attached in the same transaction as their contact. The original reference is provenance and a lookup key; display reads the BLOB. Missing original files can be explicitly accepted by the offline builder without generating replacement images.
 
 ## File import and automatic export
 
-Settings is the sole owner of the **Database and backup** destination, **Import personalhub.db**, and the SAF folder picker. Feature modules expose no database import/export, backup/restore, feature-local Datasette transport or feature-local Git transport. Domain-specific ingestion such as receipt OCR is not a database transfer surface. Legacy module databases are moved to a private recovery directory after a successful core import; they are no longer opened or used as runtime sources.
+Settings is the sole owner of the **Database and backup** destination, **Import personalhub.db**, and the SAF folder picker. Feature modules expose no database import/export, backup/restore or feature-local Git transport. Domain-specific ingestion such as receipt OCR is not a database transfer surface. Legacy module databases are moved to a private recovery directory after a successful core import; they are no longer opened or used as runtime sources.
 
 Import copies the selection to staging and verifies the SQLite header/version, complete table/column/PK/FK schema, required indexes, allowed dirty triggers, quick check, foreign key check and photo SHA-256. The writer gate drains active transactions, checkpoints WAL, saves a durable pre-import copy, closes Room, replaces the file by atomic rename, clears old sidecars and verifies reopening. A journal permits automatic rollback after interruption. A separate foreground relay process restarts the application graph after success. Old writers remain suspended until that restart.
 
@@ -125,21 +123,9 @@ Copied source rows: People 2,753; Timer 3,631 plus 1,119 sync rows; Places 1,068
 
 API 36 Pixel 8a emulator QA covered native SAF import and automatic foreground restart, all five module screens, real contact photographs, all committed module mutation types with autoexport readback, corrupt/incompatible inputs, post-replacement failure rollback, concurrent writes, and full database equivalence through export/reimport. The final source and round-trip export matched across all domain and generation tables and SQLite sequence values. Original Pixel applications remained read-only. See the generated private validation report for the final artifact path, per-table evidence and source hashes.
 
-## Datasette sync capsule
+## Retired Datasette integration
 
-Settings has three root destinations: Home shortcuts, Database and backup, and Datasette sync. The backup Activity and the five launcher shortcut identities are reused. The Timer top-bar autoexport indicator and its unused visual-state code/resources are removed; Timer persistence and automatic database export remain active.
-
-`core:database/capsules/sync` journals every committed insert/update/delete through SQLite triggers, including raw Timer writes, cascades, composite keys and primary-key changes. The journal coalesces multiple changes to the same record into its newest state. Rollback also rolls back the journal. Core sync tables and any migrated legacy Timer queue metadata are operational metadata; feature-local Timer network-sync code is retired and does not participate in runtime. They are excluded from the replica. All 51 domain tables, preferences, histories and photo BLOBs are otherwise represented independently, preserving every column and primary key. Binary columns use a base64 object. The replica never copies a live SQLite/WAL file.
-
-The existing Datasette JSON Write API receives `rows` at the runtime-selected `/{database}/{table}/-/upsert`, with bearer authorization and `return=false`. Stable identities combine installation UUID, source table and a typed, unambiguous composite primary key. The server retains the same monotonic `updated_at_ms` and deletion-tombstone rules as datasette5's original replica. A durable clock outside imported data prevents older retries/imports from overwriting newer state. A single uploader serializes requests; acknowledgements delete only the journal revision actually sent. Batched row reads decode the journal identity into bound primary-key values and use the existing SQLite indexes. Only coherent, detached row values are captured under the local writer gate (bounded raw batch, with a single large row allowed). BLOB Base64, UUID and JSON/UTF-8 serialization run outside that gate, as does HTTP. Prepared identities are recorded before sending; revision-specific acknowledgements cannot erase edits committed during encoding or upload. Failed or ambiguous requests retain pending work, with constrained WorkManager retries and exponential backoff. Startup, periodic recovery and the common dirty check close the commit-before-scheduling crash window.
-
-Sync defaults OFF. OFF starts no requests; disabling waits for the current bounded request before completing. Enabling and changing configuration request a complete reconciliation immediately, including identities previously sent or possibly accepted. Runtime URL, database, table, token, installation identity and clock are AES-GCM encrypted with Android Keystore in no-backup storage. Credentials never enter BuildConfig, SQLite, saved-instance state, logs or exports. UI errors are generic; tokens are masked and never populated back into the editor.
-
-Room version 3 adds the pending and known-identity tables and declares the Timer indices that the legacy adapter already created lazily. Migration creates these same indices without changing domain rows. Asset packaging depends on schema generation so validation uses the schema matching the APK. Existing version-2 exports remain accepted and are upgraded only in private staging. Import serializes with uploads, preserves this installation's known/pending identities, and requests full reconciliation. Missing imported rows become tombstones. Existing atomic replacement, rollback, photos and SAF export validation are retained.
-
-The backend reuses the technical envelope and projects it asynchronously into a separate server-side presentation database. The projector consumes this repository's Room schema: 51 source tables and 30 additional Timer collection/junction tables have real SQLite PK/FK constraints. Every referenced table configures a semantic Datasette `label_column`, so native clickable labels and record navigation work without manual ID-substitution views. Many-to-many relations use junction tables. Original keys are preserved; missing/deleted parents retain stable placeholders and valid inbound references. Timer and People tag namespaces stay separate. UTC/date companions and photo sizes make fields readable while preserving exact typed payloads in the envelope. The server projector updates changed sources transactionally and retries independently. Its failure cannot block the existing write endpoint or local PersonalHub saves. No new HTTP protocol or per-screen mutation callback is introduced.
-
-Validation adds native SQLite tests across all 51 table types, composite identity changes, rollback, no export loop from sync metadata and upgrade from a v2 database with legacy indices. Emulator instrumentation covers OFF, full reconciliation/idempotence, five-module create/update/delete, failed upload recovery, and a concurrent local update during an older request. The existing global import/export/photo/recovery tests remain required; run each successful-import test in a fresh app process because import intentionally freezes the old database graph until restart. Physical-device QA is limited to backed-up in-place upgrade, configuration, navigation and real upload; synthetic mutation tests stay emulator-only. Fedora and Oracle use the pinned Datasette 1.0a38 release, with no API tests skipped. The large-photo test forces a concurrent writer inside the Base64 encoder and requires completion within two seconds, then verifies both old and new revisions. Import reconciliation has a two-process test: run `importPreservesKnownIdentitiesForReconciliation`, force-stop/restart, then `importReconciliationAfterProcessRestart`; it verifies that identities removed by import become tombstones.
+PersonalHub previously included optional Datasette synchronization and an embedded read-only explorer. That integration has been removed from the current app and is not a data, backup or recovery path. External Datasette5 services and their data are maintained separately from the PersonalHub app.
 
 ## Soldi module (741295)
 
@@ -160,21 +146,12 @@ Verification for this change: debug v13 and the isolated QA variant built succes
 Application v14 / Room 5 adds required account references, derived per-currency balances, reconciliation and canonical product UUID/FK preservation. See [FINANCE_EXCHANGE.md](FINANCE_EXCHANGE.md) for the accounting rules, localized date/time pickers, local suggestions, dedicated finance-only Git exchange and conservative conflict rules. The earlier v13 editor-offset description is superseded by readable local date/time pickers; persistence remains UTC.
 
 
-## Hybrid Datasette data explorer
-
-PersonalHub keeps `personalhub.db` as the sole writable source of truth while exposing a shared read-only Data Explorer. Local exploration creates a coherent, validated snapshot under app cache and serves only that detached file to an embedded Datasette Lite runtime through a synthetic HTTPS WebView origin. The live Room database and WAL are never exposed. Local WebView requests outside that origin are blocked, so offline mode cannot silently fall back to network-hosted runtime assets.
-
-Remote exploration reuses only the encrypted Datasette HTTPS base address and targets the read-only `personalhub_read` presentation database by default. It never injects or reveals the Android `personalhub-sync` bearer token, which remains scoped to the technical envelope. Human browsing and read-only SQL use server-side interactive authentication. Arbitrary Datasette writes remain prohibited; any future explorer mutation must enter a PersonalHub-owned mutation API so domain validation, sync journaling, Activity capture and undo remain authoritative.
-
-See `docs/DATA_EXPLORER.md` for the runtime boundary and offline packaging contract.
-
-
 ## Salute canonical domain
 
-Salute is a first-class domain of the canonical `personalhub.db` and a deliberately thin read-only Android feature. The user-facing app does not provide health CRUD; trusted ChatGPT-assisted ingestion arrives through the existing semantic Git patch path, so health mutations participate in the same transaction, Git History, Time Machine, revert, Datasette and backup semantics as the other PH domains.
+Salute is a first-class domain of the canonical `personalhub.db` and a deliberately thin read-only Android feature. The user-facing app does not provide health CRUD; trusted ChatGPT-assisted ingestion arrives through the existing semantic Git patch path, so health mutations participate in the same transaction, Git History, Time Machine, revert and backup semantics as the other PH domains.
 
 The previous design that treated `gernalix/salute/salute.db` as a separately downloaded runtime database is transitional and must be retired when the canonical health schema lands. PersonalHub must not maintain a second health database, second Git history engine or second sync state machine.
 
 Health events link to canonical People and Places records; documented prescriptions/renewals update the existing Substances domain rather than creating duplicate drug entities, and medication purchases remain canonical Soldi transactions. Hub Context provides semantic cross-module links and the global temporal layer indexes health events by epoch-ms.
 
-Obsidian is the preferred human-reading projection for Health but remains a deterministic, disposable export of `personalhub.db`. Datasette remains the ad-hoc relational/query interface. The Android Salute UI is intentionally minimal. See `docs/HEALTH_MODULE.md` and `docs/health/HEALTH_DATA_MODEL.md`.
+Obsidian is the preferred human-reading projection for Health but remains a deterministic, disposable export of `personalhub.db`. The Android Salute UI is intentionally minimal. See `docs/HEALTH_MODULE.md` and `docs/health/HEALTH_DATA_MODEL.md`.

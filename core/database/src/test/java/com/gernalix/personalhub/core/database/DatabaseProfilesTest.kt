@@ -54,7 +54,6 @@ class DatabaseProfilesTest {
     fun defaultProfileUsesCanonicalDatabaseCloneAndEmptyAreIsolated() {
         val canonical = writableDatabase()
         insertCrossModuleFixture(canonical, "personal")
-        canonical.execSQL("INSERT OR REPLACE INTO hub_sync_known(table_name,row_key) VALUES('places','personal')")
 
         assertEquals(DatabaseProfiles.DEFAULT_PROFILE_ID, DatabaseProfiles.activeProfileId(context))
         assertEquals("personal", scalar(canonical, "SELECT title FROM sessions WHERE id=101"))
@@ -66,7 +65,6 @@ class DatabaseProfilesTest {
             assertEquals("clone must preserve $table", 1L, detachedCount(DatabaseProfiles.databaseFile(context, clone.id), table))
             assertEquals("empty must not inherit $table", 0L, detachedCount(DatabaseProfiles.databaseFile(context, empty.id), table))
         }
-        assertEquals(0L, detachedCount(DatabaseProfiles.databaseFile(context, clone.id), "hub_sync_known"))
 
         assertTrue(DatabaseProfiles.switch(context, clone.id))
         simulateRestart()

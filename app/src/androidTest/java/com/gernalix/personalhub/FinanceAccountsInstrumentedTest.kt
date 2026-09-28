@@ -39,7 +39,6 @@ class FinanceAccountsInstrumentedTest {
         finance.saveProduct(product,"QA renamed product")
         assertEquals(product,db.financeDao().transaction(transaction)!!.productId)
         assertEquals(3,scalar("SELECT count(*) FROM finance_transactions"))
-        assertEquals(3,scalar("SELECT count(*) FROM hub_sync_pending WHERE table_name='finance_transactions'"))
         val reopened=PersonalHubDatabase.openTemporary(context,PersonalHubDatabase.DATABASE_NAME)
         try { assertEquals(product,reopened.financeDao().transaction(transaction)!!.productId); assertFalse(reopened.financeDao().account(b.id)!!.included) } finally { reopened.close() }
         val generation=scalar("SELECT generation FROM hub_generation")

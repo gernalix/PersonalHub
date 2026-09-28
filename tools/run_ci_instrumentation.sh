@@ -35,7 +35,7 @@ run_app_test() {
 
 app_tests=(
   'DatabaseVaultLegacyTableValidationTest#inertLegacyTableIsAllowedButUnexpectedTriggerIsRejected'
-  'DatasetteSyncInstrumentedTest#journalMutationTriggersDatasetteWorkAndRecoveryWithoutPolling'
+  'LegacySyncJournalSchemaDeviceTest#legacySyncJournalSchemaPersistsAcrossReopen'
   'GlobalDatabaseInstrumentedTest#roomAndTimerWritesScheduleAndProduceExportWithoutPolling'
   'GlobalDatabaseInstrumentedTest#cleanIdleStartupHasRecoveryButNoDirtyPollingThread'
   'GlobalDatabaseInstrumentedTest#repeatedImportsDeleteOrphansButProtectAPendingRollbackCopy'
@@ -43,25 +43,10 @@ app_tests=(
   'SubstancesWidgetHostDeviceTest#twoWidgetInstancesTargetAndRecordTwoSubstancesOnceEach'
   'HubDiscoverabilityEpisodesEmulatorTest#homeSearchEpisodesAndFatigueAreReachableFromUi'
   'HubTemporalDeferredQaDeviceTest#homeSearchEpisodesAndFatigueAreReachableFromUi'
-  'DatasetteSyncInstrumentedTest#importPreservesKnownIdentitiesForReconciliation'
-  'DatasetteSyncInstrumentedTest#importReconciliationAfterProcessRestart'
 )
 for test_name in "${app_tests[@]}"; do
   run_app_test "$test_name"
 done
-
-if [[ -z "${PERSONALHUB_DATASETTE_RUNTIME_JSON:-}" ]]; then
-  echo "Missing private Datasette test runtime" >&2
-  exit 1
-fi
-# run-as owns the redirect inside the isolated QA app sandbox. No value is put
-# in argv, instrumentation arguments, workspace files, or runner logs.
-printf '%s' "$PERSONALHUB_DATASETTE_RUNTIME_JSON" \
-  | adb -s "$serial" shell "run-as com.gernalix.personalhub.qa sh -c 'umask 077; cat > /data/user/0/com.gernalix.personalhub.qa/no_backup/datasette-runtime.json'"
-unset PERSONALHUB_DATASETTE_RUNTIME_JSON
-trap 'adb -s "$serial" shell "run-as com.gernalix.personalhub.qa sh -c '\''unlink /data/user/0/com.gernalix.personalhub.qa/no_backup/datasette-runtime.json'\''" >/dev/null 2>&1 || true' EXIT
-run_app_test 'DatasetteSyncInstrumentedTest#configureFromPrivateRuntimeFile'
-run_app_test 'DatasetteSyncInstrumentedTest#oracleFullRoundTripUpload'
 
 # Library instrumentation uses the same emulator, never concurrently.
 python3 tools/android_connected_test_gate.py -- \

@@ -58,7 +58,7 @@ commands:
     full: {argv: [python3, tools/project_capsule.py, --repo, ., --mode, FULL], cwd: .}
 safety:
   invariants:
-    - personalhub.db is the only writable runtime database; SAF, Datasette and Git are backup, replica or explicit recovery paths.
+    - personalhub.db is the only writable runtime database; SAF is the user-controlled backup path and Git Data is the versioned history and explicit recovery path.
     - Preserve existing device data; APK installation does not migrate the database.
     - Keep feature implementation private behind capsule APIs and shared contracts.
   risky_operations:

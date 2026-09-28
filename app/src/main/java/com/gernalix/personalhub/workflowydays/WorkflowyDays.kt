@@ -17,7 +17,6 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
-import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -33,9 +32,8 @@ data class WorkflowyDay(val date: LocalDate, val nodeId: String) {
 /**
  * App-private store deliberately kept outside PersonalHubDatabase.
  *
- * Downloaded Workflowy metadata must not enter the generic Datasette upload journal and be
- * echoed back to the server. This tiny DB is still internal app data, but has one owner and one
- * direction: remote Workflowy index -> PersonalHub.
+ * This tiny DB is internal app data with one owner and one direction:
+ * remote Workflowy index -> PersonalHub.
  */
 object WorkflowyDaysStore {
     private const val DB_NAME = "workflowy_days.db"
@@ -128,17 +126,13 @@ object WorkflowyDaysStore {
 object WorkflowyDaysFeed {
     private val uuid = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
-    /** Accepts the compact VM feed or Datasette `_shape=array` rows from workflowy_days. */
+    /** Accepts the compact HTTPS JSON feed for workflowy_days. */
     fun parse(raw: String): List<WorkflowyDay> {
         val text = raw.trim()
         require(text.isNotEmpty()) { "Empty Workflowy-days feed" }
-        val rows = if (text.startsWith("[")) {
-            JSONArray(text)
-        } else {
-            val root = JSONObject(text)
-            require(root.getInt("schema_version") == 1) { "Unsupported Workflowy-days schema" }
-            root.getJSONArray("workflowy_days")
-        }
+        val root = JSONObject(text)
+        require(root.getInt("schema_version") == 1) { "Unsupported Workflowy-days schema" }
+        val rows = root.getJSONArray("workflowy_days")
 
         val unique = linkedMapOf<Pair<LocalDate, String>, WorkflowyDay>()
         repeat(rows.length()) { index ->
@@ -156,7 +150,7 @@ object WorkflowyDaysFeed {
     }
 }
 
-/** One-way, optional downloader. It is intentionally independent from DatasetteSync. */
+/** One-way, optional downloader for the Workflowy day index. */
 object WorkflowyDaysSync {
     private const val PREFS = "workflowy_days_sync"
     private const val KEY_URL = "feed_url"
@@ -169,9 +163,23 @@ object WorkflowyDaysSync {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    private fun isUnsupportedArrayFeedUrl(url: String): Boolean =
+        Uri.parse(url).getQueryParameter("_shape")?.equals("array", ignoreCase = true) == true
+
+    private fun retireLegacyFeed(context: Context, url: String?): Boolean {
+        if (url == null || !isUnsupportedArrayFeedUrl(url)) return false
+        val preferences = prefs(context)
+        if (!preferences.getBoolean(KEY_ENABLED, false)) return false
+        preferences.edit().putBoolean(KEY_ENABLED, false).putString(KEY_STATUS, "unsupported_feed").apply()
+        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(PERIODIC_WORK)
+        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(NOW_WORK)
+        return true
+    }
+
     fun configure(context: Context, feedUrl: String, enabled: Boolean = true) {
         if (enabled) require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         require(feedUrl.startsWith("https://")) { "Workflowy-days feed must use HTTPS" }
+        require(!isUnsupportedArrayFeedUrl(feedUrl)) { "Legacy array feed is no longer supported" }
         prefs(context).edit().putString(KEY_URL, feedUrl).putBoolean(KEY_ENABLED, enabled).apply()
         if (enabled) {
             ensureScheduled(context)
@@ -184,7 +192,11 @@ object WorkflowyDaysSync {
     fun setEnabled(context: Context, enabled: Boolean) {
         if (enabled) require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         val preferences = prefs(context)
-        if (enabled) require(!preferences.getString(KEY_URL, null).isNullOrBlank()) { "Workflowy-days feed URL is not configured" }
+        if (enabled) {
+            val url = preferences.getString(KEY_URL, null)
+            require(!url.isNullOrBlank()) { "Workflowy-days feed URL is not configured" }
+            require(!isUnsupportedArrayFeedUrl(url)) { "Legacy array feed is no longer supported" }
+        }
         preferences.edit().putBoolean(KEY_ENABLED, enabled).apply()
         if (enabled) {
             ensureScheduled(context)
@@ -218,6 +230,7 @@ object WorkflowyDaysSync {
             return
         }
         val preferences = prefs(context)
+        if (retireLegacyFeed(context, preferences.getString(KEY_URL, null))) return
         if (!preferences.getBoolean(KEY_ENABLED, false) || preferences.getString(KEY_URL, null).isNullOrBlank()) return
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
         val request = PeriodicWorkRequestBuilder<WorkflowyDaysWorker>(24, TimeUnit.HOURS)
@@ -234,6 +247,7 @@ object WorkflowyDaysSync {
     fun requestNow(context: Context) {
         if (!WorkflowyIntegrationSettings.isEnabled(context)) return
         val preferences = prefs(context)
+        if (retireLegacyFeed(context, preferences.getString(KEY_URL, null))) return
         if (!preferences.getBoolean(KEY_ENABLED, false) || preferences.getString(KEY_URL, null).isNullOrBlank()) return
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
@@ -257,6 +271,7 @@ object WorkflowyDaysSync {
         val preferences = prefs(context)
         if (!preferences.getBoolean(KEY_ENABLED, false)) return true
         val url = preferences.getString(KEY_URL, null)?.takeIf { it.isNotBlank() } ?: return true
+        if (retireLegacyFeed(context, url)) return true
         preferences.edit().putString(KEY_STATUS, "downloading").apply()
 
         var connection: HttpURLConnection? = null
