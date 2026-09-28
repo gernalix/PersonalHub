@@ -119,7 +119,8 @@ internal fun WorkflowyDaysSettings(onBack: () -> Unit) {
 
         Text(
             stringResource(
-                if (!enabled) R.string.workflowy_days_off else when (status) {
+                if (!enabled && status == "unsupported_feed") R.string.workflowy_days_legacy_feed
+                else if (!enabled) R.string.workflowy_days_off else when (status) {
                     "downloading" -> R.string.workflowy_days_downloading
                     "complete" -> R.string.workflowy_days_complete
                     "retry" -> R.string.workflowy_days_retry
