@@ -85,6 +85,7 @@ class MutationEventStoreTest {
         ))
         assertEquals(1, created.sequence)
         assertEquals(2, deleted.sequence)
+        assertEquals(deleted, MutationEventStore.byId(db, deleted.eventId))
         assertNull(deleted.afterJson)
         assertEquals("Work", JSONObject(deleted.beforeJson!!).getString("name"))
     }
