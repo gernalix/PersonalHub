@@ -142,6 +142,12 @@ object MutationEventStore {
         arrayOf(transactionId),
     ).use { cursor -> buildList { while (cursor.moveToNext()) add(read(cursor)) } }
 
+    fun oldestOccurredAt(db: SupportSQLiteDatabase): Long? = db.query(
+        "SELECT MIN(occurred_at) FROM mutation_events",
+    ).use { cursor ->
+        if (!cursor.moveToFirst() || cursor.isNull(0)) null else cursor.getLong(0)
+    }
+
     private fun read(cursor: Cursor) = MutationEvent(
         eventId = cursor.getString(0), occurredAt = cursor.getLong(1),
         transactionId = cursor.getString(2), sequence = cursor.getInt(3),

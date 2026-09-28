@@ -49,7 +49,9 @@ fun HubAuditLogScreen(onBack: () -> Unit) {
             MutationEventStore.recent(PersonalHubDatabase.get(context).openHelper.readableDatabase)
         }
         if (gitEnabled) legacyEntries = withContext(Dispatchers.IO) {
-            val oldestSemanticTime = entries.minOfOrNull(MutationEvent::occurredAt)
+            val oldestSemanticTime = MutationEventStore.oldestOccurredAt(
+                PersonalHubDatabase.get(context).openHelper.readableDatabase,
+            )
             GitHistory.recent(context.applicationContext, limit = 1000)
                 .filter { oldestSemanticTime == null || it.occurredAt < oldestSemanticTime }
         }

@@ -118,17 +118,35 @@ private class GatedDatabase(private val delegate: SupportSQLiteDatabase) : Suppo
     override fun endTransaction() = DatabaseGate.end(
         beforeOutermostMutatingEnd = { GitDataTracking.clearEditContextIfInstalled(delegate) },
     ) { delegate.endTransaction() }
-    override fun execSQL(sql: String) = mutateWithContext { delegate.execSQL(sql) }
-    override fun execSQL(sql: String, bindArgs: Array<out Any?>) = mutateWithContext { delegate.execSQL(sql, bindArgs) }
-    override fun insert(table: String, conflictAlgorithm: Int, values: ContentValues) = mutateWithContext { delegate.insert(table, conflictAlgorithm, values) }
-    override fun delete(table: String, whereClause: String?, whereArgs: Array<out Any?>?) = mutateWithContext { delegate.delete(table, whereClause, whereArgs) }
-    override fun update(table: String, conflictAlgorithm: Int, values: ContentValues, whereClause: String?, whereArgs: Array<out Any?>?) = mutateWithContext { delegate.update(table, conflictAlgorithm, values, whereClause, whereArgs) }
+    private fun isContextWrite(sql: String): Boolean =
+        sql.trimStart().startsWith("INSERT INTO ${GitDataTracking.CONTEXT_TABLE}", ignoreCase = true) ||
+            sql.trimStart().startsWith("INSERT OR REPLACE INTO ${GitDataTracking.CONTEXT_TABLE}", ignoreCase = true) ||
+            sql.trimStart().startsWith("DELETE FROM ${GitDataTracking.CONTEXT_TABLE}", ignoreCase = true)
+
+    override fun execSQL(sql: String) = if (isContextWrite(sql)) DatabaseGate.mutate { delegate.execSQL(sql) }
+        else mutateWithContext { delegate.execSQL(sql) }
+    override fun execSQL(sql: String, bindArgs: Array<out Any?>) =
+        if (isContextWrite(sql)) DatabaseGate.mutate { delegate.execSQL(sql, bindArgs) }
+        else mutateWithContext { delegate.execSQL(sql, bindArgs) }
+    override fun insert(table: String, conflictAlgorithm: Int, values: ContentValues) =
+        if (table == GitDataTracking.CONTEXT_TABLE) DatabaseGate.mutate { delegate.insert(table, conflictAlgorithm, values) }
+        else mutateWithContext { delegate.insert(table, conflictAlgorithm, values) }
+    override fun delete(table: String, whereClause: String?, whereArgs: Array<out Any?>?) =
+        if (table == GitDataTracking.CONTEXT_TABLE) DatabaseGate.mutate { delegate.delete(table, whereClause, whereArgs) }
+        else mutateWithContext { delegate.delete(table, whereClause, whereArgs) }
+    override fun update(table: String, conflictAlgorithm: Int, values: ContentValues, whereClause: String?, whereArgs: Array<out Any?>?) =
+        if (table == GitDataTracking.CONTEXT_TABLE) DatabaseGate.mutate { delegate.update(table, conflictAlgorithm, values, whereClause, whereArgs) }
+        else mutateWithContext { delegate.update(table, conflictAlgorithm, values, whereClause, whereArgs) }
     override fun compileStatement(sql: String): SupportSQLiteStatement {
         val statement = delegate.compileStatement(sql)
+        val contextWrite = isContextWrite(sql)
         return object : SupportSQLiteStatement by statement {
-            override fun execute() = mutateWithContext { statement.execute() }
-            override fun executeInsert() = mutateWithContext { statement.executeInsert() }
-            override fun executeUpdateDelete() = mutateWithContext { statement.executeUpdateDelete() }
+            override fun execute() = if (contextWrite) DatabaseGate.mutate { statement.execute() }
+                else mutateWithContext { statement.execute() }
+            override fun executeInsert() = if (contextWrite) DatabaseGate.mutate { statement.executeInsert() }
+                else mutateWithContext { statement.executeInsert() }
+            override fun executeUpdateDelete() = if (contextWrite) DatabaseGate.mutate { statement.executeUpdateDelete() }
+                else mutateWithContext { statement.executeUpdateDelete() }
         }
     }
 }

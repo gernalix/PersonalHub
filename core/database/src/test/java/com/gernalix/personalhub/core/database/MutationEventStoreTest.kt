@@ -7,6 +7,7 @@ import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEv
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoResolver
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoTarget
 import com.gernalix.personalhub.core.database.capsules.sync.SyncJournal
+import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import java.util.UUID
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -46,6 +47,7 @@ class MutationEventStoreTest {
 
         val events = MutationEventStore.recent(db)
         assertEquals(3, events.size)
+        assertEquals(events.minOf { it.occurredAt }, MutationEventStore.oldestOccurredAt(db))
         val creates = events.filter { it.eventType == "places.place.created" }
         assertEquals(2, creates.size)
         assertEquals(creates[0].transactionId, creates[1].transactionId)
@@ -147,6 +149,25 @@ class MutationEventStoreTest {
         val deleted = MutationEventStore.recent(db).single { it.eventType == "people.person.deleted" }
         assertEquals("Mario Rossi", JSONObject(deleted.beforeJson!!).getString("name"))
         assertNull(deleted.afterJson)
+    }
+
+    @Test
+    fun explicitImportContextSurvivesStatementWrapperAndStaysOutOfHumanHistory() = withDatabase { database ->
+        val db = database.openHelper.writableDatabase
+        val id = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        GitDataTracking.setEditContext(db, author = "import", source = "import", groupId = "import-batch-1")
+        try {
+            db.execSQL(
+                """INSERT INTO places(uuid,nickname,address,lat,lon,radius_m,notes,source_app,created_at,updated_at,archived,first_check_in_at_place)
+                    VALUES(?, 'Imported', NULL, NULL, NULL, NULL, NULL, 'test', ?, ?, 0, NULL)""".trimIndent(),
+                arrayOf<Any?>(id, now, now),
+            )
+        } finally { GitDataTracking.clearEditContext(db) }
+        val event = MutationEventStore.recent(db).single { it.entityId == id }
+        assertEquals("import-batch-1", event.transactionId)
+        assertEquals("import", event.actorType)
+        assertEquals("import", event.actorSource)
     }
 
     private fun withDatabase(block: (PersonalHubDatabase) -> Unit) {
