@@ -163,11 +163,11 @@ object WorkflowyDaysSync {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    private fun isLegacyDatasetteFeed(url: String): Boolean =
+    private fun isUnsupportedArrayFeedUrl(url: String): Boolean =
         Uri.parse(url).getQueryParameter("_shape")?.equals("array", ignoreCase = true) == true
 
     private fun retireLegacyFeed(context: Context, url: String?): Boolean {
-        if (url == null || !isLegacyDatasetteFeed(url)) return false
+        if (url == null || !isUnsupportedArrayFeedUrl(url)) return false
         val preferences = prefs(context)
         if (!preferences.getBoolean(KEY_ENABLED, false)) return false
         preferences.edit().putBoolean(KEY_ENABLED, false).putString(KEY_STATUS, "unsupported_feed").apply()
@@ -179,7 +179,7 @@ object WorkflowyDaysSync {
     fun configure(context: Context, feedUrl: String, enabled: Boolean = true) {
         if (enabled) require(WorkflowyIntegrationSettings.isEnabled(context)) { "Workflowy integration is disabled" }
         require(feedUrl.startsWith("https://")) { "Workflowy-days feed must use HTTPS" }
-        require(!isLegacyDatasetteFeed(feedUrl)) { "Legacy array feed is no longer supported" }
+        require(!isUnsupportedArrayFeedUrl(feedUrl)) { "Legacy array feed is no longer supported" }
         prefs(context).edit().putString(KEY_URL, feedUrl).putBoolean(KEY_ENABLED, enabled).apply()
         if (enabled) {
             ensureScheduled(context)
@@ -195,7 +195,7 @@ object WorkflowyDaysSync {
         if (enabled) {
             val url = preferences.getString(KEY_URL, null)
             require(!url.isNullOrBlank()) { "Workflowy-days feed URL is not configured" }
-            require(!isLegacyDatasetteFeed(url)) { "Legacy array feed is no longer supported" }
+            require(!isUnsupportedArrayFeedUrl(url)) { "Legacy array feed is no longer supported" }
         }
         preferences.edit().putBoolean(KEY_ENABLED, enabled).apply()
         if (enabled) {
