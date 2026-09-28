@@ -64,8 +64,8 @@ object MutationEventCapture {
         val source = "COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1),'personalhub')"
         listOf("INSERT" to "tag_added", "DELETE" to "tag_removed").forEach { (operation, action) ->
             val row = if (operation == "INSERT") "NEW" else "OLD"
-            val tag = "json_object('tag',json_object('id',$row.tag_id,'name',(SELECT name FROM tags WHERE id=$row.tag_id)))"
-            val name = "json_object('name',(SELECT title FROM sessions WHERE id=$row.session_id))"
+            val tag = "('{\"tag\":{\"id\":' || ${jsonScalar("$row.tag_id")} || ',\"name\":' || ${jsonScalar("(SELECT name FROM tags WHERE id=$row.tag_id)")} || '}}')"
+            val name = jsonObject("name", "(SELECT title FROM sessions WHERE id=$row.session_id)")
             val trigger = "mutation_session_tags_$operation"
             put(trigger, """CREATE TRIGGER `$trigger` BEFORE $operation ON session_tags BEGIN
                 INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
@@ -80,6 +80,7 @@ object MutationEventCapture {
     private fun peopleActionSql(): Map<String, String> {
         val group = "COALESCE((SELECT group_id FROM hub_git_edit_context WHERE id=1),lower(hex(randomblob(16))))"
         val label = "(SELECT value FROM contact_fields WHERE contact_id=NEW.contact_id AND field_type='name' LIMIT 1)"
+        val named = jsonObject("name", label)
         return mapOf("mutation_people_action" to """CREATE TRIGGER mutation_people_action AFTER INSERT ON contact_events
             WHEN lower(NEW.entity_type)='contact' AND lower(NEW.action_type) IN ('created','deleted','archived')
             BEGIN
@@ -90,9 +91,9 @@ object MutationEventCapture {
                 'people','people.person.' || lower(NEW.action_type),'person',CAST(NEW.contact_id AS TEXT),
                 COALESCE((SELECT actor FROM hub_git_edit_context WHERE id=1),'user'),
                 COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1),'personalhub'),
-                CASE WHEN lower(NEW.action_type)='created' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":false}' ELSE json_object('name',$label) END,
-                CASE WHEN lower(NEW.action_type)='deleted' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":true}' ELSE json_object('name',$label) END,
-                json_object('name',$label),1);
+                CASE WHEN lower(NEW.action_type)='created' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":false}' ELSE $named END,
+                CASE WHEN lower(NEW.action_type)='deleted' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":true}' ELSE $named END,
+                $named,1);
             END""".trimIndent())
     }
 
@@ -110,6 +111,8 @@ object MutationEventCapture {
             AND r.value LIKE '%workflowy.com/%' LIMIT 1)""".replace("\n", " ")
         val newResource = resource("NEW.context_id", "title")
         val oldResource = resource("OLD.id", "title")
+        val newName = jsonObject("name", newResource)
+        val oldName = jsonObject("name", oldResource)
         val assigned = """CREATE TRIGGER mutation_workflowy_assigned AFTER INSERT ON hub_context_members
             WHEN NEW.position=1 AND (SELECT title FROM hub_contexts WHERE id=NEW.context_id)='Workflowy'
                 AND ${resource("NEW.context_id", "id")} IS NOT NULL
@@ -119,7 +122,7 @@ object MutationEventCapture {
               VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
                 $group,$sequence,${anchor("NEW.context_id", "module_id")},'workflowy.link.assigned',
                 'link',${anchor("NEW.context_id", "canonical_id")},$actor,$source,
-                NULL,json_object('name',$newResource),json_object('name',$newResource),1);
+                NULL,$newName,$newName,1);
             END""".trimIndent()
         val unlinked = """CREATE TRIGGER mutation_workflowy_unlinked BEFORE DELETE ON hub_contexts
             WHEN OLD.title='Workflowy' AND ${resource("OLD.id", "id")} IS NOT NULL
@@ -129,7 +132,7 @@ object MutationEventCapture {
               VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
                 $group,$sequence,${anchor("OLD.id", "module_id")},'workflowy.link.unlinked',
                 'link',${anchor("OLD.id", "canonical_id")},$actor,$source,
-                json_object('name',$oldResource),NULL,json_object('name',$oldResource),1);
+                $oldName,NULL,$oldName,1);
             END""".trimIndent()
         return mapOf("mutation_workflowy_assigned" to assigned, "mutation_workflowy_unlinked" to unlinked)
     }
@@ -158,10 +161,10 @@ object MutationEventCapture {
         val actor = "COALESCE((SELECT actor FROM hub_git_edit_context WHERE id=1),'user')"
         val sourceName = "COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1),'personalhub')"
         val label = when (source.table) {
-            "intake_events" -> "json_object('name',(SELECT name FROM substances WHERE id=$row.substance_id))"
-            "finance_transactions" -> "json_object('name',(SELECT name FROM finance_titles WHERE id=$row.titleId))"
-            "contact_fields" -> "json_object('name',CASE WHEN $row.field_type='name' THEN $row.value ELSE (SELECT value FROM contact_fields WHERE contact_id=$row.contact_id AND field_type='name' LIMIT 1) END)"
-            else -> source.label?.let { "json_object('name',$row.`$it`)" } ?: "'{}'"
+            "intake_events" -> jsonObject("name", "(SELECT name FROM substances WHERE id=$row.substance_id)")
+            "finance_transactions" -> jsonObject("name", "(SELECT name FROM finance_titles WHERE id=$row.titleId)")
+            "contact_fields" -> jsonObject("name", "CASE WHEN $row.field_type='name' THEN $row.value ELSE (SELECT value FROM contact_fields WHERE contact_id=$row.contact_id AND field_type='name' LIMIT 1) END")
+            else -> source.label?.let { jsonObject("name", "$row.`$it`") } ?: "'{}'"
         }
         return """CREATE TRIGGER `$name` AFTER $operation ON `${source.table}`$condition BEGIN
             INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
@@ -176,12 +179,34 @@ object MutationEventCapture {
     /** UPDATE payloads contain only changed semantic fields, never timestamps or bookkeeping. */
     private fun payload(fields: List<String>, row: String, comparison: String?): String {
         val parts = fields.map { field ->
-            val value = "'\"$field\":' || json_quote($row.`$field`) || ','"
+            val value = "'\"$field\":' || ${jsonScalar("$row.`$field`")} || ','"
             if (comparison == null) value
             else "CASE WHEN $row.`$field` IS NOT $comparison.`$field` THEN $value ELSE '' END"
         }
-        return "json('{' || rtrim(${parts.joinToString(" || ") { "($it)" }}, ',') || '}')"
+        return "('{' || rtrim(${parts.joinToString(" || ") { "($it)" }}, ',') || '}')"
     }
+
+    /** Android API 29 and Robolectric SQLite do not consistently expose JSON1 functions. */
+    private fun jsonScalar(expression: String): String {
+        val escaped = listOf(
+            "char(92)" to "char(92)||char(92)",
+            "char(34)" to "char(92)||char(34)",
+            "char(10)" to "char(92)||'n'",
+            "char(13)" to "char(92)||'r'",
+            "char(9)" to "char(92)||'t'",
+            "char(8)" to "char(92)||'b'",
+            "char(12)" to "char(92)||'f'",
+        ).fold("CAST(($expression) AS TEXT)") { value, (needle, replacement) ->
+            "replace($value,$needle,$replacement)"
+        }
+        return "(CASE WHEN ($expression) IS NULL THEN 'null' " +
+            "WHEN typeof(($expression)) IN ('integer','real') THEN CAST(($expression) AS TEXT) " +
+            "WHEN typeof(($expression))='blob' THEN char(34)||hex(($expression))||char(34) " +
+            "ELSE char(34)||$escaped||char(34) END)"
+    }
+
+    private fun jsonObject(key: String, expression: String): String =
+        "('{\"$key\":' || ${jsonScalar(expression)} || '}')"
 
     private fun columns(db: SupportSQLiteDatabase, table: String): Set<String> =
         db.query("PRAGMA table_info(`$table`)").use { cursor ->

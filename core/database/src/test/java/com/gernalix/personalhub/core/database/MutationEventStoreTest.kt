@@ -216,6 +216,22 @@ class MutationEventStoreTest {
         } finally { context.deleteDatabase(name) }
     }
 
+    @Test
+    fun captureEscapesNamesWithoutJsonExtension() = withDatabase { database ->
+        val db = database.openHelper.writableDatabase
+        val name = "Room \"A\" \\ North\nFloor 2"
+        val id = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        db.execSQL(
+            """INSERT INTO places(uuid,nickname,address,lat,lon,radius_m,notes,source_app,created_at,updated_at,archived,first_check_in_at_place)
+                VALUES(?,?,NULL,NULL,NULL,NULL,NULL,'test',?,?,0,NULL)""".trimIndent(),
+            arrayOf<Any?>(id, name, now, now),
+        )
+        val event = MutationEventStore.recent(db).single { it.entityId == id }
+        assertEquals(name, JSONObject(event.afterJson!!).getString("nickname"))
+        assertEquals(name, JSONObject(event.contextJson).getString("name"))
+    }
+
     private fun withDatabase(block: (PersonalHubDatabase) -> Unit) {
         val name = "mutation-events-${UUID.randomUUID()}.db"
         val database = PersonalHubDatabase.openTemporary(context, name)
