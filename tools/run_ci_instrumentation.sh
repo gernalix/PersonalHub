@@ -35,6 +35,7 @@ run_app_test() {
 
 app_tests=(
   'DatabaseVaultLegacyTableValidationTest#inertLegacyTableIsAllowedButUnexpectedTriggerIsRejected'
+  'LegacySyncJournalSchemaDeviceTest#legacySyncJournalSchemaPersistsAcrossReopen'
   'GlobalDatabaseInstrumentedTest#roomAndTimerWritesScheduleAndProduceExportWithoutPolling'
   'GlobalDatabaseInstrumentedTest#cleanIdleStartupHasRecoveryButNoDirtyPollingThread'
   'GlobalDatabaseInstrumentedTest#repeatedImportsDeleteOrphansButProtectAPendingRollbackCopy'
