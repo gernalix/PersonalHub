@@ -170,6 +170,30 @@ class MutationEventStoreTest {
         assertEquals("import", event.actorSource)
     }
 
+    @Test
+    fun reopeningDatabaseKeepsEventsAndDoesNotDuplicateCapture() {
+        val name = "mutation-reopen-${UUID.randomUUID()}.db"
+        val now = System.currentTimeMillis()
+        fun insert(database: PersonalHubDatabase, nickname: String) {
+            database.openHelper.writableDatabase.execSQL(
+                """INSERT INTO places(uuid,nickname,address,lat,lon,radius_m,notes,source_app,created_at,updated_at,archived,first_check_in_at_place)
+                    VALUES(?,?,NULL,NULL,NULL,NULL,NULL,'test',?,?,0,NULL)""".trimIndent(),
+                arrayOf<Any?>(UUID.randomUUID().toString(), nickname, now, now),
+            )
+        }
+        try {
+            val first = PersonalHubDatabase.openTemporary(context, name)
+            try { insert(first, "First") } finally { first.close() }
+            val second = PersonalHubDatabase.openTemporary(context, name)
+            try {
+                insert(second, "Second")
+                val events = MutationEventStore.recent(second.openHelper.readableDatabase)
+                assertEquals(2, events.count { it.eventType == "places.place.created" })
+                assertEquals(setOf("First", "Second"), events.map { JSONObject(it.contextJson).optString("name") }.toSet())
+            } finally { second.close() }
+        } finally { context.deleteDatabase(name) }
+    }
+
     private fun withDatabase(block: (PersonalHubDatabase) -> Unit) {
         val name = "mutation-events-${UUID.randomUUID()}.db"
         val database = PersonalHubDatabase.openTemporary(context, name)
