@@ -53,6 +53,11 @@ class ArchiveStoreTest {
         assertEquals("thread",s.getString("conversation"))
         assertEquals(0,NotificationSnapshot.capture(StatusBarNotification("test.app","test.app",2,null,1,1,0,Notification(),android.os.Process.myUserHandle(),2000)).getJSONArray("messages").length())
     }
+    @Test fun pagingUsesCapturedTimeWithNonMonotonicClock(){
+        repeat(105){i->store.append(snapshot(key="$i", captured=if(i==104)"2026-10-08T10:00:00Z" else "2026-10-09T10:00:00Z"),"POSTED")}
+        val first=store.query();val rest=store.query(before=first.last().id)
+        assertEquals(100,first.size);assertEquals(5,rest.size);assertEquals(105,(first+rest).map{it.id}.distinct().size)
+    }
     @Test fun coherentLocalExport(){
         store.append(snapshot(),"POSTED")
         val out=java.io.ByteArrayOutputStream();store.export(out)

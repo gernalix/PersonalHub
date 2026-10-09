@@ -35,3 +35,45 @@ messages, identities and mappings from all those paths, without altering existin
 Room schema validation or remote publication. Volume is not the reason. No migration of
 PersonalHub data occurs. People mapping uses public IDs scoped by database profile ID,
 resolved read-only through the existing contact contract; no name-based merging.
+
+## Unified Conversations
+Archive schema v2 adds conversations, identities, messages, message_sources, people_mappings
+and a transactional last-event cursor. The v1 upgrade adds only derived tables; raw events
+and their immutability triggers are retained. Capture commits raw data before normalization,
+so a normalization failure cannot discard a captured notification. Processing is ordered in
+batches of at most 100 and resumes from the cursor, not from the start of history.
+
+Structured MessagingStyle is preferred. Self/null senders and aggregate summaries are not
+normalized as received messages. Text fallback requires a message category, a stable thread,
+a nonempty title/text and a single line; it remains LOW confidence with unknown sender.
+Timestamp-less contents use capture time, explicitly labeled. Attachment bytes are not read.
+
+Deduplication scopes sender/text/timestamp/attachment tuples to their original app/user/thread
+and preserves multiplicity in each observed snapshot. Every repeat retains event/slot/historic
+provenance. Identical texts with distinct observed timestamps or same-snapshot multiplicity
+remain distinct. Without platform message IDs, indistinguishable repeats cannot be proven
+as separate messages: their multiple observations remain raw/source-linked and uncertainty
+is shown. No absence from a newer snapshot asserts deletion. A same-sender/time content
+variation is only a possible revision or distinct message, and both contents are preserved.
+
+Shortcut/conversation IDs are scoped to app and Android user. Weak notification-key threads
+are marked uncertain and split after an observed removal or reconnection gap. Name-only
+senders are separate uncertain identities, not globally merged by name.
+
+People associations use profile ID and stable public contact ID, validated through existing
+read-only DAO contracts. Multiple conversations/apps and identities may link to one person;
+multiple people may link to one thread. Links can be removed/replaced without altering raw
+events or original threads. Missing/deleted People records are shown unavailable and can be
+unlinked. No association is written to the Git-versioned main DB.
+
+UI provides per-app thread lists, original-thread messages, person aggregate timelines,
+text/app/person/local-period filters, sender/thread link editors and original notification
+snapshots. Keyset pagination bounds timeline/thread queries to 100 rows, with indexed app,
+time, signature, sender and mapping lookups. Provenance detail shows the latest 100 source
+snapshots; every older source event remains in the raw searchable timeline.
+
+Validation uses synthetic Robolectric/native SQLite only. No emulator was started, no Pixel
+UI was controlled, no private device data was read, and no final distributable APK was built.
+The test-android-apps device/performance workflows are not applicable to these host tests.
+No resource measurements or device E2E result is claimed. Enable Notification access manually
+after installing an integrated build; Android may omit/redact contents or disconnect collection.

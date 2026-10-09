@@ -22,7 +22,7 @@ class CollectorService : NotificationListenerService() {
             val rank = Ranking()
             val conversation = if(android.os.Build.VERSION.SDK_INT >= 30 && ranking?.getRanking(sbn.key,rank)==true) rank.channel?.conversationId else null
             val snapshot = NotificationSnapshot.capture(sbn, conversation=conversation)
-            enqueue { ArchiveStore.get(this).append(snapshot,kind,reason) }
+            enqueue { val store=ArchiveStore.get(this); store.append(snapshot,kind,reason); store.normalizePending() }
         } catch (_: Exception) { failure() }
     }
     override fun onListenerConnected() {
@@ -31,6 +31,8 @@ class CollectorService : NotificationListenerService() {
         try { activeNotifications?.forEach { capture(it,"OBSERVED") } } catch (_: Exception) { failure() }
         getSharedPreferences("notification_status",MODE_PRIVATE).edit().putBoolean("connected",true).apply()
     }
+    override fun onNotificationPosted(sbn: StatusBarNotification) = capture(sbn,"POSTED")
+    override fun onNotificationRemoved(sbn: StatusBarNotification) = capture(sbn,"REMOVED")
     override fun onNotificationPosted(sbn: StatusBarNotification, rankingMap: RankingMap) = capture(sbn,"POSTED",rankingMap)
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap, reason: Int) = capture(sbn,"REMOVED",rankingMap,reason)
     override fun onListenerDisconnected() {

@@ -43,7 +43,10 @@ class NotificationsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        setContent { MaterialTheme { Surface { ArchiveScreen(generation, exportResult,
+        setContent { MaterialTheme { Surface {
+            var conversations by remember { mutableStateOf(false) }
+            if(conversations) ConversationsScreen(onBack={conversations=false}) else ArchiveScreen(generation, exportResult,
+            onConversations={conversations=true},
             onExport={export.launch("notifications.sqlite")}, onPermission={startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}, onBack={finish()}) } } }
     }
     override fun onResume() { super.onResume(); generation++ }
@@ -56,7 +59,7 @@ class NotificationsActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> Unit, onPermission: () -> Unit, onBack: () -> Unit) {
+internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> Unit, onPermission: () -> Unit, onBack: () -> Unit, onConversations: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val store = remember { ArchiveStore.get(context) }
     val changed by ArchiveStore.changes.collectAsState()
@@ -64,7 +67,7 @@ internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> 
     var from by remember { mutableStateOf("") }; var until by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf(emptyList<ArchiveEvent>()) }; var apps by remember { mutableStateOf(emptyList<String>()) }
     var selected by remember { mutableStateOf<ArchiveEvent?>(null) }
-    var error by remember { mutableStateOf(false) }; var more by remember { mutableStateOf(0) }
+    var error by remember { mutableStateOf(false) }; var more by remember(search,app,from,until,changed) { mutableStateOf(0) }
     val granted = remember(generation) { context.getSystemService(NotificationManager::class.java).isNotificationListenerAccessGranted(ComponentName(context,CollectorService::class.java)) }
     val status = context.getSharedPreferences("notification_status",0)
     LaunchedEffect(search,app,from,until,changed,more) {
@@ -78,7 +81,7 @@ internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> 
         Row { TextButton(onClick=onBack){Text(stringResource(R.string.back))}; Text(stringResource(R.string.notifications_title),style=MaterialTheme.typography.titleLarge) }
         Text(stringResource(if(granted) R.string.permission_on else R.string.permission_off))
         if(granted && !status.getBoolean("connected",false)) Text(stringResource(R.string.listener_waiting))
-        TextButton(onClick=onPermission){Text(stringResource(R.string.permission_settings))}
+        Row { TextButton(onClick=onPermission){Text(stringResource(R.string.permission_settings))}; TextButton(onClick=onConversations){Text(stringResource(R.string.conversations_title))} }
         Text(stringResource(R.string.archive_limits),style=MaterialTheme.typography.bodySmall)
         if(error || status.getBoolean("capture_error",false)) Text(stringResource(R.string.archive_error))
         exportResult?.let { Text(stringResource(it)) }

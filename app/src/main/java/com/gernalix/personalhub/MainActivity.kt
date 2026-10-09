@@ -173,7 +173,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                 }
             }
             item(key = "home-notifications") {
-                HomeActionTile("📥", R.string.home_notifications, R.string.home_notifications_help) {
+                HomeActionTile("📥", AlertText.get(context, R.string.home_notifications, R.string.home_notifications_it), AlertText.get(context, R.string.home_notifications_help, R.string.home_notifications_help_it)) {
                     context.startActivity(NotificationsRoute.intent(context))
                 }
             }

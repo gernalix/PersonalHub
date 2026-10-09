@@ -273,4 +273,6 @@
 
 <string name="home_notifications">Notifications</string>
 <string name="home_notifications_help">Local notification archive</string>
+<string name="home_notifications_it">Notifiche</string>
+<string name="home_notifications_help_it">Archivio locale delle notifiche</string>
 </resources>
