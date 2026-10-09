@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-09",
+  "target": "Google Pixel 8a / Android 17",
+  "canonical_implementation_commit": "96f080fbf1c46b10da83bf4664d8b13ce9ae49bf",
+  "artifact": {
+    "version": 64,
+    "size_bytes": 211136022,
+    "sha256": "f50bc29029be550c9e3f597b960feb83ce1ff15eb1db2ac639993d63f61712cb",
+    "minified": true,
+    "installed_signer_match": true,
+    "installed_in_place": true
+  },
+  "main_db": {
+    "before_integrity": "ok",
+    "after_integrity": "ok",
+    "tables": 105,
+    "tables_with_fewer_rows": [],
+    "domain_row_continuity": true
+  },
+  "e2e": {
+    "posted_updated_removed": "PASS",
+    "structured_metadata_multiple_senders": "PASS",
+    "cumulative_dedup": "PASS: 4 messages in 2 threads; identical text from distinct senders retained",
+    "chronology_provenance": "PASS: timestamps ordered; UI opens original synthetic snapshot",
+    "raw_search_app_date": "PASS: PHQA plus fixture package; future date empty/today restored",
+    "normalized_search": "PASS: second returns second conversation",
+    "people_mapping": "PASS: UI add, aggregate person timeline, UI remove; 0 residual links",
+    "process_restart_reconnect": "PASS: instrumented process restart, persisted messages; OBSERVED snapshot on reconnect",
+    "local_export": "PASS: local Downloads SAF, coherent SQLite; removed after private validation",
+    "cleanup": "PASS: owned fixture-only events/messages/mappings removed, nonfixture history count preserved, immutable trigger restored, integrity ok/FK errors 0",
+    "final_listener": "PASS: connected true, live Android-bound CollectorService; no foreground start",
+    "crash_buffer": "0 PersonalHub fatal blocks in available buffer"
+  },
+  "export_before_cleanup": {
+    "integrity": "ok",
+    "foreign_key_errors": 0,
+    "bytes": 679936,
+    "fixture_event_kinds": {
+      "OBSERVED": 1,
+      "POSTED": 4,
+      "REMOVED": 4,
+      "UPDATED": 9
+    },
+    "fixture_conversations": 2,
+    "fixture_messages": 4,
+    "fixture_people_links": 0,
+    "messaging_compatibility_metadata": {
+      "org.telegram.messenger": {},
+      "com.whatsapp": {},
+      "org.thoughtcrime.securesms": {},
+      "com.google.android.apps.messaging": {}
+    }
+  },
+  "resource_samples": [
+    {
+      "scenario": "disabled",
+      "elapsed_sec": 30.25,
+      "io_before": "rchar: 209777604\nwchar: 13821621\nsyscr: 54261\nsyscw: 201693\nread_bytes: 70987776\nwrite_bytes: 7495680\ncancelled_write_bytes: 0\n",
+      "io_after": "rchar: 216365559\nwchar: 15825271\nsyscr: 56337\nsyscw: 221279\nread_bytes: 73871360\nwrite_bytes: 8716288\ncancelled_write_bytes: 241664\n",
+      "memory": [
+        "TOTAL PSS:   153350            TOTAL RSS:   267348       TOTAL SWAP PSS:     3484"
+      ],
+      "cpu_seconds_delta": 1.81
+    },
+    {
+      "scenario": "enabled",
+      "elapsed_sec": 30.22,
+      "io_before": "rchar: 33235821\nwchar: 17433235\nsyscr: 10123\nsyscw: 201543\nread_bytes: 4018176\nwrite_bytes: 16384000\ncancelled_write_bytes: 49152\n",
+      "io_after": "rchar: 42852421\nwchar: 20701796\nsyscr: 12720\nsyscw: 223456\nread_bytes: 4710400\nwrite_bytes: 19996672\ncancelled_write_bytes: 49152\n",
+      "memory": [
+        "TOTAL PSS:   135500            TOTAL RSS:   263024       TOTAL SWAP PSS:       96"
+      ],
+      "cpu_seconds_delta": 3.96
+    },
+    {
+      "scenario": "enabled-idle",
+      "elapsed_sec": 30.21,
+      "io_before": "rchar: 1379562403\nwchar: 398643740\nsyscr: 237370\nsyscw: 550757\nread_bytes: 76468224\nwrite_bytes: 389025792\ncancelled_write_bytes: 159744\n",
+      "io_after": "rchar: 1380469211\nwchar: 398982013\nsyscr: 237660\nsyscw: 551856\nread_bytes: 76480512\nwrite_bytes: 389545984\ncancelled_write_bytes: 159744\n",
+      "memory": [
+        "TOTAL PSS:   127741            TOTAL RSS:   252636       TOTAL SWAP PSS:     2337"
+      ],
+      "cpu_seconds_delta": 0.52
+    }
+  ],
+  "energy": "WARNING: three short samples do not isolate collector energy or justify battery percentages",
+  "compatibility": "Telegram, WhatsApp, Signal and Google Messages installed; none supplied observed events during this window. No app-specific or universal capture claim.",
+  "privacy": "No private DB, WAL, exports, payloads, names, IDs or backup bytes in Git. Private rollback copies retained outside Git/on private device storage.",
+  "notifications": {
+    "pre": "Telegram accepted; Fedora 44; explicit availability confirmation",
+    "access": "manually enabled by user",
+    "end": "Telegram accepted; Fedora 50; stable Home and phone available"
+  },
+  "resource_limitations": "Whole-process measurements, 8 synthetic cumulative posts per load window, Home/background; process restarts and ordinary PersonalHub workers/exports confound attribution. 100 ticks/sec verified. No power settings changed, no permanent wakelock or feature periodic work."
+}

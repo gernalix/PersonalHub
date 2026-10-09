@@ -28,10 +28,10 @@ Same chat and task-state; new Git task worktree required because implementation 
 - [x] Installed signing certificate matches canonical shared signer. Shared Telegram readiness from implementation goal reused.
 - [x] Final minified+signed debug v64 build and artifact verification
 - [x] Dual-channel pre-test notice and explicit user availability confirmation
-- [ ] Reversible private coherent backup, compatible in-place install and manual Notification Access
-- [ ] Real device E2E, People mappings, restart/reconnection, local export/integrity
-- [ ] CPU/RAM/disk/background measurements; energy warning if inconclusive
-- [ ] Synthetic-only cleanup, stable Pixel state, dual-channel end notices
+- [x] Reversible private coherent backup, compatible in-place install and manual Notification Access
+- [x] Real device E2E, People mappings, restart/reconnection, local export/integrity
+- [x] CPU/RAM/disk/background measurements; energy WARNING (short samples inconclusive)
+- [x] Synthetic-only cleanup, stable Pixel state, dual-channel end notices
 - [ ] Artifact Telegram delivery, evidence checkpoint commit/push and canonical integration
 Build correction: debug lacked R8; opt-in -Ppersonalhub.minifiedDebug=true reuses existing release optimizer/proguard/signing rules without changing ordinary worker/test builds. Version incremented once from integrated 63 to 64.
 Temporary synthetic fixture prepared outside Git under /tmp/ph-notifications-production-20261009; no device installation or private notification reads yet.
@@ -39,3 +39,10 @@ Next action: finish build and verify exact artifact, then request the required P
 
 Artifact frozen: v64, 211136022 bytes, SHA256 f50bc29029be550c9e3f597b960feb83ce1ff15eb1db2ac639993d63f61712cb; canonical/installed signer match and R8 mapping generated. Pre-test Telegram accepted, Fedora notification ID 44; user confirmed Pixel availability in this chat.
 Next action: coherent private backup and in-place install, then baseline with collector disabled and manual grant.
+
+Production functional/device acceptance PASS. Main DB before/after coherent backups: integrity ok, schema 23, 105 tables with no fewer rows. Frozen v64 installed via canonical helper; user manually enabled access. Live capture, normalized 4 messages/2 threads, UI FTS/app/date/person filters, provenance, reversible People link, reconnect OBSERVED, local SAF export all PASS. Owned temporary fixture and synthetic rows removed; nonfixture history preserved and final listener bound. No PH uninstall/clear-data or energy-setting change.
+Resources: disabled load 1.81 CPU s / 30.25 s, PSS 153350 KiB; enabled load 3.96 CPU s / 30.22 s, PSS 135500 KiB; enabled idle 0.52 CPU s / 30.21 s, PSS 127741 KiB. Whole-process writes are confounded by ordinary main DB workers/exports; no collector energy percentage inferred. Energy WARNING, not PASS. Four real messaging apps installed but supplied no observed events in the test window; compatibility unproven, no universal acquisition claim. No PersonalHub fatal crash in available crash buffer.
+Telegram end accepted and Fedora ID 50; Pixel returned Home, usable, listener connected. Private rollback evidence stays outside Git. Public evidence: operations/evidence/notifications-production-20261009.json.
+Next action: verify exact APK GitHub asset/deliver link, then final evidence commit/push and canonical single-writer integration.
+
+Frozen 64.apk published to existing private personalhub-dev-apk prerelease; GitHub asset digest and size independently match tested/installed artifact. Release link delivered using shared Telegram notifier (API accepted). Checkpoint build commit 4cb74d54 pushed. Next action: commit/push production evidence and repo-task finish; await canonical integration.
