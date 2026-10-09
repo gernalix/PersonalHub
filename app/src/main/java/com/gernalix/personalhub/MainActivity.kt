@@ -1,5 +1,6 @@
 package com.gernalix.personalhub
 
+import com.gernalix.personalhub.notifications.api.NotificationsRoute
 import android.content.Intent
 import android.os.Bundle
 import com.gernalix.personalhub.core.database.DatabaseStartupGate
@@ -169,6 +170,11 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                     AlertText.get(context, R.string.home_alerts_help, R.string.home_alerts_help_it),
                 ) {
                     context.startActivity(UnifiedAlertsRoute.intent(context))
+                }
+            }
+            item(key = "home-notifications") {
+                HomeActionTile("📥", R.string.home_notifications, R.string.home_notifications_help) {
+                    context.startActivity(NotificationsRoute.intent(context))
                 }
             }
             item(key = "home-history") {

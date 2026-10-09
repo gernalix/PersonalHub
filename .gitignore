@@ -8,3 +8,11 @@ secrets.properties
 .idea/
 __pycache__/
 *.py[cod]
+
+# Private notification archives/backups
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm

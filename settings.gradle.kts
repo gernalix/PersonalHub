@@ -37,3 +37,5 @@ include(":feature:sostanze")
 include(":feature:supercontacts")
 include(":feature:wordpulse")
 include(":feature:soldi")
+
+include(":feature:notifications")

@@ -1,0 +1,25 @@
+<resources>
+<string name="notifications_title">Notifiche</string>
+<string name="back">Indietro</string>
+<string name="close">Chiudi</string>
+<string name="permission_on">Accesso alle notifiche abilitato</string>
+<string name="permission_off">Accesso alle notifiche disabilitato</string>
+<string name="permission_settings">Gestisci accesso alle notifiche</string>
+<string name="listener_waiting">In attesa della connessione del listener Android</string>
+<string name="archive_limits">Sono archiviate solo le notifiche osservate. Android può nascondere contenuti sensibili. Lacune e rimozioni non dimostrano cancellazioni di messaggi.</string>
+<string name="archive_error">Acquisizione o operazione fallita: alcuni eventi potrebbero mancare. Verifica accesso e spazio.</string>
+<string name="export_local">Esporta backup — scegli solo memoria locale del dispositivo</string>
+<string name="export_ok">Backup locale esportato</string>
+<string name="search">Cerca testo</string>
+<string name="all_apps">Tutte le app</string>
+<string name="date_from">Da (YYYY-MM-DD)</string>
+<string name="date_until">Fino a (YYYY-MM-DD)</string>
+<string name="no_events">Nessun evento osservato</string>
+<string name="more">Carica altri</string>
+<string name="event_detail">Evento osservato e metadati</string>
+<string name="removal_reason">Motivo rimozione Android: %1$d</string>
+<string name="posted">Pubblicata</string>
+<string name="updated">Aggiornata</string>
+<string name="removed">Rimossa</string>
+<string name="observed">Osservata alla connessione</string>
+</resources>

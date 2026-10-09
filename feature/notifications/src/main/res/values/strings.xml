@@ -1,0 +1,25 @@
+<resources>
+<string name="notifications_title">Notifications</string>
+<string name="back">Back</string>
+<string name="close">Close</string>
+<string name="permission_on">Notification access enabled</string>
+<string name="permission_off">Notification access disabled</string>
+<string name="permission_settings">Manage notification access</string>
+<string name="listener_waiting">Waiting for Android to connect the listener</string>
+<string name="archive_limits">Only observed notifications are archived. Android may hide sensitive contents. Gaps and removals do not prove message deletion.</string>
+<string name="archive_error">Capture or operation failed: some events may be missing. Check access and storage.</string>
+<string name="export_local">Export backup — choose local device storage only</string>
+<string name="export_ok">Local backup exported</string>
+<string name="search">Search text</string>
+<string name="all_apps">All apps</string>
+<string name="date_from">From (YYYY-MM-DD)</string>
+<string name="date_until">Through (YYYY-MM-DD)</string>
+<string name="no_events">No observed events</string>
+<string name="more">Load more</string>
+<string name="event_detail">Observed event and metadata</string>
+<string name="removal_reason">Android removal reason: %1$d</string>
+<string name="posted">Posted</string>
+<string name="updated">Updated</string>
+<string name="removed">Removed</string>
+<string name="observed">Observed on connection</string>
+</resources>
