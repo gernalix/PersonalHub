@@ -20,3 +20,22 @@ No final APK build, Pixel install, UI takeover, resource measurement or device E
 Checkpoint: phase 2 commit + push (identity in task branch history); canonical integration via repo-task finish, never manual canonical merge.
 Blocker: none for requested synthetic/code delivery.
 Next action: canonical single-writer integration, then enable Notification access on an installed build.
+
+## Production validation 2026-10-09
+Same chat and task-state; new Git task worktree required because implementation task is terminal/merged. No C2/C3 operation or new PROMPT_ID.
+- [x] PR #74 canonical integration: 96f080fbf1c46b10da83bf4664d8b13ce9ae49bf, all CI checks SUCCESS.
+- [x] Pixel read-only identity/package preflight: Google Pixel 8a, Android 17, PH v63 installed; main DB user_version 23 matches code. No migration needed.
+- [x] Installed signing certificate matches canonical shared signer. Shared Telegram readiness from implementation goal reused.
+- [x] Final minified+signed debug v64 build and artifact verification
+- [x] Dual-channel pre-test notice and explicit user availability confirmation
+- [ ] Reversible private coherent backup, compatible in-place install and manual Notification Access
+- [ ] Real device E2E, People mappings, restart/reconnection, local export/integrity
+- [ ] CPU/RAM/disk/background measurements; energy warning if inconclusive
+- [ ] Synthetic-only cleanup, stable Pixel state, dual-channel end notices
+- [ ] Artifact Telegram delivery, evidence checkpoint commit/push and canonical integration
+Build correction: debug lacked R8; opt-in -Ppersonalhub.minifiedDebug=true reuses existing release optimizer/proguard/signing rules without changing ordinary worker/test builds. Version incremented once from integrated 63 to 64.
+Temporary synthetic fixture prepared outside Git under /tmp/ph-notifications-production-20261009; no device installation or private notification reads yet.
+Next action: finish build and verify exact artifact, then request the required Pixel availability window.
+
+Artifact frozen: v64, 211136022 bytes, SHA256 f50bc29029be550c9e3f597b960feb83ce1ff15eb1db2ac639993d63f61712cb; canonical/installed signer match and R8 mapping generated. Pre-test Telegram accepted, Fedora notification ID 44; user confirmed Pixel availability in this chat.
+Next action: coherent private backup and in-place install, then baseline with collector disabled and manual grant.
