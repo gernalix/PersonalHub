@@ -102,6 +102,12 @@ android {
     buildTypes {
         debug {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
+            // Final Pixel delivery uses the existing R8/signing pipeline; worker/test builds stay unchanged.
+            if (providers.gradleProperty("personalhub.minifiedDebug").getOrElse("false").toBoolean()) {
+                isMinifyEnabled = true
+                isShrinkResources = true
+                proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            }
         }
         release {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")

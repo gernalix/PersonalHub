@@ -77,3 +77,7 @@ UI was controlled, no private device data was read, and no final distributable A
 The test-android-apps device/performance workflows are not applicable to these host tests.
 No resource measurements or device E2E result is claimed. Enable Notification access manually
 after installing an integrated build; Android may omit/redact contents or disconnect collection.
+
+## Pixel production validation 2026-10-09
+Integrated implementation PR #74 and installed minified, canonically signed v64 on Pixel 8a / Android 17 without migration or data reset. Manual Notification Access, real synthetic callbacks, cumulative normalization/dedup, structured multi-sender data, provenance, raw and normalized search, app/date/person filtering, reversible People mapping, process reopen/reconnect and local SAF export passed. Reconnect produced OBSERVED rather than invented historical events. Export and final archive integrity/FK checks passed. Owned synthetic data and fixture were removed while preserving nonfixture history; listener remained connected.
+Whole-process CPU/PSS/I/O samples are recorded in operations/evidence/notifications-production-20261009.json; energy remains WARNING because short samples cannot isolate battery cost. Telegram/WhatsApp/Signal/Google Messages were installed but emitted no observed test-window events; their actual compatibility remains unverified. Existing host synthetic tests and canonical CI PASS were reused. Private DBs/backups and content remain excluded from Git.
