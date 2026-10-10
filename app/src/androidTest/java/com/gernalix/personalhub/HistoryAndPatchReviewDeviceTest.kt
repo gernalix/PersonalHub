@@ -43,7 +43,7 @@ class HistoryAndPatchReviewDeviceTest {
     private fun waitFor(tag: String) { compose.waitUntil(15_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() } }
 
     @Test fun scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration() {
-        check(context.packageName == "com.gernalix.personalhub.qa")
+        check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*")))
         val previousZone=TimeZone.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("Europe/Copenhagen"))
         val db=PersonalHubDatabase.get(context)
@@ -111,7 +111,7 @@ class HistoryAndPatchReviewDeviceTest {
     }
 
     @Test fun supportedUndoRestoresSyntheticPlaceAndRecordsCompensation() {
-        check(context.packageName == "com.gernalix.personalhub.qa")
+        check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*")))
         check(!com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSettings.configuration(context).enabled)
         val db=PersonalHubDatabase.get(context)
         val sql=db.openHelper.writableDatabase
@@ -143,7 +143,7 @@ class HistoryAndPatchReviewDeviceTest {
     }
 
     @Test fun patchPreviewFailureAndExplicitConfirmationGateApplication() {
-        check(context.packageName == "com.gernalix.personalhub.qa")
+        check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*")))
         PersonalHubDatabase.get(context).openHelper.writableDatabase
         val actions=RecordingActions()
         val scenario=ActivityScenario.launch<DatabaseActivity>(Intent(context,DatabaseActivity::class.java))
