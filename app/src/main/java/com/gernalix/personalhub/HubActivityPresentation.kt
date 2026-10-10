@@ -537,7 +537,7 @@ internal fun humanizeGitHistory(
 ): HumanActivityText {
     val before = runCatching { JSONObject(item.displayBefore.orEmpty()) }.getOrNull()
     val after = runCatching { JSONObject(item.displayAfter.orEmpty()) }.getOrNull()
-    val objectName = listOf("name", "nickname", "title", "label", "display_name", "alias", "text", "query", "summary")
+    val objectName = listOf("name", "nickname", "title", "label", "display_name", "alias", "text", "query", "summary", "message")
         .firstNotNullOfOrNull { key -> cleanHumanValue(after?.optString(key)) ?: cleanHumanValue(before?.optString(key)) }
     val type = gitHistoryEntityType(item.table)
     val changes = item.changedColumns.split(',').mapNotNull { key ->
