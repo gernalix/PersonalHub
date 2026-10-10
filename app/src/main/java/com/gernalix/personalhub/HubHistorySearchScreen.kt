@@ -545,6 +545,17 @@ fun HubHistorySearchScreen(
     }
 }
 
+/** Git sandbox work belongs to the opened row; local activity Undo stays immediately available. */
+internal suspend fun historyUndoSafety(
+    target: MutationUndoTarget?,
+    expanded: Boolean,
+    previewGit: suspend (String) -> Boolean,
+): Boolean = when (target) {
+    is MutationUndoTarget.Activity -> true
+    is MutationUndoTarget.Git -> expanded && previewGit(target.gitEventId)
+    null -> false
+}
+
 @Composable
 private fun ActivityCard(
     item: ActivityUiItem,
@@ -558,7 +569,7 @@ private fun ActivityCard(
     var semanticUndoSafe by remember(item.id) { mutableStateOf(false) }
     val canOpen = item.navigationRef != null || (item.patchId != null && item.patchRef != null)
     var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
-    LaunchedEffect(item.semanticTransactionId, undoRevision) {
+    LaunchedEffect(item.semanticTransactionId, expanded, undoRevision) {
         semanticUndoSafe = false
         val transactionId = item.semanticTransactionId ?: return@LaunchedEffect
         semanticUndoSafe = withContext(Dispatchers.IO) {
@@ -567,12 +578,8 @@ private fun ActivityCard(
                     transactionId,
                     GitDataSettings.configuration(context).enabled,
                 )
-                when (target) {
-                    is MutationUndoTarget.Activity -> true
-                    is MutationUndoTarget.Git -> runCatching {
-                        GitHistory.previewRevert(context.applicationContext, target.gitEventId).safe
-                    }.getOrDefault(false)
-                    null -> false
+                historyUndoSafety(target, expanded) { eventId ->
+                    runCatching { GitHistory.previewRevert(context.applicationContext, eventId).safe }.getOrDefault(false)
                 }
         }
     }
