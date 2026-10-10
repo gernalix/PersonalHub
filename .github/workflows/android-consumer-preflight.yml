@@ -2,11 +2,14 @@ name: Android consumer preflight
 
 on:
   push:
+    branches: [main]
     paths:
       - 'tools/android_consumer_preflight.py'
       - 'tools/test_android_consumer_preflight.py'
       - 'tools/android_pixel_apk.py'
       - 'tools/test_android_pixel_apk.py'
+      - 'tools/android_connected_test_gate.py'
+      - 'tools/test_android_connected_test_gate.py'
       - '.github/workflows/android-consumer-preflight.yml'
   pull_request:
     paths:
@@ -14,6 +17,8 @@ on:
       - 'tools/test_android_consumer_preflight.py'
       - 'tools/android_pixel_apk.py'
       - 'tools/test_android_pixel_apk.py'
+      - 'tools/android_connected_test_gate.py'
+      - 'tools/test_android_connected_test_gate.py'
       - '.github/workflows/android-consumer-preflight.yml'
 
 permissions:
@@ -34,3 +39,4 @@ jobs:
         run: |
           python3 tools/test_android_consumer_preflight.py
           python3 tools/test_android_pixel_apk.py
+          python3 tools/test_android_connected_test_gate.py

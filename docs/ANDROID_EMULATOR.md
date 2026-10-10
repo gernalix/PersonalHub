@@ -30,6 +30,22 @@ final stop instead of allowing startup to consume the cleanup budget. The older
 preflight CLI remains available for compatibility, but new Codex workflows
 should use the facade above.
 
+## Connected-test target safety
+
+Gradle `connected*AndroidTest` tasks can select **every** ADB-connected device, including
+an attached physical Pixel, even with `ANDROID_SERIAL` set. Run these tasks only
+through `python3 tools/android_connected_test_gate.py -- ./gradlew ...`.
+The gate rejects Gradle connected tests unless there is exactly one online
+emulator and no additional physical/offline target. When another target is
+attached, build the instrumentation APK first, then run the test on the
+facade-returned emulator serial using `adb -s <serial> shell am instrument ...`
+through the same gate. Do not issue unscoped `adb shell am instrument`.
+
+Physical-device instrumentation requires an explicit serial, the gate's
+`--allow-physical-device` opt-in and the separate Fedora/Telegram notification
+protocol before and after any disruptive Pixel testing; this opt-in never
+permits unscoped Gradle connected tests.
+
 ## Canonical verification
 
 Run the complete emulator infrastructure unit gate exactly once:
