@@ -440,7 +440,6 @@ fun HubHistorySearchScreen(
                         item(key = activityRow.id) {
                         ActivityCard(
                             item = activityRow,
-                            moduleName = moduleDisplayName(context, activityRow.moduleId),
                             undoRevision = undoRevision,
                             onOpen = { coroutineScope.launch {
                                 if (activityRow.patchId != null && activityRow.patchRef != null) {
@@ -549,7 +548,6 @@ fun HubHistorySearchScreen(
 @Composable
 private fun ActivityCard(
     item: ActivityUiItem,
-    moduleName: String,
     undoRevision: Int,
     onOpen: () -> Unit,
     onUndo: () -> Unit,
@@ -605,7 +603,7 @@ private fun ActivityCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 Text(
-                    text = "${item.title} · $moduleName · ${historyTimeLabel(item.occurredAt)}",
+                    text = "${item.title} · ${historyTimeLabel(item.occurredAt)}",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,

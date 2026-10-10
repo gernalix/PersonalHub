@@ -124,9 +124,12 @@ android {
         create("qa") {
             initWith(getByName("debug"))
             matchingFallbacks += listOf("debug")
-            applicationIdSuffix = ".qa"
+            val qaSuffix = providers.gradleProperty("personalhub.qaSuffix").getOrElse(".qa")
+            require(qaSuffix.matches(Regex("\\.qa[0-9]*"))) { "QA suffix must remain an isolated .qa package" }
+            applicationIdSuffix = qaSuffix
             // QA supports 32-bit devices, the physical Pixel arm64, and the x86_64 emulator.
-            // Keep QA unminified: instrumentation tests call test hooks that R8 may legitimately remove.
+            // Default QA retains instrumentation hooks. The minifiedDebug opt-in also permits
+            // manual clone checks with R8; instrumentation must use the unminified default.
             ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64") }
         }
         create("benchmark") {
