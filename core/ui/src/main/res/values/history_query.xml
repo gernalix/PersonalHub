@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_mutations">Changes</string>
+    <string name="history_records">Records</string>
+    <string name="history_mutations_help">Recorded changes, with their original provenance. Undo is shown only when supported.</string>
+    <string name="history_records_help">Existing records, independently of when History started recording changes.</string>
+    <string name="history_provenance">Source: %1$s</string>
+    <string name="history_target_unavailable">The original record is no longer available.</string>
+    <string name="history_patch_applied">Applied Git patch</string>
+    <string name="history_view_git">View Git revision</string>
+    <string name="history_intake_detail">Intake of %1$s</string>
+    <string name="history_loaded_count">%1$d loaded</string>
+    <string name="history_record_person">Person</string>
+    <string name="history_record_typing_session">Typing session</string>
+    <string name="history_record_generic">Record</string>
+    <string name="history_load_failed">History could not be loaded. Try again.</string>
+    <string name="history_records_empty">No existing records match these filters.</string>
+</resources>

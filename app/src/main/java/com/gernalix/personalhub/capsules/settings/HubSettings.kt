@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.DatabaseActivity
 import com.gernalix.personalhub.DatabaseRestartActivity
 import com.gernalix.personalhub.R
+import com.gernalix.personalhub.core.ui.R as UiR
 import com.gernalix.personalhub.ProfileRuntimeCoordinator
 import com.gernalix.personalhub.WorkflowyShareActivity
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
@@ -362,10 +363,28 @@ private fun GitDataSyncSettings(onBack: () -> Unit) {
     var repository by remember { mutableStateOf(initial?.repositoryUrl ?: "") }
     var token by remember { mutableStateOf("") }
     var revision by remember { mutableStateOf("") }
+    var restoreAt by remember { mutableStateOf("") }
+    var confirmRestore by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<Int?>(null) }
     var status by remember { mutableStateOf(GitDataSync.status(context)) }
+    var selectedPatch by remember { mutableStateOf<String?>(null) }
+    var patchRef by remember { mutableStateOf<String?>(null) }
+    var showHistory by remember { mutableStateOf(false) }
+    if (showHistory) {
+        BackHandler { showHistory = false }
+        com.gernalix.personalhub.HubHistorySearchScreen(onBack = { showHistory = false })
+        return
+    }
+    selectedPatch?.let { id ->
+        BackHandler { selectedPatch = null }
+        GitPatchReviewPanel(id, requireNotNull(patchRef), onBack = { selectedPatch = null }, onApplied = {
+            selectedPatch = null
+            status = GitDataSync.status(context)
+        })
+        return
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -486,14 +505,16 @@ private fun GitDataSyncSettings(onBack: () -> Unit) {
             Text(stringResource(R.string.git_data_sync_pull_now))
         }
         if (status.pendingPatchIds.isNotEmpty()) {
-            Text(
-                stringResource(
-                    R.string.git_data_sync_pending_patches,
-                    status.pendingPatchIds.joinToString(", "),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text(stringResource(UiR.string.git_review_pending), style = MaterialTheme.typography.titleMedium)
+            status.pendingPatchIds.forEach { id ->
+                OutlinedButton(enabled = !busy && status.lastRemoteRevision != null, onClick = {
+                    patchRef = status.lastRemoteRevision
+                    selectedPatch = id
+                }) { Text(id) }
+            }
         }
+        OutlinedButton(onClick = { showHistory = true }) { Text(stringResource(R.string.activity_title)) }
+        GitHistoryTools(busy = busy, runOperation = { operation -> runOperation(operation) })
 
         HorizontalDivider()
         Text(stringResource(R.string.git_data_sync_restore_title), style = MaterialTheme.typography.titleMedium)
@@ -505,9 +526,25 @@ private fun GitDataSyncSettings(onBack: () -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        OutlinedTextField(restoreAt, { restoreAt = it }, label = { Text(stringResource(UiR.string.git_review_restore_at)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedButton(enabled = !busy && status.configured && restoreAt.isNotBlank(), onClick = {
+            var selected: String? = null
+            runOperation(block = {
+                val time = com.gernalix.personalhub.core.hubcontext.parseHubDateTime(restoreAt)
+                selected = requireNotNull(com.gernalix.personalhub.core.database.capsules.gitdata.GitHistory.revisionAtOrBefore(context,time)).sha
+            }, onSuccess = { revision = requireNotNull(selected) })
+        }) { Text(stringResource(UiR.string.git_review_resolve_date)) }
         Button(
             enabled = !busy && status.enabled && status.configured && revision.isNotBlank(),
-            onClick = {
+            onClick = { confirmRestore = true },
+        ) { Text(stringResource(R.string.git_data_sync_restore)) }
+        if (confirmRestore) AlertDialog(
+            onDismissRequest = { confirmRestore = false },
+            title = { Text(stringResource(R.string.git_data_sync_restore_title)) },
+            text = { Text(stringResource(UiR.string.git_review_restore_confirm, revision)) },
+            dismissButton = { TextButton(onClick = { confirmRestore = false }) { Text(stringResource(UiR.string.git_review_cancel)) } },
+            confirmButton = { TextButton(onClick = {
+                confirmRestore = false
                 busy = true
                 failed = false
                 message = null
@@ -525,10 +562,8 @@ private fun GitDataSyncSettings(onBack: () -> Unit) {
                         if (error is ImportRolledBack) restartDatabaseGraph(context, true)
                     }
                 }
-            },
-        ) {
-            Text(stringResource(R.string.git_data_sync_restore))
-        }
+            }) { Text(stringResource(R.string.git_data_sync_restore)) } },
+        )
 
         Text(
             stringResource(

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="git_review_pending">Verified patches awaiting review</string>
+    <string name="git_review_title">Review Git patch</string>
+    <string name="git_review_id">Patch: %1$s</string>
+    <string name="git_review_ref">Revision: %1$s</string>
+    <string name="git_review_author">Author: %1$s</string>
+    <string name="git_review_schema_pass">Schema %1$d: compatible</string>
+    <string name="git_review_schema_fail">Schema %1$d: incompatible</string>
+    <string name="git_review_operations">%1$d changes</string>
+    <string name="git_review_tables">Tables: %1$s</string>
+    <string name="git_review_isolated">Preview uses a separate database copy. Your current records stay unchanged.</string>
+    <string name="git_review_preview">Preview in sandbox</string>
+    <string name="git_review_counts">Insert: %1$d · Update: %2$d · Delete: %3$d</string>
+    <string name="git_review_checks_pass">PASS: schema, hash, foreign keys and database integrity</string>
+    <string name="git_review_apply">Apply this patch</string>
+    <string name="git_review_confirm">Apply patch %1$s to your current database? The verified preview will be checked again and all changes applied together.</string>
+    <string name="git_review_cancel">Cancel</string>
+    <string name="git_review_failed">Verification failed. Preview again before applying.</string>
+    <string name="git_review_tools">Advanced Git tools</string>
+    <string name="git_review_rebuild">Rebuild Git History index</string>
+    <string name="git_review_before">Before revision</string>
+    <string name="git_review_after">After revision</string>
+    <string name="git_review_compare">Compare revisions</string>
+    <string name="git_review_diff_table">%1$s: %2$d inserts · %3$d updates · %4$d deletes</string>
+    <string name="git_review_no_changes">No changes</string>
+    <string name="git_review_truncated">Showing a bounded comparison; more changes exist.</string>
+    <string name="git_review_milestone_name">Milestone / tag name</string>
+    <string name="git_review_milestone">Create milestone</string>
+    <string name="git_review_proposal_name">Proposal branch</string>
+    <string name="git_review_proposal">Create proposal branch</string>
+    <string name="git_review_pr">Create proposal PR</string>
+    <string name="git_review_discard">Discard proposal branch</string>
+    <string name="git_review_restore_at">Restore at date and time</string>
+    <string name="git_review_resolve_date">Find revision at this time</string>
+    <string name="git_review_restore_confirm">Restore the full database from %1$s? The current state must be safely saved first. The application will restart.</string>
+    <string name="git_review_already_applied">This patch is already applied.</string>
+</resources>

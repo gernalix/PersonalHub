@@ -81,7 +81,7 @@ internal fun humanizeGitHistoryGroup(
             (!row.operation.equals("UPDATE", true) ||
                 row.changedColumns.split(',').any { humanFieldLabel(it) != null })
     }.ifEmpty { group }
-    val primary = semantic.firstOrNull { it.table == "sessions" || it.table == "contacts" || it.table == "hub_tags" }
+    val primary = semantic.firstOrNull { it.table == "intake_events" || it.table == "sessions" || it.table == "contacts" || it.table == "hub_tags" }
         ?: semantic.first()
     val workflowy = group.any { row ->
         row.table in setOf("hub_resources", "hub_contexts") &&
@@ -372,49 +372,8 @@ internal fun humanFieldLabel(raw: String?): String? {
 }
 
 
-private val GIT_PEOPLE_TABLES = setOf(
-    "contacts", "contact_fields", "contact_events", "contact_initiatives", "contact_messaging_links",
-    "saved_searches", "saved_search_tags", "tags", "contact_tags", "people_photos",
-)
-
-private val GIT_PLACES_TABLES = setOf(
-    "places", "place_aliases", "place_links", "place_events", "check_in_attempts",
-    "check_in_attempt_candidates", "place_geofence_configs", "place_geofence_transition_log",
-    "place_tags", "place_tag_cross_ref", "alert_rules", "alert_place_tag_targets",
-    "history_audit_log", "history_actions", "global_stats_state", "route_distance_cache",
-)
-
-private val GIT_SUBSTANCES_TABLES = setOf(
-    "substances", "intake_events", "stock_adjustments", "prescriptions", "interaction_rules",
-    "interaction_targets", "settings", "macros", "macro_items", "notification_state",
-)
-
-private val GIT_WORDPULSE_TABLES = setOf(
-    "app_state", "correction_events", "word_entries", "wordpulse_sessions", "pvt_results",
-)
-
-private val GIT_TIMER_TABLES = setOf(
-    "sessions", "session_tags", "quick_event_entries", "quick_event_entry_field_values",
-    "quick_event_entry_tags", "quick_event_macro_actions", "quick_event_macro_tags",
-    "quick_event_macros", "quick_event_template_fields", "quick_event_template_tags",
-    "quick_event_templates", "audit_events", "integrity_stats", "snapshot", "snapshot_history",
-    "snapshot_payloads", "ui_prefs_mirror",
-)
-
-private val GIT_TAG_TABLES = setOf(
-    "hub_tags", "hub_tag_aliases", "hub_tag_assignments", "hub_tag_parents", "hub_saved_tag_filters",
-)
-
-internal fun gitHistoryModule(table: String): String = when {
-    table.startsWith("finance_") -> "soldi"
-    table in GIT_PEOPLE_TABLES -> "people"
-    table in GIT_PLACES_TABLES -> "places"
-    table in GIT_SUBSTANCES_TABLES -> "substances"
-    table in GIT_WORDPULSE_TABLES -> "wordpulse"
-    table in GIT_TIMER_TABLES -> "timer"
-    table in GIT_TAG_TABLES -> "tags"
-    else -> "hub"
-}
+internal fun gitHistoryModule(table: String): String =
+    com.gernalix.personalhub.core.database.capsules.history.HistoryQueryCapsule.moduleForTable(table)
 
 internal val GIT_HISTORY_ENTITY_TYPES = mapOf(
     "finance_accounts" to "account",

@@ -131,10 +131,7 @@ object GitDataTracking {
         )
         ensureColumn(db, CONTEXT_TABLE, "source", "TEXT NOT NULL DEFAULT 'ui'")
         ensureColumn(db, CONTEXT_TABLE, "reason", "TEXT")
-        db.execSQL(
-            "CREATE TABLE IF NOT EXISTS `$APPLIED_PATCHES_TABLE` (" +
-                "`id` TEXT NOT NULL PRIMARY KEY, `applied_at` INTEGER NOT NULL)",
-        )
+        ensureAppliedPatchStore(db)
         db.execSQL("DELETE FROM $CONTEXT_TABLE")
         val installed = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger'").use { cursor ->
             buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
@@ -298,16 +295,21 @@ object GitDataTracking {
         if (installed) clearEditContext(db)
     }
 
+    fun ensureAppliedPatchStore(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `$APPLIED_PATCHES_TABLE` (`id` TEXT NOT NULL PRIMARY KEY, `applied_at` INTEGER NOT NULL, `metadata_json` TEXT)")
+        ensureColumn(db,APPLIED_PATCHES_TABLE,"metadata_json","TEXT")
+    }
+
     fun isPatchApplied(db: SupportSQLiteDatabase, patchId: String): Boolean =
         db.query(
             "SELECT 1 FROM $APPLIED_PATCHES_TABLE WHERE id=? LIMIT 1",
             arrayOf(patchId),
         ).use { it.moveToFirst() }
 
-    fun markPatchApplied(db: SupportSQLiteDatabase, patchId: String) {
+    fun markPatchApplied(db: SupportSQLiteDatabase, patchId: String, metadataJson: String? = null) {
         db.execSQL(
-            "INSERT INTO $APPLIED_PATCHES_TABLE(id,applied_at) VALUES(?,?)",
-            arrayOf<Any?>(patchId, System.currentTimeMillis()),
+            "INSERT INTO $APPLIED_PATCHES_TABLE(id,applied_at,metadata_json) VALUES(?,?,?)",
+            arrayOf<Any?>(patchId, System.currentTimeMillis(),metadataJson),
         )
     }
 }

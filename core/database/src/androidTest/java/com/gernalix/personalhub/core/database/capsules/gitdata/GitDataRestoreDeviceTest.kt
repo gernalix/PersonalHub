@@ -13,6 +13,8 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,14 +31,78 @@ class GitDataRestoreDeviceTest {
     fun reset() {
         check(context.packageName == "com.gernalix.personalhub.core.database.test")
         PersonalHubDatabase.closeInstance()
+        com.gernalix.personalhub.core.database.DatabaseGate.resume()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
     }
     @After
     fun cleanup() {
         check(context.packageName == "com.gernalix.personalhub.core.database.test")
         PersonalHubDatabase.closeInstance()
+        com.gernalix.personalhub.core.database.DatabaseGate.resume()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
     }
+
+    @Test
+    fun patchDiscoveryPreviewAndApplyPreserveLiveStateUntilAtomicCommit() {
+        val db=PersonalHubDatabase.get(context).openHelper.writableDatabase
+        GitDataTracking.install(db,enqueueAll=false)
+        db.execSQL("INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) VALUES('acct','Before','DKK','0',1,1)")
+        val patch=JSONObject().put("format_version",1).put("schema_version",PersonalHubDatabase.SCHEMA_VERSION)
+            .put("patch_id","native-patch").put("author","chatgpt").put("reason","Controlled native test")
+            .put("operations",JSONArray().put(JSONObject().put("op","update").put("table","finance_accounts")
+                .put("key",JSONObject().put("id","acct")).put("expect",JSONObject().put("name","Before"))
+                .put("values",JSONObject().put("name","After"))))
+        val bytes=patch.toString().toByteArray()
+        val control=JSONObject().put("format_version",1).put("target_schema_version",PersonalHubDatabase.SCHEMA_VERSION)
+            .put("patches",JSONArray().put(JSONObject().put("id","native-patch").put("path","patches/native.json")
+                .put("sha256",GitDataFormat.sha256(bytes))))
+        val files=mapOf(GIT_CONTROL_MANIFEST to control.toString().toByteArray(),"patches/native.json" to bytes)
+            .mapKeys { (path,_) -> "/repos/owner/data/contents/$path" }
+        LocalRawHttpServer(files).use { server ->
+            val transport=GitHubDataTransport(GitRepository("owner","data"),"fixture","http://127.0.0.1:${server.port}/repos")
+            GitDataSync.pullControl(context,transport,"abcdef1")
+            assertEquals(listOf("native-patch"),GitDataSync.status(context).pendingPatchIds)
+            assertEquals("Before",text(db,"SELECT name FROM finance_accounts WHERE id='acct'"))
+            val (review,verifiedBytes)=GitDataSync.verifiedPatch(context,"abcdef1","native-patch",transport)
+            assertEquals(GitDataFormat.sha256(bytes),review.sha256)
+            LocalRawHttpServer(files + ("/repos/owner/data/contents/patches/native.json" to (String(bytes)+" ").toByteArray())).use { tampered ->
+                val untrusted=GitHubDataTransport(GitRepository("owner","data"),"fixture","http://127.0.0.1:${tampered.port}/repos")
+                assertThrows(IllegalArgumentException::class.java) { GitDataSync.verifiedPatch(context,"abcdef1","native-patch",untrusted) }
+                assertEquals("Before",text(db,"SELECT name FROM finance_accounts WHERE id='acct'"))
+            }
+            val beforeEvents=scalar(db,"SELECT COUNT(*) FROM ${GitDataTracking.EVENTS_TABLE}")
+            val preview=GitPatchEngine.preview(context,verifiedBytes)
+            assertEquals(1,preview.updates)
+            assertEquals("Before",text(db,"SELECT name FROM finance_accounts WHERE id='acct'"))
+            assertEquals(beforeEvents,scalar(db,"SELECT COUNT(*) FROM ${GitDataTracking.EVENTS_TABLE}"))
+            assertFalse(GitDataTracking.isPatchApplied(db,"native-patch"))
+            GitPatchEngine.apply(context,verifiedBytes,review.revision)
+            assertEquals("After",text(db,"SELECT name FROM finance_accounts WHERE id='acct'"))
+            val metadata=JSONObject(text(db,"SELECT metadata_json FROM ${GitDataTracking.APPLIED_PATCHES_TABLE} WHERE id='native-patch'"))
+            assertEquals(review.sha256,metadata.getString("sha256"))
+            assertEquals("abcdef1",metadata.getString("revision"))
+            assertThrows(Exception::class.java) { GitPatchEngine.apply(context,verifiedBytes,review.revision) }
+            GitDataSync.pullControl(context,transport,"abcdef1")
+            assertTrue(GitDataSync.status(context).pendingPatchIds.isEmpty())
+            val failing=JSONObject(patch.toString()).put("patch_id","rollback-patch")
+            failing.getJSONArray("operations").getJSONObject(0).put("expect",JSONObject().put("name","After"))
+                .put("values",JSONObject().put("name","Must roll back"))
+            failing.getJSONArray("operations").put(JSONObject().put("op","update").put("table","finance_accounts")
+                .put("key",JSONObject().put("id","missing")).put("values",JSONObject().put("name","Missing")))
+            assertThrows(Exception::class.java) { GitPatchEngine.apply(context,failing.toString().toByteArray(),review.revision) }
+            assertEquals("After",text(db,"SELECT name FROM finance_accounts WHERE id='acct'"))
+            assertFalse(GitDataTracking.isPatchApplied(db,"rollback-patch"))
+        }
+        val backup=com.gernalix.personalhub.core.database.DatabaseVault.backupCurrent(context)
+        try {
+            val hash=GitDataFormat.sha256(backup.readBytes())
+            com.gernalix.personalhub.core.database.DatabaseVault.validate(context,backup)
+            assertEquals(hash,GitDataFormat.sha256(backup.readBytes()))
+        } finally { backup.delete() }
+    }
+
+    private fun scalar(db: androidx.sqlite.db.SupportSQLiteDatabase,sql:String):Long = db.query(sql).use { assertTrue(it.moveToFirst());it.getLong(0) }
+    private fun text(db: androidx.sqlite.db.SupportSQLiteDatabase,sql:String):String = db.query(sql).use { assertTrue(it.moveToFirst());it.getString(0) }
 
     @Test
     fun restoreUsesValidatedStagingBeforeReplacingLiveDatabase() {
@@ -78,8 +144,10 @@ class GitDataRestoreDeviceTest {
         android.database.sqlite.SQLiteDatabase.openDatabase(
             context.getDatabasePath(PersonalHubDatabase.DB_NAME).path,
             null,
-            android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
+            android.database.sqlite.SQLiteDatabase.OPEN_READWRITE,
         ).use { restored ->
+            restored.beginTransactionNonExclusive()
+            try {
             assertEquals(0L, rawScalar(restored, "SELECT COUNT(*) FROM finance_accounts WHERE id='live'"))
             assertEquals("Restored", rawText(restored, "SELECT name FROM finance_accounts WHERE id='restored'"))
             assertEquals(expectedGeneration, rawScalar(restored, "SELECT generation FROM hub_generation WHERE id=1"))
@@ -91,6 +159,7 @@ class GitDataRestoreDeviceTest {
             assertEquals("person-surviving",rawText(restored,"SELECT canonical_id FROM hub_external_identities WHERE system='fixture' AND external_id='native'"))
             assertEquals(0L, rawScalar(restored, "SELECT COUNT(*) FROM pragma_foreign_key_check"))
             assertEquals("ok", rawText(restored, "PRAGMA quick_check"))
+            } finally { restored.endTransaction() }
         }
     }
 

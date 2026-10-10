@@ -65,7 +65,8 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
     override suspend fun summaries(canonicalIds: Set<String>) = dao.intakeHubViews(canonicalIds.mapNotNull(::local)).associate { it.intake.canonicalId to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchIntakeHubViews(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
-    override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("substances").toString(), "com.gernalix.sostanze.MainActivity")
+    override suspend fun openTarget(canonicalId: String): HubOpenTarget? = if (!exists(canonicalId)) null else
+        HubOpenTarget(HubDeepLinkContract.moduleUri("substances", "intakeId" to canonicalId).toString(), "com.gernalix.sostanze.MainActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val decoded = decodeHubTemporalCursor(query.cursor)

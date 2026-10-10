@@ -159,6 +159,9 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.install(context, db)
                         MutationEventStore.install(db)
+                        GitHistoryStore.install(db)
+                        GitDataTracking.ensureAppliedPatchStore(db)
+                        com.gernalix.personalhub.core.database.capsules.history.HistorySearchIndex.install(db)
                         val appVersion = runCatching {
                             androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
                                 context.packageManager.getPackageInfo(context.packageName, 0),

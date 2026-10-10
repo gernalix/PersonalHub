@@ -70,7 +70,8 @@ class SemanticHistoryPresentationTest {
             "unnamed", 1, "people", "people.person.created", "person", null,
             """{"name":null}""", """{"name":null}""",
         )))
-        assertTrue(rows.isEmpty())
+        assertEquals("Created person", rows.single().text.title)
+        assertFalse(rows.single().text.searchText.contains("null"))
     }
 
     private fun event(

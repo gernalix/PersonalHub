@@ -269,11 +269,18 @@ object DatabaseVault {
     fun validate(context: Context, file: File): Long {
         require(file.isFile && file.length() >= 100) { "Invalid SQLite file" }
         file.inputStream().use { input -> val header = ByteArray(16); java.io.DataInputStream(input).readFully(header); require(header.contentEquals("SQLite format 3\u0000".toByteArray())) { "Invalid SQLite header" } }
-        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+        // FTS4 integrity checking uses its write-command API internally. Permit it only
+        // in a transaction that is always rolled back; never commit validation writes.
+        SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.beginTransactionNonExclusive()
+            try {
             require(db.version == PersonalHubDatabase.SCHEMA_VERSION) { "Incompatible database version" }
             val asset = "com.gernalix.personalhub.core.database.PersonalHubDatabase/${db.version}.json"
             val schema = JSONObject(context.assets.open(asset).bufferedReader().use { it.readText() }).getJSONObject("database")
-            db.rawQuery("PRAGMA quick_check", null).use { c -> require(c.moveToFirst() && c.getString(0) == "ok" && !c.moveToNext()) { "SQLite integrity check failed" } }
+            db.rawQuery("PRAGMA quick_check", null).use { c ->
+                val checks = buildList { while(c.moveToNext()) add(c.getString(0)) }
+                require(checks == listOf("ok")) { "SQLite integrity check failed: ${checks.take(5).joinToString()}" }
+            }
             db.rawQuery("PRAGMA foreign_key_check", null).use { require(!it.moveToFirst()) { "Invalid database relationships" } }
             val entities = schema.getJSONArray("entities")
             val tables = mutableSetOf<String>()
@@ -329,6 +336,7 @@ object DatabaseVault {
             requireNoSaluteRows("hub_sync_pending", "table_name LIKE 'health_%'")
             requireNoSaluteRows("hub_sync_known", "table_name LIKE 'health_%'")
             requireNoSaluteRows("hub_tags", "namespace='salute'")
+            val historySearchTriggers = com.gernalix.personalhub.core.database.capsules.history.HistorySearchIndex.expectedSql()
             val mutationTriggers = MutationEventCapture.expectedSql(databaseTables)
             val identityTriggers = org.json.JSONArray(context.assets.open("canonical-identity-triggers.json").bufferedReader().use { it.readText() }).let { array ->
                 (0 until array.length()).associate { i -> val sql = array.getString(i); sql.substringAfter("EXISTS `").substringBefore("`") to sql }
@@ -343,6 +351,11 @@ object DatabaseVault {
                     if (name in identityTriggers || name in extraIdentityTriggers) {
                         val expected = (identityTriggers[name] ?: extraIdentityTriggers.getValue(name)).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
                         require(sql == expected) { "Incompatible identity trigger: $name" }
+                        continue
+                    }
+                    if (name in historySearchTriggers) {
+                        val expected = historySearchTriggers.getValue(name).replace(Regex("\\s+"), " ").trim()
+                        require(sql == expected) { "Incompatible History index trigger: $name" }
                         continue
                     }
                     if (name in mutationTriggers) {
@@ -393,6 +406,7 @@ object DatabaseVault {
             }
             db.rawQuery("SELECT bytes, sha256 FROM people_photos", null).use { c -> while (c.moveToNext()) require(sha256(c.getBlob(0)) == c.getString(1)) { "Photo integrity check failed" } }
             return db.rawQuery("SELECT generation FROM hub_generation WHERE id=1", null).use { c -> require(c.moveToFirst()) { "Missing database generation" }; c.getLong(0) }
+            } finally { db.endTransaction() }
         }
     }
 

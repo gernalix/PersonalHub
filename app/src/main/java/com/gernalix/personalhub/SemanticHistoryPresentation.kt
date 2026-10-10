@@ -10,11 +10,12 @@ internal data class SemanticHistoryRow(
     val module: String,
     val text: HumanActivityText,
     val events: List<MutationEvent>,
+    val primaryEvent: MutationEvent,
 )
 
 internal fun semanticHistoryRows(events: List<MutationEvent>): List<SemanticHistoryRow> =
     events.groupBy(MutationEvent::transactionId).mapNotNull { (transactionId, group) ->
-        val visible = group.filter { it.actorType == "user" }
+        val visible = group
         val rendered = visible.mapNotNull { event -> renderSemanticEvent(event)?.let { event to it } }
         val primary = rendered.maxByOrNull { (event, _) -> semanticPriority(event) } ?: return@mapNotNull null
         val text = primary.second
@@ -31,6 +32,7 @@ internal fun semanticHistoryRows(events: List<MutationEvent>): List<SemanticHist
                 searchText = rendered.joinToString(" ") { it.second.searchText },
             ),
             events = group.sortedBy(MutationEvent::sequence),
+            primaryEvent = primary.first,
         )
     }.sortedWith(compareByDescending<SemanticHistoryRow> { it.occurredAt }.thenByDescending { it.transactionId })
 
@@ -55,7 +57,17 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
         ?: semanticString(before, "name")
         ?: semanticString(after, "title")
         ?: semanticString(before, "title")
-    val name = cleanHumanValue(rawName?.removePrefix("Workflowy · ")) ?: return null
+    val name = cleanHumanValue(rawName?.removePrefix("Workflowy · "))
+    if (name == null) {
+        val verb = when (event.eventType.substringAfterLast('.')) {
+            "created", "added" -> if (event.entityType == "intake") "Recorded" else "Created"
+            "deleted", "removed" -> "Deleted"
+            else -> "Updated"
+        }
+        val subject = event.entityType.replace('_', ' ')
+        val title = "$verb $subject"
+        return HumanActivityText(title, null, title)
+    }
     val quoted = "“$name”"
     val title = when (event.eventType) {
         "workflowy.link.assigned" ->
@@ -103,7 +115,14 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
         "money.transaction.created" -> "Recorded transaction $quoted"
         "money.transaction.updated" -> "Updated transaction $quoted"
         "money.transaction.deleted" -> "Deleted transaction $quoted"
-        else -> return null
+        else -> {
+            val verb = when (event.eventType.substringAfterLast('.')) {
+                "created", "added" -> "Created"
+                "deleted", "removed" -> "Deleted"
+                else -> "Updated"
+            }
+            "$verb $quoted"
+        }
     }
     val changes = if (before != null && after != null) before.keys().asSequence().mapNotNull { key ->
         val label = semanticFieldLabel(key) ?: return@mapNotNull null

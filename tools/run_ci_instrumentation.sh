@@ -34,6 +34,9 @@ run_app_test() {
 }
 
 app_tests=(
+  'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration'
+  'HistoryAndPatchReviewDeviceTest#supportedUndoRestoresSyntheticPlaceAndRecordsCompensation'
+  'HistoryAndPatchReviewDeviceTest#patchPreviewFailureAndExplicitConfirmationGateApplication'
   'SinceWhenAutonomyDeviceTest#pendingFailedLegacyImportDoesNotBlockCanonicalCreateEditOrHubAccess'
   'DatabaseVaultLegacyTableValidationTest#inertLegacyTableIsAllowedButUnexpectedTriggerIsRejected'
   'LegacySyncJournalSchemaDeviceTest#legacySyncJournalSchemaPersistsAcrossReopen'
@@ -54,4 +57,11 @@ python3 tools/android_connected_test_gate.py -- \
   timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --max-workers=1 \
   :feature:luoghi:connectedDebugAndroidTest \
   :feature:multitimetracker:connectedDebugAndroidTest \
+  -Ppersonalhub.allowCiEmulatorDebug=true
+
+# Canonical export/restore and patch safety use an isolated library-test package.
+python3 tools/android_connected_test_gate.py -- \
+  timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --max-workers=1 \
+  :core:database:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.gernalix.personalhub.core.database.capsules.gitdata.GitDataRestoreDeviceTest \
   -Ppersonalhub.allowCiEmulatorDebug=true
