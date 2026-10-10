@@ -42,7 +42,6 @@ import com.gernalix.personalhub.contracts.database.HubOpenTarget
 import com.gernalix.personalhub.contracts.database.SinceWhenCounterEntity
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
-import com.example.multitimetracker.api.TimerStartupApi
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,17 +55,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
     var initialEditorOpened by remember(initialCounterId) { mutableStateOf(false) }
     var linkedCounterId by remember { mutableStateOf<Long?>(null) }
     var showCreate by remember { mutableStateOf(false) }
-    var migrationReady by remember { mutableStateOf(false) }
-    var migrationFailed by remember { mutableStateOf(false) }
     var sourceLabels by remember { mutableStateOf(emptyMap<Long, Pair<String, HubOpenTarget>>()) }
-    LaunchedEffect(context) {
-        try {
-            TimerStartupApi.ensureLegacySinceWhenMigrated(context)
-            migrationReady = true
-        } catch (_: Exception) {
-            migrationFailed = true
-        }
-    }
     LaunchedEffect(initialCounterId, counters) {
         val initial = initialCounterId?.let { id -> counters.firstOrNull { it.id == id } }
         if (initial != null && !initialEditorOpened) {
@@ -102,16 +91,12 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(modifier = Modifier.testTag("sincewhen-create"), onClick = { if (migrationReady) { editing = null; showCreate = true } }) {
+            FloatingActionButton(modifier = Modifier.testTag("sincewhen-create"), onClick = { editing = null; showCreate = true }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.since_when_create))
             }
         },
     ) { padding ->
-        if (migrationFailed) {
-            Text(stringResource(R.string.since_when_migration_error), modifier = Modifier.padding(padding).padding(20.dp))
-        } else if (!migrationReady) {
-            androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.padding(padding).padding(20.dp))
-        } else if (counters.isEmpty()) {
+        if (counters.isEmpty()) {
             Text(stringResource(R.string.since_when_empty), modifier = Modifier.padding(padding).padding(20.dp))
         } else {
             LazyColumn(

@@ -31,3 +31,23 @@ The exact artifacts from Gradle output-metadata.json were installed. The instrum
 
 - CI revealed that a new app Italian catalog requires translation of all 318 untranslated app resources. Moved only the editor vocabulary into the existing bilingual core/ui catalog, using unique editor keys. No lint suppression or unrelated translation work. App/core-ui lint PASS and final changed app QA round trip PASS (11.698 s).
 - Repeated legacy fixture initially reused a unique source snapshot key from the prior test. Added the run suffix to its synthetic source ID; no QA DB clearing or user data change. Final test receipt supersedes the earlier checkpoint.
+
+## PASS correction: Timer independence
+
+The initial editor PASS did not prove full autonomy: the list UI, source-create UI and Hub adapter still called TimerStartupApi.ensureLegacySinceWhenMigrated. Those calls and readiness/error UI gates are now removed. The editor itself is unchanged.
+
+One migration implementation remains, in the separate LegacySinceWhenMigrationApi compatibility boundary, with the same existing transaction, marker key and canonical field mapping. It runs in the existing host post-first-frame maintenance worker, in its own failure-isolated step before the Timer-only first-screen latch. No new scheduler, schema or migration marker. Failure does not gate canonical Since When operations; the existing once-per-process host maintenance retries on next process startup while the marker is incomplete.
+
+Canonical counters created before import may occupy a legacy Timer ID. The importer preserves those canonical rows and allocates a free existing database ID for only the colliding imported row. Otherwise legacy IDs are retained. Completion is marked atomically with the copy, so repeated/concurrent calls cannot duplicate imports.
+
+Verification:
+- 3 new migration host tests PASS: exact field copy, concurrent/repeated calls, collision preserving both rows, malformed snapshot leaves marker incomplete and allows successful retry.
+- compileDebugKotlin and architecture boundaries PASS; removed-API consumer gate PASS.
+- Real canonical Pixel_8a isolated QA: production SinceWhenActivity create/save/reopen/edit, Hub exists/search/summary/open, and source creation through the production deep-link Activity all PASS while legacy import is pending and actually throws on a corrupt snapshot. Runtime fixture registers only the Since When adapter, with no Timer startup initialization. Snapshot and completion-marker fixtures are restored in finally; no live user DB touched.
+- Receipt autonomy-device.txt: OK (1 test), fail-closed wrapper exit 0. The regression is included in the existing emulator CI selection.
+- Reused the prior 5 editor/persistence/time tests and complete editor round trip: the editor/model/resources are unchanged.
+- Post-merge CI for initial main 05184af0: all 4 workflows completed/success (38043943079 architecture, 38043943040 unit, 38043942934 Play, 38043943042 instrumentation); no unrelated CI repair.
+
+Corrected QA artifact fingerprints:
+- com.gernalix.personalhub.qa: `40e7fabb4e9fed5143ff8da448833c64c88804dbfa403f8ee503b73f1fd02688`.
+- com.gernalix.personalhub.qa.test: `fafcd3e3f7da0e01ac640edc80abb14640784597211cc91ad44ecf422e1c15f7`.

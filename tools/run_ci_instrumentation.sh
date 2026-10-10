@@ -34,6 +34,7 @@ run_app_test() {
 }
 
 app_tests=(
+  'SinceWhenAutonomyDeviceTest#pendingFailedLegacyImportDoesNotBlockCanonicalCreateEditOrHubAccess'
   'DatabaseVaultLegacyTableValidationTest#inertLegacyTableIsAllowedButUnexpectedTriggerIsRejected'
   'LegacySyncJournalSchemaDeviceTest#legacySyncJournalSchemaPersistsAcrossReopen'
   'GlobalDatabaseInstrumentedTest#roomAndTimerWritesScheduleAndProduceExportWithoutPolling'

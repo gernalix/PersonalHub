@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.contracts.database.SinceWhenSourceDescriptor
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
-import com.example.multitimetracker.api.TimerStartupApi
 import kotlinx.coroutines.launch
 
 @Composable
@@ -41,27 +40,16 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
     var error by remember { mutableStateOf<String?>(null) }
     var duplicateId by remember { mutableStateOf<Long?>(null) }
     var autoCreateAttempted by remember(source, startEnabled) { mutableStateOf(false) }
-    var migrationReady by remember { mutableStateOf(false) }
-    var migrationFailed by remember { mutableStateOf(false) }
     val selected = source.timestampSources.firstOrNull { it.id == selectedSourceId }
-
-    LaunchedEffect(context) {
-        try {
-            TimerStartupApi.ensureLegacySinceWhenMigrated(context)
-            migrationReady = true
-        } catch (_: Exception) {
-            migrationFailed = true
-        }
-    }
 
     LaunchedEffect(source, enabled, selectedSourceId) {
         duplicateId = if (enabled && selected != null) {
             dao.findSourceSnapshot(source.entityType, source.entityId, selected.timestamp)?.id
         } else null
     }
-    LaunchedEffect(source, startEnabled, migrationReady, selectedSourceId) {
+    LaunchedEffect(source, startEnabled, selectedSourceId) {
         val choice = source.timestampSources.firstOrNull { it.id == selectedSourceId }
-        if (!startEnabled || !migrationReady || !enabled || choice == null || autoCreateAttempted) return@LaunchedEffect
+        if (!startEnabled || !enabled || choice == null || autoCreateAttempted) return@LaunchedEffect
         autoCreateAttempted = true
         saving = true
         error = null
@@ -94,21 +82,19 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
         title = { Text(stringResource(R.string.since_when_create_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (migrationFailed) Text(stringResource(R.string.since_when_migration_error))
-                else if (!migrationReady) Text(stringResource(R.string.since_when_loading))
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.since_when_counter_name)) },
                     singleLine = true,
-                    enabled = migrationReady && !saving,
+                    enabled = !saving,
                 )
                 SinceWhenCreationControl(
                     timestampSources = source.timestampSources,
                     enabled = enabled,
                     selectedSourceId = selectedSourceId,
-                    saving = saving || !migrationReady,
+                    saving = saving,
                     onEnabledChange = { enabled = it },
                     onSourceSelected = { selectedSourceId = it },
                 )
@@ -120,12 +106,12 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
         },
         confirmButton = {
             if (duplicateId != null) {
-                TextButton(enabled = migrationReady && !saving, onClick = {
+                TextButton(enabled = !saving, onClick = {
                     context.startActivity(Intent(context, SinceWhenActivity::class.java).setData(android.net.Uri.parse("personalhub://sincewhen/v1/counter/$duplicateId")))
                     onBack()
                 }) { Text(stringResource(R.string.since_when_open_counter)) }
             } else {
-                TextButton(enabled = migrationReady && !saving && enabled && title.isNotBlank() && selected != null, onClick = {
+                TextButton(enabled = !saving && enabled && title.isNotBlank() && selected != null, onClick = {
                     val choice = selected ?: return@TextButton
                     saving = true
                     error = null

@@ -112,6 +112,11 @@ private object PostFirstFrameStartup {
                 Choreographer.getInstance().postFrameCallback {
                     Choreographer.getInstance().postFrameCallback {
                         executor.execute {
+                            // Compatibility failures are isolated from canonical Since When UI.
+                            // Run before the Timer-only first-screen latch: this copy needs no Timer startup.
+                            runStep("legacy Since When compatibility", "PH.bg.sinceWhenLegacy") {
+                                runBlocking { com.example.multitimetracker.api.LegacySinceWhenMigrationApi.ensureMigrated(app) }
+                            }
                             if (timerOpening && !TimerStartupApi.awaitFirstUsableScreen()) return@execute
                             runStep("profile runtime restore", "PH.bg.profileRuntime") {
                                 runBlocking { ProfileRuntimeCoordinator.restoreActiveProfile(app) }
