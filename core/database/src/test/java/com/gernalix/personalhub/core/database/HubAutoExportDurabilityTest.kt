@@ -120,7 +120,7 @@ class HubAutoExportDurabilityTest {
         val publisher = RecordingExportPublisher()
         DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
 
-        assertEquals(before + 22, latest)
+        assertEquals(before + 24, latest) // Domain row, permanent registry row and audit capture are all durable writes.
         assertEquals(1, scheduler.activeAutoExports)
         assertEquals(ExistingWorkPolicy.REPLACE, scheduler.lastPolicy)
         assertTrue(HubAutoExport.exportUntilClean(context) { false })

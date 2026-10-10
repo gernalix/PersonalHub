@@ -61,6 +61,14 @@ class CanonicalIdentityCapsuleTest {
         assertThrows(android.database.sqlite.SQLiteException::class.java) { database.openHelper.writableDatabase.execSQL("INSERT INTO hub_entity_aliases VALUES('person-b','person-a',NULL,1)") }
     }
 
+    @Test fun macroUpsertRetainsIdentityAndReturnsTheOriginalLocalKey(): Unit = runBlocking {
+        val dao=database.dao()
+        val id=dao.upsertMacro(com.gernalix.sostanze.data.MacroEntity(name="Original"))
+        val canonical=CanonicalIdentityCapsule(context).canonicalId("macros",id)
+        assertEquals(id,dao.upsertMacro(com.gernalix.sostanze.data.MacroEntity(id=id,name="Edited through legacy constructor")))
+        assertEquals(canonical,CanonicalIdentityCapsule(context).canonicalId("macros",id))
+    }
+
     @Test fun timerSnapshotRulesUseRegistryIdsWithoutChangingSnapshotStorage() {
         val db=database.openHelper.writableDatabase
         val json="""{"timeFenceRules":[{"id":42,"isDeleted":false}]}"""

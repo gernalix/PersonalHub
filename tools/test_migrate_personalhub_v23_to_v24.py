@@ -72,9 +72,15 @@ class IdentityMigrationTest(unittest.TestCase):
   with self.assertRaises(sqlite3.IntegrityError):db.execute("INSERT INTO finance_accounts VALUES('person-existing','x','EUR','0',0,1)")
   db.execute("UPDATE substances SET canonical_id='',name='renamed' WHERE id=1")
   self.assertEqual(cid,mapping(db)['substances']['1'])
+  columns=[c[1] for c in db.execute('PRAGMA table_info(quick_event_entries)')]
+  row=list(db.execute('SELECT * FROM quick_event_entries WHERE id=1').fetchone())
   db.execute('DELETE FROM quick_event_entries WHERE id=1')
   self.assertEqual('TOMBSTONED',db.execute("SELECT lifecycle FROM hub_entities WHERE local_table='quick_event_entries'").fetchone()[0])
   with self.assertRaises(sqlite3.IntegrityError):db.execute("DELETE FROM hub_entities WHERE local_table='quick_event_entries'")
+  insert='INSERT INTO quick_event_entries VALUES('+','.join('?' for _ in row)+')'
+  legacy=row.copy();legacy[columns.index('canonical_id')]=''
+  with self.assertRaises(sqlite3.IntegrityError):db.execute(insert,legacy)
+  db.execute(insert,row) # Explicit restoration targets the same reserved identity.
   validate_identities(db);db.close()
  def test_external_uniqueness_kind_and_orphans(self):
   _,db,_=self.migrated();sql="INSERT INTO hub_external_identities(id,canonical_id,entity_kind,system,source_scope,external_id,link_method,lifecycle,created_at,updated_at) VALUES(?,?,?,?,?,?,'explicit','ACTIVE',1,1)"

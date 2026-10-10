@@ -936,6 +936,8 @@ internal object GitStateRestorer {
                     )
                 }
             }
+            // Semantic facts are exported, but their runtime table is outside Room's entity manifest.
+            db.execSQL(com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore.createTableSql)
             val views = schema.optJSONArray("views") ?: JSONArray()
             for (i in 0 until views.length()) {
                 db.execSQL(views.getJSONObject(i).getString("createSql"))

@@ -21,7 +21,7 @@ class WorkflowyCardinalityTest {
         WorkflowyIntegrationSettings.setEnabled(context, true)
         val resourceAdapter = ResourceHubAdapter(context)
         HubContextRuntime.initialize(context, listOf(FakeAnchor(), resourceAdapter))
-        val anchor = HubEntityRef("people", "person", UUID.randomUUID().toString())
+        val anchor = canonicalFixture(com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context), "people", "person", UUID.randomUUID().toString())
         val url = "https://workflowy.com/#/59d823cea257"
         val resource = WorkflowyHubBridge.attachUrl(context, anchor, url)
         var remoteCalls = 0
@@ -56,7 +56,7 @@ class WorkflowyCardinalityTest {
         WorkflowyIntegrationSettings.setEnabled(context, true)
         val resourceAdapter = ResourceHubAdapter(context)
         HubContextRuntime.initialize(context, listOf(FakeAnchor(), resourceAdapter))
-        val anchor = HubEntityRef("people", "person", UUID.randomUUID().toString())
+        val anchor = canonicalFixture(com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context), "people", "person", UUID.randomUUID().toString())
         val first = requireNotNull(resourceAdapter.create(HubCreateRequest(
             "Workflowy", mapOf("kind" to HubResourceKinds.WEB_URL,
                 "value" to "https://workflowy.com/#/59d823cea257"))))

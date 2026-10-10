@@ -42,9 +42,9 @@ class HubTagBacklinksTest {
     }
 
     @Test fun transactionIsBacklinkedFromPersonPlaceAndEveryTagAndKeepsOriginalTarget() = runBlocking {
-        val transaction = HubEntityRef("soldi", "transaction", "tx-backlink")
-        val person = HubEntityRef("people", "person", "person-a")
-        val place = HubEntityRef("places", "place", "place-p")
+        val transaction = canonicalFixture(database, "soldi", "transaction", "tx-backlink")
+        val person = canonicalFixture(database, "people", "person", "person-a")
+        val place = canonicalFixture(database, "places", "place", "place-p")
         val first = requireNotNull(HubContextRuntime.tags().create(HubTagNamespaces.SOLDI, "Trip backlink").tag)
         val second = requireNotNull(HubContextRuntime.tags().create(HubTagNamespaces.SOLDI, "Shared backlink").tag)
         try {
@@ -53,9 +53,9 @@ class HubTagBacklinksTest {
 
             assertTrue(transaction in HubContextRuntime.linked(person).map { it.ref })
             assertTrue(transaction in HubContextRuntime.linked(place).map { it.ref })
-            assertTrue(transaction in HubContextRuntime.linked(HubEntityRef("tags", "tag", first.id)).map { it.ref })
-            assertTrue(transaction in HubContextRuntime.linked(HubEntityRef("tags", "tag", second.id)).map { it.ref })
-            assertEquals(setOf(person, place, HubEntityRef("tags", "tag", first.id), HubEntityRef("tags", "tag", second.id)), HubContextRuntime.linked(transaction).map { it.ref }.toSet())
+            assertTrue(transaction in HubContextRuntime.linked(canonicalFixture(database, "tags", "tag", first.id)).map { it.ref })
+            assertTrue(transaction in HubContextRuntime.linked(canonicalFixture(database, "tags", "tag", second.id)).map { it.ref })
+            assertEquals(setOf(person, place, canonicalFixture(database, "tags", "tag", first.id), canonicalFixture(database, "tags", "tag", second.id)), HubContextRuntime.linked(transaction).map { it.ref }.toSet())
             assertEquals("personalhub://soldi/transaction/tx-backlink", HubContextRuntime.adapter("soldi", "transaction").openTarget(transaction.canonicalId)?.uri)
         } finally {
             HubContextRuntime.tags().clear(transaction)

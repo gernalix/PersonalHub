@@ -45,8 +45,7 @@ object MutationEventStore {
 
     fun newTransactionId(): String = UUID.randomUUID().toString()
 
-    fun install(db: SupportSQLiteDatabase) {
-        db.execSQL(
+    internal val createTableSql =
             """CREATE TABLE IF NOT EXISTS mutation_events (
                 event_id TEXT NOT NULL PRIMARY KEY,
                 occurred_at INTEGER NOT NULL,
@@ -62,9 +61,13 @@ object MutationEventStore {
                 after_json TEXT,
                 context_json TEXT NOT NULL DEFAULT '{}',
                 schema_version INTEGER NOT NULL,
+                entity_kind TEXT,
+                canonical_id TEXT,
                 UNIQUE(transaction_id, sequence)
-            )""".trimIndent(),
-        )
+            )""".trimIndent()
+
+    fun install(db: SupportSQLiteDatabase) {
+        db.execSQL(createTableSql)
         val columns = db.query("PRAGMA table_info(mutation_events)").use { c -> buildSet { while(c.moveToNext()) add(c.getString(1)) } }
         for (column in listOf("entity_kind", "canonical_id")) if (column !in columns) db.execSQL("ALTER TABLE mutation_events ADD COLUMN `$column` TEXT")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_mutation_events_occurred_at ON mutation_events(occurred_at DESC, event_id DESC)")

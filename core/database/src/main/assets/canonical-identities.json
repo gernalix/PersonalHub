@@ -650,5 +650,15 @@
     "hub_entities": "Identity relationship/registry record, not a second recursively registered domain entity.",
     "hub_external_identities": "Identity relationship/registry record, not a second recursively registered domain entity.",
     "hub_entity_aliases": "Identity relationship/registry record, not a second recursively registered domain entity."
+  },
+  "runtime_tables": {
+    "mutation_events": "Exempt subordinate semantic facts. Existing internal event_id identifies an audit/undo fact; entity_kind and canonical_id address its registered domain target. Not a second domain identity authority.",
+    "hub_git_pending": "Exempt coalescing export journal.",
+    "hub_git_events": "Exempt raw storage edits; canonical target pair is attached at history export.",
+    "hub_git_edit_context": "Exempt transaction-scoped edit context.",
+    "hub_git_applied_patches": "Exempt applied-patch receipts.",
+    "hub_git_history_index": "Exempt derived History index.",
+    "hub_git_history_field_stats": "Exempt derived History field statistics.",
+    "hub_activity_undo_context": "Exempt transaction-scoped undo control."
   }
 }

@@ -41,8 +41,8 @@ class SharedTagEngineTest {
         val people = requireNotNull(engine.create(HubTagNamespaces.PEOPLE, "Holiday").tag)
         val places = requireNotNull(engine.create(HubTagNamespaces.PLACES, "Holiday").tag)
         val global = requireNotNull(engine.create(HubTagNamespaces.GLOBAL, "Shared").tag)
-        val person = HubEntityRef("people", "person", "p1")
-        val place = HubEntityRef("places", "place", "l1")
+        val person = canonicalFixture(database, "people", "person", "p1")
+        val place = canonicalFixture(database, "places", "place", "l1")
 
         engine.assign(person, listOf(people.id, global.id))
         engine.assign(place, listOf(places.id, global.id))
@@ -53,16 +53,16 @@ class SharedTagEngineTest {
         assertTrue(engine.matches(person, HubTagFilter(include = setOf(places.id, people.id), mode = HubTagMatchMode.OR)))
         assertFalse(engine.matches(person, HubTagFilter(exclude = setOf(global.id))))
         assertFalse(engine.matches(person, HubTagFilter(noTags = true)))
-        assertTrue(engine.matches(HubEntityRef("people", "person", "untagged"), HubTagFilter(noTags = true)))
+        assertTrue(engine.matches(canonicalFixture(database, "people", "person", "untagged"), HubTagFilter(noTags = true)))
     }
 
     @Test fun timerNamespacesRemainIndependentForRenameArchiveDeleteAndMerge() = runBlocking {
         val now = engine.createStable("timer.now:7", HubTagNamespaces.TIMER_NOW, "Focus")
         val events = engine.createStable("timer.events:7", HubTagNamespaces.TIMER_EVENTS, "Focus")
         val since = engine.createStable("timer.since_when:7", HubTagNamespaces.TIMER_SINCE_WHEN, "Focus")
-        engine.assign(HubEntityRef("timer", "session", "1"), listOf(now.id))
-        engine.assign(HubEntityRef("timer", "quick_event_entry", "2"), listOf(events.id))
-        engine.assign(HubEntityRef("timer", "life_period", "3"), listOf(since.id))
+        engine.assign(canonicalFixture(database, "timer", "session", "1"), listOf(now.id))
+        engine.assign(canonicalFixture(database, "timer", "quick_event_entry", "2"), listOf(events.id))
+        engine.assign(canonicalFixture(database, "timer", "life_period", "3"), listOf(since.id))
 
         engine.rename(now.id, "Deep focus")
         engine.archive(events.id, true)
@@ -73,7 +73,7 @@ class SharedTagEngineTest {
         assertFalse(database.hubTagDao().tag(since.id)?.archived == true)
         assertFails { engine.merge(now.id, events.id) }
         assertFalse(engine.deleteUnused(now.id))
-        engine.remove(HubEntityRef("timer", "life_period", "3"), listOf(since.id))
+        engine.remove(canonicalFixture(database, "timer", "life_period", "3"), listOf(since.id))
         assertTrue(engine.deleteUnused(since.id))
         assertNull(database.hubTagDao().tag(since.id))
         assertNotNull(database.hubTagDao().tag(events.id))
@@ -85,7 +85,7 @@ class SharedTagEngineTest {
         engine.addAlias(canonical.id, "CPH")
         assertEquals(canonical.id, engine.search(HubTagNamespaces.SOLDI, "cph").single().id)
         val duplicate = requireNotNull(engine.create(HubTagNamespaces.SOLDI, "København", acceptNearDuplicate = true).tag)
-        val transaction = HubEntityRef("soldi", "transaction", "tx-1")
+        val transaction = canonicalFixture(database, "soldi", "transaction", "tx-1")
         engine.assign(transaction, listOf(duplicate.id))
         engine.merge(duplicate.id, canonical.id)
         assertEquals(listOf(canonical.id), engine.tags(transaction).map { it.id })
@@ -94,7 +94,7 @@ class SharedTagEngineTest {
 
     @Test fun refreshUsageDoesNotRewriteTagsWhenDerivedValuesAreAlreadyCurrent() = runBlocking {
         val tag = engine.createStable("timer.now:99", HubTagNamespaces.TIMER_NOW, "Stable")
-        engine.assign(HubEntityRef("timer", "session", "99"), listOf(tag.id))
+        engine.assign(canonicalFixture(database, "timer", "session", "99"), listOf(tag.id))
         val sqlite = database.openHelper.writableDatabase
         fun totalChanges(): Long = sqlite.query("SELECT total_changes()").use { it.moveToFirst(); it.getLong(0) }
         val before = totalChanges()
@@ -107,7 +107,7 @@ class SharedTagEngineTest {
     @Test fun soldiCategoryIsTypedAndLimitedToOnePrimaryAssignment() = runBlocking {
         val food = requireNotNull(engine.create(HubTagNamespaces.SOLDI_CATEGORY, "Food", kind = HubTagKinds.CATEGORY).tag)
         val travel = requireNotNull(engine.create(HubTagNamespaces.SOLDI_CATEGORY, "Travel", kind = HubTagKinds.CATEGORY).tag)
-        val transaction = HubEntityRef("soldi", "transaction", "tx-category")
+        val transaction = canonicalFixture(database, "soldi", "transaction", "tx-category")
         engine.assign(transaction, listOf(food.id))
         assertFails { engine.assign(transaction, listOf(travel.id)) }
         engine.replace(transaction, HubTagNamespaces.SOLDI_CATEGORY, listOf(travel.id))

@@ -51,13 +51,14 @@ class SinceWhenAutonomyDeviceTest {
             compose.onNodeWithTag("sincewhen-save").performClick()
             compose.waitUntil(10000) { runBlocking { db.sinceWhenCounterDao().get(counter.id)?.title == "$title edited" } && compose.onAllNodesWithTag("sincewhen-save").fetchSemanticsNodes().isEmpty() }
             val adapter = SinceWhenCounterHubAdapter(context)
-            assertTrue(adapter.exists(counter.id.toString()))
-            assertNotNull(adapter.openTarget(counter.id.toString()))
+            assertTrue(adapter.exists(counter.canonicalId))
+            assertNotNull(adapter.openTarget(counter.canonicalId))
             assertEquals("$title edited", adapter.summaries(setOf(counter.canonicalId))[counter.canonicalId]?.label)
             assertTrue(adapter.search(title, 10).isNotEmpty())
             scenario.close()
             scenario = null
             val source = SinceWhenSourceDescriptor("places/place", "qa925611-$title", "$title source", listOf(SinceWhenTimestampSource("createdAt", "QA start", 1790000012345L, true)))
+            sql.execSQL("INSERT INTO hub_entities VALUES(?,'places/place','places','places',?,'TOMBSTONED',1,1)", arrayOf(source.entityId,source.entityId))
             sourceScenario = ActivityScenario.launch(Intent(context, HubDeepLinkActivity::class.java).setData(HubDeepLinkContract.sinceWhenCreateUri(source, startEnabled = true)))
             compose.waitUntil(10000) { runBlocking { db.sinceWhenCounterDao().all().any { it.title == source.defaultCounterTitle } } }
             val sourceRow = db.sinceWhenCounterDao().all().single { it.title == source.defaultCounterTitle }

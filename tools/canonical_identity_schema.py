@@ -44,11 +44,12 @@ def statements():
   insert_body+=fail_if(f"{identity} IS NULL OR length(trim({identity}))=0",'empty canonical identity')
   insert_body+=fail_if(f"EXISTS(SELECT 1 FROM hub_entities WHERE canonical_id={identity} AND (entity_kind<>'{kind}' OR local_table<>'{t}' OR local_key<>CAST(NEW.`{key}` AS TEXT)))",'canonical identity collision')
   # REPLACE/compatibility writes can retain a live existing mapping. Reuse after actual deletion fails.
-  insert_body+=fail_if(f"EXISTS(SELECT 1 FROM hub_entities WHERE canonical_id={identity} AND lifecycle<>'ACTIVE')",'canonical identity cannot be reused')
+  insert_body+=fail_if(f"EXISTS(SELECT 1 FROM hub_entities WHERE canonical_id={identity} AND (lifecycle='MERGED' OR (lifecycle='TOMBSTONED' AND (NEW.`{col}` IS NULL OR NEW.`{col}`=''))))",'canonical identity cannot be reused')
   insert_body+=f"INSERT INTO hub_entities(canonical_id,entity_kind,owning_module,local_table,local_key,lifecycle,created_at,updated_at) SELECT {identity},'{kind}','{module}','{t}',CAST(NEW.`{key}` AS TEXT),{life('NEW')},{NOW},{NOW} WHERE NOT EXISTS(SELECT 1 FROM hub_entities WHERE canonical_id={identity}); "
+  insert_body+=f"UPDATE hub_entities SET lifecycle={life('NEW')},updated_at={NOW} WHERE canonical_id={identity} AND lifecycle='TOMBSTONED'; "
   result.append(trigger(f'canonical_{t}_insert','AFTER','INSERT',t,insert_body))
   result.append(trigger(f'canonical_{t}_update','AFTER','UPDATE',t,
-    f"UPDATE hub_entities SET lifecycle={life('NEW')},updated_at={NOW} WHERE canonical_id=NEW.`{col}` AND lifecycle<>'MERGED';",f"NEW.`{col}`<>''"))
+    f"UPDATE hub_entities SET lifecycle={life('NEW')},updated_at={NOW} WHERE canonical_id=NEW.`{col}` AND lifecycle<>'MERGED';",f"NEW.`{col}`<>'' AND {life('NEW')} IS NOT {life('OLD')}"))
   result.append(trigger(f'canonical_{t}_delete','AFTER','DELETE',t,
     f"UPDATE hub_entities SET lifecycle='TOMBSTONED',updated_at={NOW} WHERE canonical_id=OLD.`{col}` AND lifecycle<>'MERGED';"))
  # Registry is permanent. Table-level CHECK equivalents are triggers because Room cannot declare CHECK.

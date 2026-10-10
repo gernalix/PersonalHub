@@ -22,6 +22,8 @@ A read-only export of PersonalHub-data commit `5429af0111887be738f9c313e71b1c501
 
 Migration registered 4,065 existing addressable rows with complete coverage. Source backup hash: `4193c51f151d64b12e0858885f822551f328610b7a2bb23bf08d12148e1e0d00`. Replay preserved every mapping. Rollback reproduced the coherent source backup exactly and passed schema, integrity and FK checks. The existing QA-overlay contact was explicitly classified and preserved without an external match.
 
+Prepared database: `PersonalHub-data-v24-prepared.db`, with map, validation report, coherent backup and replay/rollback copies; summary `prepared-receipt.json`.
+
 Private artifacts and classification receipt: `/home/daniele/Documents/ChatGPT/Personal Hub/artifacts/925612-isolated/`. These are test evidence, not deployment inputs. Automated test evidence is recorded in `docs/qa/925612.md`.
 
 ## Deferred live cutover
@@ -30,6 +32,6 @@ Private artifacts and classification receipt: `/home/daniele/Documents/ChatGPT/P
 
 Rollback is a snapshot rollback: freeze writers, preserve a fresh copy of the post-cutover database and sidecars, restore the verified pre-cutover backup with the old APK, then verify runtime and data. It does not reverse edits made after cutover; reconcile those explicitly from the retained copy/history. Never pair an old Room APK with schema 24.
 
-Risks still requiring live acceptance: current device data can differ from the pinned Git export; provider credentials/API access and real Workflowy creation were not exercised; existing schema-23 Git revisions need external migration before restoring into schema 24. History UI, filtering/navigation and Git patch review/preview/apply remain 193828 scope.
+Risks still requiring live acceptance: current device data can differ from the pinned Git export, and previously orphaned sources must fail and be explicitly classified (the old emulator QA fixture exercised this refusal); provider credentials/API access and real Workflowy creation were not exercised; existing schema-23 Git revisions need external migration before restoring into schema 24. History UI, filtering/navigation and Git patch review/preview/apply remain 193828 scope.
 
 B8 performs no Pixel database cutover, no final APK installation, no NV increment and no PersonalHub-data remote write.
