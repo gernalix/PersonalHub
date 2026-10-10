@@ -6,6 +6,7 @@ android {
     namespace = "com.gernalix.personalhub.core.alerts"
     compileSdk = 37
     defaultConfig { minSdk = 29 }
+    testOptions { unitTests.isIncludeAndroidResources = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

@@ -43,9 +43,17 @@ class HubDiscoverabilityEpisodesEmulatorTest {
             android.os.Build.MODEL.contains("Pixel", ignoreCase = true) ||
                 android.os.Build.MODEL.contains("sdk", ignoreCase = true)
         )
+        check(context.packageName == "com.gernalix.personalhub.qa")
         PersonalHubDatabase.resetForTests()
         context.deleteDatabase(PersonalHubDatabase.DATABASE_NAME)
 
+        // The fake temporal adapter owns these explicit fixture objects outside Room tables.
+        listOf("word-a", "word-b").forEach { id ->
+            PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL(
+                "INSERT INTO hub_entities VALUES(?,'wordpulse/entry','wordpulse','test-fixture.wordpulse.entry',?,'ACTIVE',1,1)",
+                arrayOf(id, id),
+            )
+        }
         val now = System.currentTimeMillis()
         val episodeTitle = "QA episode $now"
         HubContextRuntime.initialize(context, listOf(QaWordPulseAdapter(now)))

@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
+import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
 import com.gernalix.personalhub.core.hubcontext.WorkflowyHubBridge
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
@@ -23,8 +24,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class AlertNotificationTapTest {
     @Test fun placesTimerAndRestartedRandomAlertTapsRespectGateAndPersistentLinks() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -41,6 +44,13 @@ class AlertNotificationTapTest {
             HubEntityRef("timer", "alert", UUID.randomUUID().toString()),
             HubEntityRef("timer", "alert", UUID.randomUUID().toString()),
         )
+        anchors.forEach { anchor ->
+            val owner = if (anchor.moduleId == "timer") "timer" else "alerts"
+            PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL(
+                "INSERT INTO hub_entities VALUES(?,?,?,?,?,'ACTIVE',1,1)",
+                arrayOf(anchor.canonicalId, "$owner/alert", owner, "test-fixture.$owner.alert", anchor.canonicalId),
+            )
+        }
         val resources = anchors.map { WorkflowyHubBridge.attachUrl(context, it, url) }
         try {
             anchors.forEachIndexed { index, anchor ->
