@@ -89,6 +89,24 @@ class HubActivityPresentationTest {
         assertEquals("places", gitHistoryModule(item.table))
     }
     @Test
+    fun existingPlaceAlertHistoryUsesItsHumanMessage() {
+        val item = GitHistoryItem(
+            id = "technical-id", occurredAt = 1L, author = "user", source = "app", reason = null,
+            groupId = null, table = "alert_rules", operation = "INSERT", rowKey = "technical-row",
+            changedColumns = "", historyPath = "h", commitSha = "c", revertedBy = null,
+            displayAfter = "{\"message\":\"Arrived home\"}",
+        )
+        val text = humanizeGitHistory(item, "Places")
+        assertEquals("Created alert “Arrived home”", text.title)
+        assertTrue(text.searchText.contains("Arrived home"))
+        assertFalse(text.searchText.contains("technical-row"))
+        val deleted = humanizeGitHistory(item.copy(
+            operation = "DELETE", displayBefore = item.displayAfter, displayAfter = null,
+        ), "Places")
+        assertEquals("Deleted alert “Arrived home”", deleted.title)
+    }
+
+    @Test
     fun everyCurrentSemanticAuditTableHasAnExplicitHumanFormatter() {
         val tables = setOf(
             "finance_accounts", "finance_products", "finance_titles", "finance_chains", "finance_stores",

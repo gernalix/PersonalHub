@@ -74,6 +74,10 @@ class WorkflowyIntegrationTest {
         assertEquals(listOf("Open node", "Delink node", "Delete node"), WorkflowyHubBridge.actionNames(1))
         assertEquals("59d823cea257", WorkflowyLinkPolicy.shortId("https://workflowy.com/#/59d823cea257"))
         assertNull(WorkflowyLinkPolicy.shortId("https://workflowy.com/#/wrong"))
+        // Recovered from f66ce663: reject non-node, nested and lookalike links.
+        assertNull(WorkflowyLinkPolicy.shortId("https://workflowy.com/#/today"))
+        assertNull(WorkflowyLinkPolicy.shortId("https://workflowy.com/#/59d823cea257/child"))
+        assertNull(WorkflowyLinkPolicy.shortId("https://workflowy.com.evil.example/#/59d823cea257"))
         assertEquals(
             "2af3dd5c-7b2e-5248-bbee-59d823cea257",
             WorkflowyApiClient.parseResolvedNodeId(
