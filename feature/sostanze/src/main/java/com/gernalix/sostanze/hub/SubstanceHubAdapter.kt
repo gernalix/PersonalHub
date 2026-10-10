@@ -1,6 +1,7 @@
 package com.gernalix.sostanze.hub
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
@@ -15,22 +16,24 @@ class SubstanceHubAdapter(private val context: Context) : HubEntityAdapter {
     override val moduleId = "substances"
     override val entityKind = "substance"
     override val capabilities = setOf("substance", "health")
+    private val identities = CanonicalIdentityCapsule(context)
+    private fun local(id: String) = identities.localKey("$moduleId/$entityKind", id)?.toLongOrNull()
     private val dao get() = PersonalHubDatabase.get(context).dao()
     private val database get() = PersonalHubDatabase.get(context)
 
-    override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let { dao.substanceById(it) } != null
-    override suspend fun lifecycle(canonicalId: String) = when (canonicalId.toLongOrNull()?.let { dao.substanceById(it) }?.archived) {
+    override suspend fun exists(canonicalId: String) = local(canonicalId)?.let { dao.substanceById(it) } != null
+    override suspend fun lifecycle(canonicalId: String) = when (local(canonicalId)?.let { dao.substanceById(it) }?.archived) {
         null -> HubEntityLifecycle.DELETED
         true -> HubEntityLifecycle.ARCHIVED
         false -> HubEntityLifecycle.ACTIVE
     }
     override suspend fun summaries(canonicalIds: Set<String>) = if (canonicalIds.isEmpty()) emptyMap() else
-        dao.substancesByIds(canonicalIds.mapNotNull(String::toLongOrNull)).associate { it.id.toString() to it.summary() }
+        dao.substancesByIds(canonicalIds.mapNotNull(::local)).associate { it.canonicalId to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchSubstances(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("substances", "substanceId" to canonicalId).toString(), "com.gernalix.sostanze.MainActivity")
 
     override suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? {
-        val substanceId = canonicalId.toLongOrNull() ?: return null
+        val substanceId = local(canonicalId) ?: return null
         val substance = dao.substanceById(substanceId) ?: return null
         val createdAt = database.openHelper.readableDatabase.query(
             SimpleSQLiteQuery(
@@ -43,7 +46,7 @@ class SubstanceHubAdapter(private val context: Context) : HubEntityAdapter {
     }
 
     private fun SubstanceEntity.summary() = HubEntitySummary(
-        HubEntityRef(moduleId, entityKind, id.toString()), name,
+        HubEntityRef(moduleId, entityKind, canonicalId), name,
         "$dosePerIntake $doseUnit · $stockCurrent $stockUnit",
         if (archived) HubEntityLifecycle.ARCHIVED else HubEntityLifecycle.ACTIVE,
     )
@@ -54,17 +57,19 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
     override val entityKind = "intake"
     override val capabilities = setOf("health", "intake", "time_point")
     private val database get() = PersonalHubDatabase.get(context)
+    private val identities = CanonicalIdentityCapsule(context)
+    private fun local(id: String) = identities.localKey("$moduleId/$entityKind", id)?.toLongOrNull()
     private val dao get() = database.dao()
 
-    override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let { dao.intakeById(it) } != null
+    override suspend fun exists(canonicalId: String) = local(canonicalId)?.let { dao.intakeById(it) } != null
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
-    override suspend fun summaries(canonicalIds: Set<String>) = dao.intakeHubViews(canonicalIds.mapNotNull(String::toLongOrNull)).associate { it.intake.id.toString() to it.summary() }
+    override suspend fun summaries(canonicalIds: Set<String>) = dao.intakeHubViews(canonicalIds.mapNotNull(::local)).associate { it.intake.canonicalId to it.summary() }
     override suspend fun search(query: String, limit: Int) = dao.searchIntakeHubViews(query.trim(), limit.coerceIn(1, 100)).map { it.summary() }
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("substances").toString(), "com.gernalix.sostanze.MainActivity")
 
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val decoded = decodeHubTemporalCursor(query.cursor)
-        val cursorId = decoded?.stableId?.toLongOrNull()
+        val cursorId = decoded?.stableId?.let(::local)
         val cursor = decoded?.takeIf { cursorId != null }
         val args = mutableListOf<Any?>(query.fromMs, query.toMs)
         val cursorClause = if (cursor != null) {
@@ -95,12 +100,12 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
                         HubTemporalRecord(
                             moduleId,
                             entityKind,
-                            id.toString(),
+                            identities.canonicalId("intake_events", id),
                             HubTemporalKind.POINT,
                             timestampMs,
                             title = name,
                             subtitle = "$dose $unit",
-                            entityRef = HubEntityRef(moduleId, entityKind, id.toString()),
+                            entityRef = HubEntityRef(moduleId, entityKind, identities.canonicalId("intake_events", id)),
                         ),
                     )
                 }
@@ -113,22 +118,24 @@ class SubstanceIntakeHubAdapter(private val context: Context) : HubEntityAdapter
         )
     }
 
-    private fun IntakeHubView.summary() = HubEntitySummary(HubEntityRef(moduleId, entityKind, intake.id.toString()), substanceName, "${intake.dose} ${intake.doseUnit}", attributes = mapOf("time_ms" to intake.timestampMs.toString()))
+    private fun IntakeHubView.summary() = HubEntitySummary(HubEntityRef(moduleId, entityKind, intake.canonicalId), substanceName, "${intake.dose} ${intake.doseUnit}", attributes = mapOf("time_ms" to intake.timestampMs.toString()))
 }
 
 class PrescriptionHubAdapter(private val context: Context) : HubEntityAdapter {
     override val moduleId = "substances"
     override val entityKind = "prescription"
     override val capabilities = setOf("health", "prescription", "contextual")
+    private val identities = CanonicalIdentityCapsule(context)
+    private fun local(id: String) = identities.localKey("$moduleId/$entityKind", id)?.toLongOrNull()
     private val dao get() = PersonalHubDatabase.get(context).dao()
 
-    override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let { dao.prescriptionById(it) } != null
+    override suspend fun exists(canonicalId: String) = local(canonicalId)?.let { dao.prescriptionById(it) } != null
     override suspend fun lifecycle(canonicalId: String) =
         if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
 
     override suspend fun summaries(canonicalIds: Set<String>): Map<String, HubEntitySummary> =
         canonicalIds.mapNotNull { raw ->
-            val prescription = raw.toLongOrNull()?.let { dao.prescriptionById(it) } ?: return@mapNotNull null
+            val prescription = local(raw)?.let { dao.prescriptionById(it) } ?: return@mapNotNull null
             val substance = dao.substanceById(prescription.substanceId) ?: return@mapNotNull null
             raw to HubEntitySummary(HubEntityRef(moduleId, entityKind, raw), substance.name,
                 "${prescription.doseMg} mg")
@@ -136,7 +143,7 @@ class PrescriptionHubAdapter(private val context: Context) : HubEntityAdapter {
 
     override suspend fun search(query: String, limit: Int): List<HubEntitySummary> {
         val rows = dao.observePrescriptions().first()
-        return summaries(rows.map { it.id.toString() }.toSet()).values
+        return summaries(rows.map { it.canonicalId }.toSet()).values
             .filter { it.label.contains(query.trim(), ignoreCase = true) }.take(limit)
     }
 

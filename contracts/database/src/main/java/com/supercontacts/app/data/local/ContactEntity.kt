@@ -19,7 +19,7 @@ data class ContactEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     @ColumnInfo(name = "public_id")
-    val publicId: String? = null,
+    val publicId: String = java.util.UUID.randomUUID().toString(),
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
     @ColumnInfo(name = "updated_at")

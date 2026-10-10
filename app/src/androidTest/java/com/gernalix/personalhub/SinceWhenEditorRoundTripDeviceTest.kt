@@ -96,6 +96,7 @@ class SinceWhenEditorRoundTripDeviceTest {
             compose.waitUntil(10000) { runBlocking { db.sinceWhenCounterDao().get(edited.id)?.endTimestamp == null } }
             assertEquals(edited.copy(endTimestamp = null), runBlocking { db.sinceWhenCounterDao().get(edited.id) })
         } finally { scenario.close() }
+        db.openHelper.writableDatabase.execSQL("INSERT INTO hub_entities VALUES(?,'timer/session','timer','sessions',?,'TOMBSTONED',1,1)", arrayOf("b6-missing-source-$suffix","b6-$suffix"))
         val legacy = SinceWhenCounterEntity(title = "B6 Legacy $suffix", description = "Legacy snapshot", initialTimestamp = Instant.parse("2026-02-10T13:47:23.456Z").toEpochMilli(), endTimestamp = Instant.parse("2026-02-11T18:29:45.678Z").toEpochMilli(), colorArgb = 0xFF9B3D5CL, displayUnitsJson = "[\"MINUTES\",\"SECONDS\"]", legacyTagIdsJson = "[42,73]", sourceEntityType = "timer/session", sourceEntityId = "b6-missing-source-$suffix", sourceTimestampField = "start", createdAt = 1790000000000)
         val id = runBlocking { db.sinceWhenCounterDao().insert(legacy) }
         val old = ActivityScenario.launch<SinceWhenActivity>(Intent(context, SinceWhenActivity::class.java).setData(Uri.parse("personalhub://sincewhen/v1/counter/$id")))
@@ -104,7 +105,7 @@ class SinceWhenEditorRoundTripDeviceTest {
             node("sincewhen-title").performTextReplacement("${legacy.title} edited")
             node("sincewhen-save").performClick()
             awaitSaved("${legacy.title} edited")
-            assertEquals(legacy.copy(id = id, title = "${legacy.title} edited"), runBlocking { db.sinceWhenCounterDao().get(id) })
+            assertEquals(legacy.copy(id = id, title = "${legacy.title} edited", canonicalId = requireNotNull(runBlocking { db.sinceWhenCounterDao().get(id) }).canonicalId), runBlocking { db.sinceWhenCounterDao().get(id) })
             old.recreate()
             waitEditor()
             node("sincewhen-description").assertTextContains("Legacy snapshot")

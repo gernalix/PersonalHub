@@ -80,20 +80,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateIntentState(intent: Intent?) {
-        hubSessionId = intent.hubSessionId()
-        hubQuickEventEntryId = intent.hubQuickEventEntryId()
+        hubSessionId = intent.hubSessionId(this)
+        hubQuickEventEntryId = intent.hubQuickEventEntryId(this)
         pendingQuickEventTarget = QuickEventWidgetDeepLink.requestFrom(intent)
         alertRequest = UnifiedAlertsRoute.parse(intent)
     }
 }
 
-private fun Intent?.hubSessionId(): Long? = this?.data
+private fun Intent?.hubSessionId(context: android.content.Context): Long? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/timer" }
-    ?.getQueryParameter("sessionId")?.toLongOrNull()
+    ?.getQueryParameter("sessionId")?.let { id ->
+        id.toLongOrNull() ?: com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).localKey("timer/session", id)?.toLongOrNull()
+    }
 
-private fun Intent?.hubQuickEventEntryId(): Long? = this?.data
+private fun Intent?.hubQuickEventEntryId(context: android.content.Context): Long? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/timer" }
-    ?.getQueryParameter("quickEventEntryId")?.toLongOrNull()
+    ?.getQueryParameter("quickEventEntryId")?.let { id ->
+        id.toLongOrNull() ?: com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).localKey("timer/quick_event_entry", id)?.toLongOrNull()
+    }
 
 @Composable
 private fun MultiTimeTrackerApp(

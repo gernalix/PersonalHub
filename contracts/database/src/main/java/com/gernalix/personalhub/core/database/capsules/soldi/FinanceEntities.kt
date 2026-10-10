@@ -13,14 +13,18 @@ import com.gernalix.luoghi.data.PlaceEntity
 data class FinanceProduct(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    @ColumnInfo(defaultValue = "''") val uuid: String = java.util.UUID.randomUUID().toString(),
+    val uuid: String = java.util.UUID.randomUUID().toString(),
 )
 
-@Entity(tableName = "finance_titles", indices = [Index(value = ["name"], unique = true)])
-data class FinanceTitle(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String)
+@Entity(tableName = "finance_titles", indices = [Index(value = ["canonical_id"], unique = true), Index(value = ["name"], unique = true)])
+data class FinanceTitle(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
+)
 
-@Entity(tableName = "finance_chains", indices = [Index(value = ["name"], unique = true)])
-data class FinanceChain(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String)
+@Entity(tableName = "finance_chains", indices = [Index(value = ["canonical_id"], unique = true), Index(value = ["name"], unique = true)])
+data class FinanceChain(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
+)
 
 @Entity(
     tableName = "finance_stores",
@@ -68,10 +72,13 @@ data class FinanceTransaction(
     @ColumnInfo(defaultValue = "NULL") val recurrenceId: String? = null,
     @ColumnInfo(defaultValue = "NULL") val occurrenceKey: String? = null,
     @ColumnInfo(defaultValue = "NULL") val reminderAt: Long? = null,
+    @ColumnInfo(name = "person_canonical_id") val personCanonicalId: String? = null,
 )
 
-@Entity(tableName = "finance_tags", indices = [Index(value = ["name"], unique = true)])
-data class FinanceTag(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String)
+@Entity(tableName = "finance_tags", indices = [Index(value = ["canonical_id"], unique = true), Index(value = ["name"], unique = true)])
+data class FinanceTag(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
+)
 
 @Entity(
     tableName = "finance_transaction_tags",
@@ -146,6 +153,7 @@ data class FinanceRecurrence(
     val quotedRate: String? = null,
     val feeAmount: String? = null,
     val feeCurrency: String? = null,
+    @ColumnInfo(name = "person_canonical_id") val personCanonicalId: String? = null,
 ) {
     @Ignore var category: String = ""
 }

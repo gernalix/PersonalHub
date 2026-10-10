@@ -96,6 +96,7 @@ data class HubContextMember(
     @ColumnInfo(name = "entity_id") val entityId: String,
     val role: String = "",
     val position: Int = 0,
+    @ColumnInfo(name = "entity_canonical_id") val entityCanonicalId: String? = null,
 )
 
 data class HubEntityFacet(

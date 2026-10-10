@@ -1,6 +1,7 @@
 package com.example.multitimetracker.hub
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityAdapter
@@ -18,6 +19,7 @@ class TimerQuickEventEntryHubAdapter(private val context: Context) : HubEntityAd
     override val moduleId = "timer"
     override val entityKind = "quick_event_entry"
     override val capabilities = setOf("event", "time_point")
+    private val identities = CanonicalIdentityCapsule(context)
     private val database get() = PersonalHubDatabase.get(context.applicationContext)
 
     override suspend fun exists(canonicalId: String): Boolean = read(canonicalId) != null
@@ -67,16 +69,16 @@ class TimerQuickEventEntryHubAdapter(private val context: Context) : HubEntityAd
         )
     }
 
-    private data class Entry(val id: Long, val title: String, val timestamp: Long, val createdAt: Long, val deletedAt: Long?) {
+    private inner class Entry(val id: Long, val title: String, val timestamp: Long, val createdAt: Long, val deletedAt: Long?) {
         fun summary() = HubEntitySummary(
-            HubEntityRef("timer", "quick_event_entry", id.toString()),
+            HubEntityRef("timer", "quick_event_entry", identities.canonicalId("quick_event_entries", id)),
             title,
             attributes = mapOf("time_ms" to timestamp.toString(), "added_at_ms" to createdAt.toString()),
         )
     }
 
     private fun read(canonicalId: String): Entry? {
-        val id = canonicalId.toLongOrNull() ?: return null
+        val id = identities.localKey("timer/quick_event_entry", canonicalId)?.toLongOrNull() ?: return null
         return database.openHelper.readableDatabase.query(
             SimpleSQLiteQuery(
                 "SELECT id,title,timestamp_ms,created_at_ms,deleted_at_ms FROM quick_event_entries WHERE id=?",

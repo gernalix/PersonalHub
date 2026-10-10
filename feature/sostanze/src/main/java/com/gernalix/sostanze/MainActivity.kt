@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (DatabaseStartupGate.blockIfNotReady(this)) return
-        hubSubstanceId = intent.hubSubstanceId()
+        hubSubstanceId = intent.hubSubstanceId(this)
         enableEdgeToEdge()
         setContent {
             SostanzeTheme {
@@ -30,10 +30,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        hubSubstanceId = intent.hubSubstanceId()
+        hubSubstanceId = intent.hubSubstanceId(this)
     }
 }
 
-private fun Intent?.hubSubstanceId(): Long? = this?.data
+private fun Intent?.hubSubstanceId(context: android.content.Context): Long? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/substances" }
-    ?.getQueryParameter("substanceId")?.toLongOrNull()
+    ?.getQueryParameter("substanceId")?.let { id ->
+        id.toLongOrNull() ?: com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).localKey("substances/substance", id)?.toLongOrNull()
+    }

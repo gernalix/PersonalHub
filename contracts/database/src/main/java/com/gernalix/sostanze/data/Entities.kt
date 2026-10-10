@@ -23,7 +23,7 @@ object InteractionEnforcement {
 
 @Entity(
     tableName = "substances",
-    indices = [Index("name"), Index(value = ["canonical_name"], unique = true), Index("archived"), Index("type")]
+    indices = [Index(value = ["canonical_id"], unique = true), Index("name"), Index(value = ["canonical_name"], unique = true), Index("archived"), Index("type")]
 )
 data class SubstanceEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -42,6 +42,7 @@ data class SubstanceEntity(
     val prn: Boolean = false,
     @ColumnInfo(name = "dose_times_csv", defaultValue = "''") val doseTimesCsv: String = "",
     @ColumnInfo(name = "days_mask", defaultValue = "127") val daysMask: Int = 127,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(
@@ -54,7 +55,7 @@ data class SubstanceEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("substance_id"), Index("timestamp_ms"), Index("prescription_id")]
+    indices = [Index(value = ["canonical_id"], unique = true), Index("substance_id"), Index("timestamp_ms"), Index("prescription_id")]
 )
 data class IntakeEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -67,6 +68,7 @@ data class IntakeEventEntity(
     @ColumnInfo(name = "quantity", defaultValue = "1.0") val quantity: Double = 1.0,
     @ColumnInfo(name = "applied_stock_delta", defaultValue = "0.0") val appliedStockDelta: Double = 0.0,
     @ColumnInfo(name = "prescription_id") val prescriptionId: Long? = null,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(
@@ -101,7 +103,7 @@ data class StockAdjustmentEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("substance_id"), Index("prescription_epoch_day"), Index("order_epoch_day"), Index("doctor_contact_id"), Index("finance_transaction_id")]
+    indices = [Index(value = ["canonical_id"], unique = true), Index("substance_id"), Index("prescription_epoch_day"), Index("order_epoch_day"), Index("doctor_contact_id"), Index("finance_transaction_id")]
 )
 data class PrescriptionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -119,6 +121,9 @@ data class PrescriptionEntity(
     @ColumnInfo(name = "frequency_count", defaultValue = "1") val frequencyCount: Int = 1,
     @ColumnInfo(name = "doctor_contact_id") val doctorContactId: Long? = null,
     @ColumnInfo(name = "finance_transaction_id") val financeTransactionId: Long? = null,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
+    @ColumnInfo(name = "doctor_canonical_id") val doctorCanonicalId: String? = null,
+    @ColumnInfo(name = "transaction_canonical_id") val transactionCanonicalId: String? = null,
 )
 
 @Entity(
@@ -131,7 +136,7 @@ data class PrescriptionEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("source_substance_id")]
+    indices = [Index(value = ["canonical_id"], unique = true), Index("source_substance_id")]
 )
 data class InteractionRuleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -139,6 +144,7 @@ data class InteractionRuleEntity(
     @ColumnInfo(name = "avoid_before_hours") val avoidBeforeHours: Double,
     @ColumnInfo(name = "avoid_after_hours") val avoidAfterHours: Double,
     val enforcement: String = InteractionEnforcement.BLOCK,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(
@@ -186,11 +192,12 @@ data class SettingEntity(
     val value: String,
 )
 
-@Entity(tableName = "macros", indices = [Index("name"), Index("archived")])
+@Entity(tableName = "macros", indices = [Index(value = ["canonical_id"], unique = true), Index("name"), Index("archived")])
 data class MacroEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val archived: Boolean = false,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(

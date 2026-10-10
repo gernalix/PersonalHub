@@ -35,7 +35,7 @@ data class TimerIntegrityStats(
     val `computed_at_ms`: Long,
 )
 
-@Entity(tableName = "quick_event_entries", primaryKeys = ["id"], indices = [Index(value = ["timestamp_ms"], name = "idx_quick_event_entries_timestamp", orders = [Index.Order.DESC]), Index(value = ["deleted_at_ms", "timestamp_ms", "id"], name = "idx_quick_event_entries_visible_timestamp", orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]), Index(value = ["template_id"], name = "idx_quick_event_entries_template", orders = [Index.Order.ASC]), Index(value = ["macro_id"], name = "idx_quick_event_entries_macro", orders = [Index.Order.ASC])])
+@Entity(tableName = "quick_event_entries", primaryKeys = ["id"], indices = [Index(value = ["canonical_id"], unique = true), Index(value = ["timestamp_ms"], name = "idx_quick_event_entries_timestamp", orders = [Index.Order.DESC]), Index(value = ["deleted_at_ms", "timestamp_ms", "id"], name = "idx_quick_event_entries_visible_timestamp", orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]), Index(value = ["template_id"], name = "idx_quick_event_entries_template", orders = [Index.Order.ASC]), Index(value = ["macro_id"], name = "idx_quick_event_entries_macro", orders = [Index.Order.ASC])])
 data class TimerQuickEventEntries(
     @ColumnInfo(name = "id")
     val `id`: Long,
@@ -53,6 +53,7 @@ data class TimerQuickEventEntries(
     val `updated_at_ms`: Long,
     @ColumnInfo(name = "deleted_at_ms")
     val `deleted_at_ms`: Long?,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(tableName = "quick_event_entry_field_values", primaryKeys = ["id"], indices = [Index(value = ["entry_id", "display_order"], name = "idx_quick_event_entry_field_values_entry", orders = [Index.Order.ASC, Index.Order.ASC])])
@@ -99,7 +100,7 @@ data class TimerQuickEventMacroTags(
     val `tag_id`: Long,
 )
 
-@Entity(tableName = "quick_event_macros", primaryKeys = ["id"], indices = [Index(value = ["sort_order", "title"], name = "idx_quick_event_macros_sort", orders = [Index.Order.ASC, Index.Order.ASC]), Index(value = ["deleted_at_ms", "is_archived", "sort_order", "title", "id"], name = "idx_quick_event_macros_visible_sort", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC])])
+@Entity(tableName = "quick_event_macros", primaryKeys = ["id"], indices = [Index(value = ["canonical_id"], unique = true), Index(value = ["sort_order", "title"], name = "idx_quick_event_macros_sort", orders = [Index.Order.ASC, Index.Order.ASC]), Index(value = ["deleted_at_ms", "is_archived", "sort_order", "title", "id"], name = "idx_quick_event_macros_visible_sort", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC])])
 data class TimerQuickEventMacros(
     @ColumnInfo(name = "id")
     val `id`: Long,
@@ -115,6 +116,7 @@ data class TimerQuickEventMacros(
     val `updated_at_ms`: Long,
     @ColumnInfo(name = "deleted_at_ms")
     val `deleted_at_ms`: Long?,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(tableName = "quick_event_template_fields", primaryKeys = ["id"], indices = [Index(value = ["template_id", "display_order"], name = "idx_quick_event_template_fields_template", orders = [Index.Order.ASC, Index.Order.ASC])])
@@ -151,7 +153,7 @@ data class TimerQuickEventTemplateTags(
     val `tag_id`: Long,
 )
 
-@Entity(tableName = "quick_event_templates", primaryKeys = ["id"], indices = [Index(value = ["sort_order", "title"], name = "idx_quick_event_templates_sort", orders = [Index.Order.ASC, Index.Order.ASC]), Index(value = ["deleted_at_ms", "is_archived", "sort_order", "title", "id"], name = "idx_quick_event_templates_visible_sort", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC])])
+@Entity(tableName = "quick_event_templates", primaryKeys = ["id"], indices = [Index(value = ["canonical_id"], unique = true), Index(value = ["sort_order", "title"], name = "idx_quick_event_templates_sort", orders = [Index.Order.ASC, Index.Order.ASC]), Index(value = ["deleted_at_ms", "is_archived", "sort_order", "title", "id"], name = "idx_quick_event_templates_visible_sort", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC, Index.Order.ASC])])
 data class TimerQuickEventTemplates(
     @ColumnInfo(name = "id")
     val `id`: Long,
@@ -167,6 +169,7 @@ data class TimerQuickEventTemplates(
     val `updated_at_ms`: Long,
     @ColumnInfo(name = "deleted_at_ms")
     val `deleted_at_ms`: Long?,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(tableName = "session_tags", primaryKeys = ["session_id", "tag_id"], indices = [Index(value = ["tag_id"], name = "idx_session_tags_tag", orders = [Index.Order.ASC]), Index(value = ["session_id"], name = "idx_session_tags_session", orders = [Index.Order.ASC]), Index(value = ["session_id", "tag_id"], name = "ux_session_tags_edge", orders = [Index.Order.ASC, Index.Order.ASC], unique = true)])
@@ -177,7 +180,7 @@ data class TimerSessionTags(
     val `tag_id`: Long,
 )
 
-@Entity(tableName = "sessions", primaryKeys = ["id"], indices = [Index(value = ["deleted_at_ms", "start_ms", "id"], name = "idx_sessions_timeline", orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]), Index(value = ["deleted_at_ms", "end_ms", "start_ms"], name = "idx_sessions_running", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC]), Index(value = ["updated_at_ms", "id"], name = "idx_sessions_updated", orders = [Index.Order.DESC, Index.Order.DESC]), Index(value = ["deleted_at_ms", "id"], name = "idx_sessions_visible_id", orders = [Index.Order.ASC, Index.Order.DESC])])
+@Entity(tableName = "sessions", primaryKeys = ["id"], indices = [Index(value = ["canonical_id"], unique = true), Index(value = ["deleted_at_ms", "start_ms", "id"], name = "idx_sessions_timeline", orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.DESC]), Index(value = ["deleted_at_ms", "end_ms", "start_ms"], name = "idx_sessions_running", orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC]), Index(value = ["updated_at_ms", "id"], name = "idx_sessions_updated", orders = [Index.Order.DESC, Index.Order.DESC]), Index(value = ["deleted_at_ms", "id"], name = "idx_sessions_visible_id", orders = [Index.Order.ASC, Index.Order.DESC])])
 data class TimerSessions(
     @ColumnInfo(name = "id")
     val `id`: Long,
@@ -195,6 +198,7 @@ data class TimerSessions(
     val `updated_at_ms`: Long,
     @ColumnInfo(name = "deleted_at_ms")
     val `deleted_at_ms`: Long?,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
 )
 
 @Entity(tableName = "snapshot", primaryKeys = ["id"])

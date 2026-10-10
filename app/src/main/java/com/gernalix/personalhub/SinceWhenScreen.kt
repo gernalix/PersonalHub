@@ -125,7 +125,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
                             }
                             if (linkedCounterId == counter.id) {
                                 com.gernalix.personalhub.core.hubcontext.HubContextLinks(
-                                    HubEntityRef("since_when", "counter", counter.id.toString()),
+                                    HubEntityRef("since_when", "counter", counter.canonicalId),
                                 )
                             }
                             sourceLabels[counter.id]?.let { (label, target) ->

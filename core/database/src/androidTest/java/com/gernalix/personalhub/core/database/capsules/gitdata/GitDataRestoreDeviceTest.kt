@@ -39,34 +39,15 @@ class GitDataRestoreDeviceTest {
             "INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) " +
                 "VALUES('live','Live','DKK','0',1,1)",
         )
-        val rowBytes = (
-            JSONObject()
-                .put("id", "restored")
-                .put("name", "Restored")
-                .put("currency", "DKK")
-                .put("openingBalance", "0")
-                .put("openedAt", 2)
-                .put("included", 1)
-                .toString() + "\n"
-        ).toByteArray()
-        val manifest = JSONObject()
-            .put("format_version", 2)
-            .put("schema_version", PersonalHubDatabase.SCHEMA_VERSION)
-            .put("generation", 7)
-            .put(
-                "tables",
-                JSONArray().put(
-                    JSONObject()
-                        .put("name", "finance_accounts")
-                        .put("path", "state/tables/finance_accounts.jsonl")
-                        .put("sha256", GitDataFormat.sha256(rowBytes)),
-                ),
-            )
+        db.execSQL("DELETE FROM finance_accounts WHERE id='live'")
+        db.execSQL("INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) VALUES('restored','Restored','DKK','0',2,1)")
+        GitDataTracking.install(db,enqueueAll=true)
+        val bundle=requireNotNull(GitDataFormat.exportPending(context))
+        val expectedGeneration=bundle.generation
+        db.execSQL("DELETE FROM finance_accounts WHERE id='restored'")
+        db.execSQL("INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) VALUES('live','Live','DKK','0',1,1)")
         LocalRawHttpServer(
-            mapOf(
-                "/repos/owner/data/contents/state/manifest.json" to manifest.toString().toByteArray(),
-                "/repos/owner/data/contents/state/tables/finance_accounts.jsonl" to rowBytes,
-            ),
+            bundle.files.mapKeys { (path, _) -> "/repos/owner/data/contents/$path" },
         ).use { server ->
             GitStateRestorer.restore(
                 context,
@@ -87,7 +68,8 @@ class GitDataRestoreDeviceTest {
         ).use { restored ->
             assertEquals(0L, rawScalar(restored, "SELECT COUNT(*) FROM finance_accounts WHERE id='live'"))
             assertEquals("Restored", rawText(restored, "SELECT name FROM finance_accounts WHERE id='restored'"))
-            assertEquals(7L, rawScalar(restored, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals(expectedGeneration, rawScalar(restored, "SELECT generation FROM hub_generation WHERE id=1"))
+            assertEquals("restored",rawText(restored,"SELECT canonical_id FROM hub_entities WHERE local_table='finance_accounts' AND local_key='restored'"))
             assertEquals(0L, rawScalar(restored, "SELECT COUNT(*) FROM pragma_foreign_key_check"))
             assertEquals("ok", rawText(restored, "PRAGMA quick_check"))
         }

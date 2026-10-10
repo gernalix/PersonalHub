@@ -10,7 +10,7 @@ DatabaseVault.ensureStartupReady remains the structural validator. The gate is n
 
 ## Schema 20 to 23
 
-The current Room schema is 23. Schema 21 removes the Salute domain from schema 20. Schema 22 adds the two Since When tables, and schema 23 adds the two finance photo/owned-item tables; the retained tables are unchanged.
+The historical endpoint of this path is Room schema 23; the current schema is 24. Schema 21 removes the Salute domain from schema 20. Schema 22 adds the two Since When tables, and schema 23 adds the two finance photo/owned-item tables; the retained tables are unchanged.
 
 Use:
 
@@ -29,3 +29,9 @@ Replace the live device database only after the JSON validation report says PASS
 For a schema 21 or 22 source, run `python3 tools/migrate_personalhub_v21_to_v23.py SOURCE.db --output TARGET.db`. For schema 20, first run the 20-to-21 runner on a copy and then run the 21-to-23 runner on its output. The second runner validates the source Room identity and table shapes, makes a SQLite snapshot including WAL state, adds only the four required tables, and requires `quick_check`, `integrity_check`, `foreign_key_check`, and exact hashes and counts of all existing table rows to pass. A schema 23 source is also copied and validated without a schema change.
 
 An APK build/install is not a database migration. Never substitute uninstall, clear-data, destructive Room fallback, or a user_version-only edit.
+
+## Schema 23 to 24 — canonical identities (925612)
+
+Use `tools/migrate_personalhub_v23_to_v24.py`. Its output is prepared and validated outside Android; the APK contains no historical Room migration. See [CANONICAL_IDENTITIES.md](CANONICAL_IDENTITIES.md) for the classification and [B8_HANDOFF_193828.md](B8_HANDOFF_193828.md) for the deployment and rollback procedure. Schema 24 requires Room identity `f5ff5327fbc3067a659ded92d66db243`.
+
+The schema-23 database and previous APK remain usable before cutover. The new APK refuses schema 23 through DatabaseStartupGate; the previous APK cannot open schema 24. Compatibility means an explicit paired APK/database cutover and retained schema-23 backup, not simultaneous writes by different Room versions.

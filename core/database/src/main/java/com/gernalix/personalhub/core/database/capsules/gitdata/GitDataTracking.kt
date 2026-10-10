@@ -16,6 +16,8 @@ data class GitEditEvent(
     val columns: String,
     val beforePayload: String?,
     val afterPayload: String?,
+    val entityKind: String? = null,
+    val canonicalId: String? = null,
 )
 
 object GitDataTracking {
@@ -52,6 +54,7 @@ object GitDataTracking {
         "history_actions",
         "hub_activity_log",
         "mutation_events",
+        "hub_entities",
     )
 
     fun tables(db: SupportSQLiteDatabase): List<String> =
@@ -205,6 +208,7 @@ object GitDataTracking {
         ).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) {
+                    val identity = com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.eventRef(db, cursor.getString(6), cursor.getString(8))
                     add(
                         GitEditEvent(
                             id = cursor.getString(0),
@@ -219,6 +223,8 @@ object GitDataTracking {
                             columns = cursor.getString(9),
                             beforePayload = if (cursor.isNull(10)) null else cursor.getString(10),
                             afterPayload = if (cursor.isNull(11)) null else cursor.getString(11),
+                            entityKind = identity?.entityKind,
+                            canonicalId = identity?.canonicalId,
                         ),
                     )
                 }

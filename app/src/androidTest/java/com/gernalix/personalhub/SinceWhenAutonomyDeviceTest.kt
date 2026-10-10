@@ -53,7 +53,7 @@ class SinceWhenAutonomyDeviceTest {
             val adapter = SinceWhenCounterHubAdapter(context)
             assertTrue(adapter.exists(counter.id.toString()))
             assertNotNull(adapter.openTarget(counter.id.toString()))
-            assertEquals("$title edited", adapter.summaries(setOf(counter.id.toString()))[counter.id.toString()]?.label)
+            assertEquals("$title edited", adapter.summaries(setOf(counter.canonicalId))[counter.canonicalId]?.label)
             assertTrue(adapter.search(title, 10).isNotEmpty())
             scenario.close()
             scenario = null

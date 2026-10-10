@@ -1,6 +1,7 @@
 package com.gernalix.personalhub.core.hubcontext
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import androidx.room.withTransaction
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
@@ -299,6 +300,7 @@ class SharedTagEngine(
             runCatching { dao.addAlias(HubTagAlias(targetId, target.namespace, source.name, source.normalizedName)) }
             dao.moveAliases(sourceId, targetId, target.namespace)
             check(dao.deleteUnused(sourceId) == 1)
+            db.openHelper.writableDatabase.execSQL("INSERT INTO hub_entity_aliases(alias_canonical_id,canonical_id,reason,created_at) VALUES(?,?,?,?)", arrayOf(sourceId,targetId,"explicit tag merge",System.currentTimeMillis()))
             if (movedAssignments > 0 || deletedAssignments > 0) dao.refreshUsage()
         }
     }
@@ -323,9 +325,13 @@ class SharedTagEngine(
         }
     }
 
-    private suspend fun binding(ref: HubEntityRef) = db.hubContextDao().binding(ref.moduleId, ref.entityKind, ref.canonicalId)
+    private suspend fun binding(request: HubEntityRef): HubEntityBinding? {
+        val ref = CanonicalIdentityCapsule.normalize(db.openHelper.readableDatabase, request)
+        return db.hubContextDao().binding(ref.moduleId, ref.entityKind, ref.canonicalId)
+    }
 
-    private suspend fun ensureBinding(ref: HubEntityRef, updatedAt: Long): HubEntityBinding {
+    private suspend fun ensureBinding(request: HubEntityRef, updatedAt: Long): HubEntityBinding {
+        val ref = CanonicalIdentityCapsule.normalize(db.openHelper.readableDatabase, request)
         binding(ref)?.let { return it }
         val value = HubEntityBinding(UUID.randomUUID().toString(), ref.moduleId, ref.entityKind, ref.canonicalId, updatedAt = updatedAt)
         runCatching { db.hubContextDao().insertBinding(value) }

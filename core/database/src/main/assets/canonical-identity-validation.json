@@ -1,0 +1,527 @@
+[
+  {
+    "sql": "SELECT 1 FROM `finance_accounts` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_accounts",
+      "soldi/account"
+    ],
+    "error": "Canonical registry coverage failed: finance_accounts"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_products` r LEFT JOIN hub_entities e ON e.canonical_id=r.`uuid` WHERE r.`uuid` IS NULL OR length(trim(r.`uuid`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_products",
+      "soldi/product"
+    ],
+    "error": "Canonical registry coverage failed: finance_products"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_titles` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_titles",
+      "soldi/title"
+    ],
+    "error": "Canonical registry coverage failed: finance_titles"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_chains` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_chains",
+      "soldi/chain"
+    ],
+    "error": "Canonical registry coverage failed: finance_chains"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_transactions` r LEFT JOIN hub_entities e ON e.canonical_id=r.`uuid` WHERE r.`uuid` IS NULL OR length(trim(r.`uuid`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_transactions",
+      "soldi/transaction"
+    ],
+    "error": "Canonical registry coverage failed: finance_transactions"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_tags` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_tags",
+      "soldi/tag"
+    ],
+    "error": "Canonical registry coverage failed: finance_tags"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_transfers` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_transfers",
+      "soldi/transfer"
+    ],
+    "error": "Canonical registry coverage failed: finance_transfers"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_macros` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_macros",
+      "soldi/macro"
+    ],
+    "error": "Canonical registry coverage failed: finance_macros"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_recurrences` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_recurrences",
+      "soldi/recurrence"
+    ],
+    "error": "Canonical registry coverage failed: finance_recurrences"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_attachments` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_attachments",
+      "soldi/attachment"
+    ],
+    "error": "Canonical registry coverage failed: finance_attachments"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_owned_items` r LEFT JOIN hub_entities e ON e.canonical_id=r.`uuid` WHERE r.`uuid` IS NULL OR length(trim(r.`uuid`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`uuid` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "finance_owned_items",
+      "soldi/owned_item"
+    ],
+    "error": "Canonical registry coverage failed: finance_owned_items"
+  },
+  {
+    "sql": "SELECT 1 FROM `contacts` r LEFT JOIN hub_entities e ON e.canonical_id=r.`public_id` WHERE r.`public_id` IS NULL OR length(trim(r.`public_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "contacts",
+      "people/person"
+    ],
+    "error": "Canonical registry coverage failed: contacts"
+  },
+  {
+    "sql": "SELECT 1 FROM `saved_searches` r LEFT JOIN hub_entities e ON e.canonical_id=r.`public_id` WHERE r.`public_id` IS NULL OR length(trim(r.`public_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "saved_searches",
+      "people/saved_search"
+    ],
+    "error": "Canonical registry coverage failed: saved_searches"
+  },
+  {
+    "sql": "SELECT 1 FROM `places` r LEFT JOIN hub_entities e ON e.canonical_id=r.`uuid` WHERE r.`uuid` IS NULL OR length(trim(r.`uuid`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`uuid` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "places",
+      "places/place"
+    ],
+    "error": "Canonical registry coverage failed: places"
+  },
+  {
+    "sql": "SELECT 1 FROM `place_events` r LEFT JOIN hub_entities e ON e.canonical_id=r.`event_uuid` WHERE r.`event_uuid` IS NULL OR length(trim(r.`event_uuid`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "place_events",
+      "places/event"
+    ],
+    "error": "Canonical registry coverage failed: place_events"
+  },
+  {
+    "sql": "SELECT 1 FROM `history_audit_log` r LEFT JOIN hub_entities e ON e.canonical_id=r.`audit_uuid` WHERE r.`audit_uuid` IS NULL OR length(trim(r.`audit_uuid`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "history_audit_log",
+      "places/audit"
+    ],
+    "error": "Canonical registry coverage failed: history_audit_log"
+  },
+  {
+    "sql": "SELECT 1 FROM `history_actions` r LEFT JOIN hub_entities e ON e.canonical_id=r.`action_uuid` WHERE r.`action_uuid` IS NULL OR length(trim(r.`action_uuid`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "history_actions",
+      "places/action"
+    ],
+    "error": "Canonical registry coverage failed: history_actions"
+  },
+  {
+    "sql": "SELECT 1 FROM `alert_rules` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "alert_rules",
+      "alerts/alert"
+    ],
+    "error": "Canonical registry coverage failed: alert_rules"
+  },
+  {
+    "sql": "SELECT 1 FROM `substances` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "substances",
+      "substances/substance"
+    ],
+    "error": "Canonical registry coverage failed: substances"
+  },
+  {
+    "sql": "SELECT 1 FROM `intake_events` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "intake_events",
+      "substances/intake"
+    ],
+    "error": "Canonical registry coverage failed: intake_events"
+  },
+  {
+    "sql": "SELECT 1 FROM `prescriptions` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "prescriptions",
+      "substances/prescription"
+    ],
+    "error": "Canonical registry coverage failed: prescriptions"
+  },
+  {
+    "sql": "SELECT 1 FROM `interaction_rules` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "interaction_rules",
+      "substances/interaction_rule"
+    ],
+    "error": "Canonical registry coverage failed: interaction_rules"
+  },
+  {
+    "sql": "SELECT 1 FROM `macros` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "macros",
+      "substances/macro"
+    ],
+    "error": "Canonical registry coverage failed: macros"
+  },
+  {
+    "sql": "SELECT 1 FROM `wordpulse_sessions` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "wordpulse_sessions",
+      "wordpulse/word_session"
+    ],
+    "error": "Canonical registry coverage failed: wordpulse_sessions"
+  },
+  {
+    "sql": "SELECT 1 FROM `quick_event_entries` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "quick_event_entries",
+      "timer/quick_event_entry"
+    ],
+    "error": "Canonical registry coverage failed: quick_event_entries"
+  },
+  {
+    "sql": "SELECT 1 FROM `quick_event_macros` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "quick_event_macros",
+      "timer/quick_event_macro"
+    ],
+    "error": "Canonical registry coverage failed: quick_event_macros"
+  },
+  {
+    "sql": "SELECT 1 FROM `quick_event_templates` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "quick_event_templates",
+      "timer/quick_event_template"
+    ],
+    "error": "Canonical registry coverage failed: quick_event_templates"
+  },
+  {
+    "sql": "SELECT 1 FROM `sessions` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "sessions",
+      "timer/session"
+    ],
+    "error": "Canonical registry coverage failed: sessions"
+  },
+  {
+    "sql": "SELECT 1 FROM `hub_context_types` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "hub_context_types",
+      "hub/context_type"
+    ],
+    "error": "Canonical registry coverage failed: hub_context_types"
+  },
+  {
+    "sql": "SELECT 1 FROM `hub_contexts` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "hub_contexts",
+      "hub/context"
+    ],
+    "error": "Canonical registry coverage failed: hub_contexts"
+  },
+  {
+    "sql": "SELECT 1 FROM `hub_tags` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "hub_tags",
+      "tags/tag"
+    ],
+    "error": "Canonical registry coverage failed: hub_tags"
+  },
+  {
+    "sql": "SELECT 1 FROM `hub_saved_tag_filters` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "hub_saved_tag_filters",
+      "tags/saved_filter"
+    ],
+    "error": "Canonical registry coverage failed: hub_saved_tag_filters"
+  },
+  {
+    "sql": "SELECT 1 FROM `hub_resources` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "hub_resources",
+      "hub/resource"
+    ],
+    "error": "Canonical registry coverage failed: hub_resources"
+  },
+  {
+    "sql": "SELECT 1 FROM `hub_activity_log` r LEFT JOIN hub_entities e ON e.canonical_id=r.`id` WHERE r.`id` IS NULL OR length(trim(r.`id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "hub_activity_log",
+      "hub/activity"
+    ],
+    "error": "Canonical registry coverage failed: hub_activity_log"
+  },
+  {
+    "sql": "SELECT 1 FROM `since_when_counters` r LEFT JOIN hub_entities e ON e.canonical_id=r.`canonical_id` WHERE r.`canonical_id` IS NULL OR length(trim(r.`canonical_id`))=0 OR e.canonical_id IS NULL OR e.local_table<>? OR e.local_key<>CAST(r.`id` AS TEXT) OR e.entity_kind<>? LIMIT 1",
+    "args": [
+      "since_when_counters",
+      "since_when/counter"
+    ],
+    "error": "Canonical registry coverage failed: since_when_counters"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_accounts` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_accounts' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_accounts"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_products` r ON e.canonical_id=r.`uuid` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_products' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_products"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_titles` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_titles' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_titles"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_chains` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_chains' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_chains"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_transactions` r ON e.canonical_id=r.`uuid` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_transactions' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_transactions"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_tags` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_tags' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_tags"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_transfers` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_transfers' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_transfers"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_macros` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_macros' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_macros"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_recurrences` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_recurrences' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_recurrences"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_attachments` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='finance_attachments' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_attachments"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `finance_owned_items` r ON e.canonical_id=r.`uuid` AND e.local_key=CAST(r.`uuid` AS TEXT) WHERE e.local_table='finance_owned_items' AND e.lifecycle='ACTIVE' AND r.`uuid` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: finance_owned_items"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `contacts` r ON e.canonical_id=r.`public_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='contacts' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: contacts"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `saved_searches` r ON e.canonical_id=r.`public_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='saved_searches' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: saved_searches"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `places` r ON e.canonical_id=r.`uuid` AND e.local_key=CAST(r.`uuid` AS TEXT) WHERE e.local_table='places' AND e.lifecycle='ACTIVE' AND r.`uuid` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: places"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `place_events` r ON e.canonical_id=r.`event_uuid` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='place_events' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: place_events"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `history_audit_log` r ON e.canonical_id=r.`audit_uuid` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='history_audit_log' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: history_audit_log"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `history_actions` r ON e.canonical_id=r.`action_uuid` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='history_actions' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: history_actions"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `alert_rules` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='alert_rules' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: alert_rules"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `substances` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='substances' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: substances"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `intake_events` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='intake_events' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: intake_events"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `prescriptions` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='prescriptions' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: prescriptions"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `interaction_rules` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='interaction_rules' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: interaction_rules"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `macros` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='macros' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: macros"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `wordpulse_sessions` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='wordpulse_sessions' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: wordpulse_sessions"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `quick_event_entries` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='quick_event_entries' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: quick_event_entries"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `quick_event_macros` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='quick_event_macros' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: quick_event_macros"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `quick_event_templates` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='quick_event_templates' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: quick_event_templates"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `sessions` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='sessions' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: sessions"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `hub_context_types` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='hub_context_types' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: hub_context_types"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `hub_contexts` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='hub_contexts' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: hub_contexts"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `hub_tags` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='hub_tags' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: hub_tags"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `hub_saved_tag_filters` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='hub_saved_tag_filters' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: hub_saved_tag_filters"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `hub_resources` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='hub_resources' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: hub_resources"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `hub_activity_log` r ON e.canonical_id=r.`id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='hub_activity_log' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: hub_activity_log"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities e LEFT JOIN `since_when_counters` r ON e.canonical_id=r.`canonical_id` AND e.local_key=CAST(r.`id` AS TEXT) WHERE e.local_table='since_when_counters' AND e.lifecycle='ACTIVE' AND r.`id` IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan active registry entity: since_when_counters"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_transactions` r LEFT JOIN `contacts` p ON p.`id`=r.`personId` WHERE r.`person_canonical_id` IS NOT p.`public_id` OR (r.`personId` IS NOT NULL AND p.`id` IS NULL) LIMIT 1",
+    "args": [],
+    "error": "Orphan dual reference: finance_transactions"
+  },
+  {
+    "sql": "SELECT 1 FROM `finance_recurrences` r LEFT JOIN `contacts` p ON p.`id`=r.`personId` WHERE r.`person_canonical_id` IS NOT p.`public_id` OR (r.`personId` IS NOT NULL AND p.`id` IS NULL) LIMIT 1",
+    "args": [],
+    "error": "Orphan dual reference: finance_recurrences"
+  },
+  {
+    "sql": "SELECT 1 FROM `prescriptions` r LEFT JOIN `contacts` p ON p.`id`=r.`doctor_contact_id` WHERE r.`doctor_canonical_id` IS NOT p.`public_id` OR (r.`doctor_contact_id` IS NOT NULL AND p.`id` IS NULL) LIMIT 1",
+    "args": [],
+    "error": "Orphan dual reference: prescriptions"
+  },
+  {
+    "sql": "SELECT 1 FROM `prescriptions` r LEFT JOIN `finance_transactions` p ON p.`id`=r.`finance_transaction_id` WHERE r.`transaction_canonical_id` IS NOT p.`uuid` OR (r.`finance_transaction_id` IS NOT NULL AND p.`id` IS NULL) LIMIT 1",
+    "args": [],
+    "error": "Orphan dual reference: prescriptions"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entity_bindings b LEFT JOIN hub_entities e ON e.canonical_id=b.canonical_id AND e.entity_kind=CASE WHEN b.entity_kind='alert' AND b.module_id<>'timer' THEN 'alerts/alert' ELSE b.module_id||'/'||b.entity_kind END WHERE e.canonical_id IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan canonical binding"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_external_identities x LEFT JOIN hub_entities e ON e.canonical_id=x.canonical_id AND e.entity_kind=x.entity_kind WHERE e.canonical_id IS NULL LIMIT 1",
+    "args": [],
+    "error": "Orphan external identity"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_context_members m LEFT JOIN hub_entity_bindings b ON b.id=m.entity_id WHERE m.entity_canonical_id IS NOT b.canonical_id LIMIT 1",
+    "args": [],
+    "error": "Orphan context entity"
+  },
+  {
+    "sql": "SELECT 1 FROM since_when_counters s LEFT JOIN hub_entities e ON e.canonical_id=s.source_entity_id AND e.entity_kind=s.source_entity_type WHERE (s.source_entity_type IS NULL)<>(s.source_entity_id IS NULL) OR (s.source_entity_id IS NOT NULL AND e.canonical_id IS NULL) LIMIT 1",
+    "args": [],
+    "error": "Orphan Since When source"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entities WHERE lifecycle NOT IN ('ACTIVE','TOMBSTONED','MERGED') OR length(trim(canonical_id))=0 OR length(trim(entity_kind))=0 LIMIT 1",
+    "args": [],
+    "error": "Invalid registry lifecycle"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_external_identities WHERE lifecycle NOT IN ('ACTIVE','RETIRED') OR length(trim(system))=0 OR length(trim(source_scope))=0 OR length(trim(external_id))=0 LIMIT 1",
+    "args": [],
+    "error": "Invalid external identity"
+  },
+  {
+    "sql": "WITH RECURSIVE paths(start,id) AS (SELECT alias_canonical_id,canonical_id FROM hub_entity_aliases UNION SELECT p.start,a.canonical_id FROM paths p JOIN hub_entity_aliases a ON a.alias_canonical_id=p.id) SELECT 1 FROM paths WHERE start=id LIMIT 1",
+    "args": [],
+    "error": "Canonical alias cycle"
+  },
+  {
+    "sql": "SELECT 1 FROM hub_entity_aliases a LEFT JOIN hub_entities s ON s.canonical_id=a.alias_canonical_id LEFT JOIN hub_entities t ON t.canonical_id=a.canonical_id WHERE s.canonical_id IS NULL OR t.canonical_id IS NULL OR s.entity_kind<>t.entity_kind OR s.lifecycle<>'MERGED' LIMIT 1",
+    "args": [],
+    "error": "Orphan or invalid canonical alias"
+  },
+  {
+    "sql": "SELECT 1 FROM snapshot s,json_each(CASE WHEN json_valid(s.json) THEN s.json ELSE '{}' END,'$.timeFenceRules') r LEFT JOIN hub_entities e ON e.local_table='snapshot.timeFenceRules' AND e.local_key=CAST(json_extract(r.value,'$.id') AS TEXT) AND e.entity_kind='timer/alert' WHERE s.id=1 AND e.canonical_id IS NULL LIMIT 1",
+    "args": [],
+    "error": "Timer alert registry coverage failed"
+  },
+  {
+    "sql": "SELECT 1 FROM snapshot s,json_each(CASE WHEN json_valid(s.json) THEN s.json ELSE '{}' END,'$.timeFenceRules') r WHERE s.id=1 GROUP BY json_extract(r.value,'$.id') HAVING count(*)>1 LIMIT 1",
+    "args": [],
+    "error": "Duplicate Timer alert local ID"
+  }
+]

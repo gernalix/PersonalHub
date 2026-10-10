@@ -19,7 +19,7 @@ interface FinanceDao {
         LEFT JOIN finance_titles n ON n.id=t.titleId
         LEFT JOIN finance_chains c ON c.id=t.chainId
         LEFT JOIN places l ON l.uuid=t.placeId
-        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=t.personId AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
+        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=(SELECT id FROM contacts WHERE public_id=t.person_canonical_id) AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
         ORDER BY t.occurredAt DESC,t.id DESC
     """)
     fun transactions(): Flow<List<TransactionView>>
@@ -46,7 +46,7 @@ interface FinanceDao {
         LEFT JOIN finance_titles n ON n.id=t.titleId
         LEFT JOIN finance_chains c ON c.id=t.chainId
         LEFT JOIN places l ON l.uuid=t.placeId
-        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=t.personId AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
+        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=(SELECT id FROM contacts WHERE public_id=t.person_canonical_id) AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
         WHERE t.uuid IN (:uuids)
         ORDER BY t.occurredAt DESC,t.id DESC
     """)
@@ -62,7 +62,7 @@ interface FinanceDao {
         LEFT JOIN finance_titles n ON n.id=t.titleId
         LEFT JOIN finance_chains c ON c.id=t.chainId
         LEFT JOIN places l ON l.uuid=t.placeId
-        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=t.personId AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
+        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=(SELECT id FROM contacts WHERE public_id=t.person_canonical_id) AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
         WHERE COALESCE(p.name,n.name,'') LIKE '%' || :query || '%'
            OR t.notes LIKE '%' || :query || '%'
            OR EXISTS (SELECT 1 FROM hub_entity_bindings hb JOIN hub_tag_assignments ha ON ha.target_binding_id=hb.id JOIN hub_tags ht ON ht.id=ha.tag_id WHERE hb.module_id='soldi' AND hb.entity_kind='transaction' AND hb.canonical_id=t.uuid AND ht.name LIKE '%' || :query || '%')
@@ -81,7 +81,7 @@ interface FinanceDao {
         LEFT JOIN finance_titles n ON n.id=t.titleId
         LEFT JOIN finance_chains c ON c.id=t.chainId
         LEFT JOIN places l ON l.uuid=t.placeId
-        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=t.personId AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
+        LEFT JOIN contact_fields pf ON pf.id=(SELECT id FROM contact_fields WHERE contact_id=(SELECT id FROM contacts WHERE public_id=t.person_canonical_id) AND field_type='name' ORDER BY is_primary DESC, position ASC, id ASC LIMIT 1)
         WHERE t.occurredAt >= :fromMs AND t.occurredAt < :toMs
         ORDER BY t.occurredAt DESC,t.uuid DESC LIMIT :limit OFFSET :offset
     """)

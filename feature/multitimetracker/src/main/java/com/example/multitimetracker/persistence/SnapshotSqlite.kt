@@ -940,6 +940,7 @@ object SnapshotSqlite {
                 put("json", json)
                 put("saved_at_ms", now)
             }
+            com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.synchronizeTimerAlertIdentities(com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context).openHelper.writableDatabase, json)
             val rowId = db.insertWithOnConflict(TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
             if (rowId == -1L) {
                 throw IllegalStateException("Snapshot write returned -1")

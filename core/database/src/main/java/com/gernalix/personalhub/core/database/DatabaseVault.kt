@@ -330,10 +330,21 @@ object DatabaseVault {
             requireNoSaluteRows("hub_sync_known", "table_name LIKE 'health_%'")
             requireNoSaluteRows("hub_tags", "namespace='salute'")
             val mutationTriggers = MutationEventCapture.expectedSql(databaseTables)
+            val identityTriggers = org.json.JSONArray(context.assets.open("canonical-identity-triggers.json").bufferedReader().use { it.readText() }).let { array ->
+                (0 until array.length()).associate { i -> val sql = array.getString(i); sql.substringAfter("EXISTS `").substringBefore("`") to sql }
+            }
+            val canonicalCapsule = com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
+            val extraIdentityTriggers = mapOf(canonicalCapsule.MUTATION_TRIGGER to canonicalCapsule.mutationTriggerSql)
+            canonicalCapsule.validate(context, db)
             db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
                 while (c.moveToNext()) {
                     val name = c.getString(0); val table = c.getString(1)
                     val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
+                    if (name in identityTriggers || name in extraIdentityTriggers) {
+                        val expected = (identityTriggers[name] ?: extraIdentityTriggers.getValue(name)).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
+                        require(sql == expected) { "Incompatible identity trigger: $name" }
+                        continue
+                    }
                     if (name in mutationTriggers) {
                         val expected = mutationTriggers.getValue(name)
                         require(sql == expected.replace(Regex("\\s+"), " ").trim()) { "Incompatible database trigger: $name" }

@@ -69,10 +69,10 @@ object MutationEventCapture {
             val trigger = "mutation_session_tags_$operation"
             put(trigger, """CREATE TRIGGER `$trigger` BEFORE $operation ON session_tags BEGIN
                 INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
-                    entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
+                    entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id)
                 VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
                     $group,$sequence,'timer','timer.session.$action','session',CAST($row.session_id AS TEXT),$actor,$source,
-                    ${if (operation == "INSERT") "NULL" else tag},${if (operation == "DELETE") "NULL" else tag},$name,1);
+                    ${if (operation == "INSERT") "NULL" else tag},${if (operation == "DELETE") "NULL" else tag},$name,1,'timer/session',(SELECT canonical_id FROM sessions WHERE id=$row.session_id));
             END""".trimIndent())
         }
     }
@@ -85,7 +85,7 @@ object MutationEventCapture {
             WHEN lower(NEW.entity_type)='contact' AND lower(NEW.action_type) IN ('created','deleted','archived')
             BEGIN
               INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
-                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
+                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id)
               VALUES(lower(hex(randomblob(16))),NEW.occurred_at,$group,
                 (SELECT COALESCE(MAX(sequence),0)+1 FROM mutation_events WHERE transaction_id=$group),
                 'people','people.person.' || lower(NEW.action_type),'person',CAST(NEW.contact_id AS TEXT),
@@ -93,7 +93,7 @@ object MutationEventCapture {
                 COALESCE((SELECT source FROM hub_git_edit_context WHERE id=1),'personalhub'),
                 CASE WHEN lower(NEW.action_type)='created' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":false}' ELSE $named END,
                 CASE WHEN lower(NEW.action_type)='deleted' THEN NULL WHEN lower(NEW.action_type)='archived' THEN '{"archived":true}' ELSE $named END,
-                $named,1);
+                $named,1,'people/person',(SELECT public_id FROM contacts WHERE id=NEW.contact_id));
             END""".trimIndent())
     }
 
@@ -118,21 +118,21 @@ object MutationEventCapture {
                 AND ${resource("NEW.context_id", "id")} IS NOT NULL
             BEGIN
               INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
-                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
+                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id)
               VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
                 $group,$sequence,${anchor("NEW.context_id", "module_id")},'workflowy.link.assigned',
                 'link',${anchor("NEW.context_id", "canonical_id")},$actor,$source,
-                NULL,$newName,$newName,1);
+                NULL,$newName,$newName,1,${anchor("NEW.context_id", "module_id")} || '/' || ${anchor("NEW.context_id", "entity_kind")},${anchor("NEW.context_id", "canonical_id")});
             END""".trimIndent()
         val unlinked = """CREATE TRIGGER mutation_workflowy_unlinked BEFORE DELETE ON hub_contexts
             WHEN OLD.title='Workflowy' AND ${resource("OLD.id", "id")} IS NOT NULL
             BEGIN
               INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
-                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
+                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id)
               VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
                 $group,$sequence,${anchor("OLD.id", "module_id")},'workflowy.link.unlinked',
                 'link',${anchor("OLD.id", "canonical_id")},$actor,$source,
-                $oldName,NULL,$oldName,1);
+                $oldName,NULL,$oldName,1,${anchor("OLD.id", "module_id")} || '/' || ${anchor("OLD.id", "entity_kind")},${anchor("OLD.id", "canonical_id")});
             END""".trimIndent()
         return mapOf("mutation_workflowy_assigned" to assigned, "mutation_workflowy_unlinked" to unlinked)
     }
@@ -166,13 +166,24 @@ object MutationEventCapture {
             "contact_fields" -> jsonObject("name", "CASE WHEN $row.field_type='name' THEN $row.value ELSE (SELECT value FROM contact_fields WHERE contact_id=$row.contact_id AND field_type='name' LIMIT 1) END")
             else -> source.label?.let { jsonObject("name", "$row.`$it`") } ?: "'{}'"
         }
+        val identity = when (source.table) {
+            "contact_fields" -> "(SELECT public_id FROM contacts WHERE id=$row.contact_id)"
+            "sessions", "substances", "intake_events" -> "COALESCE(NULLIF($row.canonical_id,''),(SELECT canonical_id FROM hub_entities WHERE local_table='${source.table}' AND local_key=CAST($row.`${source.key}` AS TEXT)))"
+            "finance_transactions" -> "$row.uuid"
+            else -> "CAST($row.`${source.key}` AS TEXT)"
+        }
+        val canonicalKind = when (source.table) {
+            "contact_fields" -> "people/person"
+            "finance_transactions" -> "soldi/transaction"
+            else -> "${source.module}/${source.entity}"
+        }
         return """CREATE TRIGGER `$name` AFTER $operation ON `${source.table}`$condition BEGIN
             INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
-                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
+                entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id)
             VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
                 $transactionId,$sequence,'${source.module}','${source.module}.${source.entity}.$action',
                 '${source.entity}',CAST($row.`${source.key}` AS TEXT),$actor,$sourceName,
-                $before,$after,$label,1);
+                $before,$after,$label,1,'$canonicalKind',$identity);
         END""".trimIndent()
     }
 
