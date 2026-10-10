@@ -2,6 +2,7 @@ name: Play Store preflight
 
 on:
   push:
+    branches: [main]
     paths:
       - 'app/**'
       - 'contracts/**'

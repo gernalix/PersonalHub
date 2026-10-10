@@ -177,6 +177,31 @@ for owner, files in source_files.items():
                     )
 
 
+# Since When must remain usable when the legacy Timer importer is pending or fails.
+# Guard its production entry points, not the separate application maintenance worker.
+since_when_entrypoints = (
+    "app/src/main/java/com/gernalix/personalhub/SinceWhenActivity.kt",
+    "app/src/main/java/com/gernalix/personalhub/SinceWhenScreen.kt",
+    "app/src/main/java/com/gernalix/personalhub/SinceWhenCreateScreen.kt",
+    "app/src/main/java/com/gernalix/personalhub/sincewhen/SinceWhenEditor.kt",
+    "app/src/main/java/com/gernalix/personalhub/hub/SinceWhenCounterHubAdapter.kt",
+)
+for relative in since_when_entrypoints:
+    path = ROOT / relative
+    if not path.is_file():
+        errors.append(f"Since When autonomy entry point missing: {relative}")
+        continue
+    source = path.read_text()
+    for forbidden in (
+        "com.example.multitimetracker.",
+        "TimerStartupApi",
+        "LegacySinceWhenMigrationApi",
+        "ensureLegacySinceWhenMigrated",
+    ):
+        if forbidden in source:
+            errors.append(f"{relative} depends on legacy Timer through {forbidden}")
+
+
 # Feature code must not hand-build PersonalHub routing URIs. Keeping the scheme/authority
 # contract centralized prevents one module from silently drifting to a different link shape.
 for owner, files in source_files.items():
