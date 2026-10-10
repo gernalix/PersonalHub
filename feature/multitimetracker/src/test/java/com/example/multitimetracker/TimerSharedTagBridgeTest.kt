@@ -17,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -26,6 +27,7 @@ class TimerSharedTagBridgeTest {
         val name = "timer-shared-tags-noop.db"
         val database = PersonalHubDatabase.openTemporary(context, name)
         try {
+            registerFixtureSession(database)
             GitDataTracking.install(database.openHelper.writableDatabase, enqueueAll = false)
             val bridge = TimerSharedTagBridge(database)
             val tag = Tag(
@@ -56,6 +58,7 @@ class TimerSharedTagBridgeTest {
         val name = "timer-shared-tags.db"
         val database = PersonalHubDatabase.openTemporary(context, name)
         try {
+            registerFixtureSession(database)
             val bridge = TimerSharedTagBridge(database)
             val tag = Tag(
                 id = 7, name = "Focus", timedDurationMinutes = 25,
@@ -76,5 +79,11 @@ class TimerSharedTagBridgeTest {
             database.close()
             context.deleteDatabase(name)
         }
+    }
+    private fun registerFixtureSession(database: PersonalHubDatabase) {
+        database.openHelper.writableDatabase.execSQL(
+            "INSERT INTO hub_entities VALUES(?,'timer/session','timer','test-fixture.timer.session','11','ACTIVE',1,1)",
+            arrayOf(UUID.randomUUID().toString()),
+        )
     }
 }

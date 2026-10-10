@@ -3,6 +3,7 @@ package com.gernalix.personalhub.core.hubcontext
 import android.content.Context
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -231,13 +232,16 @@ object HubContextRuntime {
     }
 
     suspend fun linked(ref: HubEntityRef): List<HubEntitySummary> {
-        val contextLinked = requireRepository().viewsFor(ref)
+        val canonicalRef = CanonicalIdentityCapsule.normalize(
+            PersonalHubDatabase.get(requireNotNull(appContext)).openHelper.readableDatabase, ref,
+        )
+        val contextLinked = requireRepository().viewsFor(canonicalRef)
             .flatMap { it.members }
-            .filter { it.ref != ref }
-        val tagLinkedRefs = if (ref.moduleId == "tags" && ref.entityKind == "tag") {
-            tags().backlinks(ref.canonicalId)
+            .filter { it.ref != canonicalRef }
+        val tagLinkedRefs = if (canonicalRef.moduleId == "tags" && canonicalRef.entityKind == "tag") {
+            tags().backlinks(canonicalRef.canonicalId)
         } else {
-            tags().tags(ref).map { HubEntityRef("tags", "tag", it.id) }
+            tags().tags(canonicalRef).map { HubEntityRef("tags", "tag", it.id) }
         }
         val resolved = summaries(tagLinkedRefs).values
         return (contextLinked + resolved).distinctBy { it.ref }

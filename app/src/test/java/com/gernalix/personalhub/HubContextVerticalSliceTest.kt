@@ -12,6 +12,7 @@ import com.gernalix.luoghi.capsules.visits.VisitMapper
 import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.supercontacts.app.hub.PeopleHubAdapter
 import kotlinx.coroutines.runBlocking
@@ -56,10 +57,11 @@ class HubContextVerticalSliceTest {
         val otherPlace = requireNotNull(places.create(HubCreateRequest("Altro luogo")))
         val sessionId = DefaultSessionCore(context).insertSession("Pranzo", 1_000L, 8_201_000L, emptySet())
 
+        val sessionCanonicalId = CanonicalIdentityCapsule(context).canonicalId("sessions", sessionId)
         HubContextRuntime.saveTimerLinks(sessionId, setOf(person.ref.canonicalId), piazza.ref.canonicalId)
         assertEquals(setOf("people", "places"), HubContextRuntime.linked(HubEntityRef("timer", "session", sessionId.toString())).map { it.ref.moduleId }.toSet())
-        assertTrue(HubContextRuntime.linked(person.ref).any { it.ref.canonicalId == sessionId.toString() })
-        assertTrue(HubContextRuntime.linked(piazza.ref).any { it.ref.canonicalId == sessionId.toString() })
+        assertTrue(HubContextRuntime.linked(person.ref).any { it.ref.canonicalId == sessionCanonicalId })
+        assertTrue(HubContextRuntime.linked(piazza.ref).any { it.ref.canonicalId == sessionCanonicalId })
 
         val database = PersonalHubDatabase.get(context)
         val contact = database.contactsDao().getContactByPublicId(person.ref.canonicalId)!!
@@ -102,20 +104,24 @@ class HubContextVerticalSliceTest {
         val tagged = sessions.insertSession("", 3_000L, 4_000L, setOf(10, 11))
         val fallback = sessions.insertSession("", 1_770_897_600_000L, 1_770_897_660_000L, emptySet())
 
-        val summaries = timer.summaries(setOf(titled.toString(), tagged.toString(), fallback.toString()))
+        val identities = CanonicalIdentityCapsule(context)
+        val titledId = identities.canonicalId("sessions", titled)
+        val taggedId = identities.canonicalId("sessions", tagged)
+        val fallbackId = identities.canonicalId("sessions", fallback)
+        val summaries = timer.summaries(setOf(titledId, taggedId, fallbackId))
 
-        assertEquals("Focus", summaries.getValue(titled.toString()).label)
-        assertEquals("Deep work", summaries.getValue(titled.toString()).description)
-        assertEquals("Deep work, Home", summaries.getValue(tagged.toString()).label)
-        assertEquals("Deep work, Home", summaries.getValue(tagged.toString()).description)
-        assertTrue(summaries.getValue(fallback.toString()).label.startsWith("Session on 2026-02-12"))
-        assertNotEquals(fallback.toString(), summaries.getValue(fallback.toString()).label)
-        assertNotEquals("Session $fallback", summaries.getValue(fallback.toString()).label)
+        assertEquals("Focus", summaries.getValue(titledId).label)
+        assertEquals("Deep work", summaries.getValue(titledId).description)
+        assertEquals("Deep work, Home", summaries.getValue(taggedId).label)
+        assertEquals("Deep work, Home", summaries.getValue(taggedId).description)
+        assertTrue(summaries.getValue(fallbackId).label.startsWith("Session on 2026-02-12"))
+        assertNotEquals(fallback.toString(), summaries.getValue(fallbackId).label)
+        assertNotEquals("Session $fallback", summaries.getValue(fallbackId).label)
 
         val temporal = timer.queryTemporal(com.gernalix.personalhub.core.hubcontext.HubTemporalQuery(2_500L, 4_500L, 10)).records
         assertTrue(
             temporal.joinToString { "${it.stableId}:${it.title}:${it.subtitle}" },
-            temporal.any { it.stableId == tagged.toString() && it.title == "Deep work, Home" && it.subtitle == "Deep work, Home" },
+            temporal.any { it.stableId == taggedId && it.title == "Deep work, Home" && it.subtitle == "Deep work, Home" },
         )
     }
 

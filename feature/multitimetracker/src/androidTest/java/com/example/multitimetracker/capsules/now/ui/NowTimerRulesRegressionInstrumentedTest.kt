@@ -29,6 +29,7 @@ import com.example.multitimetracker.capsules.system.NowCapsuleAccess
 import com.example.multitimetracker.hub.TimerSessionHubAdapter
 import com.example.multitimetracker.model.HomeLoadState
 import com.example.multitimetracker.model.SessionUi
+import com.example.multitimetracker.registerCanonicalTimerSessionFixture
 import com.example.multitimetracker.model.Tag
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -396,7 +397,7 @@ class NowTimerRulesRegressionInstrumentedTest {
             expectedEndMs = expectedEndMs,
             tagIds = tagIds,
             deletedAtMs = deletedAtMs,
-        )
+        ).also(::registerCanonicalTimerSessionFixture)
 
     private fun tag(id: Long, name: String): Tag =
         Tag(
