@@ -11,6 +11,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from verify_apk_version import verify_final_apk
+
 
 TELEGRAM_LIMIT_BYTES = 50 * 1024 * 1024
 DEV_RELEASE_TAG = "personalhub-dev-apk"
@@ -174,6 +176,7 @@ def deliver(
 ) -> str:
     if not apk_path.is_file():
         raise FileNotFoundError(str(apk_path))
+    verify_final_apk(apk_path, declared_version=version)
     size = apk_path.stat().st_size
     from telegram_notify import send_file, send_message
 

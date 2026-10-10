@@ -10,6 +10,22 @@ import deliver_personalhub_apk as delivery
 
 
 class DeliverPersonalHubApkTest(unittest.TestCase):
+    def setUp(self) -> None:
+        gate_patch = mock.patch.object(delivery, "verify_final_apk")
+        self.version_gate = gate_patch.start()
+        self.addCleanup(gate_patch.stop)
+
+    def test_version_mismatch_blocks_delivery_before_side_effects(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".apk") as handle:
+            apk = Path(handle.name)
+            self.version_gate.side_effect = RuntimeError("APK version mismatch")
+            with mock.patch.dict("sys.modules", {"telegram_notify": mock.Mock()}):
+                import telegram_notify
+                with self.assertRaisesRegex(RuntimeError, "APK version mismatch"):
+                    delivery.deliver(apk, "63", telegram_title="PH")
+                telegram_notify.send_file.assert_not_called()
+                telegram_notify.send_message.assert_not_called()
+            self.version_gate.assert_called_once_with(apk, declared_version="63")
     def test_small_apk_is_sent_directly_to_telegram(self) -> None:
         with tempfile.NamedTemporaryFile() as handle:
             path = Path(handle.name)
