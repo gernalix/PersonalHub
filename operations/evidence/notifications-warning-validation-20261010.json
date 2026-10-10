@@ -1,0 +1,277 @@
+{
+  "date": "2026-10-10",
+  "scope": "Notifications WARNING follow-up; existing production v64 unchanged",
+  "device": "physical Pixel 8a / Android 17",
+  "phase_1": "PASS (prior acceptance reused)",
+  "phase_2": "PASS (prior acceptance reused)",
+  "real_app_compatibility": "PASS for observed synthetic notification cases only",
+  "long_measurement": "PASS",
+  "collector_only_energy_attribution": "WARNING \u2014 not isolated",
+  "privacy": {
+    "probe": "only known PHQA predicates, counts and structural confidence flags; no text/title/name/key/URI/chat IDs returned",
+    "trace": "android.power only; no logs, UI, message payloads, app heap or private DB exported",
+    "git": "only sanitized numeric evidence and documentation; raw trace/DB/backup excluded"
+  },
+  "apps": {
+    "org.telegram.messenger": {
+      "observed_source": "authorized pre-test Telegram notice containing PHQA; no extra user Telegram test pair sent",
+      "known_PHQA_messages": 1,
+      "conversations": 1,
+      "identity_rows": 1,
+      "confidence": "MEDIUM",
+      "reliable_identity_messages": 0,
+      "partial_messages": 0,
+      "marker_scoped_event_kinds": {
+        "POSTED": 1,
+        "UPDATED": 3,
+        "OBSERVED": 5
+      },
+      "message_count_unchanged_across_reconnections": true
+    },
+    "com.whatsapp": {
+      "observed_source": "two user-arranged incoming synthetic PHQA messages; client in background",
+      "known_PHQA_messages": 2,
+      "conversations": 1,
+      "identity_rows": 2,
+      "confidence": "MEDIUM",
+      "reliable_identity_messages": 0,
+      "partial_messages": 0,
+      "marker_scoped_event_kinds": {
+        "POSTED": 2,
+        "UPDATED": 1,
+        "OBSERVED": 3
+      },
+      "message_count_unchanged_across_reconnections": true
+    }
+  },
+  "method": {
+    "design": "ON20 / OFF20 / OFF20 / ON20; manual Notification Access changes",
+    "recorded_seconds": 4797.884861572005,
+    "effective_seconds": 4320.388476422988,
+    "exclusion": "first two minutes per block; 72 minutes principal comparison",
+    "fixture_load": "10 identical cumulative MessagingStyle updates per 20-minute block (every 2 minutes); stable message timestamps",
+    "conditions": "all charging sources false; HOME then screen asleep; stock Dozing/AOD and energy settings retained; no battery stats reset",
+    "sample_rates": "host resource counters every 60s; Perfetto power every 10s",
+    "cpu": "whole PersonalHub process /proc stat, clock ticks 100Hz; stable PID within each block",
+    "uid_energy": "Android BatteryStats computed whole-app UID attribution, not hardware or collector-only energy",
+    "power": "hardware whole-device sampled counters; sample means are not integrated collector-only energy"
+  },
+  "windows": [
+    {
+      "phase": "on-1",
+      "samples": 21,
+      "recorded_seconds": 1200.097495576003,
+      "effective_seconds": 1080.65996705,
+      "stable_process": true,
+      "cpu_seconds": 43.12,
+      "cpu_percent_single_core": 3.9902,
+      "io_bytes": {
+        "read_bytes": 4833280,
+        "write_bytes": 16138240
+      },
+      "temperature_C_range": [
+        29.3,
+        32.8
+      ],
+      "uid_computed_power_mAh_whole_block": 0.8,
+      "wakefulness_states": [
+        "not-sampled"
+      ],
+      "memory_end_KiB": {
+        "PSS": 51433,
+        "RSS": 129740,
+        "SWAP PSS": 12531
+      },
+      "hardware_whole_device": {
+        "samples": 107,
+        "sample_span_seconds": 1065.76837116,
+        "sample_mean_power_mW": 513.35514,
+        "sample_mean_discharge_current_uA": 133498.588785,
+        "sampled_charge_drop_mAh": 44.0,
+        "power_sample_range_mW": [
+          285.0,
+          2214.0
+        ]
+      }
+    },
+    {
+      "phase": "off-1",
+      "samples": 21,
+      "recorded_seconds": 1199.075791973999,
+      "effective_seconds": 1079.635369538999,
+      "stable_process": true,
+      "cpu_seconds": 20.76,
+      "cpu_percent_single_core": 1.9229,
+      "io_bytes": {
+        "read_bytes": 8454144,
+        "write_bytes": 4882432
+      },
+      "temperature_C_range": [
+        26.6,
+        28.4
+      ],
+      "uid_computed_power_mAh_whole_block": 1.2,
+      "wakefulness_states": [
+        "Dozing"
+      ],
+      "memory_end_KiB": {
+        "PSS": 51671,
+        "RSS": 122116,
+        "SWAP PSS": 14733
+      },
+      "hardware_whole_device": {
+        "samples": 108,
+        "sample_span_seconds": 1073.111259186,
+        "sample_mean_power_mW": 551.0,
+        "sample_mean_discharge_current_uA": 144704.62037,
+        "sampled_charge_drop_mAh": 42.0,
+        "power_sample_range_mW": [
+          218.0,
+          8362.0
+        ]
+      }
+    },
+    {
+      "phase": "off-2",
+      "samples": 21,
+      "recorded_seconds": 1199.1786355170043,
+      "effective_seconds": 1080.0860290679993,
+      "stable_process": true,
+      "cpu_seconds": 17.03,
+      "cpu_percent_single_core": 1.5767,
+      "io_bytes": {
+        "read_bytes": 1638400,
+        "write_bytes": 3751936
+      },
+      "temperature_C_range": [
+        26.2,
+        26.7
+      ],
+      "uid_computed_power_mAh_whole_block": 0.8,
+      "wakefulness_states": [
+        "Dozing"
+      ],
+      "memory_end_KiB": {
+        "PSS": 55986,
+        "RSS": 125968,
+        "SWAP PSS": 14657
+      },
+      "hardware_whole_device": {
+        "samples": 108,
+        "sample_span_seconds": 1073.598438628,
+        "sample_mean_power_mW": 483.472222,
+        "sample_mean_discharge_current_uA": 126501.462963,
+        "sampled_charge_drop_mAh": 34.0,
+        "power_sample_range_mW": [
+          104.0,
+          2197.0
+        ]
+      }
+    },
+    {
+      "phase": "on-2",
+      "samples": 21,
+      "recorded_seconds": 1199.532938504999,
+      "effective_seconds": 1080.0071107659896,
+      "stable_process": true,
+      "cpu_seconds": 38.73,
+      "cpu_percent_single_core": 3.5861,
+      "io_bytes": {
+        "read_bytes": 3088384,
+        "write_bytes": 16142336
+      },
+      "temperature_C_range": [
+        26.1,
+        26.4
+      ],
+      "uid_computed_power_mAh_whole_block": 0.6,
+      "wakefulness_states": [
+        "Dozing"
+      ],
+      "memory_end_KiB": {
+        "PSS": 53520,
+        "RSS": 123204,
+        "SWAP PSS": 14494
+      },
+      "hardware_whole_device": {
+        "samples": 108,
+        "sample_span_seconds": 1074.577728629,
+        "sample_mean_power_mW": 473.935185,
+        "sample_mean_discharge_current_uA": 124192.472222,
+        "sampled_charge_drop_mAh": 36.0,
+        "power_sample_range_mW": [
+          166.0,
+          2548.0
+        ]
+      }
+    }
+  ],
+  "comparison": {
+    "ON": {
+      "effective_seconds": 2160.6670778159896,
+      "cpu_seconds": 81.85,
+      "cpu_percent_single_core": 3.788181938826702,
+      "sample_mean_device_power_mW": 493.55348818604654,
+      "sample_mean_device_discharge_current_uA": 128823.88837195815,
+      "sampled_device_charge_drop_mAh": 80.0,
+      "uid_computed_power_mAh_40min": 1.4
+    },
+    "OFF": {
+      "effective_seconds": 2159.7213986069983,
+      "cpu_seconds": 37.790000000000006,
+      "cpu_percent_single_core": 1.749762725154005,
+      "sample_mean_device_power_mW": 517.2361109999999,
+      "sample_mean_device_discharge_current_uA": 135603.0416665,
+      "sampled_device_charge_drop_mAh": 76.0,
+      "uid_computed_power_mAh_40min": 2.0
+    },
+    "interpretation": "Whole-app CPU was higher ON in both blocks; no sampled monotonic PSS growth. Device charge deltas suggest ON +4 mAh, while sampled mean power/current and Android UID estimates are lower ON. These inconsistent aggregates, thermal drift and background activity prevent causal collector-only energy attribution or a percent-battery-per-day projection. No claim of zero overhead or leak absence."
+  },
+  "trace_validation": {
+    "bytes": 267413,
+    "sha256": "2bec962620f5de081f03f8c6d43c5d733149a341c6c1fefaffffb9281328efce",
+    "power_counter_tracks": 29,
+    "samples_per_track": 535,
+    "hardware_span_seconds": 5353.800096256,
+    "effective_phase_samples": [
+      107,
+      108,
+      108,
+      108
+    ],
+    "error_or_data_loss_stats_returned": 0,
+    "rails": "available; not summed because nested rails can overlap",
+    "query_tool": "tools/android_perfetto_query.py with existing canonical benchmark trace_processor_shell_aarch64"
+  },
+  "limits": [
+    "single physical run, two ON and two OFF blocks; not randomized independent replicates",
+    "temperature 32.8 -> 26.1 C across effective windows",
+    "common Wi-Fi ADB/profiler and synthetic broadcast overhead; ordinary PersonalHub and system background work not isolated",
+    "Cached dumpsys charge gauge; HAL counters fresher but charge endpoints coarse; point current/power sampled every 10s may miss spikes",
+    "first ON wakefulness not in each sample; separately verified Dozing; all later effective samples Dozing",
+    "cannot infer universal app compatibility, redacted/hidden contents, other profiles, app-level historical completeness or actual sender count from uncertain identity rows"
+  ],
+  "cleanup": {
+    "fixture_notification_cancelled": true,
+    "fixture_archive_events_messages_identities_mappings_removed": true,
+    "nonfixture_history_count_preserved_transactionally": true,
+    "private_reversible_backup_retained_on_device": true,
+    "fixture_messages_after_cleanup": 0,
+    "fixture_uninstalled": true,
+    "owned_device_trace_and_config_removed": true,
+    "main_app_rebuilt_reinstalled_migrated_or_cleared": false,
+    "permission_enabled": true,
+    "collector_connected": true,
+    "collector_service_present": true,
+    "fixture_absent": true
+  },
+  "notifications": {
+    "pre": "Telegram accepted and Fedora 77; explicit user availability and unplug confirmation",
+    "post": "Telegram accepted and Fedora 86; Pixel released after restored state"
+  },
+  "sources": [
+    "https://android.googlesource.com/platform/external/perfetto/+/refs/heads/main/docs/data-sources/battery-counters.md",
+    "https://source.android.com/docs/core/power/device",
+    "https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/os/BatteryStats.java"
+  ]
+}
