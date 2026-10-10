@@ -13,6 +13,7 @@ import com.gernalix.personalhub.ui.theme.PersonalHubTheme
 class SinceWhenActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (com.gernalix.personalhub.core.database.DatabaseStartupGate.blockIfNotReady(this)) return
         enableEdgeToEdge()
         val counterId = intent?.data?.lastPathSegment?.toLongOrNull()
         setContent {
