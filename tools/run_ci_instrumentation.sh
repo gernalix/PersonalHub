@@ -34,6 +34,9 @@ run_app_test() {
 }
 
 app_tests=(
+  'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration'
+  'HistoryAndPatchReviewDeviceTest#supportedUndoRestoresSyntheticPlaceAndRecordsCompensation'
+  'HistoryAndPatchReviewDeviceTest#patchPreviewFailureAndExplicitConfirmationGateApplication'
   'SinceWhenAutonomyDeviceTest#pendingFailedLegacyImportDoesNotBlockCanonicalCreateEditOrHubAccess'
   'DatabaseVaultLegacyTableValidationTest#inertLegacyTableIsAllowedButUnexpectedTriggerIsRejected'
   'LegacySyncJournalSchemaDeviceTest#legacySyncJournalSchemaPersistsAcrossReopen'

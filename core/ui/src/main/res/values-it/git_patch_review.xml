@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="git_review_pending">Patch verificate da revisionare</string>
+    <string name="git_review_title">Revisiona patch Git</string>
+    <string name="git_review_id">Patch: %1$s</string>
+    <string name="git_review_ref">Revisione: %1$s</string>
+    <string name="git_review_author">Autore: %1$s</string>
+    <string name="git_review_schema_pass">Schema %1$d: compatibile</string>
+    <string name="git_review_schema_fail">Schema %1$d: incompatibile</string>
+    <string name="git_review_operations">%1$d modifiche</string>
+    <string name="git_review_tables">Tabelle: %1$s</string>
+    <string name="git_review_isolated">La preview usa una copia separata del database. Le registrazioni correnti restano invariate.</string>
+    <string name="git_review_preview">Preview nella sandbox</string>
+    <string name="git_review_counts">Inserimenti: %1$d · Modifiche: %2$d · Eliminazioni: %3$d</string>
+    <string name="git_review_checks_pass">PASS: schema, hash, chiavi esterne e integrità del database</string>
+    <string name="git_review_apply">Applica questa patch</string>
+    <string name="git_review_confirm">Applicare la patch %1$s al database corrente? La preview verificata sarà ricontrollata e tutte le modifiche applicate insieme.</string>
+    <string name="git_review_cancel">Annulla</string>
+    <string name="git_review_failed">Verifica fallita. Ripeti la preview prima di applicare.</string>
+    <string name="git_review_tools">Strumenti Git avanzati</string>
+    <string name="git_review_rebuild">Ricostruisci indice Git History</string>
+    <string name="git_review_before">Revisione iniziale</string>
+    <string name="git_review_after">Revisione finale</string>
+    <string name="git_review_compare">Confronta revisioni</string>
+    <string name="git_review_diff_table">%1$s: %2$d inserimenti · %3$d modifiche · %4$d eliminazioni</string>
+    <string name="git_review_no_changes">Nessuna modifica</string>
+    <string name="git_review_truncated">Confronto parziale; sono presenti altre modifiche.</string>
+    <string name="git_review_milestone_name">Nome milestone / tag</string>
+    <string name="git_review_milestone">Crea milestone</string>
+    <string name="git_review_proposal_name">Branch proposta</string>
+    <string name="git_review_proposal">Crea branch proposta</string>
+    <string name="git_review_pr">Crea PR della proposta</string>
+    <string name="git_review_discard">Elimina branch proposta</string>
+    <string name="git_review_restore_at">Ripristino per data e ora</string>
+    <string name="git_review_resolve_date">Trova revisione a questo orario</string>
+    <string name="git_review_restore_confirm">Ripristinare tutto il database da %1$s? Prima lo stato corrente deve essere salvato in sicurezza. La app sarà riavviata.</string>
+    <string name="git_review_already_applied">Questa patch è già applicata.</string>
+</resources>

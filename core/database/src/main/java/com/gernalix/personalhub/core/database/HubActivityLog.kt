@@ -112,6 +112,9 @@ interface HubActivityDao {
         limit: Int,
     ): List<HubActivityEntity>
 
+    @Query("SELECT * FROM hub_activity_log WHERE group_id = :groupId OR (group_id IS NULL AND id = :groupId) ORDER BY occurred_at DESC,id DESC")
+    suspend fun historyGroup(groupId: String): List<HubActivityEntity>
+
     @Query("SELECT * FROM hub_activity_log WHERE id = :id LIMIT 1")
     suspend fun byId(id: String): HubActivityEntity?
 

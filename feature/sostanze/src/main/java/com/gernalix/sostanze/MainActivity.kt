@@ -14,15 +14,17 @@ import com.gernalix.sostanze.ui.theme.SostanzeTheme
 
 class MainActivity : ComponentActivity() {
     private var hubSubstanceId by mutableStateOf<Long?>(null)
+    private var hubIntakeId by mutableStateOf<Long?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (DatabaseStartupGate.blockIfNotReady(this)) return
         hubSubstanceId = intent.hubSubstanceId(this)
+        hubIntakeId = intent.hubIntakeId(this)
         enableEdgeToEdge()
         setContent {
             SostanzeTheme {
-                SostanzeApp(hubSubstanceId)
+                SostanzeApp(hubSubstanceId, initialIntakeId = hubIntakeId)
             }
         }
     }
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         hubSubstanceId = intent.hubSubstanceId(this)
+        hubIntakeId = intent.hubIntakeId(this)
     }
 }
 
@@ -38,4 +41,11 @@ private fun Intent?.hubSubstanceId(context: android.content.Context): Long? = th
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/substances" }
     ?.getQueryParameter("substanceId")?.let { id ->
         id.toLongOrNull() ?: com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).localKey("substances/substance", id)?.toLongOrNull()
+    }
+
+private fun Intent?.hubIntakeId(context: android.content.Context): Long? = this?.data
+    ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/substances" }
+    ?.getQueryParameter("intakeId")?.let { id ->
+        com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context)
+            .localKey("substances/intake",id)?.toLongOrNull()
     }

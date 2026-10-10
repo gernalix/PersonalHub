@@ -15,6 +15,7 @@ object MutationEventCapture {
     )
 
     private val sources = listOf(
+        Source("since_when_counters", "since_when", "counter", "id", "title", listOf("title", "description", "initial_timestamp", "end_timestamp", "color_argb", "display_units_json")),
         Source("sessions", "timer", "session", "id", "title", listOf("title", "start_ms", "end_ms", "expected_end_ms", "deleted_at_ms")),
         Source("hub_tags", "tags", "tag", "id", "name", listOf("name", "description", "icon", "color", "archived", "pinned")),
         Source("places", "places", "place", "uuid", "nickname", listOf("nickname", "address", "notes", "archived")),
@@ -168,7 +169,7 @@ object MutationEventCapture {
         }
         val identity = when (source.table) {
             "contact_fields" -> "(SELECT public_id FROM contacts WHERE id=$row.contact_id)"
-            "sessions", "substances", "intake_events" -> "COALESCE(NULLIF($row.canonical_id,''),(SELECT canonical_id FROM hub_entities WHERE local_table='${source.table}' AND local_key=CAST($row.`${source.key}` AS TEXT)))"
+            "sessions", "substances", "intake_events", "since_when_counters" -> "COALESCE(NULLIF($row.canonical_id,''),(SELECT canonical_id FROM hub_entities WHERE local_table='${source.table}' AND local_key=CAST($row.`${source.key}` AS TEXT)))"
             "finance_transactions" -> "$row.uuid"
             else -> "CAST($row.`${source.key}` AS TEXT)"
         }

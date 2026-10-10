@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_mutations">Modifiche</string>
+    <string name="history_records">Registrazioni</string>
+    <string name="history_mutations_help">Modifiche registrate con provenance originale. Annulla è disponibile solo dove supportato.</string>
+    <string name="history_records_help">Registrazioni esistenti, indipendentemente da quando è iniziata la cronologia delle modifiche.</string>
+    <string name="history_provenance">Origine: %1$s</string>
+    <string name="history_target_unavailable">La registrazione originale non è più disponibile.</string>
+    <string name="history_patch_applied">Patch Git applicata</string>
+    <string name="history_view_git">Apri revisione Git</string>
+    <string name="history_intake_detail">Assunzione di %1$s</string>
+    <string name="history_loaded_count">%1$d caricati</string>
+    <string name="history_record_person">Persona</string>
+    <string name="history_record_typing_session">Sessione di scrittura</string>
+    <string name="history_record_generic">Registrazione</string>
+    <string name="history_load_failed">Impossibile caricare History. Riprova.</string>
+    <string name="history_records_empty">Nessuna registrazione esistente corrisponde ai filtri.</string>
+</resources>

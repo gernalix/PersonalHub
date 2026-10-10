@@ -174,68 +174,57 @@ object GitDataSync {
      * Cherry-picks one declarative data patch from any commit/branch/tag without merging Git trees.
      * This is the safe PersonalHub equivalent of accepting one change from a data proposal PR.
      */
-    fun previewPatchFromRevision(
-        context: Context,
-        ref: String,
-        patchId: String,
-    ): GitPatchPreview = operations.withLock {
-        val app = context.applicationContext
-        val config = requireConfiguration(app)
+    data class PatchReview(
+        val patchId: String, val revision: String, val sha256: String, val author: String,
+        val reason: String?, val schemaVersion: Int, val minimumAppVersion: Long,
+        val operations: Int, val tables: List<String>, val alreadyApplied: Boolean = false,
+    )
+
+    private fun verifiedPatch(context: Context, ref: String, patchId: String): Pair<PatchReview, ByteArray> {
         require(ref.matches(Regex("[A-Za-z0-9._/-]+"))) { "Invalid Git ref" }
         require(patchId.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid patch id" }
-        val transport = transport(app, config)
-        val controlBytes = transport.readFile(GIT_CONTROL_MANIFEST, ref)
-        val control = JSONObject(String(controlBytes, Charsets.UTF_8)).also(::validateControl)
-        val patches = control.optJSONArray("patches") ?: JSONArray()
-        var match: JSONObject? = null
-        for (i in 0 until patches.length()) {
-            val candidate = patches.getJSONObject(i)
-            if (candidate.getString("id") == patchId) {
-                match = candidate
-                break
-            }
-        }
-        val spec = requireNotNull(match) { "Patch is not present in selected revision" }
-        require(spec.optLong("minimum_app_version", 0L) <= appVersion(app)) {
-            "Patch requires a newer PersonalHub app"
-        }
-        val bytes = transport.readFile(spec.getString("path"), ref)
-        require(GitDataFormat.sha256(bytes) == spec.getString("sha256")) {
-            "Patch hash mismatch"
-        }
-        GitPatchEngine.preview(app, bytes)
+        val revision = GitHistory.resolveRevision(context, ref).sha
+        return verifiedPatch(context, revision, patchId, transport(context, requireConfiguration(context)))
     }
 
-    fun applyPatchFromRevision(context: Context, ref: String, patchId: String) = operations.withLock {
-        val app = context.applicationContext
-        val config = requireConfiguration(app)
-        require(ref.matches(Regex("[A-Za-z0-9._/-]+"))) { "Invalid Git ref" }
-        require(patchId.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid patch id" }
-        val transport = transport(app, config)
-        val controlBytes = transport.readFile(GIT_CONTROL_MANIFEST, ref)
-        val control = JSONObject(String(controlBytes, Charsets.UTF_8)).also(::validateControl)
+    /** Same verified loader used by review, preview and apply; transport is injectable for isolated QA. */
+    internal fun verifiedPatch(context: Context, revision: String, patchId: String, git: GitHubDataTransport): Pair<PatchReview, ByteArray> {
+        val control = JSONObject(String(git.readFile(GIT_CONTROL_MANIFEST, revision), Charsets.UTF_8)).also(::validateControl)
         val patches = control.optJSONArray("patches") ?: JSONArray()
-        var match: JSONObject? = null
-        for (i in 0 until patches.length()) {
-            val candidate = patches.getJSONObject(i)
-            if (candidate.getString("id") == patchId) {
-                match = candidate
-                break
-            }
-        }
-        val spec = requireNotNull(match) { "Patch is not present in selected revision" }
+        val matches = (0 until patches.length()).map { patches.getJSONObject(it) }.filter { it.getString("id") == patchId }
+        require(matches.size == 1) { "Patch is missing or ambiguous in selected revision" }
+        val spec = matches.single()
+        val minimum = maxOf(spec.optLong("minimum_app_version",0), control.optLong("minimum_app_version",0))
+        require(minimum <= appVersion(context)) { "Patch requires a newer PersonalHub app" }
+        val bytes = git.readFile(spec.getString("path"), revision)
+        val hash = GitDataFormat.sha256(bytes)
+        require(hash == spec.getString("sha256")) { "Patch hash mismatch" }
+        val patch = JSONObject(String(bytes, Charsets.UTF_8))
+        require(patch.getString("patch_id") == patchId) { "Patch id mismatch" }
+        require(patch.getInt("format_version") == 1) { "Unsupported patch format" }
+        val operations = patch.getJSONArray("operations")
+        val tables = (0 until operations.length()).map { operations.getJSONObject(it).getString("table") }.distinct().sorted()
+        return PatchReview(patchId, revision, hash, patch.optString("author").ifBlank { "chatgpt" },
+            patch.optString("reason").takeIf(String::isNotBlank), patch.getInt("schema_version"), minimum,
+            operations.length(), tables, GitDataTracking.isPatchApplied(PersonalHubDatabase.get(context).openHelper.readableDatabase,patchId)) to bytes
+    }
+
+    fun describePatchFromRevision(context: Context, ref: String, patchId: String): PatchReview = operations.withLock {
+        verifiedPatch(context.applicationContext,ref,patchId).first
+    }
+
+    fun previewPatchFromRevision(context: Context, ref: String, patchId: String): GitPatchPreview = operations.withLock {
+        val (review, bytes) = verifiedPatch(context.applicationContext,ref,patchId)
+        GitPatchEngine.preview(context.applicationContext,bytes).copy(verifiedRevision=review.revision,sha256=review.sha256)
+    }
+
+    fun applyPatchFromRevision(context: Context, ref: String, patchId: String, expectedSha256: String? = null) = operations.withLock {
+        val app = context.applicationContext
+        val (review, bytes) = verifiedPatch(app,ref,patchId)
+        require(expectedSha256 == null || expectedSha256 == review.sha256) { "Patch changed after preview" }
         require(patchId !in GitDataSettings.appliedPatchIds(app)) { "Patch was already applied" }
-        require(spec.optLong("minimum_app_version", 0L) <= appVersion(app)) {
-            "Patch requires a newer PersonalHub app"
-        }
-        val bytes = transport.readFile(spec.getString("path"), ref)
-        require(GitDataFormat.sha256(bytes) == spec.getString("sha256")) {
-            "Patch hash mismatch"
-        }
-        val document = JSONObject(String(bytes, Charsets.UTF_8))
-        require(document.getString("patch_id") == patchId) { "Patch id mismatch" }
-        GitPatchEngine.apply(app, bytes)
-        GitDataSettings.markPatchApplied(app, patchId)
+        GitPatchEngine.apply(app,bytes,review.revision)
+        GitDataSettings.markPatchApplied(app,patchId)
         checkForChanges(app)
     }
 
@@ -309,7 +298,7 @@ object GitDataSync {
         GitDataTracking.pending(db).isNotEmpty() || GitDataTracking.events(db).isNotEmpty()
     }
 
-    private fun pullControl(
+    internal fun pullControl(
         context: Context,
         transport: GitHubDataTransport,
         ref: String,
@@ -338,7 +327,7 @@ object GitDataSync {
         for (i in 0 until patches.length()) {
             val spec = patches.getJSONObject(i)
             val id = spec.getString("id")
-            if (id in applied) continue
+            if (id in applied || GitDataTracking.isPatchApplied(PersonalHubDatabase.get(context).openHelper.readableDatabase,id)) continue
             require(id.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid patch id" }
             require(spec.optLong("minimum_app_version", 0L) <= appVersion) {
                 "Patch requires a newer PersonalHub app"
@@ -361,8 +350,10 @@ object GitDataSync {
     private fun validateControl(control: JSONObject) {
         require(control.getInt("format_version") == 1) { "Unsupported Git control format" }
         val patches = control.optJSONArray("patches") ?: JSONArray()
+        val ids = mutableSetOf<String>()
         for (i in 0 until patches.length()) {
             val item = patches.getJSONObject(i)
+            require(ids.add(item.getString("id"))) { "Duplicate patch id" }
             require(item.getString("path").startsWith("patches/")) {
                 "Patch must live under patches/"
             }

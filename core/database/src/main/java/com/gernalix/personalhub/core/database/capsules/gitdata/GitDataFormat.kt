@@ -673,12 +673,14 @@ data class GitPatchPreview(
     val updates: Int,
     val deletes: Int,
     val tables: List<String>,
+    val verifiedRevision: String? = null,
+    val sha256: String? = null,
 )
 
 internal object GitPatchEngine {
-    fun apply(context: Context, patchBytes: ByteArray) {
+    fun apply(context: Context, patchBytes: ByteArray, verifiedRevision: String? = null) {
         val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
-        applyToDatabase(db, patchBytes)
+        applyToDatabase(db, patchBytes, verifiedRevision)
     }
 
     /**
@@ -696,7 +698,7 @@ internal object GitPatchEngine {
             } finally {
                 temporary.close()
             }
-            SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
                 db.rawQuery("PRAGMA quick_check", null).use {
                     require(it.moveToFirst() && it.getString(0) == "ok") {
                         "Patch preview failed SQLite integrity check"
@@ -743,13 +745,14 @@ internal object GitPatchEngine {
             }
         }
 
-    private fun applyToDatabase(db: SupportSQLiteDatabase, patchBytes: ByteArray) {
+    private fun applyToDatabase(db: SupportSQLiteDatabase, patchBytes: ByteArray, verifiedRevision: String? = null) {
         val patch = validatePatch(patchBytes)
         val operations = patch.getJSONArray("operations")
         val patchId = patch.optString("patch_id").ifBlank { "remote-patch" }
         val author = patch.optString("author").ifBlank { "chatgpt" }
         db.beginTransaction()
         try {
+            require(!GitDataTracking.isPatchApplied(db, patchId)) { "Patch was already applied" }
             GitDataTracking.setEditContext(
                 db = db,
                 author = author,
@@ -758,9 +761,17 @@ internal object GitPatchEngine {
                 groupId = patchId,
             )
             for (i in 0 until operations.length()) applyOperation(db, operations.getJSONObject(i))
+            db.query("PRAGMA quick_check").use {
+                require(it.moveToFirst() && it.getString(0) == "ok") { "Patch fails integrity verification" }
+            }
             db.query("PRAGMA foreign_key_check").use {
                 require(!it.moveToFirst()) { "Patch would break database relationships" }
             }
+            val metadata = JSONObject().put("patch_id",patchId).put("sha256",GitDataFormat.sha256(patchBytes))
+                .put("revision",verifiedRevision ?: JSONObject.NULL).put("author",author)
+                .put("schema_version",patch.getInt("schema_version")).put("operation_count",operations.length())
+                .put("tables",JSONArray((0 until operations.length()).map { operations.getJSONObject(it).getString("table") }.distinct()))
+            GitDataTracking.markPatchApplied(db, patchId, metadata.toString())
             db.setTransactionSuccessful()
         } finally {
             GitDataTracking.clearEditContext(db)

@@ -68,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -116,9 +117,27 @@ private enum class AppTab {
 }
 
 @Composable
-fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel = viewModel()) {
+fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel = viewModel(), initialIntakeId: Long? = null) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var linkedIntake by remember(initialIntakeId) { mutableStateOf<com.gernalix.sostanze.data.IntakeHubView?>(null) }
+    LaunchedEffect(initialIntakeId) {
+        val id = initialIntakeId ?: return@LaunchedEffect
+        linkedIntake = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context).dao().intakeHubViews(listOf(id)).singleOrNull()
+        }
+    }
+    linkedIntake?.let { record ->
+        AlertDialog(
+            onDismissRequest = { linkedIntake = null },
+            title = { Text(stringResource(com.gernalix.personalhub.core.ui.R.string.history_intake_detail,record.substanceName)) },
+            text = { Column(Modifier.testTag("intake-detail")) {
+                Text(formatDateTime(record.intake.timestampUtc),Modifier.testTag("intake-detail-time"))
+                Text("${record.intake.dose.clean()} ${record.intake.doseUnit}")
+            } },
+            confirmButton = { TextButton(onClick = { linkedIntake = null }) { Text(stringResource(R.string.close)) } },
+        )
+    }
     var sinceWhenSources by remember { mutableStateOf<Map<Long, SinceWhenSourceDescriptor>>(emptyMap()) }
     LaunchedEffect(context, state.substances.map { it.id }) {
         val adapter = SubstanceHubAdapter(context.applicationContext)

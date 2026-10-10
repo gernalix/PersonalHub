@@ -88,6 +88,10 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
             TopAppBar(
                 title = { Text(stringResource(R.string.since_when_title)) },
                 navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.since_when_back)) } },
+                actions = { TextButton(modifier = Modifier.testTag("sincewhen-history"), onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW,
+                        com.gernalix.personalhub.contracts.database.HubDeepLinkContract.moduleHistoryUri("since_when")).setPackage(context.packageName))
+                }) { Text(stringResource(R.string.activity_title)) } },
             )
         },
         floatingActionButton = {

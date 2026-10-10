@@ -37,7 +37,11 @@ class CanonicalIdentityCapsuleTest {
         database.dao().updateSubstance(requireNotNull(database.dao().substanceById(id)).copy(name="Changed"))
         assertEquals(identity,CanonicalIdentityCapsule(context).canonicalId("substances", id))
         val backup=DatabaseVault.backupCurrent(context)
-        try { DatabaseVault.validate(context,backup) } finally { backup.delete() }
+        try {
+            val before=java.security.MessageDigest.getInstance("SHA-256").digest(backup.readBytes())
+            DatabaseVault.validate(context,backup)
+            assertArrayEquals(before,java.security.MessageDigest.getInstance("SHA-256").digest(backup.readBytes()))
+        } finally { backup.delete() }
     }
 
     @Test fun explicitExternalTupleIsIdempotentAndConflictsFail(): Unit = runBlocking {
