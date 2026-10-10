@@ -47,4 +47,21 @@ class SinceWhenCurrentSchemaTest {
         assertEquals("event_date", reopened.sourceTimestampField)
         assertNull(reopened.endTimestamp)
     }
+    @Test fun completeCounterEditPersistsPreciseTimesLegacyTagsAndProvenance() = runBlocking {
+        val original = SinceWhenCounterEntity(
+            title = "Legacy counter", description = "Description",
+            initialTimestamp = 1790000012345L, endTimestamp = 1790100098765L,
+            colorArgb = 0xFF9B3D5CL, displayUnitsJson = "[\"HOURS\",\"SECONDS\"]",
+            legacyTagIdsJson = "[42,73]", sourceEntityType = "timer/session",
+            sourceEntityId = "gone-source", sourceTimestampField = "start", createdAt = 1790000000000L,
+        )
+        val id = PersonalHubDatabase.get(context).sinceWhenCounterDao().insert(original)
+        PersonalHubDatabase.closeInstance()
+        val dao = PersonalHubDatabase.get(context).sinceWhenCounterDao()
+        assertEquals(original.copy(id = id), dao.get(id))
+        val edited = requireNotNull(dao.get(id)).copy(title = "Edited", description = "Changed", initialTimestamp = 1790000067890L, endTimestamp = null, colorArgb = 0xFF2B5DAAL, displayUnitsJson = "[\"MINUTES\"]")
+        dao.update(edited)
+        PersonalHubDatabase.closeInstance()
+        assertEquals(edited, PersonalHubDatabase.get(context).sinceWhenCounterDao().get(id))
+    }
 }
