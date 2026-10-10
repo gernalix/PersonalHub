@@ -8,6 +8,7 @@ import subprocess
 from typing import Any
 
 import android_target_preflight as preflight
+import verify_apk_version
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -101,9 +102,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "resolve":
             print(json.dumps({"status": "ok", "apk": str(apk)}, sort_keys=True))
             return 0
+        verify_apk_version.verify_final_apk(apk)
         target = resolve_pixel(timeout_s=timeout_s)
         detail = install(apk, target["serial"], timeout_s=timeout_s)
-    except PixelApkError as exc:
+    except (PixelApkError, verify_apk_version.ApkVersionError) as exc:
         print(json.dumps({"status": "blocked", "reason": str(exc)}, sort_keys=True))
         return 2
 

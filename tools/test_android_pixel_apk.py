@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -34,6 +35,23 @@ class AndroidPixelApkTests(unittest.TestCase):
 
             with self.assertRaisesRegex(installer.PixelApkError, "exactly one"):
                 installer.resolve_apk(metadata)
+
+    def test_invalid_apk_version_blocks_before_pixel_contact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "64.apk").write_bytes(b"apk")
+            metadata = out / "output-metadata.json"
+            metadata.write_text(json.dumps({"elements": [{"outputFile": "64.apk"}]}), encoding="utf-8")
+            with mock.patch.object(
+                installer.verify_apk_version,
+                "verify_final_apk",
+                side_effect=installer.verify_apk_version.ApkVersionError("APK version mismatch"),
+            ):
+                with mock.patch.object(installer, "resolve_pixel") as resolve_pixel:
+                    with mock.patch("sys.stdout", new_callable=io.StringIO) as output:
+                        self.assertEqual(2, installer.main(["install", "--metadata", str(metadata)]))
+                    resolve_pixel.assert_not_called()
+                    self.assertIn("APK version mismatch", output.getvalue())
 
     def test_resolve_pixel_requires_physical_pixel(self) -> None:
         with mock.patch.object(
