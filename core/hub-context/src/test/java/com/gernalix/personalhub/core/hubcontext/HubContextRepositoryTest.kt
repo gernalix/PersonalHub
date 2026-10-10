@@ -111,22 +111,22 @@ class HubContextRepositoryTest {
         val places = FakeKindAdapter("places", "place")
         val sessions = FakeKindAdapter("timer", "session")
         val graph = HubContextRepository(database, HubAdapterRegistry(listOf(people, places, sessions)))
-        val giovanni = graph.bind(HubEntityRef("people", "person", "giovanni"))
-        val piazza = graph.bind(HubEntityRef("places", "place", "piazza-savona"))
-        val oscar = graph.bind(HubEntityRef("places", "place", "oscar-cafe"))
-        val feb = graph.bind(HubEntityRef("timer", "session", "12-02"))
-        val may = graph.bind(HubEntityRef("timer", "session", "17-05"))
-        val other = graph.bind(HubEntityRef("timer", "session", "session-x"))
+        val giovanni = graph.bind(canonicalFixture(database, "people", "person", "giovanni"))
+        val piazza = graph.bind(canonicalFixture(database, "places", "place", "piazza-savona"))
+        val oscar = graph.bind(canonicalFixture(database, "places", "place", "oscar-cafe"))
+        val feb = graph.bind(canonicalFixture(database, "timer", "session", "12-02"))
+        val may = graph.bind(canonicalFixture(database, "timer", "session", "17-05"))
+        val other = graph.bind(canonicalFixture(database, "timer", "session", "session-x"))
         graph.createContext(listOf(draft(giovanni), draft(piazza), draft(feb)))
         graph.createContext(listOf(draft(giovanni), draft(piazza), draft(may)))
         graph.createContext(listOf(draft(giovanni), draft(oscar), draft(other)))
 
-        val fromPerson = graph.explore(listOf(HubEntityRef("people", "person", "giovanni")))
+        val fromPerson = graph.explore(listOf(canonicalFixture(database, "people", "person", "giovanni")))
         assertEquals(mapOf("piazza-savona" to 2, "oscar-cafe" to 1), fromPerson.facets.single { it.entityKind == "place" }.candidates.associate { it.summary.ref.canonicalId to it.compatibleContextCount })
-        val narrowed = graph.explore(listOf(HubEntityRef("people", "person", "giovanni"), HubEntityRef("places", "place", "piazza-savona")))
+        val narrowed = graph.explore(listOf(canonicalFixture(database, "people", "person", "giovanni"), canonicalFixture(database, "places", "place", "piazza-savona")))
         assertEquals(setOf("12-02", "17-05"), narrowed.facets.single { it.entityKind == "session" }.candidates.map { it.summary.ref.canonicalId }.toSet())
         assertFalse(narrowed.facets.flatMap { it.candidates }.any { it.summary.ref.canonicalId == "session-x" })
-        val reverse = graph.explore(listOf(HubEntityRef("places", "place", "piazza-savona"), HubEntityRef("people", "person", "giovanni")))
+        val reverse = graph.explore(listOf(canonicalFixture(database, "places", "place", "piazza-savona"), canonicalFixture(database, "people", "person", "giovanni")))
         assertEquals(narrowed.facets, reverse.facets)
     }
 
@@ -134,13 +134,13 @@ class HubContextRepositoryTest {
         val people = FakeKindAdapter("people", "person")
         val places = FakeKindAdapter("places", "place")
         val graph = HubContextRepository(database, HubAdapterRegistry(listOf(people, places)))
-        val anchor = graph.bind(HubEntityRef("people", "person", "anchor"))
+        val anchor = graph.bind(canonicalFixture(database, "people", "person", "anchor"))
         repeat(300) { index ->
-            val place = graph.bind(HubEntityRef("places", "place", "place-$index"))
+            val place = graph.bind(canonicalFixture(database, "places", "place", "place-$index"))
             graph.createContext(listOf(draft(anchor), draft(place)))
         }
         val started = System.nanoTime()
-        val result = graph.explore(listOf(HubEntityRef("people", "person", "anchor")), limit = 200)
+        val result = graph.explore(listOf(canonicalFixture(database, "people", "person", "anchor")), limit = 200)
         val elapsedMs = (System.nanoTime() - started) / 1_000_000
         assertEquals(200, result.facets.single().candidates.size)
         assertTrue("Indexed 300-context query took ${elapsedMs}ms", elapsedMs < 2_000)
@@ -196,7 +196,7 @@ class HubContextRepositoryTest {
         assertNull(repository.type("user"))
     }
 
-    private fun ref(id: String) = HubEntityRef("fake", "item", id)
+    private fun ref(id: String) = canonicalFixture(database, "fake", "item", id)
     private fun draft(binding: HubEntityBinding) = HubContextMemberDraft(binding.id)
     private suspend fun assertFails(block: suspend () -> Unit) {
         try { block(); fail("Expected failure") } catch (_: IllegalArgumentException) { }

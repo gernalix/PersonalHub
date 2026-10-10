@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
 /** A timestamp snapshot. Source fields are descriptive links and never cascade to the source row. */
 @Entity(
     tableName = "since_when_counters",
-    indices = [
+    indices = [Index(value = ["canonical_id"], unique = true), 
         Index(value = ["source_entity_type", "source_entity_id", "initial_timestamp"], unique = true),
         Index("initial_timestamp"),
         Index("created_at"),
@@ -27,4 +27,6 @@ data class SinceWhenCounterEntity(
     @ColumnInfo(name = "source_entity_id") val sourceEntityId: String? = null,
     @ColumnInfo(name = "source_timestamp_field") val sourceTimestampField: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
+    @ColumnInfo(name = "legacy_source_entity_id") val legacySourceEntityId: String? = null,
 )

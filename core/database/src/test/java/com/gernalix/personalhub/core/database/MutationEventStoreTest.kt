@@ -123,6 +123,7 @@ class MutationEventStoreTest {
         )
         val event = MutationEventStore.recent(db).single { it.eventType == "hub.resource.created" }
         assertEquals("Workflowy · Study", JSONObject(event.contextJson).getString("name"))
+        db.execSQL("INSERT INTO places(uuid,nickname,created_at,updated_at,archived) VALUES('place-1','Fixture',?, ?,0)", arrayOf(now,now))
         val anchorBinding = UUID.randomUUID().toString()
         val resourceBinding = UUID.randomUUID().toString()
         val linkContext = UUID.randomUUID().toString()

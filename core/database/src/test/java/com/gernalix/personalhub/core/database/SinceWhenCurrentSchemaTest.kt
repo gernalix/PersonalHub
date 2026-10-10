@@ -29,6 +29,7 @@ class SinceWhenCurrentSchemaTest {
     }
 
     @Test fun currentSchemaPersistsSourceSnapshotAcrossReopenWithoutSourceForeignKey() = runBlocking {
+        PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL("INSERT INTO hub_entities VALUES('event-42','timer/quick_event_entry','timer','quick_event_entries','42','TOMBSTONED',1,1)")
         val dao = PersonalHubDatabase.get(context).sinceWhenCounterDao()
         val id = dao.insert(
             SinceWhenCounterEntity(
@@ -55,10 +56,11 @@ class SinceWhenCurrentSchemaTest {
             legacyTagIdsJson = "[42,73]", sourceEntityType = "timer/session",
             sourceEntityId = "gone-source", sourceTimestampField = "start", createdAt = 1790000000000L,
         )
+        PersonalHubDatabase.get(context).openHelper.writableDatabase.execSQL("INSERT INTO hub_entities VALUES('gone-source','timer/session','timer','sessions','42','TOMBSTONED',1,1)")
         val id = PersonalHubDatabase.get(context).sinceWhenCounterDao().insert(original)
         PersonalHubDatabase.closeInstance()
         val dao = PersonalHubDatabase.get(context).sinceWhenCounterDao()
-        assertEquals(original.copy(id = id), dao.get(id))
+        assertEquals(original.copy(id = id, canonicalId = requireNotNull(dao.get(id)).canonicalId), dao.get(id))
         val edited = requireNotNull(dao.get(id)).copy(title = "Edited", description = "Changed", initialTimestamp = 1790000067890L, endTimestamp = null, colorArgb = 0xFF2B5DAAL, displayUnitsJson = "[\"MINUTES\"]")
         dao.update(edited)
         PersonalHubDatabase.closeInstance()

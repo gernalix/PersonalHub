@@ -1,6 +1,7 @@
 package com.example.multitimetracker.hub
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import com.example.multitimetracker.core.session.DefaultSessionCore
 import com.example.multitimetracker.model.SessionUi
 import com.example.multitimetracker.persistence.SnapshotStore
@@ -14,19 +15,21 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     override val moduleId = "timer"
     override val entityKind = "session"
     override val capabilities = setOf("time_interval", "activity")
+    private val identities = CanonicalIdentityCapsule(context)
+    private fun local(id: String) = identities.localKey("timer/session", id)?.toLongOrNull()
     private val sessions = DefaultSessionCore(context.applicationContext)
     private val appContext = context.applicationContext
     private val fallbackStringId by lazy(LazyThreadSafetyMode.NONE) {
         appContext.resources.getIdentifier("hub_session_time_fallback", "string", appContext.packageName)
     }
 
-    override suspend fun exists(canonicalId: String) = canonicalId.toLongOrNull()?.let(sessions::readSessionById) != null
+    override suspend fun exists(canonicalId: String) = local(canonicalId)?.let(sessions::readSessionById) != null
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
 
     override suspend fun summaries(canonicalIds: Set<String>): Map<String, HubEntitySummary> {
         val tagNamesById = loadTagNamesById()
         return canonicalIds.mapNotNull { id ->
-            id.toLongOrNull()?.let(sessions::readSessionById)?.let { id to it.summary(tagNamesById) }
+            local(id)?.let(sessions::readSessionById)?.let { id to it.summary(tagNamesById) }
         }.toMap()
     }
 
@@ -38,7 +41,7 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     override suspend fun openTarget(canonicalId: String) = HubOpenTarget(HubDeepLinkContract.moduleUri("timer", "sessionId" to canonicalId).toString(), "com.example.multitimetracker.MainActivity")
 
     override suspend fun sinceWhenSource(canonicalId: String): SinceWhenSourceDescriptor? {
-        val session = canonicalId.toLongOrNull()?.let(sessions::readSessionById) ?: return null
+        val session = local(canonicalId)?.let(sessions::readSessionById) ?: return null
         return SinceWhenSourceDescriptor(
             entityType = "$moduleId/$entityKind",
             entityId = canonicalId,
@@ -52,7 +55,7 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     override suspend fun queryTemporal(query: HubTemporalQuery): HubTemporalPage = withContext(Dispatchers.IO) {
         val tagNamesById = loadTagNamesById()
         val cursor = decodeHubTemporalCursor(query.cursor)
-        val cursorId = cursor?.stableId?.toLongOrNull()
+        val cursorId = cursor?.stableId?.let(::local)
         val rows = sessions.readTemporalSessionsKeyset(
             query.fromMs,
             query.toMs,
@@ -72,17 +75,17 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     private fun SessionUi.temporal(tagNamesById: Map<Long, String>) = HubTemporalRecord(
         moduleId = moduleId,
         source = entityKind,
-        stableId = id.toString(),
+        stableId = identities.canonicalId("sessions", id),
         kind = HubTemporalKind.INTERVAL,
         startMs = startMs,
         endMs = endMs,
         title = hubLabel(tagNamesById),
         subtitle = tagNames(tagNamesById).takeIf { it.isNotEmpty() }?.joinToString(", "),
-        entityRef = HubEntityRef(moduleId, entityKind, id.toString()),
+        entityRef = HubEntityRef(moduleId, entityKind, identities.canonicalId("sessions", id)),
     )
 
     private fun SessionUi.summary(tagNamesById: Map<Long, String>) = HubEntitySummary(
-        HubEntityRef(moduleId, entityKind, id.toString()),
+        HubEntityRef(moduleId, entityKind, identities.canonicalId("sessions", id)),
         hubLabel(tagNamesById),
         description = tagNames(tagNamesById).takeIf { it.isNotEmpty() }?.joinToString(", "),
         attributes = buildMap {

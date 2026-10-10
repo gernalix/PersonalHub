@@ -6,6 +6,8 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
+import androidx.room.Transaction
 import androidx.room.Embedded
 import androidx.room.ColumnInfo
 import kotlinx.coroutines.flow.Flow
@@ -182,8 +184,12 @@ interface SostanzeDao {
     @Query("UPDATE prescriptions SET remaining_doses = :remaining WHERE id = :id")
     suspend fun updatePrescriptionRemaining(id: Long, remaining: Int)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertInteractionRule(rule: InteractionRuleEntity): Long
+    @Upsert
+    suspend fun upsertInteractionRuleRow(rule: InteractionRuleEntity): Long
+
+    @Transaction
+    suspend fun upsertInteractionRule(rule: InteractionRuleEntity): Long =
+        upsertInteractionRuleRow(rule).let { if (it == -1L) rule.id else it }
 
     @Update
     suspend fun updateInteractionRule(rule: InteractionRuleEntity)
@@ -221,8 +227,12 @@ interface SostanzeDao {
     @Query("DELETE FROM settings")
     suspend fun deleteAllSettings()
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertMacro(macro: MacroEntity): Long
+    @Upsert
+    suspend fun upsertMacroRow(macro: MacroEntity): Long
+
+    @Transaction
+    suspend fun upsertMacro(macro: MacroEntity): Long =
+        upsertMacroRow(macro).let { if (it == -1L) macro.id else it }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMacroItem(item: MacroItemEntity): Long

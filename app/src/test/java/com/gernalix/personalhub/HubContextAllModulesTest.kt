@@ -78,8 +78,8 @@ class HubContextAllModulesTest {
 
         val substanceId = db.dao().insertSubstance(substance("Vitamina D", "vitamina d"))
         val secondSubstanceId = db.dao().insertSubstance(substance("Magnesio", "magnesio"))
-        val substance = requireNotNull(substances.summaries(setOf(substanceId.toString()))[substanceId.toString()])
-        val secondSubstance = requireNotNull(substances.summaries(setOf(secondSubstanceId.toString()))[secondSubstanceId.toString()])
+        val substance = requireNotNull(substances.summaries(setOf(com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).canonicalId("substances", substanceId)))[com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).canonicalId("substances", substanceId)])
+        val secondSubstance = requireNotNull(substances.summaries(setOf(com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).canonicalId("substances", secondSubstanceId)))[com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).canonicalId("substances", secondSubstanceId)])
         val wordSessionId = "word-${UUID.randomUUID()}"
         db.wordPulseDao().insertSession(WordSession(wordSessionId, 1_770_897_600_000L, 1_770_897_660_000L))
         val wordSession = requireNotNull(words.summaries(setOf(wordSessionId))[wordSessionId])

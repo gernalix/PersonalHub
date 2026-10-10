@@ -15,7 +15,9 @@ class SinceWhenActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (com.gernalix.personalhub.core.database.DatabaseStartupGate.blockIfNotReady(this)) return
         enableEdgeToEdge()
-        val counterId = intent?.data?.lastPathSegment?.toLongOrNull()
+        val counterId = intent?.data?.lastPathSegment?.let { id ->
+            id.toLongOrNull() ?: com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(this).localKey("since_when/counter",id)?.toLongOrNull()
+        }
         setContent {
             PersonalHubTheme {
                 Surface(Modifier.fillMaxSize()) {

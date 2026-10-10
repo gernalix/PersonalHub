@@ -9,6 +9,7 @@ import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.contracts.database.HubCreateRequest
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import com.supercontacts.app.hub.PeopleHubAdapter
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -35,7 +36,7 @@ class HubContextVerticalSliceInstrumentedTest {
         val sessionId = DefaultSessionCore(context).insertSession("Hub QA Session $suffix", 1_000L, 4_000L, emptySet())
         try {
             HubContextRuntime.saveTimerLinks(sessionId, setOf(person.ref.canonicalId), place.ref.canonicalId)
-            val sessionRef = HubEntityRef("timer", "session", sessionId.toString())
+            val sessionRef = HubEntityRef("timer", "session", CanonicalIdentityCapsule(context).canonicalId("sessions", sessionId))
             assertEquals(setOf("people", "places"), HubContextRuntime.linked(sessionRef).map { it.ref.moduleId }.toSet())
             assertTrue(HubContextRuntime.linked(person.ref).any { it.ref == sessionRef })
             assertTrue(HubContextRuntime.linked(place.ref).any { it.ref == sessionRef })

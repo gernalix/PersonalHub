@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
 import androidx.room.withTransaction
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.HubActivityEntity
@@ -26,7 +27,8 @@ class HubContextRepository(
 ) {
     private val dao = database.hubContextDao()
 
-    suspend fun bind(ref: HubEntityRef): HubEntityBinding = database.withTransaction {
+    suspend fun bind(request: HubEntityRef): HubEntityBinding = database.withTransaction {
+        val ref = CanonicalIdentityCapsule.normalize(database.openHelper.readableDatabase, request)
         dao.binding(ref.moduleId, ref.entityKind, ref.canonicalId)?.let { return@withTransaction it }
         val adapter = adapters.adapter(ref)
         require(adapter.exists(ref.canonicalId)) { "Canonical entity does not exist" }
@@ -36,7 +38,10 @@ class HubContextRepository(
             .also { dao.insertBinding(it) }
     }
 
-    suspend fun binding(ref: HubEntityRef): HubEntityBinding? = dao.binding(ref.moduleId, ref.entityKind, ref.canonicalId)
+    suspend fun binding(request: HubEntityRef): HubEntityBinding? {
+        val ref = CanonicalIdentityCapsule.normalize(database.openHelper.readableDatabase, request)
+        return dao.binding(ref.moduleId, ref.entityKind, ref.canonicalId)
+    }
 
     suspend fun createContext(
         members: List<HubContextMemberDraft>,

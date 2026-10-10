@@ -29,7 +29,7 @@ internal suspend fun saveSinceWhenCounter(db: PersonalHubDatabase, value: SinceW
     return db.withTransaction {
         val dao = db.sinceWhenCounterDao()
         val id = if (value.id == 0L) dao.insert(value) else { dao.update(value); value.id }
-        HubContextRuntime.tags().replace(HubEntityRef("since_when", "counter", id.toString()), HubTagNamespaces.SINCE_WHEN, tagIds)
+        HubContextRuntime.tags().replace(HubEntityRef("since_when", "counter", requireNotNull(dao.get(id)).canonicalId), HubTagNamespaces.SINCE_WHEN, tagIds)
         id
     }
 }
@@ -63,7 +63,7 @@ internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: 
     var failed by remember { mutableStateOf(false) }
     var pickEnd by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(initial?.id) {
-        selectedTags = initial?.let { tags.tags(HubEntityRef("since_when", "counter", it.id.toString())).filter { t -> t.namespace == HubTagNamespaces.SINCE_WHEN || t.isGlobal }.map { t -> t.id }.toSet() }.orEmpty()
+        selectedTags = initial?.let { tags.tags(HubEntityRef("since_when", "counter", it.canonicalId)).filter { t -> t.namespace == HubTagNamespaces.SINCE_WHEN || t.isGlobal }.map { t -> t.id }.toSet() }.orEmpty()
         tagsReady = true
     }
     val units = remember(value.displayUnitsJson) {

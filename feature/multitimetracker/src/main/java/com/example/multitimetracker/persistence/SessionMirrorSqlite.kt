@@ -108,7 +108,8 @@ fun mirrorFromSnapshot(
         val db = helper(context).writableDatabase
         db.beginTransaction()
         try {
-            // Replace-all strategy: simplest & safest for phase 1.
+            // Once sessions are authoritative, importing the legacy snapshot must not replace their identities.
+            db.rawQuery("SELECT 1 FROM sessions LIMIT 1", null).use { check(!it.moveToFirst()) { "Legacy session bootstrap requires an empty session table" } }
             db.delete(SnapshotSqlite.SESSION_TAGS_TABLE, null, null)
             db.delete(SnapshotSqlite.SESSIONS_TABLE, null, null)
 

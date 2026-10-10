@@ -10,6 +10,7 @@ import androidx.room.withTransaction
 import com.gernalix.personalhub.contracts.database.HubCreateRequest
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
+import com.gernalix.personalhub.contracts.database.HubExternalIdentity
 import com.gernalix.personalhub.contracts.database.HubResourceKinds
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.CancellationException
@@ -303,7 +304,7 @@ object WorkflowyHubBridge {
     suspend fun createNote(context: Context, anchor: HubEntityRef, text: String): WorkflowyCreatedNode {
         val created = WorkflowyApiClient.createNode(context, text)
         try {
-            attachUrl(context, anchor, created.deepLink, labelFor(text))
+            attachCreatedNode(context, anchor, created, labelFor(text))
         } catch (error: CancellationException) {
             withContext(NonCancellable) { runCatching { WorkflowyApiClient.deleteNode(context, created.id) } }
             throw error
@@ -317,7 +318,7 @@ object WorkflowyHubBridge {
     suspend fun createEmptyAndOpen(context: Context, anchor: HubEntityRef): WorkflowyCreatedNode {
         val created = WorkflowyApiClient.createEmptyNode(context)
         try {
-            attachUrl(context, anchor, created.deepLink)
+            attachCreatedNode(context, anchor, created, "Workflowy")
         } catch (error: CancellationException) {
             withContext(NonCancellable) { runCatching { WorkflowyApiClient.deleteNode(context, created.id) } }
             throw error
@@ -328,6 +329,16 @@ object WorkflowyHubBridge {
         if (!open(context, created.deepLink)) error("Could not open Workflowy node")
         return created
     }
+
+    private suspend fun attachCreatedNode(context: Context, anchor: HubEntityRef, node: WorkflowyCreatedNode, label: String) =
+        PersonalHubDatabase.get(context).withTransaction {
+            val resource = attachUrl(context, anchor, node.deepLink, label)
+            val now = System.currentTimeMillis()
+            com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).linkExternal(
+                HubExternalIdentity(canonicalId=resource.ref.canonicalId,entityKind="hub/resource",system="workflowy",sourceScope="nodes",externalId=node.id,linkMethod="provider-created",createdAt=now,updatedAt=now),
+            )
+            resource
+        }
 
     suspend fun attachUrl(
         context: Context,

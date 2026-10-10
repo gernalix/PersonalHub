@@ -60,6 +60,7 @@ internal object GitDataFormat {
                 val cached = GitDataSettings.readCachedStateManifest(context)
                 val cachedSchema = cached?.optInt("schema_version", -1) ?: -1
                 val cachedEntries = cachedEntries(cached)
+                val identityContract = JSONObject(context.assets.open("canonical-identities.json").bufferedReader().use { it.readText() })
                 val cachedObjects = cached?.optJSONArray("objects")?.let { array ->
                     buildSet {
                         for (i in 0 until array.length()) add(array.getString(i))
@@ -96,10 +97,19 @@ internal object GitDataFormat {
                         if (previousHashes[path] != sha256(bytes)) files[path] = bytes
                     }
                     entries[table] = snapshot.entry
+                    val classified = identityContract.getJSONArray("tables")
+                    for (i in 0 until classified.length()) {
+                        val item = classified.getJSONObject(i)
+                        if (item.getString("table") == table && item.getString("classification") == "canonical") {
+                            snapshot.entry.put("identity", JSONObject().put("entity_kind",item.getString("kind")).put("canonical_id_column",item.getString("column")))
+                            snapshot.entry.put("storage_key", JSONArray(SyncJournal.primaryKeys(PersonalHubDatabase.get(context).openHelper.readableDatabase,table)))
+                        }
+                    }
                 }
 
                 val manifest = JSONObject()
                     .put("format_version", 2)
+                    .put("identity_contract", "personalhub.canonical.v1")
                     .put("schema_version", PersonalHubDatabase.SCHEMA_VERSION)
                     .put("app_version", appVersion(context))
                     .put("generation", generation)
@@ -198,6 +208,8 @@ internal object GitDataFormat {
             output.append(
                 JSONObject()
                     .put("format_version", 1)
+                    .put("entity_kind", event.entityKind ?: JSONObject.NULL)
+                    .put("canonical_id", event.canonicalId ?: JSONObject.NULL)
                     .put("event_id", event.id)
                     .put("timestamp_ms", event.occurredAt)
                     .put("author", event.author)
@@ -924,6 +936,8 @@ internal object GitStateRestorer {
                     )
                 }
             }
+            // Semantic facts are exported, but their runtime table is outside Room's entity manifest.
+            db.execSQL(com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore.createTableSql)
             val views = schema.optJSONArray("views") ?: JSONArray()
             for (i in 0 until views.length()) {
                 db.execSQL(views.getJSONObject(i).getString("createSql"))
@@ -966,7 +980,7 @@ internal object GitStateRestorer {
                         require(GitDataFormat.sha256(bytes) == entry.getString("sha256")) {
                             "State file hash mismatch: $table"
                         }
-                        importTable(db, table, bytes, transport, revision)
+                        importTable(db, table, bytes, transport, revision, entry.optJSONObject("identity"))
                     } else {
                         for (j in 0 until shards.length()) {
                             val shard = shards.getJSONObject(j)
@@ -974,7 +988,7 @@ internal object GitStateRestorer {
                             require(GitDataFormat.sha256(bytes) == shard.getString("sha256")) {
                                 "State shard hash mismatch: $table"
                             }
-                            importTable(db, table, bytes, transport, revision)
+                            importTable(db, table, bytes, transport, revision, entry.optJSONObject("identity"))
                         }
                     }
                 }
@@ -1005,6 +1019,7 @@ internal object GitStateRestorer {
         bytes: ByteArray,
         transport: GitHubDataTransport,
         revision: String,
+        identity: JSONObject?,
     ) {
         val allowed = db.rawQuery("PRAGMA table_info(`$table`)", null).use { cursor ->
             buildSet {
@@ -1014,6 +1029,7 @@ internal object GitStateRestorer {
         require(allowed.isNotEmpty()) { "State references a table absent from its schema: $table" }
         String(bytes, Charsets.UTF_8).lineSequence().filter { it.isNotBlank() }.forEach { line ->
             val row = JSONObject(line)
+            identity?.let { contract -> require(row.optString(contract.getString("canonical_id_column")).isNotBlank()) { "Missing canonical identity: $table" } }
             val values = ContentValues()
             row.keys().forEach { column ->
                 require(column in allowed) { "State contains unknown column: $table.$column" }

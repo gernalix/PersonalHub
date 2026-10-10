@@ -78,7 +78,7 @@ class HubContextAllModulesDeviceTest {
         val transaction = runBlocking { requireNotNull(soldi.summaries(setOf(transactionUuid))[transactionUuid]) }
         val linkedTransaction = runBlocking { requireNotNull(soldi.summaries(setOf(linkedTransactionUuid))[linkedTransactionUuid]) }
         val substanceId = runBlocking { db.dao().insertSubstance(SubstanceEntity(name = "Vitamina $suffix", canonicalName = "vitamina-$suffix", type = "integratore", stockCurrent = 10.0, stockUnit = "dose", dosePerIntake = 1.0, doseUnit = "dose", dailyFrequency = 1, startEpochDay = 20_000)) }
-        val substance = runBlocking { requireNotNull(substances.summaries(setOf(substanceId.toString()))[substanceId.toString()]) }
+        val substance = runBlocking { requireNotNull(substances.summaries(setOf(com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).canonicalId("substances", substanceId)))[com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule(context).canonicalId("substances", substanceId)]) }
         val wordId = "word-$suffix"
         runBlocking { db.wordPulseDao().insertSession(WordSession(wordId, System.currentTimeMillis(), null)) }
         val word = runBlocking { requireNotNull(words.summaries(setOf(wordId))[wordId]) }

@@ -1,0 +1,664 @@
+{
+  "version": 1,
+  "schema_version": 24,
+  "wire_contract": [
+    "entity_kind",
+    "canonical_id"
+  ],
+  "tables": [
+    {
+      "table": "finance_accounts",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/account",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "finance_products",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/product",
+      "key": "id",
+      "column": "uuid",
+      "added": false
+    },
+    {
+      "table": "finance_titles",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/title",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "finance_chains",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/chain",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "finance_stores",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "finance_transactions",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/transaction",
+      "key": "id",
+      "column": "uuid",
+      "added": false
+    },
+    {
+      "table": "finance_tags",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/tag",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "finance_transaction_tags",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "finance_transfers",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/transfer",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "finance_macros",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/macro",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "finance_recurrences",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/recurrence",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "finance_recurrence_tags",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "finance_recurrence_overrides",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "finance_attachments",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/attachment",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "finance_photo_index",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "finance_owned_items",
+      "classification": "canonical",
+      "module": "soldi",
+      "kind": "soldi/owned_item",
+      "key": "uuid",
+      "column": "uuid",
+      "added": false
+    },
+    {
+      "table": "backup_metadata",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "contacts",
+      "classification": "canonical",
+      "module": "people",
+      "kind": "people/person",
+      "key": "id",
+      "column": "public_id",
+      "added": false,
+      "tombstone_column": "deleted_at"
+    },
+    {
+      "table": "contact_fields",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "contact_events",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "contact_initiatives",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "contact_messaging_links",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "saved_searches",
+      "classification": "canonical",
+      "module": "people",
+      "kind": "people/saved_search",
+      "key": "id",
+      "column": "public_id",
+      "added": false
+    },
+    {
+      "table": "saved_search_tags",
+      "classification": "exempt",
+      "reason": "Legacy tag compatibility/index; unified hub_tags is canonical. No competing tag identity."
+    },
+    {
+      "table": "tags",
+      "classification": "exempt",
+      "reason": "Legacy tag compatibility/index; unified hub_tags is canonical. No competing tag identity."
+    },
+    {
+      "table": "contact_tags",
+      "classification": "exempt",
+      "reason": "Legacy tag compatibility/index; unified hub_tags is canonical. No competing tag identity."
+    },
+    {
+      "table": "places",
+      "classification": "canonical",
+      "module": "places",
+      "kind": "places/place",
+      "key": "uuid",
+      "column": "uuid",
+      "added": false
+    },
+    {
+      "table": "place_aliases",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "place_links",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "place_events",
+      "classification": "canonical",
+      "module": "places",
+      "kind": "places/event",
+      "key": "id",
+      "column": "event_uuid",
+      "added": false
+    },
+    {
+      "table": "check_in_attempts",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "check_in_attempt_candidates",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "global_stats_state",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "route_distance_cache",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "history_audit_log",
+      "classification": "canonical",
+      "module": "places",
+      "kind": "places/audit",
+      "key": "id",
+      "column": "audit_uuid",
+      "added": false
+    },
+    {
+      "table": "history_actions",
+      "classification": "canonical",
+      "module": "places",
+      "kind": "places/action",
+      "key": "id",
+      "column": "action_uuid",
+      "added": false
+    },
+    {
+      "table": "place_geofence_configs",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "place_geofence_transition_log",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "place_tags",
+      "classification": "exempt",
+      "reason": "Legacy tag compatibility/index; unified hub_tags is canonical. No competing tag identity."
+    },
+    {
+      "table": "place_tag_cross_ref",
+      "classification": "exempt",
+      "reason": "Legacy tag compatibility/index; unified hub_tags is canonical. No competing tag identity."
+    },
+    {
+      "table": "alert_rules",
+      "classification": "canonical",
+      "module": "alerts",
+      "kind": "alerts/alert",
+      "key": "id",
+      "column": "id",
+      "added": false,
+      "tombstone_column": "deleted_at"
+    },
+    {
+      "table": "alert_place_tag_targets",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "substances",
+      "classification": "canonical",
+      "module": "substances",
+      "kind": "substances/substance",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "intake_events",
+      "classification": "canonical",
+      "module": "substances",
+      "kind": "substances/intake",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "stock_adjustments",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "prescriptions",
+      "classification": "canonical",
+      "module": "substances",
+      "kind": "substances/prescription",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "interaction_rules",
+      "classification": "canonical",
+      "module": "substances",
+      "kind": "substances/interaction_rule",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "interaction_targets",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "notification_state",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "settings",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "macros",
+      "classification": "canonical",
+      "module": "substances",
+      "kind": "substances/macro",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "macro_items",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "app_state",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "correction_events",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "word_entries",
+      "classification": "exempt",
+      "reason": "High-volume subordinate session data; no verified external targeting requirement."
+    },
+    {
+      "table": "wordpulse_sessions",
+      "classification": "canonical",
+      "module": "wordpulse",
+      "kind": "wordpulse/word_session",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "pvt_results",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "audit_events",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "integrity_stats",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "quick_event_entries",
+      "classification": "canonical",
+      "module": "timer",
+      "kind": "timer/quick_event_entry",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true,
+      "tombstone_column": "deleted_at_ms"
+    },
+    {
+      "table": "quick_event_entry_field_values",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "quick_event_entry_tags",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "quick_event_macro_actions",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "quick_event_macro_tags",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "quick_event_macros",
+      "classification": "canonical",
+      "module": "timer",
+      "kind": "timer/quick_event_macro",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true,
+      "tombstone_column": "deleted_at_ms"
+    },
+    {
+      "table": "quick_event_template_fields",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "quick_event_template_tags",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "quick_event_templates",
+      "classification": "canonical",
+      "module": "timer",
+      "kind": "timer/quick_event_template",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true,
+      "tombstone_column": "deleted_at_ms"
+    },
+    {
+      "table": "session_tags",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "sessions",
+      "classification": "canonical",
+      "module": "timer",
+      "kind": "timer/session",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true,
+      "tombstone_column": "deleted_at_ms"
+    },
+    {
+      "table": "snapshot",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "snapshot_history",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "snapshot_payloads",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "ui_prefs_mirror",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "sync_meta",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "sync_queue",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "sync_shadow",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "people_photos",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "hub_generation",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "hub_preferences",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "hub_sync_pending",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "hub_sync_known",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    },
+    {
+      "table": "hub_entity_bindings",
+      "classification": "exempt",
+      "reason": "Binding layer; resolves to a registry entity. Its ID is a binding ID only."
+    },
+    {
+      "table": "hub_context_types",
+      "classification": "canonical",
+      "module": "hub",
+      "kind": "hub/context_type",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "hub_context_type_fields",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "hub_contexts",
+      "classification": "canonical",
+      "module": "hub",
+      "kind": "hub/context",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "hub_context_members",
+      "classification": "exempt",
+      "reason": "Membership edge. entity_id is the legacy binding FK; new entity_canonical_id addresses the entity."
+    },
+    {
+      "table": "hub_tags",
+      "classification": "canonical",
+      "module": "tags",
+      "kind": "tags/tag",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "hub_tag_aliases",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "hub_tag_assignments",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "hub_tag_parents",
+      "classification": "exempt",
+      "reason": "Subordinate record; addressed through its owner. Local keys are restore storage keys only."
+    },
+    {
+      "table": "hub_saved_tag_filters",
+      "classification": "canonical",
+      "module": "tags",
+      "kind": "tags/saved_filter",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "hub_resources",
+      "classification": "canonical",
+      "module": "hub",
+      "kind": "hub/resource",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "hub_activity_log",
+      "classification": "canonical",
+      "module": "hub",
+      "kind": "hub/activity",
+      "key": "id",
+      "column": "id",
+      "added": false
+    },
+    {
+      "table": "since_when_counters",
+      "classification": "canonical",
+      "module": "since_when",
+      "kind": "since_when/counter",
+      "key": "id",
+      "column": "canonical_id",
+      "added": true
+    },
+    {
+      "table": "since_when_migration_state",
+      "classification": "exempt",
+      "reason": "Internal state, cache, snapshot, or derived projection; no external object targeting."
+    }
+  ],
+  "virtual_entities": [
+    {
+      "table": "snapshot.timeFenceRules",
+      "module": "timer",
+      "kind": "timer/alert",
+      "key": "id",
+      "source_table": "snapshot",
+      "source_key": 1,
+      "json_array": "timeFenceRules",
+      "classification": "canonical",
+      "reason": "Addressable Timer alert objects inside the current snapshot. Identity lives once in hub_entities; snapshot rows/history remain internal."
+    }
+  ],
+  "registries": {
+    "hub_entities": "Identity relationship/registry record, not a second recursively registered domain entity.",
+    "hub_external_identities": "Identity relationship/registry record, not a second recursively registered domain entity.",
+    "hub_entity_aliases": "Identity relationship/registry record, not a second recursively registered domain entity."
+  },
+  "runtime_tables": {
+    "mutation_events": "Exempt subordinate semantic facts. Existing internal event_id identifies an audit/undo fact; entity_kind and canonical_id address its registered domain target. Not a second domain identity authority.",
+    "hub_git_pending": "Exempt coalescing export journal.",
+    "hub_git_events": "Exempt raw storage edits; canonical target pair is attached at history export.",
+    "hub_git_edit_context": "Exempt transaction-scoped edit context.",
+    "hub_git_applied_patches": "Exempt applied-patch receipts.",
+    "hub_git_history_index": "Exempt derived History index.",
+    "hub_git_history_field_stats": "Exempt derived History field statistics.",
+    "hub_activity_undo_context": "Exempt transaction-scoped undo control."
+  }
+}

@@ -21,6 +21,8 @@ data class MutationEvent(
     val afterJson: String?,
     val contextJson: String,
     val schemaVersion: Int,
+    val entityKind: String? = null,
+    val canonicalId: String? = null,
 )
 
 data class MutationEventDraft(
@@ -43,8 +45,7 @@ object MutationEventStore {
 
     fun newTransactionId(): String = UUID.randomUUID().toString()
 
-    fun install(db: SupportSQLiteDatabase) {
-        db.execSQL(
+    internal val createTableSql =
             """CREATE TABLE IF NOT EXISTS mutation_events (
                 event_id TEXT NOT NULL PRIMARY KEY,
                 occurred_at INTEGER NOT NULL,
@@ -60,9 +61,15 @@ object MutationEventStore {
                 after_json TEXT,
                 context_json TEXT NOT NULL DEFAULT '{}',
                 schema_version INTEGER NOT NULL,
+                entity_kind TEXT,
+                canonical_id TEXT,
                 UNIQUE(transaction_id, sequence)
-            )""".trimIndent(),
-        )
+            )""".trimIndent()
+
+    fun install(db: SupportSQLiteDatabase) {
+        db.execSQL(createTableSql)
+        val columns = db.query("PRAGMA table_info(mutation_events)").use { c -> buildSet { while(c.moveToNext()) add(c.getString(1)) } }
+        for (column in listOf("entity_kind", "canonical_id")) if (column !in columns) db.execSQL("ALTER TABLE mutation_events ADD COLUMN `$column` TEXT")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_mutation_events_occurred_at ON mutation_events(occurred_at DESC, event_id DESC)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_mutation_events_transaction_id ON mutation_events(transaction_id, sequence)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_mutation_events_event_type ON mutation_events(event_type)")
@@ -125,7 +132,7 @@ object MutationEventStore {
         require(limit in 1..10_000)
         return db.query(
             """SELECT event_id,occurred_at,transaction_id,sequence,module,event_type,entity_type,
-                entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version
+                entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id
                 FROM mutation_events ORDER BY occurred_at DESC,event_id DESC LIMIT ?""".trimIndent(),
             arrayOf(limit),
         ).use { cursor ->
@@ -137,14 +144,14 @@ object MutationEventStore {
 
     fun byTransaction(db: SupportSQLiteDatabase, transactionId: String): List<MutationEvent> = db.query(
         """SELECT event_id,occurred_at,transaction_id,sequence,module,event_type,entity_type,
-            entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version
+            entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id
             FROM mutation_events WHERE transaction_id=? ORDER BY sequence""".trimIndent(),
         arrayOf(transactionId),
     ).use { cursor -> buildList { while (cursor.moveToNext()) add(read(cursor)) } }
 
     fun byId(db: SupportSQLiteDatabase, eventId: String): MutationEvent? = db.query(
         """SELECT event_id,occurred_at,transaction_id,sequence,module,event_type,entity_type,
-            entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version
+            entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id
             FROM mutation_events WHERE event_id=? LIMIT 1""".trimIndent(),
         arrayOf(eventId),
     ).use { cursor -> if (cursor.moveToFirst()) read(cursor) else null }
@@ -163,5 +170,6 @@ object MutationEventStore {
         actorType = cursor.getString(8), actorSource = cursor.getString(9),
         beforeJson = cursor.getString(10), afterJson = cursor.getString(11),
         contextJson = cursor.getString(12), schemaVersion = cursor.getInt(13),
+        entityKind = cursor.getString(14), canonicalId = cursor.getString(15),
     )
 }

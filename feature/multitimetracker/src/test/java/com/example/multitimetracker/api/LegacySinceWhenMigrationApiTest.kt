@@ -39,7 +39,8 @@ class LegacySinceWhenMigrationApiTest {
         assertEquals(listOf(row), db.sinceWhenCounterDao().all())
     }
     @Test fun autonomousIdCollisionPreservesBothCountersAndRetriesDoNotDuplicate() = runBlocking {
-        val canonical = SinceWhenCounterEntity(id = 7, title = "Autonomous", initialTimestamp = 1790000000000L, sourceEntityType = "soldi/transaction", sourceEntityId = "kept", sourceTimestampField = "occurredAt", createdAt = 1)
+        val canonical = SinceWhenCounterEntity(id = 7, title = "Autonomous", initialTimestamp = 1790000000000L, sourceEntityType = "soldi/transaction", sourceEntityId = "kept", sourceTimestampField = "occurredAt", createdAt = 1, canonicalId = java.util.UUID.randomUUID().toString())
+        db.openHelper.writableDatabase.execSQL("INSERT INTO hub_entities VALUES('kept','soldi/transaction','soldi','finance_transactions','99','TOMBSTONED',1,1)")
         db.sinceWhenCounterDao().insert(canonical)
         snapshot(legacy)
         LegacySinceWhenMigrationApi.ensureMigrated(context)

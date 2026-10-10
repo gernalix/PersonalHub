@@ -18,6 +18,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.multitimetracker.R
 import com.example.multitimetracker.hub.TimerSessionHubAdapter
 import com.example.multitimetracker.model.SessionUi
+import com.example.multitimetracker.registerCanonicalTimerSessionFixture
 import com.example.multitimetracker.model.Tag
 import com.example.multitimetracker.model.TimedTagNotificationType
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
@@ -324,7 +325,7 @@ class SessionEditDialogRegressionInstrumentedTest {
             endMs = endMs,
             tagIds = tagIds,
             deletedAtMs = null,
-        )
+        ).also(::registerCanonicalTimerSessionFixture)
 
     private fun tag(
         id: Long,
