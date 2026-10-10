@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="since_when_editor_save">Save</string>
+    <string name="since_when_editor_has_end">Has end date and time</string>
+    <string name="since_when_editor_ends_at">Ends at %1$s</string>
+    <string name="since_when_editor_end_error">End must be after start.</string>
+    <string name="since_when_editor_color">Color</string>
+    <string name="since_when_editor_teal">Teal</string>
+    <string name="since_when_editor_blue">Blue</string>
+    <string name="since_when_editor_amber">Amber</string>
+    <string name="since_when_editor_rose">Rose</string>
+    <string name="since_when_editor_olive">Olive</string>
+    <string name="since_when_editor_slate">Slate</string>
+    <string name="since_when_editor_units">Display units</string>
+    <string name="since_when_editor_years">Years</string>
+    <string name="since_when_editor_months">Months</string>
+    <string name="since_when_editor_weeks">Weeks</string>
+    <string name="since_when_editor_days">Days</string>
+    <string name="since_when_editor_hours">Hours</string>
+    <string name="since_when_editor_minutes">Minutes</string>
+    <string name="since_when_editor_seconds">Seconds</string>
+    <string name="since_when_editor_tags">Since When tags</string>
+    <string name="since_when_editor_no_tags">No Since When tags available.</string>
+    <string name="since_when_editor_create">Create counter</string>
+    <string name="since_when_editor_edit">Edit counter</string>
+    <string name="since_when_editor_counter_name">Counter name</string>
+    <string name="since_when_editor_description">Description</string>
+    <string name="since_when_editor_starts_from">Starts from: %1$s</string>
+    <string name="since_when_editor_cancel">Cancel</string>
+    <string name="since_when_editor_save_error">Could not save the counter. Try again.</string>
+</resources>

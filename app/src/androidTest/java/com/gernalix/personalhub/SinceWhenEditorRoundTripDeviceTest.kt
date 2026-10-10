@@ -38,6 +38,9 @@ class SinceWhenEditorRoundTripDeviceTest {
 
     @Test fun autonomousCreateSaveReopenEditReadbackPreservesAllFieldsAndLegacyProvenance() {
         check(context.packageName == "com.gernalix.personalhub.qa")
+        val italian = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale.ITALIAN) })
+        assertEquals("Nome del contatore", italian.getString(com.gernalix.personalhub.core.ui.R.string.since_when_editor_counter_name))
+        assertEquals("Unità di visualizzazione", italian.getString(com.gernalix.personalhub.core.ui.R.string.since_when_editor_units))
         db.openHelper.writableDatabase
         initializeHubContextRuntime(context)
         val suffix = System.currentTimeMillis().toString()
@@ -79,6 +82,7 @@ class SinceWhenEditorRoundTripDeviceTest {
             node("sincewhen-save").performClick()
             awaitSaved("$title edited")
             val edited = row("$title edited")
+            assertEquals(listOf(tag.id), runBlocking { tags.tags(HubEntityRef("since_when", "counter", edited.id.toString())).map { it.id } })
             assertEquals(13, Instant.ofEpochMilli(edited.initialTimestamp).atZone(ZoneId.systemDefault()).hour)
             assertEquals(47, Instant.ofEpochMilli(edited.initialTimestamp).atZone(ZoneId.systemDefault()).minute)
             assertEquals(23, Instant.ofEpochMilli(edited.endTimestamp!!).atZone(ZoneId.systemDefault()).hour)
@@ -92,7 +96,7 @@ class SinceWhenEditorRoundTripDeviceTest {
             compose.waitUntil(10000) { runBlocking { db.sinceWhenCounterDao().get(edited.id)?.endTimestamp == null } }
             assertEquals(edited.copy(endTimestamp = null), runBlocking { db.sinceWhenCounterDao().get(edited.id) })
         } finally { scenario.close() }
-        val legacy = SinceWhenCounterEntity(title = "B6 Legacy $suffix", description = "Legacy snapshot", initialTimestamp = Instant.parse("2026-02-10T13:47:23.456Z").toEpochMilli(), endTimestamp = Instant.parse("2026-02-11T18:29:45.678Z").toEpochMilli(), colorArgb = 0xFF9B3D5CL, displayUnitsJson = "[\"MINUTES\",\"SECONDS\"]", legacyTagIdsJson = "[42,73]", sourceEntityType = "timer/session", sourceEntityId = "b6-missing-source", sourceTimestampField = "start", createdAt = 1790000000000)
+        val legacy = SinceWhenCounterEntity(title = "B6 Legacy $suffix", description = "Legacy snapshot", initialTimestamp = Instant.parse("2026-02-10T13:47:23.456Z").toEpochMilli(), endTimestamp = Instant.parse("2026-02-11T18:29:45.678Z").toEpochMilli(), colorArgb = 0xFF9B3D5CL, displayUnitsJson = "[\"MINUTES\",\"SECONDS\"]", legacyTagIdsJson = "[42,73]", sourceEntityType = "timer/session", sourceEntityId = "b6-missing-source-$suffix", sourceTimestampField = "start", createdAt = 1790000000000)
         val id = runBlocking { db.sinceWhenCounterDao().insert(legacy) }
         val old = ActivityScenario.launch<SinceWhenActivity>(Intent(context, SinceWhenActivity::class.java).setData(Uri.parse("personalhub://sincewhen/v1/counter/$id")))
         try {
@@ -104,6 +108,7 @@ class SinceWhenEditorRoundTripDeviceTest {
             old.recreate()
             waitEditor()
             node("sincewhen-description").assertTextContains("Legacy snapshot")
+            androidx.test.uiautomator.UiDevice.getInstance(androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()).takeScreenshot(java.io.File(context.cacheDir, "925611-editor.png"))
         } finally { old.close() }
     }
 }

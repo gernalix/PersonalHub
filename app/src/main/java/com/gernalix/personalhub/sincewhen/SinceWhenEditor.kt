@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.gernalix.personalhub.R
+import com.gernalix.personalhub.core.ui.R
 import com.gernalix.personalhub.contracts.database.*
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
@@ -73,7 +73,7 @@ internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: 
     val valid = value.title.isNotBlank() && units.isNotEmpty() && (!hasEnd || end > value.initialTimestamp)
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
-        title = { Text(stringResource(if (initial == null) R.string.since_when_create else R.string.since_when_edit)) },
+        title = { Text(stringResource(if (initial == null) R.string.since_when_editor_create else R.string.since_when_editor_edit)) },
         confirmButton = { TextButton(modifier = Modifier.testTag("sincewhen-save"), enabled = valid && tagsReady && !saving, onClick = {
             saving = true
             failed = false
@@ -83,40 +83,40 @@ internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: 
                     onSaved()
                 } catch (_: Exception) { failed = true } finally { saving = false }
             }
-        }) { Text(stringResource(R.string.since_when_save)) } },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text(stringResource(R.string.since_when_cancel)) } },
+        }) { Text(stringResource(R.string.since_when_editor_save)) } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text(stringResource(R.string.since_when_editor_cancel)) } },
         text = {
             Column(Modifier.testTag("sincewhen-fields").verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value.title, { value = value.copy(title = it) }, modifier = Modifier.fillMaxWidth().testTag("sincewhen-title"), label = { Text(stringResource(R.string.since_when_counter_name)) }, singleLine = true, enabled = !saving)
-                OutlinedTextField(value.description, { value = value.copy(description = it) }, modifier = Modifier.fillMaxWidth().testTag("sincewhen-description"), label = { Text(stringResource(R.string.since_when_description)) }, enabled = !saving)
+                OutlinedTextField(value.title, { value = value.copy(title = it) }, modifier = Modifier.fillMaxWidth().testTag("sincewhen-title"), label = { Text(stringResource(R.string.since_when_editor_counter_name)) }, singleLine = true, enabled = !saving)
+                OutlinedTextField(value.description, { value = value.copy(description = it) }, modifier = Modifier.fillMaxWidth().testTag("sincewhen-description"), label = { Text(stringResource(R.string.since_when_editor_description)) }, enabled = !saving)
                 TextButton(modifier = Modifier.testTag("sincewhen-start"), enabled = !saving, onClick = { pickEnd = false }) {
-                    Text(stringResource(R.string.since_when_starts_from, formatSinceWhenTimestamp(value.initialTimestamp)))
+                    Text(stringResource(R.string.since_when_editor_starts_from, formatSinceWhenTimestamp(value.initialTimestamp)))
                 }
-                Row { Checkbox(hasEnd, { hasEnd = it }, modifier = Modifier.testTag("sincewhen-has-end"), enabled = !saving); Text(stringResource(R.string.since_when_has_end)) }
+                Row { Checkbox(hasEnd, { hasEnd = it }, modifier = Modifier.testTag("sincewhen-has-end"), enabled = !saving); Text(stringResource(R.string.since_when_editor_has_end)) }
                 if (hasEnd) {
-                    TextButton(modifier = Modifier.testTag("sincewhen-end"), enabled = !saving, onClick = { pickEnd = true }) { Text(stringResource(R.string.since_when_ends_at, formatSinceWhenTimestamp(end))) }
-                    if (end <= value.initialTimestamp) Text(stringResource(R.string.since_when_end_error), color = MaterialTheme.colorScheme.error)
+                    TextButton(modifier = Modifier.testTag("sincewhen-end"), enabled = !saving, onClick = { pickEnd = true }) { Text(stringResource(R.string.since_when_editor_ends_at, formatSinceWhenTimestamp(end))) }
+                    if (end <= value.initialTimestamp) Text(stringResource(R.string.since_when_editor_end_error), color = MaterialTheme.colorScheme.error)
                 }
-                Text(stringResource(R.string.since_when_color))
+                Text(stringResource(R.string.since_when_editor_color))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(0xFF168A83L to R.string.since_when_teal, 0xFF2B5DAAL to R.string.since_when_blue, 0xFFB86E00L to R.string.since_when_amber, 0xFF9B3D5CL to R.string.since_when_rose, 0xFF5E7F28L to R.string.since_when_olive, 0xFF5C6470L to R.string.since_when_slate).forEach { (color, label) ->
+                    listOf(0xFF168A83L to R.string.since_when_editor_teal, 0xFF2B5DAAL to R.string.since_when_editor_blue, 0xFFB86E00L to R.string.since_when_editor_amber, 0xFF9B3D5CL to R.string.since_when_editor_rose, 0xFF5E7F28L to R.string.since_when_editor_olive, 0xFF5C6470L to R.string.since_when_editor_slate).forEach { (color, label) ->
                         FilterChip(value.colorArgb == color, { value = value.copy(colorArgb = color) }, label = { Text(stringResource(label)) }, enabled = !saving, modifier = Modifier.testTag("sincewhen-color-$color"), leadingIcon = { Surface(color = androidx.compose.ui.graphics.Color(color)) { Spacer(Modifier.size(14.dp)) } })
                     }
                 }
-                Text(stringResource(R.string.since_when_units))
+                Text(stringResource(R.string.since_when_editor_units))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("YEARS" to R.string.since_when_years, "MONTHS" to R.string.since_when_months, "WEEKS" to R.string.since_when_weeks, "DAYS" to R.string.since_when_days, "HOURS" to R.string.since_when_hours, "MINUTES" to R.string.since_when_minutes, "SECONDS" to R.string.since_when_seconds).forEach { (unit, label) ->
+                    listOf("YEARS" to R.string.since_when_editor_years, "MONTHS" to R.string.since_when_editor_months, "WEEKS" to R.string.since_when_editor_weeks, "DAYS" to R.string.since_when_editor_days, "HOURS" to R.string.since_when_editor_hours, "MINUTES" to R.string.since_when_editor_minutes, "SECONDS" to R.string.since_when_editor_seconds).forEach { (unit, label) ->
                         FilterChip(unit in units, { val next = if (unit in units) units - unit else units + unit; value = value.copy(displayUnitsJson = JSONArray(next.toList()).toString()) }, label = { Text(stringResource(label)) }, enabled = !saving, modifier = Modifier.testTag("sincewhen-unit-$unit"))
                     }
                 }
-                Text(stringResource(R.string.since_when_tags))
+                Text(stringResource(R.string.since_when_editor_tags))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     available.filter { !it.archived || it.id in selectedTags }.forEach { tag ->
                         FilterChip(tag.id in selectedTags, { selectedTags = if (tag.id in selectedTags) selectedTags - tag.id else selectedTags + tag.id }, label = { Text(tag.name) }, enabled = tagsReady && !saving, modifier = Modifier.testTag("sincewhen-tag-${tag.id}"))
                     }
                 }
-                if (available.isEmpty()) Text(stringResource(R.string.since_when_no_tags))
-                if (failed) Text(stringResource(R.string.since_when_save_error), color = MaterialTheme.colorScheme.error)
+                if (available.isEmpty()) Text(stringResource(R.string.since_when_editor_no_tags))
+                if (failed) Text(stringResource(R.string.since_when_editor_save_error), color = MaterialTheme.colorScheme.error)
             }
         },
     )
@@ -139,14 +139,14 @@ private fun SinceWhenDateTimePicker(initial: Long, onDismiss: () -> Unit, onConf
     val h = hour.toIntOrNull()
     val m = minute.toIntOrNull()
     DatePickerDialog(onDismissRequest = onDismiss,
-        confirmButton = { TextButton(modifier = Modifier.testTag("sincewhen-time-confirm"), enabled = h in 0..23 && m in 0..59 && date.selectedDateMillis != null, onClick = { onConfirm(sinceWhenPickedTimestamp(initial, date.selectedDateMillis!!, h!!, m!!, zone)) }) { Text(stringResource(R.string.since_when_save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.since_when_cancel)) } },
+        confirmButton = { TextButton(modifier = Modifier.testTag("sincewhen-time-confirm"), enabled = h in 0..23 && m in 0..59 && date.selectedDateMillis != null, onClick = { onConfirm(sinceWhenPickedTimestamp(initial, date.selectedDateMillis!!, h!!, m!!, zone)) }) { Text(stringResource(R.string.since_when_editor_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.since_when_editor_cancel)) } },
     ) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             DatePicker(date)
             Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(hour, { hour = it.filter(Char::isDigit).take(2) }, modifier = Modifier.weight(1f).testTag("sincewhen-hour"), label = { Text(stringResource(R.string.since_when_hours)) }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
-                OutlinedTextField(minute, { minute = it.filter(Char::isDigit).take(2) }, modifier = Modifier.weight(1f).testTag("sincewhen-minute"), label = { Text(stringResource(R.string.since_when_minutes)) }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                OutlinedTextField(hour, { hour = it.filter(Char::isDigit).take(2) }, modifier = Modifier.weight(1f).testTag("sincewhen-hour"), label = { Text(stringResource(R.string.since_when_editor_hours)) }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                OutlinedTextField(minute, { minute = it.filter(Char::isDigit).take(2) }, modifier = Modifier.weight(1f).testTag("sincewhen-minute"), label = { Text(stringResource(R.string.since_when_editor_minutes)) }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
             }
         }
     }

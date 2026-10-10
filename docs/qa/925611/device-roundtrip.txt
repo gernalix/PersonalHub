@@ -15,7 +15,7 @@ INSTRUMENTATION_STATUS: test=autonomousCreateSaveReopenEditReadbackPreservesAllF
 INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 13.526
+Time: 11.698
 
 OK (1 test)
 
