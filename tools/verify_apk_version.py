@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Validate the real final PersonalHub APK manifest against canonical version.txt."""
+"""Validate the real final PersonalHub APK manifest against canonical NV.txt."""
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -42,14 +43,15 @@ def verify_final_apk(
 ) -> dict[str, str]:
     """Fail closed before Pixel installation or external APK delivery."""
     try:
-        canonical = (repo_root / "version.txt").read_text(encoding="utf-8").strip()
+        raw_nv = (repo_root / "NV.txt").read_bytes()
     except OSError as exc:
-        raise ApkVersionError("canonical version.txt is unavailable") from exc
-    if not canonical.isascii() or not canonical.isdecimal() or int(canonical) < 1:
-        raise ApkVersionError(f"invalid canonical version.txt value: {canonical!r}")
+        raise ApkVersionError("canonical NV.txt is unavailable") from exc
+    if not re.fullmatch(rb"[1-9][0-9]*\n", raw_nv):
+        raise ApkVersionError("invalid canonical NV.txt: expected a positive integer followed by one LF")
+    canonical = raw_nv[:-1].decode("ascii")
     if declared_version is not None and str(declared_version) != canonical:
         raise ApkVersionError(
-            f"declared APK version {declared_version!r} disagrees with version.txt {canonical}"
+            f"declared APK version {declared_version!r} disagrees with NV.txt {canonical}"
         )
     if not apk.is_file() or apk.suffix.lower() != ".apk":
         raise ApkVersionError(f"final APK file missing or invalid: {apk}")
@@ -85,7 +87,7 @@ def verify_final_apk(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check final PersonalHub APK version and package identity.")
     parser.add_argument("apk", type=Path)
-    parser.add_argument("--version", help="Optional declared delivery version; must match version.txt")
+    parser.add_argument("--version", help="Optional declared delivery version; must match NV.txt")
     args = parser.parse_args(argv)
     try:
         values = verify_final_apk(args.apk, declared_version=args.version)

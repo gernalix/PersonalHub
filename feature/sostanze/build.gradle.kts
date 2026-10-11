@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val personalHubVersion = rootProject.file("version.txt").readText().trim().toInt()
+val personalHubVersion = rootProject.file("NV.txt").readText().trim().toInt()
 
 android {
     namespace = "com.gernalix.sostanze"

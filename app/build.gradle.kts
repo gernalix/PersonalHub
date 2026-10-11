@@ -66,7 +66,9 @@ if (hasCanonicalSigning) {
     ) { "Canonical Android signing keystore must have mode 0600." }
 }
 
-val appVersion = rootProject.file("version.txt").readText().trim().toInt()
+val nvText = rootProject.file("NV.txt").readText()
+require(Regex("[1-9][0-9]*\\n").matches(nvText)) { "NV.txt must contain a positive integer followed by one LF." }
+val appVersion = nvText.trim().toInt()
 val realPersonalHubPackage = "com.gernalix.personalhub"
 val isolatedBenchmarkPackage = "$realPersonalHubPackage.benchmarktarget"
 val realPackageDestructiveOptIn = providers.gradleProperty("personalhub.allowRealPackageDestructive")
@@ -92,6 +94,7 @@ android {
         applicationId = "com.gernalix.personalhub"
         minSdk = 29
         targetSdk = 37
+        buildConfigField("int", "NV", appVersion.toString())
         versionCode = appVersion
         versionName = appVersion.toString()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

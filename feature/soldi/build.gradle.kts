@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val personalHubVersion = rootProject.file("version.txt").readText().trim().toInt()
+val personalHubVersion = rootProject.file("NV.txt").readText().trim().toInt()
 
 android {
     namespace = "com.gernalix.personalhub.soldi"
