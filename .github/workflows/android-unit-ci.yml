@@ -16,6 +16,11 @@ on:
       - 'tools/migrate_personalhub_v20_to_v21.py'
       - 'tools/migrations/**'
       - 'tools/test_migrate_personalhub_v20_to_v21.py'
+      - 'tools/migrate_personalhub_v23_to_v24.py'
+      - 'tools/test_migrate_personalhub_v23_to_v24.py'
+      - 'tools/canonical_identity_schema.py'
+      - 'tools/android_paired_cutover_v24.py'
+      - 'tools/test_android_paired_cutover_v24.py'
       - '.github/workflows/android-unit-ci.yml'
   pull_request:
     paths:
@@ -31,6 +36,11 @@ on:
       - 'tools/migrate_personalhub_v20_to_v21.py'
       - 'tools/migrations/**'
       - 'tools/test_migrate_personalhub_v20_to_v21.py'
+      - 'tools/migrate_personalhub_v23_to_v24.py'
+      - 'tools/test_migrate_personalhub_v23_to_v24.py'
+      - 'tools/canonical_identity_schema.py'
+      - 'tools/android_paired_cutover_v24.py'
+      - 'tools/test_android_paired_cutover_v24.py'
       - '.github/workflows/android-unit-ci.yml'
 
 permissions:
@@ -53,10 +63,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: gradle
-      - name: Validate external database migration
-        run: PYTHONDONTWRITEBYTECODE=1 python3 tools/test_migrate_personalhub_v20_to_v21.py
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Validate external database migrations
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/test_migrate_personalhub_v20_to_v21.py
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/test_migrate_personalhub_v23_to_v24.py
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_paired_cutover_v24.py
       - name: Run all debug unit tests and lint
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon --console=plain             testDebugUnitTest             lintDebug             checkArchitectureBoundaries
+          ./gradlew --no-daemon --parallel --max-workers=2 --build-cache --console=plain \
+            testDebugUnitTest lintDebug checkArchitectureBoundaries

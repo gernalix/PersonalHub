@@ -35,3 +35,20 @@ An APK build/install is not a database migration. Never substitute uninstall, cl
 Use `tools/migrate_personalhub_v23_to_v24.py`. Its output is prepared and validated outside Android; the APK contains no historical Room migration. See [CANONICAL_IDENTITIES.md](CANONICAL_IDENTITIES.md) for the classification and [B8_HANDOFF_193828.md](B8_HANDOFF_193828.md) for the deployment and rollback procedure. Schema 24 requires Room identity `f5ff5327fbc3067a659ded92d66db243`.
 
 The schema-23 database and previous APK remain usable before cutover. The new APK refuses schema 23 through DatabaseStartupGate; the previous APK cannot open schema 24. Compatibility means an explicit paired APK/database cutover and retained schema-23 backup, not simultaneous writes by different Room versions.
+
+### Reusable paired Pixel cutover gate
+
+For a **future** device still at schema 23, `tools/android_paired_cutover_v24.py` combines the previously manual safe steps in one guarded command: verify the Pixel and final APK, verify *both* notification receipts, disable the app to freeze writes, back up the installed APK plus SQLite DB/WAL/SHM, produce a coherent SQLite snapshot, migrate and validate v24, compare the frozen source checksums again, stage and verify the target, retain the original DB/sidecars for rollback, and install exactly the validated APK. On failure after replacement, it attempts paired rollback to the previous APK and database; ambiguous recovery leaves the app disabled. Multiple profiles or stale sources are refused. It never clears app data.
+
+Use only inside the already-authorized **exclusive** Pixel window, after the new APK passed isolated tests. The explicit `--execute --allow-production` switches are both required. Keep the private `--output-dir` outside Git. Do not log or commit its contents.
+
+```bash
+python3 tools/android_paired_cutover_v24.py \
+  --serial <verified-pixel-serial> \
+  --new-apk /private/path/final-tested.apk \
+  --output-dir /private/new-cutover-directory \
+  --pre-notification /private/verified-pre-notifications.json \
+  --execute --allow-production
+```
+
+The helper returns `PAIR_INSTALLED_QA_PENDING`, **not** a release PASS. A live app/History/Timer smoke test, data/ID and Git-export readback, verified post-test Fedora+Telegram notifications, and the normal immutable-APK delivery gate are still required. If those checks fail after activation, preserve post-cutover edits and reconcile them before a manual paired rollback. Never run this v23→v24 helper on a device already at schema 24. Host-only safety tests: `PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_paired_cutover_v24.py`.

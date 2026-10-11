@@ -50,6 +50,19 @@ app_tests=(
 )
 for test_name in "${app_tests[@]}"; do
   run_app_test "$test_name"
+  if [[ "$test_name" == 'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration' ]]; then
+    # Upgrade a synthetic, populated clone, not the production package. Reinstall
+    # triggers MY_PACKAGE_REPLACED while keeping all 719+ recorded fixtures.
+    adb -s "$serial" logcat -c
+    adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
+    run_app_test 'HistoryUpgradeDeviceTest#upgradeBroadcastNeverWaitsForAnOccupiedDatabase'
+    run_app_test 'HistoryUpgradeDeviceTest#restoredCloneRetainsRealisticHistoryAndPagesResponsively'
+    if adb -s "$serial" logcat -d -v brief -s ActivityManager:E AndroidRuntime:E \
+      | grep -E 'ANR in com[.]gernalix[.]personalhub[.]qa'; then
+      echo 'Clone update caused an ANR' >&2
+      exit 1
+    fi
+  fi
 done
 
 # Library instrumentation uses the same emulator, never concurrently.

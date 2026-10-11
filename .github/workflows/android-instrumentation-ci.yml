@@ -13,6 +13,7 @@ on:
       - 'settings.gradle.kts'
       - 'gradle.properties'
       - '.github/workflows/android-instrumentation-ci.yml'
+      - 'tools/run_ci_instrumentation.sh'
   pull_request:
     paths:
       - 'app/**'
@@ -24,6 +25,7 @@ on:
       - 'settings.gradle.kts'
       - 'gradle.properties'
       - '.github/workflows/android-instrumentation-ci.yml'
+      - 'tools/run_ci_instrumentation.sh'
 
 permissions:
   contents: read
@@ -47,7 +49,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: gradle
+      - uses: gradle/actions/setup-gradle@v4
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"'             | sudo tee /etc/udev/rules.d/99-kvm4all.rules

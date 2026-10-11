@@ -2,6 +2,8 @@ package com.gernalix.personalhub
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -68,8 +70,12 @@ class HistoryAndPatchReviewDeviceTest {
             compose.onNodeWithTag("history-mode-records").performClick()
             waitLoaded(50)
             compose.onNodeWithTag("history-results").performScrollToNode(hasTestTag("history-more"))
+            val pageStartedAt = SystemClock.elapsedRealtime()
             compose.onNodeWithTag("history-more").performClick()
             waitLoaded(100)
+            val pageMs = SystemClock.elapsedRealtime() - pageStartedAt
+            Log.i("PHHistoryUpgradeQa", "load_more_50_to_100_ms=$pageMs")
+            assertTrue("History load-more regression: ${pageMs}ms", pageMs < 12_000L)
             scenario.recreate()
             waitFor("history-mode-records")
             compose.onNodeWithTag("history-mode-records").performClick()
