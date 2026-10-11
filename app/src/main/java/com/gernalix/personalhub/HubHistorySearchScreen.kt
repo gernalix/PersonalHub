@@ -46,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -301,6 +303,8 @@ fun HubHistorySearchScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // Expose stable History test tags to UIAutomator as resource IDs.
+                .semantics { testTagsAsResourceId = true }
                 .padding(contentPadding)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = 12.dp, vertical = 4.dp),
@@ -556,6 +560,21 @@ internal suspend fun historyUndoSafety(
     null -> false
 }
 
+/** Trace the real sandbox cost for a single expanded Git Undo entry, never a closed row. */
+private fun timedHistoryGitPreview(context: Context, eventId: String): Boolean {
+    val startedNs = android.os.SystemClock.elapsedRealtimeNanos()
+    android.os.Trace.beginSection("PH.HistoryGitUndoPreview")
+    try {
+        return GitHistory.previewRevert(context.applicationContext, eventId).safe
+    } finally {
+        android.os.Trace.endSection()
+        android.util.Log.i(
+            "PHHistoryUndoPerf",
+            "preview_ms=${(android.os.SystemClock.elapsedRealtimeNanos() - startedNs) / 1_000_000}",
+        )
+    }
+}
+
 @Composable
 private fun ActivityCard(
     item: ActivityUiItem,
@@ -579,7 +598,7 @@ private fun ActivityCard(
                     GitDataSettings.configuration(context).enabled,
                 )
                 historyUndoSafety(target, expanded) { eventId ->
-                    runCatching { GitHistory.previewRevert(context.applicationContext, eventId).safe }.getOrDefault(false)
+                    runCatching { timedHistoryGitPreview(context, eventId) }.getOrDefault(false)
                 }
         }
     }
@@ -588,7 +607,7 @@ private fun ActivityCard(
         val git = item.git ?: return@LaunchedEffect
         if (expanded && git.revertedBy == null) {
             gitUndoSafe = withContext(Dispatchers.IO) {
-                runCatching { GitHistory.previewRevert(context.applicationContext, git.id).safe }.getOrDefault(false)
+                runCatching { timedHistoryGitPreview(context, git.id) }.getOrDefault(false)
             }
         }
     }
