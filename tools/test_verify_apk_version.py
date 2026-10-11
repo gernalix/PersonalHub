@@ -14,7 +14,7 @@ class FinalApkVersionTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        (self.root / "version.txt").write_text("64\n", encoding="utf-8")
+        (self.root / "NV.txt").write_text("64\n", encoding="utf-8")
         self.apk = self.root / "64.apk"
         self.apk.write_bytes(b"fake APK for mocked analyzer")
 
@@ -52,6 +52,17 @@ class FinalApkVersionTests(unittest.TestCase):
                 gate.verify_final_apk(self.apk, declared_version="63", repo_root=self.root)
             analyzer.assert_not_called()
 
+    def test_noncanonical_nv_and_legacy_only_source_block(self) -> None:
+        for raw in (b"0\n", b"064\n", b"64", b"64\r\n", b"64\n\n", b" 64\n"):
+            with self.subTest(raw=raw):
+                (self.root / "NV.txt").write_bytes(raw)
+                with self.assertRaisesRegex(gate.ApkVersionError, "invalid canonical"):
+                    gate.verify_final_apk(self.apk, repo_root=self.root)
+        (self.root / "NV.txt").unlink()
+        (self.root / "version.txt").write_text("64\n")
+        with self.assertRaisesRegex(gate.ApkVersionError, "NV.txt is unavailable"):
+            gate.verify_final_apk(self.apk, repo_root=self.root)
+
     def test_missing_analyzer_is_a_blocker(self) -> None:
         with mock.patch.object(gate, "_apkanalyzer", side_effect=gate.ApkVersionError("apkanalyzer unavailable")):
             with self.assertRaisesRegex(gate.ApkVersionError, "unavailable"):
@@ -70,7 +81,7 @@ class FinalApkVersionTests(unittest.TestCase):
     def test_missing_file_and_bad_canonical_version_block(self) -> None:
         with self.assertRaisesRegex(gate.ApkVersionError, "missing or invalid"):
             gate.verify_final_apk(self.root / "missing.apk", repo_root=self.root)
-        (self.root / "version.txt").write_text("not-a-number", encoding="utf-8")
+        (self.root / "NV.txt").write_text("not-a-number", encoding="utf-8")
         with self.assertRaisesRegex(gate.ApkVersionError, "invalid canonical"):
             gate.verify_final_apk(self.apk, repo_root=self.root)
 

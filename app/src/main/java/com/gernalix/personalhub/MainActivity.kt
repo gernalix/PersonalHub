@@ -188,7 +188,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             }
         }
         Text(
-            text = BuildConfig.VERSION_NAME,
+            text = BuildConfig.NV.toString(),
             modifier = Modifier.align(Alignment.End),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
