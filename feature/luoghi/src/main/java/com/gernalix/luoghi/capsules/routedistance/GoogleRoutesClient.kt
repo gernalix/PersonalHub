@@ -1,5 +1,6 @@
 package com.gernalix.luoghi.capsules.routedistance
 
+import android.content.Context
 import com.gernalix.luoghi.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,9 +18,11 @@ interface GoogleRoutesClient {
 }
 
 class HttpGoogleRoutesClient(
+    context: Context,
     private val apiKey: String = BuildConfig.GOOGLE_ROUTES_API_KEY,
 ) : GoogleRoutesClient {
-    override val isConfigured: Boolean = apiKey.isNotBlank()
+    private val identity = AndroidRouteIdentity.fromContext(context.applicationContext)
+    override val isConfigured: Boolean = apiKey.isNotBlank() && identity != null
 
     override suspend fun bicycleRoute(
         origin: RouteCoordinates,
@@ -34,6 +37,7 @@ class HttpGoogleRoutesClient(
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("X-Goog-Api-Key", apiKey)
             setRequestProperty("X-Goog-FieldMask", "routes.distanceMeters,routes.duration")
+            identity!!.applyTo(this)
         }
         try {
             val body = routeRequestBody(origin, destination).toByteArray(Charsets.UTF_8)
