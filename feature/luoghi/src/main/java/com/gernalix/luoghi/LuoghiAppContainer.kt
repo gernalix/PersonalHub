@@ -38,7 +38,7 @@ class LuoghiAppContainer(context: Context) {
         RouteDistanceCapsule(
         RouteDistanceRepository(
             dao = dao,
-            googleRoutesClient = HttpGoogleRoutesClient(),
+            googleRoutesClient = HttpGoogleRoutesClient(appContext),
             onCacheChanged = { HubAutoExport.request(appContext) },
         )
         )
