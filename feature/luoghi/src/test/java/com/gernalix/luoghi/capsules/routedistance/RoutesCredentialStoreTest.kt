@@ -66,4 +66,16 @@ class RoutesCredentialStoreTest {
             directory.deleteRecursively()
         }
     }
+
+    @Test fun brokenStateSymlinkStillBlocksLegacyFallback() {
+        val directory = Files.createTempDirectory("routes-symlink-test")
+        try {
+            val base = directory.resolve("routes.enc")
+            Files.createSymbolicLink(base, directory.resolve("absent"))
+            assertTrue(RoutesCredentialPolicy.hasState(base.toFile()))
+        } finally {
+            Files.deleteIfExists(directory.resolve("routes.enc"))
+            Files.deleteIfExists(directory)
+        }
+    }
 }
