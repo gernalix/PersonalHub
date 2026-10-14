@@ -21,3 +21,9 @@ Synthetic JVM tests cover authenticated encryption, random IVs, corrupted data, 
 Before provider activation: separate Places/Routes keys, actual final-artifact package and signing certificate, current provider usage and legacy consumers, explicit Google rotation authorization, and positive/negative Google restrictions tests. Final PersonalHub APK validation, install and delivery remain required. This preparation does not establish P83 PASS or public readiness.
 
 Google security guidance: https://developers.google.com/maps/api-security-best-practices
+
+## Shared Places/Routes adapter
+
+GoogleCredentialStore is the single Google-services custody implementation. Routes keeps its previous alias and filenames; Places uses `personalhub.luoghi.places` and `google-places.enc` / `google-places.pending`. Their values and encryption keys are independent. AddressAutocompleteRepository obtains the Places credential through this adapter; it never silently falls back when its configured provider is broken. An existing Keystore alias without its ciphertext also counts as broken configured state.
+
+During a Places cutover, restart the application process before SDK acceptance. GooglePlacesLocationProvider caches a PlacesClient and initializes the SDK only once per process; importing a value alone does not replace an already initialized SDK key. Preserve both legacy consumers until real service checks and final delivery have passed. A Places/Routes value must be staged only from its approved native reference, never copied between service kinds as an automatic fallback.

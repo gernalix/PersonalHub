@@ -2,6 +2,8 @@ package com.gernalix.luoghi.capsules.addressautocomplete
 
 import android.content.Context
 import com.gernalix.luoghi.BuildConfig
+import com.gernalix.luoghi.capsules.googlecredentials.GoogleCredentialKind
+import com.gernalix.luoghi.capsules.googlecredentials.GoogleCredentialStore
 import com.gernalix.personalhub.core.location.GooglePlacesLocationProvider
 import com.gernalix.personalhub.core.location.LocationSuggestion
 import com.gernalix.personalhub.core.location.LocationSuggestionSource
@@ -39,7 +41,10 @@ class AddressAutocompleteRepository(
 ) : AddressAutocompleteSource {
     private val provider = GooglePlacesLocationProvider(
         context = context.applicationContext,
-        apiKey = BuildConfig.GOOGLE_MAPS_API_KEY,
+        apiKey = runCatching {
+            GoogleCredentialStore(context.applicationContext, GoogleCredentialKind.PLACES)
+                .resolve { BuildConfig.GOOGLE_MAPS_API_KEY }
+        }.getOrDefault(""),
     )
 
     override val isConfigured: Boolean
