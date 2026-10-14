@@ -19,10 +19,13 @@ interface GoogleRoutesClient {
 
 class HttpGoogleRoutesClient(
     context: Context,
-    private val apiKey: String = BuildConfig.GOOGLE_ROUTES_API_KEY,
+    apiKey: String? = null,
 ) : GoogleRoutesClient {
+    private val apiKey = apiKey ?: runCatching {
+        RoutesCredentialStore(context.applicationContext).resolve { BuildConfig.GOOGLE_ROUTES_API_KEY }
+    }.getOrDefault("")
     private val identity = AndroidRouteIdentity.fromContext(context.applicationContext)
-    override val isConfigured: Boolean = apiKey.isNotBlank() && identity != null
+    override val isConfigured: Boolean = this.apiKey.isNotBlank() && identity != null
 
     override suspend fun bicycleRoute(
         origin: RouteCoordinates,
