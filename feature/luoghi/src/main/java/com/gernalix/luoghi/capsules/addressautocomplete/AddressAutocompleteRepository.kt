@@ -1,7 +1,6 @@
 package com.gernalix.luoghi.capsules.addressautocomplete
 
 import android.content.Context
-import com.gernalix.luoghi.BuildConfig
 import com.gernalix.luoghi.capsules.googlecredentials.GoogleCredentialKind
 import com.gernalix.luoghi.capsules.googlecredentials.GoogleCredentialStore
 import com.gernalix.personalhub.core.location.GooglePlacesLocationProvider
@@ -43,7 +42,7 @@ class AddressAutocompleteRepository(
         context = context.applicationContext,
         apiKey = runCatching {
             GoogleCredentialStore(context.applicationContext, GoogleCredentialKind.PLACES)
-                .resolve { BuildConfig.GOOGLE_MAPS_API_KEY }
+                .resolve()
         }.getOrDefault(""),
     )
 

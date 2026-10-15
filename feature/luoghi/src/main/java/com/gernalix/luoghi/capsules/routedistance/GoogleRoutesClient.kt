@@ -1,7 +1,6 @@
 package com.gernalix.luoghi.capsules.routedistance
 
 import android.content.Context
-import com.gernalix.luoghi.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -22,7 +21,7 @@ class HttpGoogleRoutesClient(
     apiKey: String? = null,
 ) : GoogleRoutesClient {
     private val apiKey = apiKey ?: runCatching {
-        RoutesCredentialStore(context.applicationContext).resolve { BuildConfig.GOOGLE_ROUTES_API_KEY }
+        RoutesCredentialStore(context.applicationContext).resolve()
     }.getOrDefault("")
     private val identity = AndroidRouteIdentity.fromContext(context.applicationContext)
     override val isConfigured: Boolean = this.apiKey.isNotBlank() && identity != null
