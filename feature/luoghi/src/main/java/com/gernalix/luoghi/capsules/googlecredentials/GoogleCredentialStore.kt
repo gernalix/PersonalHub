@@ -34,7 +34,7 @@ internal class GoogleCredentialStore(
     private val file = AtomicFile(File(context.applicationContext.noBackupFilesDir, "${kind.fileStem}.enc"))
     private val pending = File(context.applicationContext.noBackupFilesDir, "${kind.fileStem}.pending")
 
-    fun resolve(legacy: () -> String): String = synchronized(LOCK) {
+    fun resolve(legacy: () -> String = { "" }): String = synchronized(LOCK) {
         importPending()
         val configured = GoogleCredentialPolicy.hasState(file.baseFile) ||
             KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.containsAlias(keyAlias)

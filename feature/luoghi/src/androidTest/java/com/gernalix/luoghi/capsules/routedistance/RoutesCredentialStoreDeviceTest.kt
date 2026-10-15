@@ -101,6 +101,11 @@ class RoutesCredentialStoreDeviceTest {
         assertFalse(File(directory, "google-routes.enc").exists())
     }
 
+    @Test fun unconfiguredProductionProviderHasNoPackagedCredential() {
+        assertEquals("", RoutesCredentialStore(context, alias).resolve())
+        assertEquals("", GoogleCredentialStore(context, GoogleCredentialKind.PLACES, alias).resolve())
+    }
+
     @Test fun brokenEncryptedStateNeverFallsBack() {
         Os.symlink(File(directory, "absent").path, File(directory, "google-routes.enc").path)
         var fallback = false
