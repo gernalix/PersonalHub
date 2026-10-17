@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,8 +14,11 @@ import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount
+import com.gernalix.personalhub.core.database.capsules.soldi.TransactionView
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.Instant
@@ -24,8 +28,17 @@ import java.time.format.FormatStyle
 import java.util.Locale
 
 @Composable
-internal fun BankingScreen(repository: BankingRepository = BankingRepository(LocalContext.current)) {
+internal fun BankingScreen(
+    repository: BankingRepository = BankingRepository(LocalContext.current),
+    localAccounts: List<FinanceAccount> = emptyList(),
+    localRows: List<TransactionView> = emptyList(),
+    onCreateAccount: suspend (FinanceAccount) -> Unit = {},
+    onSuggestion: (BankingSuggestion) -> Unit = {},
+    onRequestNotifications: () -> Unit = {},
+) {
     val context = LocalContext.current
+    val mappingErrorMessage = stringResource(R.string.banking_mapping_error)
+    val invalidAlertThresholdMessage = stringResource(R.string.banking_alert_invalid_threshold)
     val scope = rememberCoroutineScope()
     var snapshot by remember { mutableStateOf(repository.cached()) }
     var configuration by remember { mutableStateOf(repository.configuration()) }
@@ -33,6 +46,12 @@ internal fun BankingScreen(repository: BankingRepository = BankingRepository(Loc
     var message by remember { mutableStateOf<String?>(null) }
     var setup by remember { mutableStateOf(!configuration.configured) }
     var filters by remember { mutableStateOf(BankingFilters()) }
+    var reconciliationState by remember { mutableStateOf(repository.reconciliationState()) }
+    var mappingAccount by remember { mutableStateOf<BankingAccount?>(null) }
+    var alertsOpen by remember { mutableStateOf(false) }
+    val reconciliation = remember(snapshot, reconciliationState, localAccounts, localRows) {
+        snapshot?.let { reconcileBanking(it, reconciliationState, localAccounts, localRows) }
+    }
 
     fun refresh() {
         if (busy) return
@@ -40,8 +59,10 @@ internal fun BankingScreen(repository: BankingRepository = BankingRepository(Loc
         message = null
         scope.launch {
             try {
-                snapshot = repository.refresh()
-                message = if (snapshot?.partialAccounts?.isNotEmpty() == true) {
+                val refreshed = repository.refresh()
+                snapshot = refreshed
+                reconciliationState = repository.processAlerts(refreshed, localAccounts, localRows)
+                message = if (refreshed.partialAccounts.isNotEmpty()) {
                     null
                 } else {
                     repositoryMessage(context, BankingMessage.UPDATED)
@@ -87,7 +108,17 @@ internal fun BankingScreen(repository: BankingRepository = BankingRepository(Loc
                 body = stringResource(R.string.banking_no_accounts_body),
                 action = ::refresh,
             )
-            else -> BankingContent(snapshot!!, filters) { filters = it }
+            else -> BankingContent(
+                snapshot = snapshot!!,
+                filters = filters,
+                localAccounts = localAccounts,
+                reconciliation = requireNotNull(reconciliation),
+                state = reconciliationState,
+                onFilters = { filters = it },
+                onMap = { mappingAccount = it },
+                onSuggestion = onSuggestion,
+                onAlerts = { alertsOpen = true },
+            )
         }
     }
 
@@ -103,14 +134,76 @@ internal fun BankingScreen(repository: BankingRepository = BankingRepository(Loc
         },
         onDisconnect = {
             repository.disconnect(); configuration = repository.configuration(); snapshot = null; setup = false
+            reconciliationState = BankingReconciliationState()
             message = repositoryMessage(context, BankingMessage.DISCONNECTED)
+        },
+    )
+
+    mappingAccount?.let { bankAccount ->
+        BankingAccountMappingDialog(
+            bankAccount = bankAccount,
+            localAccounts = localAccounts,
+            state = reconciliationState,
+            onDismiss = { mappingAccount = null },
+            onLink = { localAccount ->
+                runCatching { repository.linkAccount(bankAccount, localAccount) }
+                    .onSuccess { reconciliationState = it; mappingAccount = null; message = null }
+                    .onFailure { message = mappingErrorMessage }
+            },
+            onCreate = { currency ->
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        try {
+                            val created = FinanceAccount(name = bankAccount.bank, currency = currency)
+                            onCreateAccount(created)
+                            reconciliationState = repository.linkAccount(bankAccount, created)
+                            mappingAccount = null
+                            message = null
+                        } catch (_: Exception) {
+                            message = mappingErrorMessage
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }
+            },
+            onUnlink = {
+                reconciliationState = repository.unlinkAccount(bankAccount.id)
+                mappingAccount = null
+            },
+        )
+    }
+
+    if (alertsOpen) BankingAlertSettingsDialog(
+        preferences = reconciliationState.alertPreferences,
+        onDismiss = { alertsOpen = false },
+        onSave = { enabled, threshold ->
+            runCatching { repository.saveAlertPreferences(enabled, threshold) }
+                .onSuccess {
+                    reconciliationState = it
+                    alertsOpen = false
+                    message = null
+                    if (enabled) onRequestNotifications()
+                }
+                .onFailure { message = invalidAlertThresholdMessage }
         },
     )
 }
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-internal fun BankingContent(snapshot: BankingSnapshot, filters: BankingFilters, onFilters: (BankingFilters) -> Unit) {
+internal fun BankingContent(
+    snapshot: BankingSnapshot,
+    filters: BankingFilters,
+    localAccounts: List<FinanceAccount>,
+    reconciliation: BankingReconciliationResult,
+    state: BankingReconciliationState,
+    onFilters: (BankingFilters) -> Unit,
+    onMap: (BankingAccount) -> Unit,
+    onSuggestion: (BankingSuggestion) -> Unit,
+    onAlerts: () -> Unit,
+) {
     val rows = remember(snapshot.transactions, filters) { filterBankingTransactions(snapshot.transactions, filters) }
     val accountLabels = remember(snapshot.accounts) {
         snapshot.accounts.groupBy(BankingAccount::bank).flatMap { (bank, accounts) ->
@@ -119,6 +212,9 @@ internal fun BankingContent(snapshot: BankingSnapshot, filters: BankingFilters, 
     }
     val banks = snapshot.accounts.map(BankingAccount::bank).distinct().sorted()
     val currencies = snapshot.accounts.flatMap(BankingAccount::currencies).distinct().sorted()
+    val localById = localAccounts.associateBy(FinanceAccount::id)
+    val comparisons = reconciliation.comparisons.associateBy(BankingComparison::bankAccountId)
+    val suggestions = reconciliation.suggestions.groupBy(BankingSuggestion::bankAccountId)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -128,14 +224,53 @@ internal fun BankingContent(snapshot: BankingSnapshot, filters: BankingFilters, 
             snapshot.partialAccounts.takeIf(Set<String>::isNotEmpty)?.let {
                 AssistChip(onClick = {}, label = { Text(stringResource(R.string.banking_partial_error)) })
             }
-            Text(stringResource(R.string.banking_bank_balances), style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.banking_bank_balances), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = onAlerts) { Text(stringResource(R.string.banking_alert_settings)) }
+            }
+            Text(
+                if (state.alertPreferences.enabled) {
+                    stringResource(R.string.banking_alert_enabled, formatAmount(state.alertPreferences.threshold))
+                } else {
+                    stringResource(R.string.banking_alert_disabled)
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         items(snapshot.accounts, key = BankingAccount::id) { account ->
+            val comparison = requireNotNull(comparisons[account.id])
+            val linked = comparison.localAccountId?.let(localById::get)
             ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(accountLabels.getValue(account.id), fontWeight = FontWeight.SemiBold)
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(accountLabels.getValue(account.id), fontWeight = FontWeight.SemiBold)
+                            Text(
+                                linked?.let { stringResource(R.string.banking_mapped_to, it.name, it.currency) }
+                                    ?: stringResource(R.string.banking_unmapped),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        TextButton(onClick = { onMap(account) }) { Text(stringResource(R.string.banking_change_mapping)) }
+                    }
                     snapshot.balances.filter { it.accountId == account.id }.forEach { balance ->
                         Text("${balanceTypeLabel(balance.type)}  ${formatAmount(balance.amount)} ${balance.currency}")
+                    }
+                    HorizontalDivider()
+                    BankingComparisonBlock(comparison)
+                    suggestions[account.id].orEmpty().forEach { suggestion ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(suggestion.description)
+                                Text(
+                                    "${formatDate(suggestion.date)} · ${formatAmount(suggestion.amount)} ${suggestion.currency}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            TextButton(onClick = { onSuggestion(suggestion) }) {
+                                Text(stringResource(R.string.banking_review_suggestion))
+                            }
+                        }
                     }
                 }
             }
@@ -186,6 +321,65 @@ internal fun BankingContent(snapshot: BankingSnapshot, filters: BankingFilters, 
 }
 
 @Composable
+private fun BankingComparisonBlock(comparison: BankingComparison) {
+    if (comparison.state != BankingComparisonState.COMPARABLE) {
+        Text(comparisonStateLabel(comparison.state), color = MaterialTheme.colorScheme.tertiary)
+        return
+    }
+    val currency = requireNotNull(comparison.currency)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Column {
+            Text(stringResource(R.string.banking_compare_bank), style = MaterialTheme.typography.labelMedium)
+            Text("${formatAmount(requireNotNull(comparison.bankBalance))} $currency")
+        }
+        Column {
+            Text(stringResource(R.string.banking_compare_ph), style = MaterialTheme.typography.labelMedium)
+            Text("${formatAmount(requireNotNull(comparison.phBalance))} $currency")
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(stringResource(R.string.banking_compare_difference), style = MaterialTheme.typography.labelMedium)
+            Text("${formatAmount(requireNotNull(comparison.difference))} $currency", fontWeight = FontWeight.SemiBold)
+        }
+    }
+    comparison.fetchedAt?.let {
+        Text(stringResource(R.string.banking_compare_reference, formatInstant(it)), style = MaterialTheme.typography.bodySmall)
+    }
+    Text(comparisonCauseLabel(requireNotNull(comparison.cause)), style = MaterialTheme.typography.bodySmall)
+    if (comparison.pendingCount > 0) {
+        Text(stringResource(R.string.banking_pending_separate, comparison.pendingCount), style = MaterialTheme.typography.bodySmall)
+    }
+    if (comparison.futurePhCount > 0) {
+        Text(stringResource(R.string.banking_future_separate, comparison.futurePhCount), style = MaterialTheme.typography.bodySmall)
+    }
+    if (comparison.ambiguousCount > 0) {
+        Text(stringResource(R.string.banking_ambiguous_matches, comparison.ambiguousCount), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun comparisonStateLabel(value: BankingComparisonState): String = stringResource(when (value) {
+    BankingComparisonState.COMPARABLE -> R.string.banking_comparable
+    BankingComparisonState.UNMAPPED -> R.string.banking_compare_unmapped
+    BankingComparisonState.MAPPING_INVALID -> R.string.banking_compare_mapping_invalid
+    BankingComparisonState.CURRENCY_MISMATCH -> R.string.banking_compare_currency_mismatch
+    BankingComparisonState.STALE -> R.string.banking_compare_stale
+    BankingComparisonState.PARTIAL -> R.string.banking_compare_partial
+    BankingComparisonState.INCOMPLETE -> R.string.banking_compare_incomplete
+    BankingComparisonState.NO_BOOKED_BALANCE -> R.string.banking_compare_no_booked
+    BankingComparisonState.REFERENCE_DATE_MISMATCH -> R.string.banking_compare_reference_mismatch
+    BankingComparisonState.LOCAL_ACCOUNT_NOT_OPEN -> R.string.banking_compare_local_not_open
+})
+
+@Composable
+private fun comparisonCauseLabel(value: BankingComparisonCause): String = stringResource(when (value) {
+    BankingComparisonCause.BALANCED -> R.string.banking_cause_balanced
+    BankingComparisonCause.MISSING_PH_TRANSACTIONS -> R.string.banking_cause_missing
+    BankingComparisonCause.PENDING_SEPARATE -> R.string.banking_cause_pending
+    BankingComparisonCause.FUTURE_PH_SEPARATE -> R.string.banking_cause_future
+    BankingComparisonCause.UNCONFIRMED -> R.string.banking_cause_unconfirmed
+})
+
+@Composable
 private fun BankingChoice(
     label: String,
     selected: String?,
@@ -204,6 +398,86 @@ private fun BankingChoice(
             values.forEach { value -> DropdownMenuItem(text = { Text(labels[value] ?: value) }, onClick = { expanded = false; onSelect(value) }) }
         }
     }
+}
+
+@Composable
+private fun BankingAccountMappingDialog(
+    bankAccount: BankingAccount,
+    localAccounts: List<FinanceAccount>,
+    state: BankingReconciliationState,
+    onDismiss: () -> Unit,
+    onLink: (FinanceAccount) -> Unit,
+    onCreate: (String) -> Unit,
+    onUnlink: () -> Unit,
+) {
+    val currentLocalId = state.accountLinks[bankAccount.id]
+    val usedLocalIds = state.accountLinks.filterKeys { it != bankAccount.id }.values.toSet()
+    val eligible = localAccounts.filter { it.currency in bankAccount.currencies && it.id !in usedLocalIds }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.banking_mapping_title, bankAccount.bank)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.banking_mapping_body))
+                eligible.forEach { account ->
+                    FilledTonalButton(onClick = { onLink(account) }, Modifier.fillMaxWidth()) {
+                        Text("${account.name} · ${account.currency}${if (account.id == currentLocalId) " ✓" else ""}")
+                    }
+                }
+                bankAccount.currencies.distinct().sorted().forEach { currency ->
+                    OutlinedButton(onClick = { onCreate(currency) }, Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.banking_create_account, currency))
+                    }
+                }
+                if (currentLocalId != null) {
+                    TextButton(onClick = onUnlink) { Text(stringResource(R.string.banking_unlink)) }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun BankingAlertSettingsDialog(
+    preferences: BankingAlertPreferences,
+    onDismiss: () -> Unit,
+    onSave: (Boolean, BigDecimal) -> Unit,
+) {
+    var enabled by remember(preferences) { mutableStateOf(preferences.enabled) }
+    var threshold by remember(preferences) {
+        mutableStateOf(preferences.threshold.takeIf { it.signum() > 0 }?.toPlainString() ?: "10")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.banking_alert_settings)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.banking_alert_settings_body))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = enabled, onCheckedChange = { enabled = it })
+                    Text(stringResource(R.string.banking_alert_enable))
+                }
+                OutlinedTextField(
+                    value = threshold,
+                    onValueChange = { threshold = it },
+                    enabled = enabled,
+                    label = { Text(stringResource(R.string.banking_alert_threshold)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                )
+                Text(stringResource(R.string.banking_alert_privacy), style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val parsed = runCatching { BigDecimal(threshold.trim().replace(',', '.')) }.getOrDefault(BigDecimal.ZERO)
+                onSave(enabled, parsed)
+            }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
 @Composable

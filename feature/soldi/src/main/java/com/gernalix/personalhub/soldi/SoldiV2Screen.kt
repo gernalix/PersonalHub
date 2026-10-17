@@ -51,10 +51,12 @@ internal fun SoldiV2Screen(
     val products by capsule.products.collectAsState(emptyList())
 
     val context = LocalContext.current
+    val bankingSuggestionExpiredMessage = stringResource(R.string.banking_suggestion_expired)
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val prefs = remember { SoldiViewPrefs(context.applicationContext) }
     val semanticEngine = remember(capsule) { FinancePhotoSemanticEngine(context.applicationContext, capsule) }
+    val bankingRepository = remember { BankingRepository(context.applicationContext) }
     DisposableEffect(semanticEngine) { onDispose { semanticEngine.close() } }
 
     var tab by rememberSaveable { mutableStateOf(SoldiTab.TRANSACTIONS) }
@@ -67,6 +69,7 @@ internal fun SoldiV2Screen(
     var globalSearchQuery by rememberSaveable { mutableStateOf("") }
     var globalSearchMode by rememberSaveable { mutableStateOf(SoldiSearchMode.SEARCH) }
     var editor by remember { mutableStateOf<SoldiEditor?>(null) }
+    var pendingBankingSuggestion by remember { mutableStateOf<BankingSuggestion?>(null) }
     var recurrenceEditor by remember { mutableStateOf<RecurrenceDraft?>(null) }
     var accountEditor by remember { mutableStateOf<FinanceAccount?>(null) }
     var receiptDraft by remember { mutableStateOf<ReceiptImportDraft?>(null) }
@@ -189,6 +192,7 @@ internal fun SoldiV2Screen(
     val rowMap = remember(transactions) { transactions.associateBy { it.value.id } }
 
     fun openTransaction(row: TransactionView) {
+        pendingBankingSuggestion = null
         val transfer = transfers.firstOrNull {
             it.sourceTransactionId == row.value.id || it.targetTransactionId == row.value.id
         }
@@ -270,7 +274,10 @@ internal fun SoldiV2Screen(
         floatingActionButton = {
             if (!busy && editor == null && recurrenceEditor == null && accountEditor == null && receiptDraft == null && !searchOpen) {
                 when (bottom) {
-                    BottomDestination.HOME -> if (tab == SoldiTab.TRANSACTIONS) FloatingActionButton(onClick = { editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.EXPENSE) }) { Text("+") }
+                    BottomDestination.HOME -> if (tab == SoldiTab.TRANSACTIONS) FloatingActionButton(onClick = {
+                        pendingBankingSuggestion = null
+                        editor = SoldiEditor.Transaction(defaultTransaction(accounts), EntryKind.EXPENSE)
+                    }) { Text("+") }
                     BottomDestination.ACCOUNTS -> FloatingActionButton(onClick = { accountEditor = FinanceAccount(name = "", currency = accounts.firstOrNull()?.currency ?: "DKK", openedAt = System.currentTimeMillis()) }) { Text("+") }
                     BottomDestination.RECURRENCES -> FloatingActionButton(onClick = {
                         val draft = defaultRecurrence(accounts)
@@ -293,7 +300,7 @@ internal fun SoldiV2Screen(
                         tags = tags,
                         existingAttachments = existingAttachments,
                         ownedItems = currentOwnedItems,
-                        onBack = { if (!busy) editor = null },
+                        onBack = { if (!busy) { editor = null; pendingBankingSuggestion = null } },
                         onChange = { if (!busy) editor = it },
                         onSwitchToTransfer = { if (!busy) editor = SoldiEditor.Transfer(defaultTransfer(accounts)) },
                         onRequestNotifications = ::requestNotifications,
@@ -313,16 +320,26 @@ internal fun SoldiV2Screen(
                         onSave = { draft, recurrence, pendingAttachments, saveAndNew, createSinceWhen, selectedSourceId ->
                             runAction {
                                 val signed = draft.copy(amount = signedAmount(draft.amount, current.kind))
+                                val bankingSuggestion = pendingBankingSuggestion
+                                if (bankingSuggestion != null && !bankingRepository.validateSuggestion(
+                                        bankingSuggestion, signed, accounts, transactions,
+                                    )) {
+                                    error(bankingSuggestionExpiredMessage)
+                                }
                                 val recurrenceId = recurrence?.let { capsule.saveRecurrence(it) }
                                 val identified = signed.copy(transactionUuid = signed.transactionUuid ?: java.util.UUID.randomUUID().toString())
                                 val finalDraft = if (recurrenceId == null) identified else identified.copy(recurrenceId = recurrenceId, occurrenceKey = localDate(identified.occurredAt).toString())
                                 val transactionId = capsule.saveTransaction(finalDraft)
+                                bankingSuggestion?.let {
+                                    bankingRepository.markSuggestionAccepted(it, requireNotNull(finalDraft.transactionUuid))
+                                }
                                 pendingAttachments.forEach { capsule.addAttachment(transactionId, it) }
                                 FinanceReminderScheduler.reschedule(context.applicationContext)
                                 if (createSinceWhen) {
                                     SoldiTransactionHubAdapter(context).sinceWhenSource(requireNotNull(finalDraft.transactionUuid))
                                         ?.let { context.launchSinceWhenCreate(it, selectedSourceId) }
                                 }
+                                pendingBankingSuggestion = null
                                 editor = if (saveAndNew) SoldiEditor.Transaction(defaultTransaction(accounts), current.kind) else null
                             }
                         },
@@ -483,7 +500,17 @@ internal fun SoldiV2Screen(
                     } },
                 )
 
-                bottom == BottomDestination.BANKS -> BankingScreen()
+                bottom == BottomDestination.BANKS -> BankingScreen(
+                    repository = bankingRepository,
+                    localAccounts = accounts,
+                    localRows = transactions,
+                    onCreateAccount = { capsule.saveAccount(it) },
+                    onSuggestion = { suggestion ->
+                        pendingBankingSuggestion = suggestion
+                        editor = suggestion.toEditor()
+                    },
+                    onRequestNotifications = ::requestNotifications,
+                )
 
                 else -> when (tab) {
                     SoldiTab.TRANSACTIONS -> TransactionsScreenV2(

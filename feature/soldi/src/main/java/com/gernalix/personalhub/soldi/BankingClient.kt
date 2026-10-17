@@ -1,8 +1,12 @@
 package com.gernalix.personalhub.soldi
 
 import android.content.Context
+import com.gernalix.personalhub.core.database.capsules.soldi.FinanceAccount
+import com.gernalix.personalhub.core.database.capsules.soldi.TransactionDraft
+import com.gernalix.personalhub.core.database.capsules.soldi.TransactionView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.math.BigDecimal
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -16,12 +20,86 @@ internal fun bankingFailureForHttpStatus(code: Int): BankingFailure = when (code
 }
 
 internal class BankingRepository(context: Context) {
-    private val store = BankingSecureStore(context)
+    private val app = context.applicationContext
+    private val store = BankingSecureStore(app)
 
     fun configuration(): BankingConfiguration = store.configuration()
     fun cached(): BankingSnapshot? = runCatching(store::readCache).getOrNull()
     fun configure(baseUrl: String, token: String) = store.saveConfiguration(baseUrl, token)
     fun disconnect() = store.disconnect()
+    fun reconciliationState(): BankingReconciliationState =
+        runCatching(store::reconciliationState).getOrDefault(BankingReconciliationState())
+
+    fun linkAccount(bankAccount: BankingAccount, localAccount: FinanceAccount): BankingReconciliationState {
+        require(localAccount.currency in bankAccount.currencies) { "Bank and PersonalHub currencies differ" }
+        return store.updateReconciliationState { state ->
+            require(state.accountLinks.none { (bankId, localId) ->
+                bankId != bankAccount.id && localId == localAccount.id
+            }) { "PersonalHub account is already linked" }
+            state.copy(accountLinks = state.accountLinks + (bankAccount.id to localAccount.id))
+        }
+    }
+
+    fun unlinkAccount(bankAccountId: String): BankingReconciliationState = store.updateReconciliationState { state ->
+        state.copy(
+            accountLinks = state.accountLinks - bankAccountId,
+            observedAlerts = state.observedAlerts - bankAccountId,
+            notifiedAlerts = state.notifiedAlerts - bankAccountId,
+        )
+    }
+
+    fun saveAlertPreferences(enabled: Boolean, threshold: BigDecimal): BankingReconciliationState {
+        require(!enabled || threshold.signum() > 0) { "Alert threshold must be positive" }
+        return store.updateReconciliationState { state ->
+            state.copy(
+                alertPreferences = BankingAlertPreferences(enabled, threshold.stripTrailingZeros()),
+                observedAlerts = if (enabled) state.observedAlerts else emptyMap(),
+                notifiedAlerts = if (enabled) state.notifiedAlerts else emptyMap(),
+            )
+        }
+    }
+
+    fun validateSuggestion(
+        suggestion: BankingSuggestion,
+        draft: TransactionDraft,
+        localAccounts: List<FinanceAccount>,
+        localRows: List<TransactionView>,
+    ): Boolean {
+        val snapshot = cached() ?: return false
+        return validateBankingSuggestion(suggestion, draft, snapshot, reconciliationState(), localAccounts, localRows)
+    }
+
+    fun markSuggestionAccepted(suggestion: BankingSuggestion, transactionUuid: String) {
+        store.updateReconciliationState { state ->
+            require(suggestion.key !in state.acceptedSuggestions) { "Bank suggestion was already accepted" }
+            state.copy(acceptedSuggestions = state.acceptedSuggestions + (suggestion.key to transactionUuid))
+        }
+    }
+
+    fun processAlerts(
+        snapshot: BankingSnapshot,
+        localAccounts: List<FinanceAccount>,
+        localRows: List<TransactionView>,
+    ): BankingReconciliationState {
+        val initial = reconciliationState()
+        val result = reconcileBanking(snapshot, initial, localAccounts, localRows)
+        val advance = advanceBankingAlerts(initial, result.comparisons)
+        var saved = store.updateReconciliationState { current ->
+            current.copy(
+                observedAlerts = advance.state.observedAlerts,
+                notifiedAlerts = advance.state.notifiedAlerts,
+            )
+        }
+        val posted = advance.accountIdsToNotify.filter { BankingAlertNotifier.post(app, it) }
+        if (posted.isNotEmpty()) {
+            saved = store.updateReconciliationState { current ->
+                current.copy(notifiedAlerts = current.notifiedAlerts + posted.mapNotNull { accountId ->
+                    current.observedAlerts[accountId]?.let { accountId to it }
+                })
+            }
+        }
+        return saved
+    }
 
     suspend fun refresh(): BankingSnapshot = withContext(Dispatchers.IO) {
         val config = store.configuration()
