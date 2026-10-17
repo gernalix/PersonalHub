@@ -4,7 +4,9 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
+import org.json.JSONObject
 import java.io.File
+import java.math.BigDecimal
 import java.net.URI
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -19,6 +21,7 @@ internal class BankingSecureStore(context: Context) {
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val credentialFile = AtomicFile(File(app.noBackupFilesDir, "soldi-banking-credential.enc"))
     private val cacheFile = AtomicFile(File(app.noBackupFilesDir, "soldi-banking-cache.enc"))
+    private val reconciliationFile = AtomicFile(File(app.noBackupFilesDir, "soldi-banking-reconciliation.enc"))
 
     fun configuration(): BankingConfiguration = BankingConfiguration(
         baseUrl = prefs.getString(KEY_BASE_URL, DEFAULT_BASE_URL).orEmpty().ifBlank { DEFAULT_BASE_URL },
@@ -46,11 +49,54 @@ internal class BankingSecureStore(context: Context) {
         if (!cacheFile.baseFile.exists()) null else BankingJson.decode(decrypt(cacheFile.readFully(), CACHE_ALIAS))
     }
 
+    fun reconciliationState(): BankingReconciliationState = synchronized(LOCK) {
+        if (!reconciliationFile.baseFile.exists()) BankingReconciliationState()
+        else decodeReconciliation(decrypt(reconciliationFile.readFully(), RECONCILIATION_ALIAS))
+    }
+
+    fun updateReconciliationState(
+        transform: (BankingReconciliationState) -> BankingReconciliationState,
+    ): BankingReconciliationState = synchronized(LOCK) {
+        val next = transform(reconciliationState())
+        write(reconciliationFile, encrypt(encodeReconciliation(next), RECONCILIATION_ALIAS))
+        next
+    }
+
     fun disconnect() = synchronized(LOCK) {
-        credentialFile.delete(); cacheFile.delete(); prefs.edit().remove(KEY_BASE_URL).apply()
+        credentialFile.delete(); cacheFile.delete(); reconciliationFile.delete(); prefs.edit().remove(KEY_BASE_URL).apply()
         KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.run {
-            deleteEntry(CREDENTIAL_ALIAS); deleteEntry(CACHE_ALIAS)
+            deleteEntry(CREDENTIAL_ALIAS); deleteEntry(CACHE_ALIAS); deleteEntry(RECONCILIATION_ALIAS)
         }
+    }
+
+    private fun encodeReconciliation(value: BankingReconciliationState): String = JSONObject().apply {
+        put("account_links", JSONObject(value.accountLinks))
+        put("alerts", JSONObject().apply {
+            put("enabled", value.alertPreferences.enabled)
+            put("threshold", value.alertPreferences.threshold.toPlainString())
+        })
+        put("accepted_suggestions", JSONObject(value.acceptedSuggestions))
+        put("observed_alerts", JSONObject(value.observedAlerts))
+        put("notified_alerts", JSONObject(value.notifiedAlerts))
+    }.toString()
+
+    private fun decodeReconciliation(body: String): BankingReconciliationState {
+        val root = JSONObject(body)
+        fun stringMap(key: String): Map<String, String> = root.optJSONObject(key)?.let { value ->
+            value.keys().asSequence().associateWith { name -> value.getString(name) }
+        }.orEmpty()
+        val alerts = root.optJSONObject("alerts")
+        return BankingReconciliationState(
+            accountLinks = stringMap("account_links"),
+            alertPreferences = BankingAlertPreferences(
+                enabled = alerts?.optBoolean("enabled", false) ?: false,
+                threshold = alerts?.optString("threshold")?.takeIf(String::isNotBlank)?.let(::BigDecimal)
+                    ?: BigDecimal.ZERO,
+            ),
+            acceptedSuggestions = stringMap("accepted_suggestions"),
+            observedAlerts = stringMap("observed_alerts"),
+            notifiedAlerts = stringMap("notified_alerts"),
+        )
     }
 
     private fun encrypt(value: String, alias: String): ByteArray {
@@ -89,6 +135,7 @@ internal class BankingSecureStore(context: Context) {
         private const val KEY_BASE_URL = "base_url"
         private const val CREDENTIAL_ALIAS = "personalhub.soldi.banking.credential"
         private const val CACHE_ALIAS = "personalhub.soldi.banking.cache"
+        private const val RECONCILIATION_ALIAS = "personalhub.soldi.banking.reconciliation"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val IV_BYTES = 12
         private val LOCK = Any()
