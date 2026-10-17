@@ -92,6 +92,7 @@ internal fun SoldiBottomBar(selected: BottomDestination, onSelect: (BottomDestin
                             BottomDestination.ACCOUNTS -> "▣"
                             BottomDestination.CATEGORIES -> "◇"
                             BottomDestination.RECURRENCES -> "↻"
+                            BottomDestination.BANKS -> "B"
                             BottomDestination.MORE -> "≡"
                         },
                     )
