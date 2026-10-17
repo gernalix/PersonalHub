@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="soldi_title">Soldi</string>
     <string name="back">Back</string>
     <string name="operation_failed">Cannot save. Check amount, date and currency. Referenced products cannot be deleted. A place must keep the same chain.</string>
