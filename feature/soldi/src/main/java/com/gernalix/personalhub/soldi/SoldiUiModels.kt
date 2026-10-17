@@ -15,7 +15,7 @@ import java.util.Locale
 
 internal enum class SoldiTab { TRANSACTIONS, OVERVIEW, STATISTICS, CHARTS, CALENDAR }
 internal enum class EntryKind { EXPENSE, INCOME }
-internal enum class BottomDestination { HOME, ACCOUNTS, CATEGORIES, RECURRENCES, MORE }
+internal enum class BottomDestination { HOME, ACCOUNTS, CATEGORIES, RECURRENCES, BANKS, MORE }
 
 internal sealed interface SoldiEditor {
     data class Transaction(val draft: TransactionDraft, val kind: EntryKind) : SoldiEditor

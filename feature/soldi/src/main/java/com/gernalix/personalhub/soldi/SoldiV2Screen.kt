@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
@@ -250,6 +251,7 @@ internal fun SoldiV2Screen(
                             BottomDestination.ACCOUNTS -> "Conti"
                             BottomDestination.CATEGORIES -> "Categorie"
                             BottomDestination.RECURRENCES -> "Ricorrenze"
+                            BottomDestination.BANKS -> stringResource(R.string.banking_title)
                             else -> "Soldi"
                         },
                         onHome = { bottom = BottomDestination.HOME },
@@ -481,6 +483,8 @@ internal fun SoldiV2Screen(
                     } },
                 )
 
+                bottom == BottomDestination.BANKS -> BankingScreen()
+
                 else -> when (tab) {
                     SoldiTab.TRANSACTIONS -> TransactionsScreenV2(
                         month,
@@ -571,6 +575,11 @@ internal fun SoldiV2Screen(
                         },
                     )
                     ListItem(headlineContent = { Text("Nuovo trasferimento") }, modifier = Modifier.clickable { showMore = false; editor = SoldiEditor.Transfer(defaultTransfer(accounts)) })
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.banking_title)) },
+                        supportingContent = { Text(stringResource(R.string.banking_menu_summary)) },
+                        modifier = Modifier.clickable { showMore = false; bottom = BottomDestination.BANKS },
+                    )
                 }
             },
             confirmButton = { TextButton(onClick = { showMore = false }) { Text("Chiudi") } },
