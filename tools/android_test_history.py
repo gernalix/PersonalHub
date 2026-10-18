@@ -109,14 +109,36 @@ def junit(text: str) -> tuple[str, list[tuple], list[tuple]]:
     return ("FAIL" if suite_failure or any(c[1] == "FAIL" for c in cases) else "PASS" if any(c[1] == "PASS" for c in cases) else "INCOMPLETE", cases, [])
 
 
+def unittest_result(text: str) -> tuple[str, list[tuple], list[tuple]]:
+    reports = list(re.finditer(r"^Ran (\d+) tests? in ([0-9.]+)s$", text, re.M))
+    if not reports:
+        return "INCOMPLETE", [], []
+    report = reports[-1]
+    tail = text[report.end():]
+    count, seconds = int(report[1]), float(report[2])
+    if not math.isfinite(seconds) or seconds < 0:
+        raise ValueError("Invalid unittest duration")
+    failed = bool(re.search(r"^FAILED(?:\s|$)", tail, re.M))
+    success = bool(re.search(r"^OK(?:\s|$)", tail, re.M))
+    skipped = re.search(r"^OK \(skipped=(\d+)\)", tail, re.M)
+    has_run_case = count > 0 and (skipped is None or int(skipped[1]) < count)
+    status = "FAIL" if failed else "PASS" if success and has_run_case else "INCOMPLETE"
+    # Non-verbose unittest logs prove a suite result, not individual case IDs.
+    return status, [("unittest-suite", status, seconds * 1000)], []
+
+
 def record(db_path: Path, source: Path, category: str, context: dict, *, module: str = "") -> dict:
     source = source.resolve(strict=True)
-    if category not in ("instrumentation", "am-start", "junit"):
+    if category not in ("instrumentation", "am-start", "junit", "unittest"):
         raise ValueError("Unsupported evidence category")
     data = source.read_text()
     context = dict(context)
-    parsed = instrumentation(data) if category == "instrumentation" else startup(data, module, context.get("app_id")) if category == "am-start" else junit(data)
+    parsed = instrumentation(data) if category == "instrumentation" else startup(data, module, context.get("app_id")) if category == "am-start" else unittest_result(data) if category == "unittest" else junit(data)
     status, cases, samples = parsed
+    if category == "unittest":
+        reports = re.findall(r"^Ran (\d+) tests? in [0-9.]+s$", data, re.M)
+        context.update(granularity="suite", reported_test_count=int(reports[-1]) if reports else 0)
+        cases = [(context.get("suite", source.stem), row[1], row[2]) for row in cases]
     if context.get("process_exit_code", 0) != 0:
         status = "FAIL"
         samples = []
@@ -151,7 +173,7 @@ def record(db_path: Path, source: Path, category: str, context: dict, *, module:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("category", choices=("instrumentation", "am-start", "junit", "summary"))
+    parser.add_argument("category", choices=("instrumentation", "am-start", "junit", "unittest", "summary"))
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--source", type=Path)
     parser.add_argument("--device-kind", choices=("host", "pixel", "tcl", "emulator"), default="host")

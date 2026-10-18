@@ -22,6 +22,7 @@ Per importare evidenze esistenti:
 python3 tools/android_test_history.py instrumentation --source LOG --device-kind pixel --device-model 'Google Pixel 8a' --android-api 37 --app-id com.gernalix.personalhub.qa --app-version 69 --variant qa-unminified --apk APK --test-apk TEST_APK
 python3 tools/android_test_history.py am-start --source LOG --module places --device-kind pixel --app-id com.gernalix.personalhub.qa --apk APK
 python3 tools/android_test_history.py junit --source TEST-CLASS.xml --device-kind host
+python3 tools/android_test_history.py unittest --source PYTHON-TESTS.log --device-kind host
 python3 tools/android_test_history.py summary
 ```
 
@@ -30,6 +31,9 @@ Per JUnit host non inventare un'identità APK. Reimportare la stessa evidenza è
 idempotente; una nuova esecuzione, anche con esito e testo identici, resta una
 misura distinta grazie al timestamp del file. Il timestamp salvato è quello
 dell'evidenza, non un orario di avvio del test presunto.
+I log Python unittest senza dettaglio dei casi sono registrati come risultato
+di suite, con il conteggio dichiarato nel contesto e la durata complessiva;
+non vengono inventati nomi o durate dei singoli test.
 
 Le tabelle sono `runs`, `test_results` e `measurements`; la vista
 `startup_history` espone le misure per modulo, build e dispositivo. Esempio:

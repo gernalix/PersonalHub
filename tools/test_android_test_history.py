@@ -19,6 +19,15 @@ INSTRUMENTATION_CODE: -1
 
 
 class TestHistoryTests(unittest.TestCase):
+    def test_python_suite_uses_its_terminal_summary_not_expected_failure_output(self):
+        log = "FAIL-CLOSED: expected negative test\nRan 17 tests in 0.090s\n\nOK\n"
+        status, rows, _ = history.unittest_result(log)
+        self.assertEqual("PASS", status)
+        self.assertEqual(90., rows[0][2])
+        self.assertEqual("FAIL", history.unittest_result("Ran 2 tests in 0.010s\nFAILED (failures=1)\n")[0])
+        self.assertEqual("INCOMPLETE", history.unittest_result("Ran 0 tests in 0.000s\nOK\n")[0])
+        self.assertEqual("INCOMPLETE", history.unittest_result("Ran 2 tests in 0.000s\nOK (skipped=2)\n")[0])
+
     def test_crashes_and_incomplete_streams_never_become_pass(self):
         self.assertEqual("PASS", history.instrumentation(SUCCESS)[0])
         self.assertEqual("FAIL", history.instrumentation(SUCCESS + "INSTRUMENTATION_RESULT: shortMsg=Process crashed.")[0])
