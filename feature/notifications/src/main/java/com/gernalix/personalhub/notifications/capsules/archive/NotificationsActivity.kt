@@ -44,9 +44,10 @@ class NotificationsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContent { MaterialTheme { Surface {
-            com.gernalix.personalhub.core.ui.ModuleHistoryHost("notifications") {
+            com.gernalix.personalhub.core.ui.ModuleHistoryHost("notifications", intent.getLongExtra(com.gernalix.personalhub.notifications.api.NotificationsRoute.EXTRA_EVENT_ID, -1)) {
             var conversations by remember { mutableStateOf(false) }
             if(conversations) ConversationsScreen(onBack={conversations=false}) else ArchiveScreen(generation, exportResult,
+            initialEventId=intent.getLongExtra(com.gernalix.personalhub.notifications.api.NotificationsRoute.EXTRA_EVENT_ID, -1).takeIf { it > 0 },
             onConversations={conversations=true},
             onExport={export.launch("notifications.sqlite")}, onPermission={startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}, onBack={finish()}) } } } }
     }
@@ -60,7 +61,7 @@ class NotificationsActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> Unit, onPermission: () -> Unit, onBack: () -> Unit, onConversations: () -> Unit) {
+internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> Unit, onPermission: () -> Unit, onBack: () -> Unit, onConversations: () -> Unit, initialEventId: Long? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val store = remember { ArchiveStore.get(context) }
     val changed by ArchiveStore.changes.collectAsState()
@@ -69,6 +70,12 @@ internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> 
     var rows by remember { mutableStateOf(emptyList<ArchiveEvent>()) }; var apps by remember { mutableStateOf(emptyList<String>()) }
     var selected by remember { mutableStateOf<ArchiveEvent?>(null) }
     var error by remember { mutableStateOf(false) }; var more by remember(search,app,from,until,changed) { mutableStateOf(0) }
+    LaunchedEffect(initialEventId) {
+        initialEventId?.let { id ->
+            try { selected = withContext(Dispatchers.IO) { store.event(id) } }
+            catch (_: Exception) { error = true }
+        }
+    }
     val granted = remember(generation) { context.getSystemService(NotificationManager::class.java).isNotificationListenerAccessGranted(ComponentName(context,CollectorService::class.java)) }
     val status = context.getSharedPreferences("notification_status",0)
     LaunchedEffect(search,app,from,until,changed,more) {

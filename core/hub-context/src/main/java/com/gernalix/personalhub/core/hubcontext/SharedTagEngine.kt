@@ -339,8 +339,19 @@ class SharedTagEngine(
     }
 
     private fun requireCompatible(target: HubEntityRef, tag: HubTagEntity) {
-        require(tag.isGlobal || tag.namespace == namespaceForTarget(target) || (target.moduleId == "soldi" && tag.namespace == HubTagNamespaces.SOLDI_CATEGORY)) {
+        require(tag.isGlobal || tag.namespace == counterNamespace(target) || (target.moduleId == "soldi" && tag.namespace == HubTagNamespaces.SOLDI_CATEGORY)) {
             "Tag ${tag.id} is not compatible with ${target.moduleId}/${target.entityKind}"
+        }
+    }
+
+    private fun counterNamespace(target: HubEntityRef): String {
+        if (target.moduleId != "since_when" || target.entityKind != "counter") return namespaceForTarget(target)
+        val canonical = CanonicalIdentityCapsule.normalize(db.openHelper.readableDatabase, target)
+        return db.openHelper.readableDatabase.query(
+            "SELECT mode FROM since_when_counters WHERE canonical_id=?", arrayOf(canonical.canonicalId),
+        ).use { cursor ->
+            require(cursor.moveToFirst()) { "Unknown counter" }
+            com.gernalix.personalhub.contracts.database.CounterModes.namespace(cursor.getString(0))
         }
     }
 
@@ -354,6 +365,7 @@ class SharedTagEngine(
             "soldi" -> HubTagNamespaces.SOLDI
             "substances" -> HubTagNamespaces.SUBSTANCES
             "since_when" -> HubTagNamespaces.SINCE_WHEN
+            "countdown" -> HubTagNamespaces.COUNTDOWN
             else -> require(moduleId.startsWith("timer")) { "Unsupported tag module: $moduleId" }.let { HubTagNamespaces.TIMER_NOW }
         }
 

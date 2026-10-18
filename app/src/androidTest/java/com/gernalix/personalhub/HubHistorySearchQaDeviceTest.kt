@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextReplacement
@@ -82,7 +83,7 @@ class HubHistorySearchQaDeviceTest {
         // The same popup must remain open across multiple checkbox selections.
         composeRule.onNode(hasText(places) and hasClickAction()).assertIsDisplayed().performClick()
         waitForText(seed.placeName)
-        composeRule.onNodeWithText(context.getString(android.R.string.ok)).performClick()
+        composeRule.onNodeWithText(context.getString(android.R.string.ok)).performScrollTo().performClick()
         composeRule.onNodeWithTag("history-from")
             .performTextReplacement("2099-01-01 00:00")
         waitForText(seed.placeName, present = false)
@@ -92,7 +93,11 @@ class HubHistorySearchQaDeviceTest {
         composeRule.waitUntil(timeoutMillis = 7_000L) {
             runCatching { composeRule.onNodeWithTag("history-undo").assertIsEnabled(); true }.getOrDefault(false)
         }
-        composeRule.onNodeWithTag("history-undo").performClick()
+        val target = com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoResolver.resolve(
+            seed.database.openHelper.readableDatabase, semanticUpdate.transactionId, false,
+        )
+        assertEquals(com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUndoTarget.Activity(seed.updateActivityId), target)
+        composeRule.onNodeWithTag("history-undo").performScrollTo().assertIsDisplayed().performClick()
         composeRule.waitUntil(timeoutMillis = 7_000L) {
             runBlocking {
                 seed.database.activityDao().byId(seed.updateActivityId)?.status ==
@@ -134,7 +139,7 @@ class HubHistorySearchQaDeviceTest {
             composeRule.setContent { PersonalHubTheme { Surface { PersonalHubApp() } } }
             HubModule.entries.forEach { composeRule.onNodeWithContentDescription(context.getString(it.titleRes)).assertIsDisplayed() }
             listOf(R.string.home_context, R.string.home_tags, R.string.home_history_search,
-                R.string.since_when_title, R.string.settings_title).forEach {
+                R.string.since_when_title, com.gernalix.personalhub.core.ui.R.string.countdown_title, R.string.settings_title).forEach {
                 composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed()
             }
             composeRule.onNodeWithText(context.getString(com.gernalix.personalhub.core.ui.R.string.home_layout_extended)).assertIsDisplayed()

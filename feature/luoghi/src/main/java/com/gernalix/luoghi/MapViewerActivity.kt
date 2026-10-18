@@ -109,14 +109,14 @@ class MapViewerActivity : ComponentActivity() {
         super.onResume()
         if (leftForMap && ::bridge.isInitialized) {
             leftForMap = false
-            lifecycleScope.launch { try { bridge.clear() } finally { bridge.close(); finish() } }
+            lifecycleScope.launch { try { runCatching { bridge.clear() } } finally { bridge.close(); finish() } }
         }
     }
     override fun onDestroy() {
         if (::bridge.isInitialized) {
             val ownedBridge = bridge
             // Binder cleanup does not block the UI or introduce a long-lived service.
-            Thread({ kotlinx.coroutines.runBlocking { try { ownedBridge.clear() } finally { ownedBridge.close() } } }, "ph-map-cleanup").start()
+            Thread({ kotlinx.coroutines.runBlocking { try { runCatching { ownedBridge.clear() } } finally { ownedBridge.close() } } }, "ph-map-cleanup").start()
         }
         super.onDestroy()
     }

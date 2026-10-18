@@ -14,11 +14,12 @@ object HubTagNamespaces {
     const val TIMER_NOW = "timer.now"
     const val TIMER_EVENTS = "timer.events"
     const val SINCE_WHEN = "since_when"
+    const val COUNTDOWN = "countdown"
     @Deprecated("Since When is a PersonalHub domain")
     const val TIMER_SINCE_WHEN = SINCE_WHEN
     const val GLOBAL = "global"
 
-    val local = setOf(PEOPLE, PLACES, SOLDI, SOLDI_CATEGORY, SUBSTANCES, TIMER_NOW, TIMER_EVENTS, SINCE_WHEN)
+    val local = setOf(PEOPLE, PLACES, SOLDI, SOLDI_CATEGORY, SUBSTANCES, TIMER_NOW, TIMER_EVENTS, SINCE_WHEN, COUNTDOWN)
     val all = local + GLOBAL
 }
 

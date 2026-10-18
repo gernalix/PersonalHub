@@ -29,4 +29,22 @@ data class SinceWhenCounterEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "canonical_id", defaultValue = "''") val canonicalId: String = "",
     @ColumnInfo(name = "legacy_source_entity_id") val legacySourceEntityId: String? = null,
+    @ColumnInfo(defaultValue = "'SINCE_WHEN'") val mode: String = CounterModes.SINCE_WHEN,
 )
+
+/** Both views use the same counter, identity, editor, persistence and elapsed-time engine. */
+object CounterModes {
+    const val SINCE_WHEN = "SINCE_WHEN"
+    const val COUNTDOWN = "COUNTDOWN"
+    val all = setOf(SINCE_WHEN, COUNTDOWN)
+    fun namespace(mode: String): String = when (mode) {
+        SINCE_WHEN -> HubTagNamespaces.SINCE_WHEN
+        COUNTDOWN -> HubTagNamespaces.COUNTDOWN
+        else -> error("Unsupported counter mode")
+    }
+    fun module(mode: String): String = when (mode) {
+        SINCE_WHEN -> "since_when"
+        COUNTDOWN -> "countdown"
+        else -> error("Unsupported counter mode")
+    }
+}

@@ -10,6 +10,7 @@ android {
 
     defaultConfig {
         minSdk = 26
+        consumerProguardFiles("consumer-rules.pro")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "APPLICATION_ID", "\"com.gernalix.luoghi\"")
         buildConfigField("int", "VERSION_CODE", "15")

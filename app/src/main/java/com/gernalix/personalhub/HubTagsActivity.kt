@@ -67,7 +67,9 @@ class HubTagsActivity : ComponentActivity() {
         setContent {
             PersonalHubTheme {
                 Surface(Modifier.fillMaxSize()) {
-                    HubTagsScreen(initialTagId = initialTagId, onBack = ::finish)
+                    com.gernalix.personalhub.core.ui.ModuleHistoryHost("tags", initialTagId) {
+                        HubTagsScreen(initialTagId = initialTagId, onBack = ::finish)
+                    }
                 }
             }
         }

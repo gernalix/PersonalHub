@@ -7,6 +7,7 @@ import json
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from android_paired_cutover_v24 import (
@@ -17,6 +18,7 @@ from android_paired_cutover_v24 import (
     require_single_profile,
     sha,
     stage_and_swap,
+    paired_rollback,
 )
 
 
@@ -85,6 +87,13 @@ class PairedCutoverTests(unittest.TestCase):
             self.assertTrue((self.root / destination / name).is_file())
         self.assertFalse((self.root / "databases/personalhub.db-wal").exists())
 
+    def test_v25_publish_failure_restores_original_db_and_wal(self):
+        fake, expected = self.baseline("mv databases/.ph-v25-")
+        prepared, report = self.prepared()
+        with self.assertRaises(OSError):
+            stage_and_swap(fake, prepared, report, expected, "testv25", target_version=25)
+        assert_still_frozen(fake, expected)
+
     def test_failure_before_first_move_never_removes_live_db(self):
         fake, expected = self.baseline("mv databases/personalhub.db ")
         prepared, report = self.prepared()
@@ -106,6 +115,18 @@ class PairedCutoverTests(unittest.TestCase):
         with self.assertRaisesRegex(CutoverBlocked, "hash mismatch"):
             stage_and_swap(fake, prepared, report, expected, "test126")
         assert_still_frozen(fake, expected)
+
+    def test_paired_rollback_uses_explicit_downgrade_then_verifies_the_old_apk(self):
+        old_apk = self.root / "previous.apk"
+        old_apk.write_bytes(b"verified previous APK")
+        device = mock.Mock(serial="pixel-serial")
+        device.installed_apk.return_value = "/data/app/previous/base.apk"
+        device.shell.return_value = sha(old_apk) + "  /data/app/previous/base.apk"
+        with mock.patch("android_paired_cutover_v24.install_apk") as install:
+            paired_rollback(device, "files/rollback", old_apk, "rollback123")
+        install.assert_called_once_with(old_apk, "pixel-serial", timeout_s=120, paired_rollback=True)
+        device.freeze.assert_called_once()
+        device.enable.assert_called_once()
 
     def test_single_profile_and_unfinished_switch(self):
         with self.assertRaisesRegex(CutoverBlocked, "registry unavailable"):

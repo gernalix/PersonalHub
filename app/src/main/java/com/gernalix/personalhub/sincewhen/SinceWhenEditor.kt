@@ -23,13 +23,15 @@ import java.util.Locale
 /** Change only the editable snapshot fields; IDs, legacy tags and provenance remain untouched. */
 internal suspend fun saveSinceWhenCounter(db: PersonalHubDatabase, value: SinceWhenCounterEntity, tagIds: Set<String>): Long {
     require(value.title.isNotBlank())
+    require(value.mode in CounterModes.all)
     val end = value.endTimestamp
     require(end == null || end > value.initialTimestamp)
     require(JSONArray(value.displayUnitsJson).length() > 0)
     return db.withTransaction {
         val dao = db.sinceWhenCounterDao()
+        if (value.id != 0L) require(dao.get(value.id)?.mode == value.mode) { "Counter mode is immutable" }
         val id = if (value.id == 0L) dao.insert(value) else { dao.update(value); value.id }
-        HubContextRuntime.tags().replace(HubEntityRef("since_when", "counter", requireNotNull(dao.get(id)).canonicalId), HubTagNamespaces.SINCE_WHEN, tagIds)
+        HubContextRuntime.tags().replace(HubEntityRef("since_when", "counter", requireNotNull(dao.get(id)).canonicalId), CounterModes.namespace(value.mode), tagIds)
         id
     }
 }
@@ -48,13 +50,14 @@ internal fun formatSinceWhenTimestamp(timestamp: Long): String = DateTimeFormatt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: () -> Unit, onSaved: () -> Unit) {
+internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: () -> Unit, onSaved: () -> Unit, mode: String = CounterModes.SINCE_WHEN) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val db = remember { PersonalHubDatabase.get(context) }
     val tags = remember { HubContextRuntime.tags() }
-    val available by tags.observe(HubTagNamespaces.SINCE_WHEN).collectAsState(initial = emptyList())
+    val namespace = CounterModes.namespace(mode)
+    val available by tags.observe(namespace).collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
-    var value by remember(initial) { mutableStateOf(initial ?: SinceWhenCounterEntity(title = "", initialTimestamp = System.currentTimeMillis(), createdAt = System.currentTimeMillis())) }
+    var value by remember(initial) { mutableStateOf(initial ?: SinceWhenCounterEntity(title = "", initialTimestamp = if (mode == CounterModes.COUNTDOWN) ZonedDateTime.now().plusDays(1).toInstant().toEpochMilli() else System.currentTimeMillis(), createdAt = System.currentTimeMillis(), mode = mode, displayUnitsJson = if (mode == CounterModes.COUNTDOWN) "[\"DAYS\",\"HOURS\",\"MINUTES\",\"SECONDS\"]" else "[\"DAYS\"]")) }
     var hasEnd by remember(initial) { mutableStateOf(initial?.endTimestamp != null) }
     var end by remember(initial) { mutableStateOf(initial?.endTimestamp ?: System.currentTimeMillis()) }
     var selectedTags by remember(initial) { mutableStateOf(emptySet<String>()) }
@@ -63,7 +66,7 @@ internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: 
     var failed by remember { mutableStateOf(false) }
     var pickEnd by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(initial?.id) {
-        selectedTags = initial?.let { tags.tags(HubEntityRef("since_when", "counter", it.canonicalId)).filter { t -> t.namespace == HubTagNamespaces.SINCE_WHEN || t.isGlobal }.map { t -> t.id }.toSet() }.orEmpty()
+        selectedTags = initial?.let { tags.tags(HubEntityRef("since_when", "counter", it.canonicalId)).filter { t -> t.namespace == namespace || t.isGlobal }.map { t -> t.id }.toSet() }.orEmpty()
         tagsReady = true
     }
     val units = remember(value.displayUnitsJson) {
@@ -90,7 +93,7 @@ internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: 
                 OutlinedTextField(value.title, { value = value.copy(title = it) }, modifier = Modifier.fillMaxWidth().testTag("sincewhen-title"), label = { Text(stringResource(R.string.since_when_editor_counter_name)) }, singleLine = true, enabled = !saving)
                 OutlinedTextField(value.description, { value = value.copy(description = it) }, modifier = Modifier.fillMaxWidth().testTag("sincewhen-description"), label = { Text(stringResource(R.string.since_when_editor_description)) }, enabled = !saving)
                 TextButton(modifier = Modifier.testTag("sincewhen-start"), enabled = !saving, onClick = { pickEnd = false }) {
-                    Text(stringResource(R.string.since_when_editor_starts_from, formatSinceWhenTimestamp(value.initialTimestamp)))
+                    Text(stringResource(if (mode == CounterModes.COUNTDOWN) R.string.countdown_target else R.string.since_when_editor_starts_from, formatSinceWhenTimestamp(value.initialTimestamp)))
                 }
                 Row { Checkbox(hasEnd, { hasEnd = it }, modifier = Modifier.testTag("sincewhen-has-end"), enabled = !saving); Text(stringResource(R.string.since_when_editor_has_end)) }
                 if (hasEnd) {
@@ -109,13 +112,13 @@ internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: 
                         FilterChip(unit in units, { val next = if (unit in units) units - unit else units + unit; value = value.copy(displayUnitsJson = JSONArray(next.toList()).toString()) }, label = { Text(stringResource(label)) }, enabled = !saving, modifier = Modifier.testTag("sincewhen-unit-$unit"))
                     }
                 }
-                Text(stringResource(R.string.since_when_editor_tags))
+                Text(stringResource(if (mode == CounterModes.COUNTDOWN) R.string.countdown_tags else R.string.since_when_editor_tags))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     available.filter { !it.archived || it.id in selectedTags }.forEach { tag ->
                         FilterChip(tag.id in selectedTags, { selectedTags = if (tag.id in selectedTags) selectedTags - tag.id else selectedTags + tag.id }, label = { Text(tag.name) }, enabled = tagsReady && !saving, modifier = Modifier.testTag("sincewhen-tag-${tag.id}"))
                     }
                 }
-                if (available.isEmpty()) Text(stringResource(R.string.since_when_editor_no_tags))
+                if (available.isEmpty()) Text(stringResource(if (mode == CounterModes.COUNTDOWN) R.string.countdown_no_tags else R.string.since_when_editor_no_tags))
                 if (failed) Text(stringResource(R.string.since_when_editor_save_error), color = MaterialTheme.colorScheme.error)
             }
         },

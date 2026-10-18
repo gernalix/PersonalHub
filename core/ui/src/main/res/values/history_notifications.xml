@@ -1,0 +1,6 @@
+<resources>
+    <string name="history_notification_posted">Received notification</string>
+    <string name="history_notification_updated">Updated notification</string>
+    <string name="history_notification_removed">Removed notification</string>
+    <string name="history_notification_observed">Observed notification</string>
+</resources>

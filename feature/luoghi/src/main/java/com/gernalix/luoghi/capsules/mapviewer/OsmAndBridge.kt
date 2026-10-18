@@ -58,8 +58,10 @@ class OsmAndBridge(context: Context) {
                 suspendCancellableCoroutine<Unit> { continuation ->
                     val connected = object : ServiceConnection {
                         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-                            api = IOsmAndAidlInterface.Stub.asInterface(binder)
-                            if (continuation.isActive) continuation.resume(Unit)
+                            if (continuation.isActive) {
+                                api = IOsmAndAidlInterface.Stub.asInterface(binder)
+                                continuation.resume(Unit)
+                            } else close()
                         }
                         override fun onServiceDisconnected(name: ComponentName) { api = null }
                         override fun onNullBinding(name: ComponentName) {

@@ -43,6 +43,16 @@ class ArchiveStoreTest {
         assertEquals(2,store.query("\"'").size)
         assertEquals("2026-03-28T23:00:00Z" to "2026-03-29T22:00:00Z",archiveDateBounds("2026-03-29","2026-03-29",ZoneId.of("Europe/Copenhagen")))
     }
+    @Test fun multiWordPrefixesMatchInBothArchiveAndSharedHistory(){
+        store.append(snapshot(text="PH shared History QA 12345 Caffè Århus"),"POSTED")
+        store.append(snapshot(key="other",text="PH unrelated QA 12345"),"POSTED")
+        listOf("PH shared History QA 12345", "ph shar hist 123", "Caffè Årh 123").forEach { query ->
+            assertEquals(query,1,store.query(query).size)
+            assertEquals(query,1,store.historyEvents(query,null,null,null,null,10).size)
+        }
+        assertTrue(store.query("PH shared absent").isEmpty())
+        assertTrue(store.historyEvents("PH shared absent",null,null,null,null,10).isEmpty())
+    }
     @Test fun structuredAndMissingNotificationFields(){
         val sender=Person.Builder().setName("Same name").setKey("sender-id").build()
         val n=Notification.Builder(context,"channel").setStyle(Notification.MessagingStyle(Person.Builder().setName("Me").build()).addMessage("hello",1000,sender)).build()
@@ -57,6 +67,28 @@ class ArchiveStoreTest {
         repeat(105){i->store.append(snapshot(key="$i", captured=if(i==104)"2026-10-08T10:00:00Z" else "2026-10-09T10:00:00Z"),"POSTED")}
         val first=store.query();val rest=store.query(before=first.last().id)
         assertEquals(100,first.size);assertEquals(5,rest.size);assertEquals(105,(first+rest).map{it.id}.distinct().size)
+    }
+    @Test fun sharedHistoryReadsOriginalFactsWithStableCrossSourcePagingAndDateSearchFilters(){
+        val at=java.time.Instant.parse("2026-10-09T10:00:00Z").toEpochMilli()
+        repeat(105){i->store.append(snapshot(key="$i",captured=if(i==104)"2026-10-08T10:00:00Z" else "2026-10-09T10:00:00Z"),"POSTED")}
+        val first=store.historyEvents("",null,null,null,null,50)
+        val second=store.historyEvents("",null,null,at,"notifications:"+first.last().id.toString().padStart(20,'0'),50)
+        val third=store.historyEvents("",null,null,at,"notifications:"+second.last().id.toString().padStart(20,'0'),50)
+        assertEquals(105,(first+second+third).map{it.id}.distinct().size)
+        assertEquals(1,store.historyEvents("",null,null,at,"git:boundary",101).size)
+        assertEquals(101,store.historyEvents("",null,null,at,"semantic:boundary",101).size)
+        val bounded=store.historyEvents("hello",at,at,null,null,101)
+        assertEquals(101,bounded.size)
+        assertTrue(bounded.all { java.time.Instant.parse(it.snapshot.getString("captured")).toEpochMilli()==at })
+        assertTrue(store.historyEvents("missing",null,null,null,null,10).isEmpty())
+        assertTrue(store.historyEvents("\"'",null,null,null,null,10).isEmpty())
+        val rows=com.gernalix.personalhub.notifications.api.NotificationsHistory.query(context,"hello",at,at,null,null,10)
+        assertEquals(10,rows.size)
+        assertEquals("POSTED",rows.first().kind)
+        assertEquals("hello",rows.first().body)
+        assertEquals(at,rows.first().occurredAt)
+        assertEquals("notifications:"+rows.first().eventId.toString().padStart(20,'0'),rows.first().key)
+        assertEquals(105,store.readableDatabase.rawQuery("SELECT count(*) FROM events",null).use{it.moveToFirst();it.getInt(0)})
     }
     @Test fun coherentLocalExport(){
         store.append(snapshot(),"POSTED")

@@ -375,6 +375,18 @@ internal fun humanFieldLabel(raw: String?): String? {
 internal fun gitHistoryModule(table: String): String =
     com.gernalix.personalhub.core.database.capsules.history.HistoryQueryCapsule.moduleForTable(table)
 
+internal fun gitHistoryModule(
+    item: com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryItem,
+    db: androidx.sqlite.db.SupportSQLiteDatabase,
+): String {
+    if (item.table != "since_when_counters") return gitHistoryModule(item.table)
+    val ref = runCatching { com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.eventRef(db, item.table, item.rowKey) }.getOrNull()
+        ?: return "since_when"
+    return db.query("SELECT COALESCE((SELECT CASE WHEN mode='COUNTDOWN' THEN 'countdown' ELSE 'since_when' END FROM since_when_counters WHERE canonical_id=?)," +
+        "(SELECT module FROM mutation_events WHERE canonical_id=? AND entity_kind='since_when/counter' ORDER BY occurred_at DESC,sequence DESC LIMIT 1),'since_when')",
+        arrayOf(ref.canonicalId, ref.canonicalId)).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else "since_when" }
+}
+
 internal val GIT_HISTORY_ENTITY_TYPES = mapOf(
     "finance_accounts" to "account",
     "finance_products" to "product",
@@ -503,6 +515,7 @@ internal fun humanizeGitHistory(
         .firstNotNullOfOrNull { key -> cleanHumanValue(after?.optString(key)) ?: cleanHumanValue(before?.optString(key)) }
     val type = gitHistoryEntityType(item.table)
     val changes = item.changedColumns.split(',').mapNotNull { key ->
+        if (item.table == "since_when_counters" && key in setOf("mode", "color_argb")) return@mapNotNull null
         val label = humanFieldLabel(key) ?: return@mapNotNull null
         val oldValue = cleanHumanValue(before?.opt(key)?.takeUnless { it == JSONObject.NULL }?.toString())
         val newValue = cleanHumanValue(after?.opt(key)?.takeUnless { it == JSONObject.NULL }?.toString())

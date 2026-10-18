@@ -15,7 +15,7 @@ object MutationEventCapture {
     )
 
     private val sources = listOf(
-        Source("since_when_counters", "since_when", "counter", "id", "title", listOf("title", "description", "initial_timestamp", "end_timestamp", "color_argb", "display_units_json")),
+        Source("since_when_counters", "since_when", "counter", "id", "title", listOf("title", "description", "initial_timestamp", "end_timestamp", "color_argb", "display_units_json", "mode")),
         Source("sessions", "timer", "session", "id", "title", listOf("title", "start_ms", "end_ms", "expected_end_ms", "deleted_at_ms")),
         Source("hub_tags", "tags", "tag", "id", "name", listOf("name", "description", "icon", "color", "archived", "pinned")),
         Source("places", "places", "place", "uuid", "nickname", listOf("nickname", "address", "notes", "archived")),
@@ -178,11 +178,13 @@ object MutationEventCapture {
             "finance_transactions" -> "soldi/transaction"
             else -> "${source.module}/${source.entity}"
         }
+        val module = if (source.table == "since_when_counters") "CASE WHEN $row.mode='COUNTDOWN' THEN 'countdown' ELSE 'since_when' END" else "'${source.module}'"
+        val eventType = if (source.table == "since_when_counters") "($module)||'.${source.entity}.$action'" else "'${source.module}.${source.entity}.$action'"
         return """CREATE TRIGGER `$name` AFTER $operation ON `${source.table}`$condition BEGIN
             INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
                 entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version,entity_kind,canonical_id)
             VALUES(lower(hex(randomblob(16))),CAST((julianday('now')-2440587.5)*86400000 AS INTEGER),
-                $transactionId,$sequence,'${source.module}','${source.module}.${source.entity}.$action',
+                $transactionId,$sequence,$module,$eventType,
                 '${source.entity}',CAST($row.`${source.key}` AS TEXT),$actor,$sourceName,
                 $before,$after,$label,1,'$canonicalKind',$identity);
         END""".trimIndent()

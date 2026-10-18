@@ -10,7 +10,7 @@ DatabaseVault.ensureStartupReady remains the structural validator. The gate is n
 
 ## Schema 20 to 23
 
-The historical endpoint of this path is Room schema 23; the current schema is 24. Schema 21 removes the Salute domain from schema 20. Schema 22 adds the two Since When tables, and schema 23 adds the two finance photo/owned-item tables; the retained tables are unchanged.
+The historical endpoint of this path is Room schema 23; the current schema is 25. Schema 21 removes the Salute domain from schema 20. Schema 22 adds the two Since When tables, and schema 23 adds the two finance photo/owned-item tables; the retained tables are unchanged.
 
 Use:
 
@@ -52,3 +52,13 @@ python3 tools/android_paired_cutover_v24.py \
 ```
 
 The helper returns `PAIR_INSTALLED_QA_PENDING`, **not** a release PASS. A live app/History/Timer smoke test, data/ID and Git-export readback, verified post-test Fedora+Telegram notifications, and the normal immutable-APK delivery gate are still required. If those checks fail after activation, preserve post-cutover edits and reconcile them before a manual paired rollback. Never run this v23→v24 helper on a device already at schema 24. Host-only safety tests: `PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_paired_cutover_v24.py`.
+
+## Schema 24 to 25 — shared Since When / Countdown counters
+
+Schema 25 adds only `since_when_counters.mode`, a non-null text column defaulting to `SINCE_WHEN`. Existing counter values, IDs, links and tag assignments are preserved. Countdown uses the same canonical `since_when/counter` identity and editor; its local tag namespace and History module are `countdown`. Mode cannot be changed by the editor after creation.
+
+Prepare a separate output with `python3 tools/migrate_personalhub_v24_to_v25.py SOURCE.db TARGET.db`. The source and WAL are never modified. The tool creates a private rollback snapshot and validation JSON; it validates Room shape/identity, canonical identities, every original field value, integrity and foreign keys. It retires only the generated counter mutation/Git triggers invalidated by the new column; Room reinstalls them before any feature write. `--rollback TARGET.db RESTORED.db` restores a validated copy of the original snapshot without replacing the source.
+
+The existing paired Pixel helper also supports `--schema-upgrade 24-to-25` with the same notification, exact-APK, freeze, backup, hash, single-profile and paired rollback guards documented above. Its default remains `23-to-24` for compatibility. A paired rollback explicitly permits the backed-up debug APK version to downgrade alongside its original database; normal installs retain the existing version check. No source or device is changed by the migration preparation command alone.
+
+Host gates: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p test_migrate_personalhub_v24_to_v25.py`, plus the paired-cutover and Pixel installer safety suites when those helpers change. Device acceptance and immutable final-APK delivery remain separate requirements.

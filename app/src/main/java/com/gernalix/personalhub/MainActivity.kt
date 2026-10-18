@@ -100,9 +100,10 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         HubContextComposerScreen(onBack = { topDestination = null })
         return
     }
-    if (topDestination == "since_when") {
-        com.gernalix.personalhub.core.ui.ModuleHistoryHost("since_when") {
-            SinceWhenScreen(onBack = { topDestination = null })
+    if (topDestination == "since_when" || topDestination == "countdown") {
+        val mode = if (topDestination == "countdown") com.gernalix.personalhub.contracts.database.CounterModes.COUNTDOWN else com.gernalix.personalhub.contracts.database.CounterModes.SINCE_WHEN
+        com.gernalix.personalhub.core.ui.ModuleHistoryHost(requireNotNull(topDestination)) {
+            SinceWhenScreen(onBack = { topDestination = null }, mode = mode)
         }
         return
     }
@@ -201,6 +202,9 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             }
             item(key = "home-since-when") {
                 HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }
+            }
+            item(key = "home-countdown") {
+                HomeActionTile("⏳", com.gernalix.personalhub.core.ui.R.string.countdown_title, com.gernalix.personalhub.core.ui.R.string.countdown_help) { topDestination = "countdown" }
             }
             item(key = "home-settings") {
                 HomeActionTile("⚙️", R.string.settings_title, R.string.home_settings_help) { showSettings = true }
