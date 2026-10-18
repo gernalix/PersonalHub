@@ -13,9 +13,9 @@ class MapViewerRepository(private val dao: PlaceDao) {
         currentLocation: MapCurrentLocation? = null,
     ): MapViewerModel {
         val places = if (uuids.isEmpty()) {
-            dao.placesWithCoordinatesBlocking(MAX_MAP_PLACES)
+            dao.listPlacesBlocking()
         } else {
-            val byUuid = dao.placesByUuidsBlocking(uuids).associateBy { it.uuid }
+            val byUuid = uuids.distinct().chunked(900).flatMap(dao::placesByUuidsBlocking).associateBy { it.uuid }
             uuids.mapNotNull(byUuid::get)
         }
         val labelsByUuid = uuids.mapIndexedNotNull { index, uuid ->
@@ -33,7 +33,4 @@ class MapViewerRepository(private val dao: PlaceDao) {
         )
     }
 
-    private companion object {
-        const val MAX_MAP_PLACES = 20_000
-    }
 }

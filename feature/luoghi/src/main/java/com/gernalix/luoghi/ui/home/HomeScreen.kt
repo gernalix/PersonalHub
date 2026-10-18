@@ -84,6 +84,7 @@ fun HomeScreen(
     onPlaceQueryChange: (String) -> Unit,
     onRefreshLocation: () -> Unit,
     onToggleTagFilter: (String) -> Unit,
+    onExplore: () -> Unit,
     onGlobalMap: () -> Unit,
     onGlobalStats: () -> Unit,
     onHistorySearch: () -> Unit,
@@ -155,10 +156,15 @@ fun HomeScreen(
                 }
             }
             item(key = "where-was-i") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onExplore, modifier = Modifier.weight(1f).testTag("places-explore")) {
+                    Text("Explore")
+                }
                 OutlinedButton(
                     onClick = { whereWasIOpen = true },
-                    modifier = Modifier.fillMaxWidth().testTag("places-where-was-i"),
+                    modifier = Modifier.weight(1f).testTag("places-where-was-i"),
                 ) { Text(stringResource(R.string.where_was_i)) }
+                }
             }
             item(key = "places-query") {
                 com.gernalix.personalhub.core.ui.HubSearchField(

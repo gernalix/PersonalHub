@@ -1,0 +1,4 @@
+<resources>
+    <string name="home_layout_compact">Compatta</string>
+    <string name="home_layout_extended">Estesa</string>
+</resources>

@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -82,7 +83,7 @@ private fun Intent?.hubPlaceId(): String? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/places" }
     ?.getQueryParameter("placeId")?.takeIf(String::isNotBlank)
 
-private enum class AppDestination { HOME, PLACE_DETAIL, VISITS }
+private enum class AppDestination { HOME, PLACE_DETAIL, VISITS, EXPLORE }
 
 @Composable
 fun LuoghiHome(initialPlaceId: String? = null) {
@@ -140,12 +141,19 @@ private fun LuoghiNavigation(
     var manualVisitPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var geofencePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     val visitsListState: LazyListState = rememberLazyListState()
+    val destinationState = rememberSaveableStateHolder()
+    var detailFromExplore by rememberSaveable { mutableStateOf(false) }
     val destination = runCatching { AppDestination.valueOf(destinationName) }.getOrDefault(AppDestination.HOME)
-    val selectedItem = selectedPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
+    fun resolveItem(id: String): PlaceListUiModel? = state.placeItems.firstOrNull { it.place.uuid == id }
+        ?: state.places.firstOrNull { it.uuid == id }?.let { place ->
+            com.gernalix.luoghi.capsules.places.PlaceListUiMapper.map(listOf(place), state.stats.places,
+                state.visits, state.placeSort, state.currentListLocation).single()
+        }
+    val selectedItem = selectedPlaceId?.let(::resolveItem)
     val pendingDelete = pendingDeletePlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
 
     LaunchedEffect(initialPlaceId, state.dataLoaded) {
-        if (state.dataLoaded && initialPlaceId != null && state.placeItems.any { it.place.uuid == initialPlaceId }) {
+        if (state.dataLoaded && initialPlaceId != null && state.places.any { it.uuid == initialPlaceId }) {
             selectedPlaceId = initialPlaceId
             destinationName = AppDestination.PLACE_DETAIL.name
         }
@@ -158,6 +166,7 @@ private fun LuoghiNavigation(
         initialVisitId = null
     }
     fun openDetail(item: PlaceListUiModel) {
+        detailFromExplore = destination == AppDestination.EXPLORE
         selectedPlaceId = item.place.uuid
         destinationName = AppDestination.PLACE_DETAIL.name
     }
@@ -176,7 +185,8 @@ private fun LuoghiNavigation(
     fun navigateBack() {
         when (destination) {
             AppDestination.HOME -> Unit
-            AppDestination.PLACE_DETAIL -> openHome()
+            AppDestination.EXPLORE -> openHome()
+            AppDestination.PLACE_DETAIL -> if (detailFromExplore) destinationName = AppDestination.EXPLORE.name else openHome()
 
             AppDestination.VISITS -> {
                 val detail = visitsFilterPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
@@ -210,6 +220,7 @@ private fun LuoghiNavigation(
             onSortPlaces = vm::updatePlaceSort,
             onRefreshLocation = vm::refreshListLocation,
             onToggleTagFilter = vm::togglePlaceTagFilter,
+            onExplore = { destinationName = AppDestination.EXPLORE.name },
             onGlobalMap = {
                 context.startActivity(MapViewerCapsule.globalMapIntent(context, state.placeItems.map { it.place }))
             },
@@ -227,11 +238,16 @@ private fun LuoghiNavigation(
             },
         )
 
+        AppDestination.EXPLORE -> destinationState.SaveableStateProvider("explore") {
+            com.gernalix.luoghi.ui.explore.ExplorePlacesScreen(state.places, ::openHome) { place ->
+                resolveItem(place.uuid)?.let(::openDetail)
+            }
+        }
         AppDestination.PLACE_DETAIL -> selectedItem?.let { item ->
             PlaceDetailScreen(
                 item = item,
                 stats = state.stats.places.firstOrNull { it.place.uuid == item.place.uuid },
-                onBack = ::openHome,
+                onBack = ::navigateBack,
                 onEdit = { edit(item) },
                 onMap = { showMap(item) },
                 onHistory = {

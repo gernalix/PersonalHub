@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -78,9 +79,10 @@ class HubHistorySearchQaDeviceTest {
         composeRule.onNodeWithTag("history-module-filter").performClick()
         composeRule.onNode(hasText(places) and hasClickAction()).performClick()
         waitForText(seed.placeName, present = false)
-        composeRule.onNodeWithTag("history-module-filter").performClick()
-        composeRule.onNode(hasText(places) and hasClickAction()).performClick()
+        // The same popup must remain open across multiple checkbox selections.
+        composeRule.onNode(hasText(places) and hasClickAction()).assertIsDisplayed().performClick()
         waitForText(seed.placeName)
+        composeRule.onNodeWithText(context.getString(android.R.string.ok)).performClick()
         composeRule.onNodeWithTag("history-from")
             .performTextReplacement("2099-01-01 00:00")
         waitForText(seed.placeName, present = false)
@@ -120,6 +122,28 @@ class HubHistorySearchQaDeviceTest {
         composeRule.onNodeWithText(context.getString(R.string.settings_title)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.git_history_title))
             .assertDoesNotExist()
+    }
+
+    @Test
+    fun compactHomeShowsEveryModuleAndKeepsTheSavedLayout() {
+        val context = qaContext()
+        val preferences = context.getSharedPreferences("home_layout", Context.MODE_PRIVATE)
+        val previous = preferences.getBoolean("compact", false)
+        preferences.edit().putBoolean("compact", true).commit()
+        try {
+            composeRule.setContent { PersonalHubTheme { Surface { PersonalHubApp() } } }
+            HubModule.entries.forEach { composeRule.onNodeWithContentDescription(context.getString(it.titleRes)).assertIsDisplayed() }
+            listOf(R.string.home_context, R.string.home_tags, R.string.home_history_search,
+                R.string.since_when_title, R.string.settings_title).forEach {
+                composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed()
+            }
+            composeRule.onNodeWithText(context.getString(com.gernalix.personalhub.core.ui.R.string.home_layout_extended)).assertIsDisplayed()
+            composeRule.onNodeWithTag("home-layout-switch").performClick()
+            composeRule.runOnIdle { assertTrue(!preferences.getBoolean("compact", true)) }
+            composeRule.onNodeWithTag("home-layout-switch").performClick()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.settings_title)).assertIsDisplayed()
+            composeRule.runOnIdle { assertTrue(preferences.getBoolean("compact", false)) }
+        } finally { preferences.edit().putBoolean("compact", previous).commit() }
     }
 
     @Test

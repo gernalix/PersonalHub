@@ -66,7 +66,7 @@ dependencies {
     implementation(libs.google.places)
     implementation(libs.google.play.services.location)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.osmdroid.android)
+    implementation(files("libs/osmand-aidl-api-20261019.jar"))
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.androidx.test.core)

@@ -1,0 +1,4 @@
+<resources>
+    <string name="home_layout_compact">Compact</string>
+    <string name="home_layout_extended">Extended</string>
+</resources>

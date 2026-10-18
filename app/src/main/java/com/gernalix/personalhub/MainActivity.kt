@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -31,6 +34,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,6 +57,8 @@ import com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule
 import com.gernalix.personalhub.core.hubcontext.HubContextComposerScreen
 import com.gernalix.personalhub.core.alerts.UnifiedAlertsRoute
 import com.gernalix.personalhub.core.alerts.AlertText
+
+private val LocalCompactHome = staticCompositionLocalOf { false }
 
 class MainActivity : ComponentActivity() {
     private var launcherGeneration by mutableStateOf(0)
@@ -83,6 +91,8 @@ internal fun Intent.isPersonalHubLauncherIntent(): Boolean =
 @Composable
 fun PersonalHubApp(launcherGeneration: Int = 0) {
     val context = LocalContext.current
+    val homePreferences = remember(context) { context.getSharedPreferences("home_layout", android.content.Context.MODE_PRIVATE) }
+    var compact by rememberSaveable { mutableStateOf(homePreferences.getBoolean("compact", false)) }
     var showSettings by rememberSaveable(launcherGeneration) { mutableStateOf(false) }
     var topDestination by rememberSaveable(launcherGeneration) { mutableStateOf<String?>(null) }
     BackHandler(enabled = topDestination != null) { topDestination = null }
@@ -108,6 +118,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         HubSettings(onBack = { showSettings = false })
         return
     }
+    CompositionLocalProvider(LocalCompactHome provides compact) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -133,6 +144,12 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            TextButton(onClick = {
+                compact = !compact
+                homePreferences.edit().putBoolean("compact", compact).apply()
+            }, modifier = Modifier.testTag("home-layout-switch")) {
+                Text(stringResource(if (compact) com.gernalix.personalhub.core.ui.R.string.home_layout_extended else com.gernalix.personalhub.core.ui.R.string.home_layout_compact))
+            }
             TextButton(
                 onClick = { topDestination = "audit" },
                 modifier = Modifier.testTag("home-audit-button"),
@@ -142,7 +159,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             HomeAutoExportStatusIndicator()
         }
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 240.dp),
+            columns = if (compact) GridCells.Fixed(4) else GridCells.Adaptive(minSize = 240.dp),
             modifier = Modifier.weight(1f).testTag("home-grid"),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -196,6 +213,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+    }
 }
 
 @Composable
@@ -205,6 +223,10 @@ private fun HomeActionTile(icon: String, titleRes: Int, subtitleRes: Int, onClic
 
 @Composable
 private fun HomeActionTile(icon: String, title: String, subtitle: String, onClick: () -> Unit) {
+    if (LocalCompactHome.current) {
+        CompactHomeTile(title, onClick) { Text(icon, style = MaterialTheme.typography.headlineSmall) }
+        return
+    }
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -237,6 +259,12 @@ private fun HomeActionTile(icon: String, title: String, subtitle: String, onClic
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModuleTile(module: HubModule, onClick: () -> Unit) {
+    if (LocalCompactHome.current) {
+        CompactHomeTile(stringResource(module.titleRes), onClick) {
+            Icon(painterResource(module.shortcutIconRes), contentDescription = null, tint = androidx.compose.ui.graphics.Color.Unspecified)
+        }
+        return
+    }
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -277,5 +305,13 @@ private fun ModuleTile(module: HubModule, onClick: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CompactHomeTile(title: String, onClick: () -> Unit, icon: @Composable () -> Unit) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(1f).semantics(mergeDescendants = true) { contentDescription = title }, shape = RoundedCornerShape(8.dp)) {
+        Column(Modifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center) { icon() }
     }
 }
