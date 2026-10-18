@@ -32,11 +32,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SuperContactsTheme {
+                com.gernalix.personalhub.core.ui.ModuleHistoryHost("people", latestIntent?.dataString) {
                 SuperContactsApp(
                     launchIntent = latestIntent,
                     callOverlaySignal = callOverlaySignal,
                     onCallPermissionsReady = ::registerPhoneStateListenerIfAllowed,
                 )
+                }
             }
         }
     }

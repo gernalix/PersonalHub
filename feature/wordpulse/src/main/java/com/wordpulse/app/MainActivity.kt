@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             WordPulseTheme {
-                WordPulseRoute(viewModel = viewModel, initialSessionId = hubSessionId)
+                com.gernalix.personalhub.core.ui.ModuleHistoryHost("wordpulse", hubSessionId) { WordPulseRoute(viewModel = viewModel, initialSessionId = hubSessionId) }
             }
         }
     }

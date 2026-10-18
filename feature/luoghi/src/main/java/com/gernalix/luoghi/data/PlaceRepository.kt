@@ -55,9 +55,28 @@ class PlaceRepository(
 
     suspend fun setPlaceTags(placeUuid: String, names: Collection<String>) {
         DatabaseMutationCoordinator.mutex.withLock {
-            sharedTags.replaceByNames(HubEntityRef("places", "place", placeUuid), HubTagNamespaces.PLACES, names)
+            database.withTransaction { replacePlaceTagNames(placeUuid, names) }
         }
         HubAutoExport.request(context)
+    }
+
+    private suspend fun replacePlaceTagNames(placeUuid: String, names: Collection<String>) {
+        val target = HubEntityRef("places", "place", placeUuid)
+        val assigned = sharedTags.tags(target).groupBy { SharedTagEngine.normalize(it.name) }
+        val desiredIds = buildList {
+            for (name in names.map(String::trim).filter(String::isNotEmpty).distinctBy(SharedTagEngine::normalize)) {
+                val current = assigned[SharedTagEngine.normalize(name)]
+                if (!current.isNullOrEmpty()) {
+                    // Keep the actual assigned identities, including global tags with the same name.
+                    addAll(current.map { it.id })
+                } else {
+                    val tag = sharedTags.getOrCreate(HubTagNamespaces.PLACES, name)
+                    if (tag.archived) sharedTags.archive(tag.id, false)
+                    add(tag.id)
+                }
+            }
+        }
+        sharedTags.replace(target, HubTagNamespaces.PLACES, desiredIds)
     }
 
     suspend fun bulkAddPlaceTags(placeUuids: Collection<String>, tagIds: Collection<String>) {
@@ -80,8 +99,10 @@ class PlaceRepository(
         notes: String?,
         sourceApp: String?,
         photoUri: String? = null,
+        tagNames: Collection<String>? = null,
     ): String {
         val resolvedUuid = DatabaseMutationCoordinator.mutex.withLock {
+            database.withTransaction {
             val now = System.currentTimeMillis()
             val existing = uuid?.takeIf { it.isNotBlank() }?.let { dao.getPlace(it) }
             val resolved = existing?.uuid ?: uuid?.takeIf { isValidUuid(it) } ?: UUID.randomUUID().toString()
@@ -102,7 +123,9 @@ class PlaceRepository(
                     firstCheckInAtPlace = existing?.firstCheckInAtPlace,
                 ),
             )
+            if (tagNames != null) replacePlaceTagNames(resolved, tagNames)
             resolved
+            }
         }
         HubAutoExport.request(context)
         return resolvedUuid

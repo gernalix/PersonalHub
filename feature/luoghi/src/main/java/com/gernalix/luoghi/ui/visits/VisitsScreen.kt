@@ -87,7 +87,6 @@ fun VisitsScreen(
     var editingEventId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingEventId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deletingVisitId by rememberSaveable { mutableStateOf<String?>(null) }
-    var whereWasIOpen by rememberSaveable { mutableStateOf(false) }
     val selectedVisit = selectedVisitId?.let { id -> filteredVisits.firstOrNull { it.stableId == id } }
     val editingEvent = editingEventId?.let { id -> events.firstOrNull { it.id == id } }
     val deletingEvent = deletingEventId?.let { id -> events.firstOrNull { it.id == id } }
@@ -151,15 +150,6 @@ fun VisitsScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    item(key = "visit-actions") {
-                        OutlinedButton(
-                            onClick = { whereWasIOpen = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Outlined.Place, contentDescription = null)
-                            Text(stringResource(R.string.where_was_i), modifier = Modifier.padding(start = 8.dp))
-                        }
-                    }
                     if (filteredVisits.isEmpty()) {
                         item(key = "history-empty") {
                             EmptyVisits(modifier = Modifier.fillMaxWidth())
@@ -234,13 +224,7 @@ fun VisitsScreen(
             onDismiss = { deletingVisitId = null },
         )
     }
-    if (whereWasIOpen) {
-        WhereWasIDialog(
-            visits = visits,
-            places = places,
-            onDismiss = { whereWasIOpen = false },
-        )
-    }
+
 }
 
 @Composable
@@ -259,7 +243,7 @@ private fun DayHeader(text: String) {
 }
 
 @Composable
-private fun WhereWasIDialog(
+fun WhereWasIDialog(
     visits: List<VisitUiModel>,
     places: List<PlaceEntity>,
     onDismiss: () -> Unit,
@@ -301,6 +285,9 @@ private fun WhereWasIDialog(
 private fun whereWasIText(result: WhereWasIResult?): String = when (result) {
     null -> stringResource(R.string.where_was_i_invalid)
     is WhereWasIResult.Inside -> stringResource(R.string.where_was_i_inside_format, result.place.nickname)
+    is WhereWasIResult.Overlapping -> stringResource(
+        R.string.where_was_i_overlapping_format, result.places.joinToString(", ") { it.nickname },
+    )
     is WhereWasIResult.Between -> stringResource(
         R.string.where_was_i_between_format,
         result.previous.nickname,

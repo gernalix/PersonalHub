@@ -262,4 +262,7 @@
     <string name="place_alert_edit">Edit</string>
     <string name="place_alert_existing">Existing Places alerts</string>
     <string name="place_alert_specific_place">Specific place</string>
+    <string name="places_search_hint">Search places, addresses, notes and tags</string>
+    <string name="places_sort_help">Sort the places below. Tap the selected criterion again to reverse the order.</string>
+    <string name="where_was_i_overlapping_format">Overlapping visits were recorded at: %1$s</string>
 </resources>

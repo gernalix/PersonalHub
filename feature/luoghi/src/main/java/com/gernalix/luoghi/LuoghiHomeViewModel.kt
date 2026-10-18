@@ -155,6 +155,7 @@ data class HistoryUiState(
 
 data class HomeUiState(
     val dataLoaded: Boolean = false,
+    val placeQuery: String = "",
     val places: List<PlaceEntity> = emptyList(),
     val placeItems: List<PlaceListUiModel> = emptyList(),
     val visits: List<VisitUiModel> = emptyList(),
@@ -216,8 +217,14 @@ class LuoghiHomeViewModel(
         val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
         val placeTagIds = tagAssignments.filter { it.moduleId == "places" && it.entityKind == "place" }
             .groupBy({ it.canonicalId }, { it.tagId }).mapValues { it.value.toSet() }
-        val visiblePlaces = if (state.selectedPlaceTagIds.isEmpty()) places else places.filter { place ->
-            placeTagIds[place.uuid].orEmpty().containsAll(state.selectedPlaceTagIds)
+        val activeTagIds = tags.filterNot { it.archived }.map { it.id }.toSet()
+        val selectedTags = state.selectedPlaceTagIds.intersect(activeTagIds)
+        val tagNames = tags.associate { it.id to it.name }
+        val visiblePlaces = places.filter { place ->
+            val assigned = placeTagIds[place.uuid].orEmpty()
+            assigned.containsAll(selectedTags) && com.gernalix.luoghi.capsules.places.PlaceSearch.matches(
+                place, assigned.mapNotNull(tagNames::get), state.placeQuery,
+            )
         }
         state.copy(
             dataLoaded = true,
@@ -237,6 +244,7 @@ class LuoghiHomeViewModel(
             ),
             placeTagIds = placeTagIds,
             placeTags = tags,
+            selectedPlaceTagIds = selectedTags,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -247,6 +255,10 @@ class LuoghiHomeViewModel(
     init {
         observeHistoryActions()
         viewModelScope.launch { container.checkIns.recoverInterruptedAttempts() }
+    }
+
+    fun updatePlaceQuery(value: String) {
+        mutableState.update { it.copy(placeQuery = value) }
     }
 
     fun togglePlaceTagFilter(tagId: String) {

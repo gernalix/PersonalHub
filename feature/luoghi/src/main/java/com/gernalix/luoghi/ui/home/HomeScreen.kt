@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.gernalix.luoghi.ui.visits.WhereWasIDialog
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -71,12 +74,14 @@ fun HomeScreen(
     state: HomeUiState,
     onCheckAction: () -> Unit,
     onAmbiguousCheckIn: (String) -> Unit,
+    onCancelAmbiguousCheckIn: () -> Unit,
     onOpenPlace: (PlaceListUiModel) -> Unit,
     onEditPlace: (PlaceListUiModel) -> Unit,
     onPlaceVisits: (PlaceListUiModel) -> Unit,
     onPlaceMap: (PlaceListUiModel) -> Unit,
     onDeletePlace: (PlaceListUiModel) -> Unit,
     onSortPlaces: (PlaceSortCriterion, PlaceSortDirection) -> Unit,
+    onPlaceQueryChange: (String) -> Unit,
     onRefreshLocation: () -> Unit,
     onToggleTagFilter: (String) -> Unit,
     onGlobalMap: () -> Unit,
@@ -88,6 +93,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val recentVisits = state.visits.take(3)
     var diagnosticsOpen by remember { mutableStateOf(false) }
+    var whereWasIOpen by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -126,6 +132,7 @@ fun HomeScreen(
                     checkIn = state.checkIn,
                     onCheckAction = onCheckAction,
                     onAmbiguousCheckIn = onAmbiguousCheckIn,
+                    onCancelAmbiguousCheckIn = onCancelAmbiguousCheckIn,
                 )
             }
             item(key = "global-actions") {
@@ -146,6 +153,20 @@ fun HomeScreen(
                         Text(stringResource(R.string.statistics), modifier = Modifier.padding(start = 8.dp))
                     }
                 }
+            }
+            item(key = "where-was-i") {
+                OutlinedButton(
+                    onClick = { whereWasIOpen = true },
+                    modifier = Modifier.fillMaxWidth().testTag("places-where-was-i"),
+                ) { Text(stringResource(R.string.where_was_i)) }
+            }
+            item(key = "places-query") {
+                com.gernalix.personalhub.core.ui.HubSearchField(
+                    value = state.placeQuery,
+                    onValueChange = onPlaceQueryChange,
+                    label = stringResource(R.string.places_search_hint),
+                    modifier = Modifier.fillMaxWidth().testTag("places-live-search"),
+                )
             }
             item(key = "places-title") {
                 SectionHeader(
@@ -220,6 +241,9 @@ fun HomeScreen(
                 }
             }
         }
+    }
+    if (whereWasIOpen) {
+        WhereWasIDialog(state.visits, state.places, onDismiss = { whereWasIOpen = false })
     }
     if (diagnosticsOpen) {
         AlertDialog(
@@ -352,6 +376,7 @@ private fun PlacesSortBar(
     onRefreshLocation: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(R.string.places_sort_help), style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             SortChip(R.string.sort_distance, sort, PlaceSortCriterion.DISTANCE, onSortPlaces, Modifier.weight(1f))
             SortChip(R.string.sort_last_visit, sort, PlaceSortCriterion.LAST_VISIT, onSortPlaces, Modifier.weight(1f))
@@ -435,6 +460,7 @@ fun CheckInPanel(
     checkIn: CheckInHomeState,
     onCheckAction: () -> Unit,
     onAmbiguousCheckIn: (String) -> Unit,
+    onCancelAmbiguousCheckIn: () -> Unit,
 ) {
     val active = checkIn.activeVisit
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -472,18 +498,35 @@ fun CheckInPanel(
                     }
                 )
             }
-            if (checkIn.ambiguousCandidates.isNotEmpty()) {
-                Text(stringResource(R.string.checkin_choose_place), fontWeight = FontWeight.SemiBold)
-                checkIn.ambiguousCandidates.forEach { candidate: CheckInCandidate ->
-                    OutlinedButton(
-                        onClick = { onAmbiguousCheckIn(candidate.place.uuid) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.checkin_candidate_format, candidate.place.nickname, candidate.distanceM))
+        }
+    }
+    if (checkIn.ambiguousCandidates.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { if (!checkIn.working) onCancelAmbiguousCheckIn() },
+            title = { Text(stringResource(R.string.checkin_choose_place)) },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 320.dp).testTag("places-checkin-choices"),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(checkIn.ambiguousCandidates, key = { it.place.uuid }) { candidate ->
+                        OutlinedButton(
+                            enabled = !checkIn.working,
+                            onClick = { onAmbiguousCheckIn(candidate.place.uuid) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.checkin_candidate_format, candidate.place.nickname, candidate.distanceM))
+                        }
                     }
                 }
-            }
-        }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(enabled = !checkIn.working, onClick = onCancelAmbiguousCheckIn) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
     }
 }
 

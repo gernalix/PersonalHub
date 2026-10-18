@@ -90,8 +90,8 @@ class CheckInCapsule(
             radiusM = mutation.radiusM ?: CheckInPolicy.DEFAULT_RADIUS_M,
             notes = mutation.notes,
             sourceApp = mutation.sourceApp,
+            tagNames = mutation.tagNames,
         )
-        repository.setPlaceTags(uuid, mutation.tagNames)
         checkIn(uuid, location)
         return uuid
     }

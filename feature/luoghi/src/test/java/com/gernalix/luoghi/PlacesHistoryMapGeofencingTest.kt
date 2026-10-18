@@ -60,15 +60,15 @@ class PlacesHistoryMapGeofencingTest {
     }
 
     @Test
-    fun overlappingNearbyPlacesPreferClearlySeparatedNearestCandidate() {
+    fun overlappingNearbyPlacesAlwaysRequireExplicitSelection() {
         val near = place("near", "Near", 0.0, 0.0, radiusM = 2_000.0)
         val far = place("far", "Far", 0.0, 0.015, radiusM = 2_000.0)
         val decision = CheckInPolicy.choosePlace(
             places = listOf(near, far),
             location = LocationSample(0.0, 0.0, accuracyM = 4.0),
         )
-        assertTrue(decision is CheckInMatchDecision.Matched)
-        assertEquals("near", (decision as CheckInMatchDecision.Matched).candidate.place.uuid)
+        assertTrue(decision is CheckInMatchDecision.Ambiguous)
+        assertEquals(listOf("near", "far"), (decision as CheckInMatchDecision.Ambiguous).candidates.map { it.place.uuid })
     }
 
     @Test
@@ -93,6 +93,38 @@ class PlacesHistoryMapGeofencingTest {
         assertTrue(WhereWasIQuery.at(visits, listOf(home, office), 6_000L) is WhereWasIResult.OnlyPrevious)
         assertTrue(WhereWasIQuery.at(visits, listOf(home, office), 500L) is WhereWasIResult.OnlyNext)
         assertTrue(WhereWasIQuery.at(emptyList(), listOf(home, office), 3_000L) is WhereWasIResult.NoData)
+    }
+
+    @Test
+    fun checkInDoesNotHideOverlappingPlacesBeyondTheFirstFive() {
+        val places = (1..8).map { place("place-$it", "Place $it", 0.0, 0.0) }
+        val decision = CheckInPolicy.choosePlace(places, LocationSample(0.0, 0.0, accuracyM = 0.0))
+        assertEquals(8, (decision as CheckInMatchDecision.Ambiguous).candidates.size)
+    }
+
+    @Test
+    fun whereWasIDoesNotTreatAnOldUnclosedVisitAsPermanentOrPredictFuture() {
+        val places = listOf(place("home", "Home"), place("office", "Office"))
+        val visits = VisitMapper.map(listOf(
+            event("home", PlaceEventTypes.CHECK_IN, 1_000L, "old"),
+            event("office", PlaceEventTypes.CHECK_IN, 3_000L, "current"),
+        ), places, 5_000L)
+        val current = WhereWasIQuery.at(visits, places, 4_000L) as WhereWasIResult.Inside
+        assertEquals("office", current.place.uuid)
+        assertTrue(WhereWasIQuery.at(visits, places, 6_000L) !is WhereWasIResult.Inside)
+    }
+
+    @Test
+    fun whereWasIReportsConflictingRecordedLocationsInsteadOfChoosingOne() {
+        val places = listOf(place("home", "Home"), place("office", "Office"))
+        val visits = VisitMapper.map(listOf(
+            event("home", PlaceEventTypes.CHECK_IN, 1_000L, "a"),
+            event("home", PlaceEventTypes.CHECK_OUT, 4_000L, "a"),
+            event("office", PlaceEventTypes.CHECK_IN, 2_000L, "b"),
+            event("office", PlaceEventTypes.CHECK_OUT, 5_000L, "b"),
+        ), places, 6_000L)
+        val result = WhereWasIQuery.at(visits, places, 3_000L) as WhereWasIResult.Overlapping
+        assertEquals(setOf("home", "office"), result.places.map { it.uuid }.toSet())
     }
 
     @Test

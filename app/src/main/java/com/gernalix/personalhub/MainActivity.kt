@@ -91,7 +91,9 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         return
     }
     if (topDestination == "since_when") {
-        SinceWhenScreen(onBack = { topDestination = null })
+        com.gernalix.personalhub.core.ui.ModuleHistoryHost("since_when") {
+            SinceWhenScreen(onBack = { topDestination = null })
+        }
         return
     }
     if (topDestination == "history") {

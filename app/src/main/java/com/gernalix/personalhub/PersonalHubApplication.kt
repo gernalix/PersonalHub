@@ -54,6 +54,10 @@ class PersonalHubApplication : Application(), Configuration.Provider {
             TimerStartupApi.applicationOnCreate()
         }
         traceStartup("PH.hubRuntimeInit") { initializeHubContextRuntime(this) }
+        AppUpdateTracker.install(this)
+        com.gernalix.personalhub.core.ui.ModuleHistoryUi.screen = { moduleId, onBack ->
+            HubHistorySearchScreen(onBack = onBack, scopeModuleId = moduleId)
+        }
         traceStartup("PH.postFirstFrameInstall") {
             PostFirstFrameStartup.install(this)
         }

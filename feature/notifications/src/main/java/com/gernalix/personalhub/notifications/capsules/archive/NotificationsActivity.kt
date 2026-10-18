@@ -44,10 +44,11 @@ class NotificationsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContent { MaterialTheme { Surface {
+            com.gernalix.personalhub.core.ui.ModuleHistoryHost("notifications") {
             var conversations by remember { mutableStateOf(false) }
             if(conversations) ConversationsScreen(onBack={conversations=false}) else ArchiveScreen(generation, exportResult,
             onConversations={conversations=true},
-            onExport={export.launch("notifications.sqlite")}, onPermission={startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}, onBack={finish()}) } } }
+            onExport={export.launch("notifications.sqlite")}, onPermission={startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}, onBack={finish()}) } } } }
     }
     override fun onResume() { super.onResume(); generation++ }
     internal suspend fun writeExport(uri: android.net.Uri) {

@@ -373,10 +373,13 @@ fun HubHistorySearchScreen(
                                     onClick = {
                                         selectedModuleIds = (if (checked) selectedSet - moduleId
                                             else selectedSet + moduleId).sorted()
-                                        moduleMenuOpen = false
                                     },
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(android.R.string.ok)) },
+                                onClick = { moduleMenuOpen = false },
+                            )
                         }
                     }
                 }

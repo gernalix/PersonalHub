@@ -26,7 +26,7 @@ class SoldiActivity : ComponentActivity() {
         setContent {
             SoldiTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    SoldiV2Screen(capsule, ::finish, hubTransactionUuid)
+                    com.gernalix.personalhub.core.ui.ModuleHistoryHost("soldi", hubTransactionUuid) { SoldiV2Screen(capsule, ::finish, hubTransactionUuid) }
                 }
             }
         }

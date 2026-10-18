@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
         hubPlaceId = intent.hubPlaceId()
         setContent {
             LuoghiTheme {
-                Surface(modifier = Modifier.fillMaxSize()) { LuoghiHome(hubPlaceId) }
+                Surface(modifier = Modifier.fillMaxSize()) { com.gernalix.personalhub.core.ui.ModuleHistoryHost("places", hubPlaceId) { LuoghiHome(hubPlaceId) } }
             }
         }
     }
@@ -185,8 +185,10 @@ private fun LuoghiNavigation(
         }
     }
 
-    LaunchedEffect(state.checkIn.pendingCheckInLocation) {
-        if (state.checkIn.pendingCheckInLocation != null) editorOpen = true
+    LaunchedEffect(state.checkIn.pendingCheckInLocation, state.checkIn.message) {
+        if (state.checkIn.pendingCheckInLocation != null && state.checkIn.message == CheckInMessage.UNKNOWN_PLACE) {
+            editorOpen = true
+        }
     }
     LaunchedEffect(selectedPlaceId, selectedItem, state.dataLoaded) {
         if (state.dataLoaded && (selectedPlaceId != null) && (selectedItem == null)) openHome()
@@ -198,6 +200,8 @@ private fun LuoghiNavigation(
             state = state,
             onCheckAction = onCheckAction,
             onAmbiguousCheckIn = vm::selectAmbiguousCheckIn,
+            onCancelAmbiguousCheckIn = vm::newPlace,
+            onPlaceQueryChange = vm::updatePlaceQuery,
             onOpenPlace = ::openDetail,
             onEditPlace = ::edit,
             onPlaceVisits = { openVisits(it.place.uuid) },

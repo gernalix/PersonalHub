@@ -8,13 +8,11 @@ import com.gernalix.luoghi.data.PlaceEventEntity
 object CheckInPolicy {
     const val DEFAULT_RADIUS_M = 75.0
     private const val MAX_ACCURACY_ALLOWANCE_M = 50.0
-    private const val MAX_AMBIGUOUS_CHOICES = 5
 
     fun choosePlace(
         places: List<PlaceEntity>,
         location: LocationSample,
     ): CheckInMatchDecision {
-        val accuracyAllowanceM = accuracyAllowanceM(location)
         val candidates = places
             .filter { !it.archived }
             .mapNotNull { place ->
@@ -27,21 +25,13 @@ object CheckInPolicy {
                     null
                 }
             }
-            .sortedWith(compareBy<CheckInCandidate> { it.distanceM }.thenBy { it.place.nickname.lowercase() })
+            .sortedWith(compareBy<CheckInCandidate> { it.distanceM }.thenBy { it.place.nickname.lowercase(java.util.Locale.ROOT) }.thenBy { it.place.uuid })
 
         if (candidates.isEmpty()) return CheckInMatchDecision.UnknownPlace
         if (candidates.size == 1) return CheckInMatchDecision.Matched(candidates.single())
 
-        val nearest = candidates[0]
-        val runnerUp = candidates[1]
-        if (
-            accuracyAllowanceM > 0.0 &&
-            nearest.distanceM + accuracyAllowanceM < runnerUp.distanceM - accuracyAllowanceM
-        ) {
-            return CheckInMatchDecision.Matched(nearest)
-        }
-
-        return CheckInMatchDecision.Ambiguous(candidates.take(MAX_AMBIGUOUS_CHOICES))
+        // A manual check-in must never guess between overlapping saved places.
+        return CheckInMatchDecision.Ambiguous(candidates)
     }
 
     fun activeVisit(events: List<PlaceEventEntity>): PlaceEventEntity? {
