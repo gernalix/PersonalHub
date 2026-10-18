@@ -146,12 +146,10 @@ Verification for this change: debug v13 and the isolated QA variant built succes
 Application v14 / Room 5 adds required account references, derived per-currency balances, reconciliation and canonical product UUID/FK preservation. See [FINANCE_EXCHANGE.md](FINANCE_EXCHANGE.md) for the accounting rules, localized date/time pickers, local suggestions, dedicated finance-only Git exchange and conservative conflict rules. The earlier v13 editor-offset description is superseded by readable local date/time pickers; persistence remains UTC.
 
 
-## Salute canonical domain
+## Salute as an independent project
 
-Salute is a first-class domain of the canonical `personalhub.db` and a deliberately thin read-only Android feature. The user-facing app does not provide health CRUD; trusted ChatGPT-assisted ingestion arrives through the existing semantic Git patch path, so health mutations participate in the same transaction, Git History, Time Machine, revert and backup semantics as the other PH domains.
+Salute remains an active, independent project in `gernalix/salute`, with its own database, clinical provenance rules and ingestion pipeline. PersonalHub is not a consumer of that repository and does not store clinical data in `personalhub.db`.
 
-The previous design that treated `gernalix/salute/salute.db` as a separately downloaded runtime database is transitional and must be retired when the canonical health schema lands. PersonalHub must not maintain a second health database, second Git history engine or second sync state machine.
+The current PersonalHub runtime has no Salute/Health feature, downloaded Salute database or health projection in its Git Data/Obsidian export. People, Places, Substances and Soldi retain their existing PersonalHub responsibilities without an implicit connection to Salute.
 
-Health events link to canonical People and Places records; documented prescriptions/renewals update the existing Substances domain rather than creating duplicate drug entities, and medication purchases remain canonical Soldi transactions. Hub Context provides semantic cross-module links and the global temporal layer indexes health events by epoch-ms.
-
-Obsidian is the preferred human-reading projection for Health but remains a deterministic, disposable export of `personalhub.db`. The Android Salute UI is intentionally minimal. See `docs/HEALTH_MODULE.md` and `docs/health/HEALTH_DATA_MODEL.md`.
+The historical schema-20 health domain was removed in schema 21. See [DATABASE_SCHEMA_UPGRADES.md](DATABASE_SCHEMA_UPGRADES.md) for the external migration and rollback-backup requirements, and [OBSIDIAN_ARCHIVE.md](OBSIDIAN_ARCHIVE.md) for the current export boundary. This separation does not archive the Salute project.
