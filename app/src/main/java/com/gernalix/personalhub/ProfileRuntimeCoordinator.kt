@@ -14,6 +14,7 @@ object ProfileRuntimeCoordinator {
     suspend fun restoreActiveProfile(context: Context) {
         TimerProfileRuntime.restoreActiveProfile(context)
         PlacesProfileRuntime.restoreActiveProfile(context)
+        com.gernalix.sostanze.hub.SubstancesWidgetsRuntime.restoreActiveProfile(context)
     }
 
     suspend fun switchActiveProfile(context: Context, profileId: String): Boolean =

@@ -94,6 +94,7 @@
     <string name="widget_substances_unavailable">Substance unavailable. Reconfigure widget.</string>
     <string name="widget_substances_untitled">Untitled substance</string>
     <string name="widget_substances_write_failed">Could not save intake.</string>
+    <string name="widget_substances_refresh" translatable="false">Open PersonalHub to refresh</string>
     <string name="export_status_failed">Export failed: %1$s</string>
     <string name="import_status_failed">Import rejected: %1$s</string>
     <string name="export_folder_hint">Automatic export includes all five PersonalHub modules and contact photos.</string>

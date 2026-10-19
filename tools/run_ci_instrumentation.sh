@@ -9,6 +9,9 @@ if (( ${#devices[@]} != 1 )) || [[ "${devices[0]:-}" != emulator-* ]]; then
   exit 1
 fi
 serial=${devices[0]}
+# Device identity is diagnostic only; native emulator-only guards remain required.
+adb -s "$serial" shell getprop ro.product.model
+adb -s "$serial" shell getprop ro.hardware
 runner=com.gernalix.personalhub.qa.test/androidx.test.runner.AndroidJUnitRunner
 
 capture_failure() {
@@ -21,6 +24,7 @@ capture_failure() {
   adb -s "$serial" logcat -d -b crash > "$diagnostics/crash.log" || true
   adb -s "$serial" shell dumpsys activity lastanr > "$diagnostics/last-anr.txt" || true
   adb -s "$serial" shell dumpsys dropbox --print data_app_anr > "$diagnostics/app-anr-dropbox.txt" || true
+  adb -s "$serial" shell dumpsys dropbox --print system_app_anr > "$diagnostics/system-app-anr-dropbox.txt" || true
   adb -s "$serial" logcat -d -b system -v threadtime > "$diagnostics/system.log" || true
   adb -s "$serial" shell dumpsys meminfo > "$diagnostics/meminfo.txt" || true
   for module in PEOPLE SUBSTANCES WORDPULSE; do
@@ -43,10 +47,65 @@ wait_for_broadcast_idle() {
     return 1
   fi
 }
+assert_clean_boot() {
+  local result
+  if ! result=$(adb -s "$serial" shell dumpsys activity lastanr); then
+    capture_failure emulator_boot_anr_readback
+    return 1
+  fi
+  if [[ "$result" != *'<no ANR has occurred since boot>'* ]]; then
+    echo 'Emulator boot did not provide an ANR-free baseline; app tests were not started' >&2
+    capture_failure emulator_first_boot_system_anr
+    return 1
+  fi
+}
+assert_ci_display() {
+  local actual_size actual_density
+  if ! actual_size=$(adb -s "$serial" shell wm size) || \
+     ! actual_density=$(adb -s "$serial" shell wm density); then
+    capture_failure emulator_display_readback
+    return 1
+  fi
+  printf '%s\n%s\n' "$actual_size" "$actual_density"
+  if [[ "$actual_size" != *'Physical size: 720x1600'* || \
+        "$actual_density" != *'Physical density: 280'* ]]; then
+    echo 'CI display preparation was not applied; app tests were not started' >&2
+    capture_failure emulator_display_mismatch
+    return 1
+  fi
+}
+assert_ci_display
 wait_for_broadcast_idle emulator_first_boot
+assert_clean_boot
 adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
 adb -s "$serial" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk >/dev/null
 wait_for_broadcast_idle instrumentation_package_installation
+
+# Fresh QA APKs are unminified and have no installed ART profile. Compile them
+# before instrumentation: otherwise interpreting first-database creation while
+# the Google image finishes booting can exhaust Android's process-start limit
+# before the runner executes even its first test. Keep this preparation scoped
+# to the two isolated QA packages, bounded and fail-closed (never retry a test).
+prepare_qa_compilation() {
+  local package_name result
+  for package_name in com.gernalix.personalhub.qa com.gernalix.personalhub.qa.test; do
+    if ! result=$(timeout --signal=TERM --kill-after=5s 3m \
+      adb -s "$serial" shell cmd package compile -m speed -f "$package_name" 2>&1); then
+      printf 'QA compilation failed: %s\n%s\n' "$package_name" "$result" >&2
+      capture_failure "compile_$package_name"
+      return 1
+    fi
+    if [[ "$result" != 'Success' ]]; then
+      printf 'Unexpected QA compilation result: %s\n%s\n' "$package_name" "$result" >&2
+      capture_failure "compile_$package_name"
+      return 1
+    fi
+    printf 'Prepared ART compilation: %s\n' "$package_name"
+  done
+}
+prepare_qa_compilation
+wait_for_broadcast_idle instrumentation_package_compilation
+assert_clean_boot
 
 run_app_test() {
   local test_name=$1 result
@@ -87,11 +146,22 @@ app_tests=(
   'GlobalDatabaseInstrumentedTest#repeatedImportsDeleteOrphansButProtectAPendingRollbackCopy'
   'QuickEventWidgetClickDeviceTest#twoWidgetEventTapsCreateOneEntryEach'
   'SubstancesWidgetHostDeviceTest#twoWidgetInstancesTargetAndRecordTwoSubstancesOnceEach'
+  'SubstancesWidgetHostDeviceTest#blankBoundWidgetIsRehydratedWithoutRecordingAnIntake'
   'HubDiscoverabilityEpisodesEmulatorTest#homeSearchEpisodesAndFatigueAreReachableFromUi'
   'HubTemporalDeferredQaDeviceTest#homeSearchEpisodesAndFatigueAreReachableFromUi'
 )
 for test_name in "${app_tests[@]}"; do
   run_app_test "$test_name"
+  if [[ "$test_name" == 'SubstancesWidgetHostDeviceTest#blankBoundWidgetIsRehydratedWithoutRecordingAnIntake' ]]; then
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#prepareOwnedWidgetBeforeProcessRestart'
+    # Only the isolated QA process is stopped; keep its existing widget binding.
+    adb -s "$serial" shell am force-stop com.gernalix.personalhub.qa
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#existingWidgetRecoversOnNormalForegroundWithoutRecording'
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#prepareOwnedWidgetBeforeProcessRestart'
+    adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
+    wait_for_broadcast_idle widget_package_replacement
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#existingWidgetRecoversAfterSystemBroadcastWithoutRecording'
+  fi
   if [[ "$test_name" == 'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration' ]]; then
     # Upgrade a synthetic, populated clone, not the production package. Reinstall
     # triggers MY_PACKAGE_REPLACED while keeping all 719+ recorded fixtures.

@@ -8,7 +8,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.text.AnnotatedString
 import com.gernalix.luoghi.ADDRESS_FIELD_TAG
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
@@ -56,7 +55,7 @@ class PlacesEditorLocationDeviceTest {
                 val output = InstrumentationRegistry.getInstrumentation().uiAutomation
                     .executeShellCommand("input text $expected")
                 ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes() }
-                editor.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(expected)))
+                assertEquals(expected, editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
             }
         } finally {
             hideKeyboard()

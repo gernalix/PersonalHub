@@ -76,11 +76,17 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          target: google_apis
+          # This self-contained suite needs Android APIs, not Google services.
+          target: default
           arch: x86_64
           profile: pixel_6
           cores: 4
           ram-size: 4096M
+          # Preserve the Pixel 6 logical viewport (411x914dp) while rendering
+          # 4/9 as many pixels. Both stock launchers have missed first draw on
+          # the software-rendered runner before any app instrumentation starts.
+          # The runner executes hook lines separately; keep this one command.
+          pre-emulator-launch-script: python3 tools/configure_ci_emulator.py
           disable-animations: true
           script: timeout --signal=TERM --kill-after=2m 50m bash tools/run_ci_instrumentation.sh
       - name: Preserve failed app instrumentation diagnostics

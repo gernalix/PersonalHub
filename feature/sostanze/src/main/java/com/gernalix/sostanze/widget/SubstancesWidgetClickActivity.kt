@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.widget.Toast
 import com.gernalix.personalhub.core.database.HubAutoExport
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import com.gernalix.sostanze.R
 import com.gernalix.sostanze.data.SostanzeRepository
 import kotlinx.coroutines.runBlocking
@@ -19,6 +20,11 @@ class SubstancesWidgetClickActivity : Activity() {
         super.onCreate(savedInstanceState)
         val appCtx = applicationContext
         val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+            finishWithoutAnimation()
+            return
+        }
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
         val substanceId = SubstancesWidgetPrefs.read(appCtx, appWidgetId)
         if (substanceId == null) {
             openConfiguration(appWidgetId)
