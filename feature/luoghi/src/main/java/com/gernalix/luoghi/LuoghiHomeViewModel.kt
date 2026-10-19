@@ -48,6 +48,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
+enum class PlaceLocationSource { ADDRESS, CURRENT_LOCATION, SAVED }
+
 data class PlaceFormState(
     val uuid: String? = null,
     val nickname: String = "",
@@ -59,7 +61,23 @@ data class PlaceFormState(
     val photoUri: String = "",
     val tagsText: String = "",
     val sourceApp: String = "Luoghi",
+    val locationSource: PlaceLocationSource = PlaceLocationSource.ADDRESS,
 ) {
+    /** Address metadata must never silently move an existing or GPS-positioned place. */
+    fun withAddressText(value: String): PlaceFormState =
+        if (uuid == null && locationSource == PlaceLocationSource.ADDRESS) {
+            copy(address = value, lat = null, lon = null)
+        } else {
+            copy(address = value)
+        }
+
+    fun withResolvedAddress(value: String, latitude: Double?, longitude: Double?): PlaceFormState =
+        if (uuid == null && locationSource == PlaceLocationSource.ADDRESS) {
+            copy(address = value, lat = latitude, lon = longitude)
+        } else {
+            copy(address = value)
+        }
+
     companion object {
         fun from(place: PlaceEntity) = PlaceFormState(
             uuid = place.uuid,
@@ -71,6 +89,7 @@ data class PlaceFormState(
             notes = place.notes.orEmpty(),
             photoUri = place.photoUri.orEmpty(),
             sourceApp = place.sourceApp.orEmpty().ifBlank { "Luoghi" },
+            locationSource = PlaceLocationSource.SAVED,
         )
     }
 }
@@ -408,7 +427,7 @@ class LuoghiHomeViewModel(
         val duplicateSearch = shouldSearch && AddressAutocompletePolicy.isDuplicateSearch(lastAddressSearchQuery, value)
         mutableState.update {
             it.copy(
-                form = it.form.copy(address = value, lat = null, lon = null),
+                form = it.form.withAddressText(value),
                 addressAutocomplete = if (duplicateSearch) {
                     it.addressAutocomplete
                 } else {
@@ -476,6 +495,7 @@ class LuoghiHomeViewModel(
         addressSearchJob?.cancel()
         addressLatestGate.invalidate()
         lastAddressSearchQuery = null
+        val request = addressLatestGate.next(mutableState.value.form.address)
         viewModelScope.launch {
             mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(loading = true)) }
             runCatching {
@@ -486,12 +506,13 @@ class LuoghiHomeViewModel(
                 } ?: throw AddressOperationTimeoutException()
             }
                 .onSuccess { resolved ->
+                    if (!addressLatestGate.isLatest(request, mutableState.value.form.address)) return@onSuccess
                     mutableState.update {
                         it.copy(
-                            form = it.form.copy(
-                                address = resolved.address,
-                                lat = resolved.latitude,
-                                lon = resolved.longitude,
+                            form = it.form.withResolvedAddress(
+                                resolved.address,
+                                resolved.latitude,
+                                resolved.longitude,
                             ),
                             addressAutocomplete = it.addressAutocomplete.copy(
                                 loading = false,
@@ -503,6 +524,7 @@ class LuoghiHomeViewModel(
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
+                    if (!addressLatestGate.isLatest(request, mutableState.value.form.address)) return@onFailure
                     mutableState.update {
                         it.copy(
                             addressAutocomplete = it.addressAutocomplete.copy(
@@ -913,6 +935,7 @@ class LuoghiHomeViewModel(
                             form = PlaceFormState(
                                 lat = location.latitude,
                                 lon = location.longitude,
+                                locationSource = PlaceLocationSource.CURRENT_LOCATION,
                                 radiusM = CheckInPolicy.DEFAULT_RADIUS_M.toInt().toString(),
                                 notes = "",
                             ),

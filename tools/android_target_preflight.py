@@ -110,6 +110,7 @@ def run_adb(args: list[str]) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [adb, *args],
             text=True,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             check=False,
             timeout=timeout_s,
@@ -190,6 +191,7 @@ def list_avds() -> tuple[str, list[str]]:
         result = subprocess.run(
             [emulator, "-list-avds"],
             text=True,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             check=False,
             timeout=timeout_s,

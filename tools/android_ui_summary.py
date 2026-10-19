@@ -12,6 +12,8 @@ import xml.etree.ElementTree as ET
 def _adb(serial: str, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["adb", "-s", serial, *args],
+        # ADB shell forwards inherited stdin; never let it drain UI controller commands.
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

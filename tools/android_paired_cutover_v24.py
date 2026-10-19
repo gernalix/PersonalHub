@@ -82,7 +82,10 @@ class Pixel:
     def run(self, *args: str, input_bytes: bytes | None = None) -> bytes:
         result = subprocess.run(
             [self.adb, "-s", self.serial, *args],
-            input=input_bytes, check=True, capture_output=True, timeout=120,
+            # Only explicit DB transfer payloads may use stdin. Ordinary ADB calls
+            # must leave the parent controller's queued commands untouched.
+            **({"input": input_bytes} if input_bytes is not None else {"stdin": subprocess.DEVNULL}),
+            check=True, capture_output=True, timeout=120,
         )
         return result.stdout
 
