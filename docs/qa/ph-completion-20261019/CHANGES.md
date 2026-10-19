@@ -32,6 +32,8 @@ Status: implementation and QA in progress. This is not a final release or purifi
 
 ## Data, tooling and safety
 
+- Fixed widget loss in the external paired update procedure: package disable pruned Android widget providers and launcher bindings. Freeze now suspends and force-stops PH while retaining its original enabled state; cleanup removes only an owned suspension, validates readback and refuses pre-disabled or foreign-suspended states. Nineteen paired safety tests, seven installer tests and two migration tests pass (SQLite68–70). No APK change/rebuild is required for this host-tool fix. Native widget restoration/binding preservation remains pending; both attempted Pixel windows closed with verified pre/post notices, with no intake activation.
+
 - Room schema 25 adds a defaulted counter mode; mutation capture and readable History/Git presentation distinguish Countdown, including deleted counters.
 - External v24-to-v25 preparation makes a coherent backup, preserves source bytes/original fields/canonical IDs, validates integrity/FKs/modes/Room identity and provides rollback. Only the six obsolete generated counter triggers are retired.
 - The existing paired Pixel cutover supports 24-to-25 while preserving its 23-to-24 default, freeze/source-hash checks and paired recovery. Downgrade is allowed explicitly only for restoring the backed-up APK during paired rollback; ordinary installs retain their gate.

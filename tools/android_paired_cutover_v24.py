@@ -76,6 +76,8 @@ class Pixel:
             raise CutoverBlocked("Specified device is not the verified physical Pixel")
         self.serial = serial
         self.adb = resolve_tool("adb")
+        self._suspension_owned = False
+        self._enabled_before_freeze: int | None = None
 
     def run(self, *args: str, input_bytes: bytes | None = None) -> bytes:
         result = subprocess.run(
@@ -107,14 +109,48 @@ class Pixel:
             raise CutoverBlocked("Expected a single installed APK for paired rollback")
         return matches[0].removeprefix("package:")
 
+    def package_state(self) -> tuple[bool, int]:
+        """Read only user 0; never guess state from another Android profile."""
+        dump = self.shell("dumpsys", "package", PACKAGE)
+        user = re.search(r"(?m)^\s*User 0:([^\n]*)$", dump)
+        if user is None:
+            raise CutoverBlocked("Cannot verify PersonalHub user-0 package state")
+        suspended = re.search(r"\bsuspended=(true|false)\b", user[1])
+        enabled = re.search(r"\benabled=(\d+)\b", user[1])
+        if suspended is None or enabled is None:
+            raise CutoverBlocked("Incomplete PersonalHub package suspension/enabled state")
+        return suspended[1] == "true", int(enabled[1])
+
     def freeze(self) -> None:
-        self.shell("pm", "disable-user", "--user", "0", PACKAGE)
+        # Disabling a package removes its widget providers and their launcher
+        # bindings. Suspension masks widgets temporarily without deleting them.
+        suspended, enabled = self.package_state()
+        if enabled not in (0, 1):
+            raise CutoverBlocked("PersonalHub was already disabled; preserve its original state")
+        if suspended and not self._suspension_owned:
+            raise CutoverBlocked("PersonalHub was already suspended by another operation")
+        if self._enabled_before_freeze is None:
+            self._enabled_before_freeze = enabled
+        if enabled != self._enabled_before_freeze:
+            raise CutoverBlocked("PersonalHub enabled state changed during cutover")
+        if not suspended:
+            # Retain cleanup ownership even if the shell loses the response
+            # after Android has already applied the requested suspension.
+            self._suspension_owned = True
+            self.shell("pm", "suspend", "--user", "0", PACKAGE)
         self.shell("am", "force-stop", PACKAGE)
-        if not self.frozen():
-            raise CutoverBlocked("PersonalHub is still running after package disable")
+        actual_suspended, actual_enabled = self.package_state()
+        if not actual_suspended or actual_enabled != enabled or not self.frozen():
+            raise CutoverBlocked("PersonalHub suspension/process freeze was not verified")
 
     def enable(self) -> None:
-        self.shell("pm", "default-state", "--user", "0", PACKAGE)
+        if not self._suspension_owned:
+            return
+        self.shell("pm", "unsuspend", "--user", "0", PACKAGE)
+        suspended, enabled = self.package_state()
+        if suspended or enabled != self._enabled_before_freeze:
+            raise CutoverBlocked("PersonalHub suspension restoration was not verified")
+        self._suspension_owned = False
 
 
 def read_frozen_database(device: Pixel, root: Path, source_version: int = 23) -> tuple[Path, dict[str, str]]:
@@ -204,7 +240,7 @@ def stage_and_swap(device: Pixel, prepared: Path, report: dict, expected: dict[s
 
 
 def paired_rollback(device: Pixel, rollback: str, old_apk: Path, token: str) -> None:
-    """Restore old schema and old APK while disabled; keep failed new data."""
+    """Restore old schema and old APK while suspended; keep failed new data."""
     device.freeze()
     failed = "files/ph-cutover-failed-" + token
     device.app("umask 077; mkdir " + failed)
@@ -286,20 +322,20 @@ def execute(args: argparse.Namespace) -> dict:
                 frozen = False
             except Exception as recovery:
                 raise CutoverBlocked(
-                    "Cutover failed and paired rollback failed; leave app disabled. "
+                    "Cutover failed and paired rollback failed; keep the app frozen. "
                     f"Original: {type(exc).__name__}; rollback: {type(recovery).__name__}"
                 ) from recovery
         raise
     finally:
         if frozen and not swapped:
-            # Never re-enable after an uncertain partial swap. Stage-and-swap
+            # Never unfreeze after an uncertain partial swap. Stage-and-swap
             # must have restored every original byte before this assertion passes.
             try:
                 if file_hashes:
                     assert_still_frozen(device, file_hashes)
             except Exception as unsafe:
                 raise CutoverBlocked(
-                    "Original database state unverified; leave package disabled for recovery"
+                    "Original database state unverified; keep package frozen for recovery"
                 ) from unsafe
             device.enable()
 
