@@ -240,7 +240,7 @@ class PlaceRepository(
         val result = DatabaseMutationCoordinator.mutex.withLock {
             database.withTransaction {
                 val place = dao.getPlace(uuid) ?: return@withTransaction PlaceDeleteResult.NotFound
-                if (placeReferences.referenceCount(uuid) > 0) {
+                if (placeReferences.referenceCount(uuid) > 0 || dao.linksForPlace(uuid).isNotEmpty()) {
                     dao.setPlaceArchived(uuid, archived = true, updatedAt = System.currentTimeMillis())
                     PlaceDeleteResult.ArchivedBecauseReferenced
                 } else if (dao.deletePlaceByUuid(place.uuid) > 0) {
@@ -293,6 +293,7 @@ class PlaceRepository(
         source: String = "Luoghi",
         notes: String? = null,
         timestamp: Long = System.currentTimeMillis(),
+        geofencePlaceUuids: Collection<String> = emptyList(),
     ): Long = recordPlaceEventEntity(
         event = PlaceEventEntity(
             placeId = placeUuid,
@@ -305,15 +306,33 @@ class PlaceRepository(
             notes = notes.cleanNullable(),
         ),
         mutationSource = "place_events.${eventType.lowercase()}",
+        geofencePlaceUuids = geofencePlaceUuids,
     )
 
     suspend fun recordPlaceEventEntity(
         event: PlaceEventEntity,
         mutationSource: String = "place_events.${event.eventType.lowercase()}",
+        geofencePlaceUuids: Collection<String> = emptyList(),
     ): Long {
         val inserted = DatabaseMutationCoordinator.mutex.withLock {
             val normalized = normalizedEventForInsert(event)
             database.withTransaction {
+                val candidateIds = (listOf(normalized.placeId) + geofencePlaceUuids).distinct()
+                if (normalized.eventType == PlaceEventTypes.CHECK_IN && candidateIds.size > 1) {
+                    // Typed visit -> place links retain the original disambiguation cohort.
+                    // They are committed with the chosen visit, never inferred from later GPS.
+                    candidateIds.forEach { candidateId ->
+                        require(dao.getPlace(candidateId) != null) { "Check-in candidate is no longer available" }
+                        dao.insertLink(PlaceLinkEntity(
+                            placeUuid = candidateId,
+                            ownerApp = VISIT_GEOFENCE_OWNER,
+                            ownerType = VISIT_GEOFENCE_LINK_TYPE,
+                            ownerId = normalized.sessionUuid,
+                            createdAt = normalized.timestamp,
+                            updatedAt = normalized.timestamp,
+                        ))
+                    }
+                }
                 val id = dao.insertEvent(normalized)
                 val saved = normalized.copy(id = id)
                 dao.recalculateStatsBaselines()
@@ -333,6 +352,21 @@ class PlaceRepository(
         HubAutoExport.request(context)
         return inserted
     }
+
+    /** Includes the chosen place first, followed by its original persisted candidates. */
+    suspend fun geofencePlacesForEvent(eventId: Long): List<String> {
+        val event = dao.getEvent(eventId) ?: return emptyList()
+        return geofencePlacesForSession(event.placeId, event.sessionUuid)
+    }
+
+    suspend fun geofencePlacesForActiveVisit(placeUuid: String): List<String> {
+        val active = dao.getActiveVisitEvent()?.takeIf { it.placeId == placeUuid }
+        return if (active == null) listOf(placeUuid) else geofencePlacesForSession(placeUuid, active.sessionUuid)
+    }
+
+    private suspend fun geofencePlacesForSession(placeUuid: String, sessionUuid: String): List<String> =
+        (listOf(placeUuid) + dao.linksForOwner(VISIT_GEOFENCE_OWNER, VISIT_GEOFENCE_LINK_TYPE, sessionUuid)
+            .map { it.placeUuid }).distinct()
 
     suspend fun recordManualCheckIn(
         placeUuid: String,
@@ -948,6 +982,8 @@ class PlaceRepository(
     }
 
     companion object {
+        private const val VISIT_GEOFENCE_OWNER = "Luoghi"
+        private const val VISIT_GEOFENCE_LINK_TYPE = "visit_geofence_candidate"
         private const val ACTION_EVENT_UPDATE = "EVENT_UPDATE"
         private const val ACTION_EVENT_DELETE = "EVENT_DELETE"
         private const val ACTION_SESSION_DELETE = "SESSION_DELETE"

@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -125,14 +127,13 @@ fun PlaceListItem(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
                         text = displayName,
-                        modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -174,6 +175,7 @@ fun PlaceListItem(
                 distance?.let { value ->
                     Text(
                         text = value,
+                        modifier = Modifier.testTag("place-distance"),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

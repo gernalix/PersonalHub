@@ -46,7 +46,7 @@
     <string name="delete_place">Delete place</string>
     <string name="delete_place_confirm_format">Remove %1$s from active places?</string>
     <string name="delete_place_deleted">Place deleted.</string>
-    <string name="delete_place_archived_referenced">This place is used by Finance, so it was archived instead of deleted. Financial history was preserved.</string>
+    <string name="delete_place_archived_referenced">This place is linked to other records, so it was archived instead of deleted. Linked history was preserved.</string>
     <string name="delete_place_not_found">Place no longer exists.</string>
     <string name="delete">Delete</string>
     <string name="edit">Edit</string>
@@ -216,13 +216,10 @@
     <string name="manual_visit_check_in">Check-in time</string>
     <string name="manual_visit_check_out">Check-out time</string>
     <string name="manual_visit_open_hint">Leave empty only for an open visit.</string>
-    <string name="geofence_settings">Geofence settings</string>
-    <string name="geofence_enabled">Use background geofence for this place</string>
-    <string name="geofence_enter_enabled">Handle ENTER</string>
-    <string name="geofence_exit_enabled">Handle EXIT</string>
+    <string name="geofence_settings">Background place detection</string>
+    <string name="geofence_enabled">Detect arrivals and departures automatically</string>
     <string name="geofence_action_notify">Notification only</string>
-    <string name="geofence_action_automatic">Automatic check-in/check-out</string>
-    <string name="geofence_background_disclosure">Geofencing uses Android background location only for places where you enable it. Places, manual visits, history and maps keep working when that permission is unavailable.</string>
+    <string name="geofence_background_disclosure">Android monitors the saved position in the background only when this switch is on. Background location permission is required.</string>
     <string name="geofence_saved">Geofence settings saved.</string>
     <string name="geofence_permission_missing">Settings saved. Background location is required before Android geofences can be registered.</string>
     <string name="geofence_channel_name">Places geofences</string>
@@ -232,7 +229,7 @@
     <string name="geofence_notification_checkin_format">Checked in at %1$s.</string>
     <string name="geofence_notification_checkout_format">Checked out from %1$s.</string>
     <string name="geofence_ambiguous_title">Place geofence needs review</string>
-    <string name="geofence_ambiguous_message_format" translatable="false">Overlapping geofence alerts: %1$d. Open Places to choose the right one.</string>
+    <string name="geofence_ambiguous_message_format" translatable="false">Nearby places detected: %1$d. Open Places and tap Check-in to choose your visit.</string>
     <string name="stat_global_share">Share of global lifetime</string>
     <string name="stat_place_lifetime_share">Share of place lifetime</string>
     <string name="notes_empty">No notes</string>
@@ -277,4 +274,16 @@
     <string name="place_location_loading" translatable="false">Getting current location…</string>
     <string name="place_location_permission_missing" translatable="false">Allow foreground location to use your current position, or choose an address.</string>
     <string name="place_location_unavailable" translatable="false">Current location unavailable. Try again or choose an address.</string>
+    <string name="geofence_radius_help" translatable="false">Detection radius: %1$d m around the saved position. Edit the place to change its radius.</string>
+    <string name="geofence_coordinates_required" translatable="false">This place needs a saved position before background detection can work.</string>
+    <string name="geofence_permission_guidance" translatable="false">Background location is not allowed. In app settings, open Permissions → Location and choose Allow all the time with precise location. Your choices will still be saved.</string>
+    <string name="geofence_open_app_settings" translatable="false">Open app settings</string>
+    <string name="geofence_arrival" translatable="false">On arrival</string>
+    <string name="geofence_departure" translatable="false">On departure</string>
+    <string name="geofence_action_off" translatable="false">Do nothing</string>
+    <string name="geofence_automatic_checkin" translatable="false">Record check-in and notify</string>
+    <string name="geofence_automatic_checkout" translatable="false">Record check-out and notify</string>
+    <string name="geofence_overlap_help" translatable="false">Overlapping places notify you and ask you to choose before recording an arrival. Departure can close only the visit actually in progress.</string>
+    <string name="geofence_manual_alerts_help" translatable="false">Check-in/out alerts are separate: they run when you use the check-in/out buttons, even with background detection off. Manage them in Alerts.</string>
+    <string name="geofence_registration_failed" translatable="false">Settings saved, but Android could not update background detection. Check location services and try again.</string>
 </resources>

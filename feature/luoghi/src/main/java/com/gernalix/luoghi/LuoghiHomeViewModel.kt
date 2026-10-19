@@ -143,6 +143,8 @@ enum class HistoryMessage {
 enum class GeofenceMessage {
     SAVED,
     PERMISSION_MISSING,
+    COORDINATES_MISSING,
+    REGISTRATION_FAILED,
 }
 
 enum class PlaceDeleteMessage {
@@ -731,12 +733,16 @@ class LuoghiHomeViewModel(
 
     fun selectAmbiguousCheckIn(placeUuid: String) {
         val checkInState = mutableState.value.checkIn
+        if (checkInState.working) return
         val location = checkInState.pendingCheckInLocation ?: return
         val attemptId = checkInState.pendingAttemptId
         val candidate = checkInState.ambiguousCandidates.firstOrNull { it.place.uuid == placeUuid } ?: return
         viewModelScope.launch {
             mutableState.update { it.copy(checkIn = it.checkIn.copy(working = true)) }
-            val inserted = runCatching { container.checkIns.checkIn(placeUuid, location) }
+            val inserted = runCatching {
+                container.checkIns.checkIn(placeUuid, location,
+                    geofencePlaceUuids = checkInState.ambiguousCandidates.map { it.place.uuid })
+            }
             inserted.onSuccess {
                 if (attemptId != null) {
                     container.checkIns.finishAttempt(
@@ -852,10 +858,11 @@ class LuoghiHomeViewModel(
             val result = container.geofences.save(config)
             mutableState.update {
                 it.copy(
-                    geofenceMessage = if (result is com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.PermissionMissing) {
-                        GeofenceMessage.PERMISSION_MISSING
-                    } else {
-                        GeofenceMessage.SAVED
+                    geofenceMessage = when (result) {
+                        com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.Success -> GeofenceMessage.SAVED
+                        com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.PermissionMissing -> GeofenceMessage.PERMISSION_MISSING
+                        com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.CoordinatesMissing -> GeofenceMessage.COORDINATES_MISSING
+                        else -> GeofenceMessage.REGISTRATION_FAILED
                     }
                 )
             }

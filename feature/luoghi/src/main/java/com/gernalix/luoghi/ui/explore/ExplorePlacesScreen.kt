@@ -123,7 +123,8 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
                 OutlinedCard(onClick = { onOpenPlace(nearby.place) }, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(nearby.place.nickname.ifBlank { unnamedPlace })
-                        Text(nearby.distanceMeters?.roundToLong()?.let { localizedDistance(it) } ?: stringResource(R.string.places_explore_missing_value))
+                        Text(nearby.distanceMeters?.roundToLong()?.let { localizedDistance(it) } ?: stringResource(R.string.places_explore_missing_value),
+                            modifier = Modifier.testTag("explore-place-distance-${nearby.place.uuid}"))
                     }
                 }
             }

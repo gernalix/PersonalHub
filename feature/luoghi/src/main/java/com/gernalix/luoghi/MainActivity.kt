@@ -10,6 +10,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -383,6 +390,7 @@ private fun LuoghiNavigation(
         val place = state.places.firstOrNull { it.uuid == placeId }
         if (place != null) {
             GeofenceSettingsDialog(
+                place = place,
                 initial = state.geofenceConfigs[placeId] ?: PlaceGeofenceConfigEntity(placeUuid = placeId),
                 onDismiss = { geofencePlaceId = null },
                 onSave = {
@@ -402,6 +410,8 @@ private fun LuoghiNavigation(
                         when (message) {
                             GeofenceMessage.SAVED -> R.string.geofence_saved
                             GeofenceMessage.PERMISSION_MISSING -> R.string.geofence_permission_missing
+                            GeofenceMessage.COORDINATES_MISSING -> R.string.geofence_coordinates_required
+                            GeofenceMessage.REGISTRATION_FAILED -> R.string.geofence_registration_failed
                         }
                     )
                 )
@@ -476,6 +486,7 @@ private fun ManualVisitDialog(
 
 @Composable
 private fun GeofenceSettingsDialog(
+    place: com.gernalix.luoghi.data.PlaceEntity,
     initial: PlaceGeofenceConfigEntity,
     onDismiss: () -> Unit,
     onSave: (PlaceGeofenceConfigEntity) -> Unit,
@@ -493,23 +504,46 @@ private fun GeofenceSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.geofence_settings)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(place.nickname.ifBlank { stringResource(R.string.unnamed_place) }, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.geofence_radius_help,
+                    com.gernalix.luoghi.capsules.checkin.CheckInPolicy.effectiveRadiusM(place).toInt()),
+                    style = MaterialTheme.typography.bodySmall)
+                if (place.lat == null || place.lon == null) {
+                    Text(stringResource(R.string.geofence_coordinates_required), color = MaterialTheme.colorScheme.error)
+                }
                 CheckRow(checked = enabled, label = stringResource(R.string.geofence_enabled), onCheckedChange = { enabled = it })
-                Text(
-                    stringResource(R.string.geofence_background_disclosure),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                CheckRow(checked = enterEnabled, label = stringResource(R.string.geofence_enter_enabled), onCheckedChange = { enterEnabled = it })
-                ActionRow(
+                Text(stringResource(R.string.geofence_background_disclosure), style = MaterialTheme.typography.bodySmall)
+                if (enabled && !com.gernalix.luoghi.capsules.geofence.PlaceGeofenceRegistrar.hasBackgroundLocationPermission(LocalContext.current)) {
+                    val context = LocalContext.current
+                    Text(stringResource(R.string.geofence_permission_guidance), color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = {
+                        context.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.fromParts("package", context.packageName, null)))
+                    }) { Text(stringResource(R.string.geofence_open_app_settings)) }
+                }
+                GeofenceTransitionChoices(
+                    title = stringResource(R.string.geofence_arrival),
+                    automaticLabel = stringResource(R.string.geofence_automatic_checkin),
+                    transitionEnabled = enterEnabled,
                     automatic = enterAutomatic,
-                    onAutomaticChange = { enterAutomatic = it },
+                    enabled = enabled,
+                    onChoice = { active, automatic -> enterEnabled = active; enterAutomatic = automatic },
                 )
-                CheckRow(checked = exitEnabled, label = stringResource(R.string.geofence_exit_enabled), onCheckedChange = { exitEnabled = it })
-                ActionRow(
+                GeofenceTransitionChoices(
+                    title = stringResource(R.string.geofence_departure),
+                    automaticLabel = stringResource(R.string.geofence_automatic_checkout),
+                    transitionEnabled = exitEnabled,
                     automatic = exitAutomatic,
-                    onAutomaticChange = { exitAutomatic = it },
+                    enabled = enabled,
+                    onChoice = { active, automatic -> exitEnabled = active; exitAutomatic = automatic },
                 )
+                Text(stringResource(R.string.geofence_overlap_help), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.geofence_manual_alerts_help), style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
@@ -531,22 +565,38 @@ private fun GeofenceSettingsDialog(
 
 @Composable
 private fun CheckRow(checked: Boolean, label: String, onCheckedChange: (Boolean) -> Unit) {
-    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
         Text(label)
     }
 }
 
 @Composable
-private fun ActionRow(automatic: Boolean, onAutomaticChange: (Boolean) -> Unit) {
-    Column {
-        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            RadioButton(selected = !automatic, onClick = { onAutomaticChange(false) })
-            Text(stringResource(R.string.geofence_action_notify))
-        }
-        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            RadioButton(selected = automatic, onClick = { onAutomaticChange(true) })
-            Text(stringResource(R.string.geofence_action_automatic))
+private fun GeofenceTransitionChoices(
+    title: String,
+    automaticLabel: String,
+    transitionEnabled: Boolean,
+    automatic: Boolean,
+    enabled: Boolean,
+    onChoice: (Boolean, Boolean) -> Unit,
+) {
+    Column(Modifier.selectableGroup()) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        listOf(
+            Triple(stringResource(R.string.geofence_action_off), !transitionEnabled, { onChoice(false, automatic) }),
+            Triple(stringResource(R.string.geofence_action_notify), transitionEnabled && !automatic, { onChoice(true, false) }),
+            Triple(automaticLabel, transitionEnabled && automatic, { onChoice(true, true) }),
+        ).forEach { (label, selected, select) ->
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = select),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = selected, enabled = enabled, onClick = null)
+                Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+            }
         }
     }
 }

@@ -220,6 +220,9 @@ abstract class PlacesQaScenario {
             compose.onNode(hasText(names.last(), substring = true) and hasClickAction()).performClick()
             compose.waitUntil(10_000) { runBlocking { CheckInPolicy.activeVisit(db.placeDao().listEvents())?.placeId == ids.last() } }
             compose.onNodeWithTag("places-checkin-choices").assertDoesNotExist()
+            val chosenEvent = runBlocking { db.placeDao().listEvents().last { it.placeId == ids.last() && it.eventType == PlaceEventTypes.CHECK_IN } }
+            assertEquals("The real selection must persist every original candidate", ids.toSet(),
+                runBlocking { repository.geofencePlacesForEvent(chosenEvent.id).toSet() })
             compose.onNodeWithTag("places-where-was-i").performScrollTo().performClick()
             val currentPlace = context.getString(PlacesR.string.where_was_i_inside_format, names.last())
             compose.waitUntil(10_000) { compose.onAllNodesWithText(currentPlace).fetchSemanticsNodes().isNotEmpty() }
@@ -227,11 +230,17 @@ abstract class PlacesQaScenario {
             compose.onNodeWithText(context.getString(PlacesR.string.close)).performClick()
             compose.onNodeWithTag(CHECKIN_BUTTON_TAG).performScrollTo().assertTextContains(context.getString(PlacesR.string.checkout_button)).performClick()
             compose.waitUntil(10_000) { runBlocking { CheckInPolicy.activeVisit(db.placeDao().listEvents()) == null } }
+            val checkoutEvent = runBlocking { db.placeDao().listEvents().last { it.placeId == ids.last() && it.eventType == PlaceEventTypes.CHECK_OUT } }
+            assertEquals(ids.toSet(), runBlocking { repository.geofencePlacesForEvent(checkoutEvent.id).toSet() })
         } finally {
             runBlocking {
                 db.placeDao().listEvents().filter { it.placeId in ids }.forEach { db.placeDao().deleteEventByUuid(it.eventUuid) }
                 db.placeDao().recalculateStatsBaselines()
-                ids.forEach { repository.deletePlace(it) }
+                ids.forEach { id ->
+                    db.placeDao().linksForPlace(id).filter { it.ownerApp == "Luoghi" && it.ownerType == "visit_geofence_candidate" }
+                        .forEach { db.placeDao().deleteLinkByIdBlocking(it.id) }
+                    repository.deletePlace(id)
+                }
             }
         }
     }
@@ -250,7 +259,7 @@ class PlacesPixelQaDeviceTest : PlacesQaScenario() {
 @RunWith(AndroidJUnit4::class)
 class PlacesEmulatorQaDeviceTest : PlacesQaScenario() {
     override fun verifyTarget(context: Context) {
-        check(context.packageName == "com.gernalix.personalhub.qa")
+        check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*")))
         check(Build.MODEL.contains("sdk", ignoreCase = true))
         check(Build.HARDWARE in setOf("goldfish", "ranchu"))
     }
