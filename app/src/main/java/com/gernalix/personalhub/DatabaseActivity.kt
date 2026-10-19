@@ -89,8 +89,8 @@ class DatabaseActivity : ComponentActivity() {
                 Button(enabled = !busy, onClick = { exportFolder.launch(null) }) { Text(stringResource(R.string.database_folder)) }
                 Text(stringResource(if (folder == null) R.string.database_folder_missing else R.string.database_folder_ready))
                 OutlinedButton(enabled = !busy && folder != null, onClick = { operation {
-                    withContext(Dispatchers.IO) { DatabaseVault.exportNow(this@DatabaseActivity) }
-                    message = exported
+                    val success = withContext(Dispatchers.IO) { DatabaseVault.exportNow(this@DatabaseActivity) }
+                    message = if (success) exported else failed
                 } }) { Text(stringResource(R.string.database_export)) }
                 if (lastExport > 0) Text(stringResource(R.string.database_last_export, HubTimestamp.format(lastExport)))
                 exportError?.let { Text(failed, color = MaterialTheme.colorScheme.error) }

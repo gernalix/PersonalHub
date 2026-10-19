@@ -263,3 +263,5 @@ Source checkpoint2462c321 contains the cross-module cursor correction and all st
 Version72 source4fd69d38 reviewed: Capsule FAST13/FULL14 PASS (SQLite450 contains2 command gates). The following metadata checkpoint does not alter app/build inputs. Final minified/signature/manifest/mapping verification and exact-byte native acceptance remain pending.
 
 Optimized72/CI source89e68a61 reviewed: Capsule FAST13/FULL14 PASS457 (2 command gates). This metadata checkpoint changes no app/build inputs. Final artifact optimization/native proof and export-based physical acceptance remain pending.
+
+Database export UI feedback correction: the existing Boolean export result is now respected; a provider failure reports the existing failure message instead of announcing success. No persistence/API/string change. Highest app optimized compilation and app debug lint0 PASS; source visible-value gate remains unchanged.

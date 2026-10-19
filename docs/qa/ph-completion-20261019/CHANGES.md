@@ -471,3 +471,5 @@ Hosted CI66f6e278 passed consumer/architecture/Play/unit and three new shared cu
 The CI failure capture also retrieves the per-module screenshot/XML written at the exact startup timeout, before instrumentation teardown can change the foreground. These are scoped to the fresh CI QA package; the generic post-failure screenshot remains additional context.
 
 Optimized72/CI source89e68a61 reviewed: Capsule FAST13/FULL14 PASS457 (2 command gates). This metadata checkpoint changes no app/build inputs. Final artifact optimization/native proof and export-based physical acceptance remain pending.
+
+Database export UI feedback correction: the existing Boolean export result is now respected; a provider failure reports the existing failure message instead of announcing success. No persistence/API/string change. Highest app optimized compilation and app debug lint0 PASS; source visible-value gate remains unchanged.
