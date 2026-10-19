@@ -95,11 +95,11 @@ internal object NormalizedArchive {
             val occurrence = counts.getOrDefault(signature,0);counts[signature]=occurrence+1
             val existing = db.rawQuery("SELECT id FROM messages WHERE conversation=? AND signature=? AND occurrence=?",arrayOf(conversation,signature,occurrence.toString())).use { if(it.moveToFirst())it.getLong(0) else null }
             if(existing!=null) {
-                db.execSQL("INSERT OR IGNORE INTO message_sources VALUES(?,?,?,?)",arrayOf(existing,event,slot,if(historic)1 else 0));return
+                db.execSQL("INSERT OR IGNORE INTO message_sources VALUES(?,?,?,?)",arrayOf<Any>(existing,event,slot,if(historic)1 else 0));return
             }
             // Name-only senders remain independent ambiguous identities; never merge homonyms by name.
             val identity = if(reliableIdentity) stableKey(appScope,"sender",senderToken) else stableKey(conversation,signature,occurrence.toString(),"uncertain-sender")
-            db.execSQL("INSERT OR IGNORE INTO identities VALUES(?,?,?)",arrayOf(identity,senderName,if(reliableIdentity)1 else 0))
+            db.execSQL("INSERT OR IGNORE INTO identities VALUES(?,?,?)",arrayOf<Any>(identity,senderName,if(reliableIdentity)1 else 0))
             val partial = text.endsWith("…") || text.endsWith("...") || text.isBlank() || mime.isNotBlank()
             val confidence = if(fallbackText || stamp.isBlank()) "LOW" else if(reliableIdentity) "HIGH" else "MEDIUM"
             val time = utc(stamp.ifBlank { s.getString("captured") })
@@ -107,10 +107,10 @@ internal object NormalizedArchive {
             val possible = if(reliableIdentity && stamp.isNotBlank()) db.rawQuery("SELECT id FROM messages WHERE conversation=? AND identity=? AND time=? AND text!=? LIMIT 2",arrayOf(conversation,identity,time,text)).use {
                 if(!it.moveToFirst()) null else it.getLong(0).takeIf { _ -> !it.moveToNext() }
             } else null
-            db.execSQL("INSERT INTO messages(conversation,identity,signature,occurrence,text,time,confidence,partial,revision_of) VALUES(?,?,?,?,?,?,?,?,?)",arrayOf(conversation,identity,signature,occurrence,text,time,confidence,if(partial)1 else 0,possible))
+            db.execSQL("INSERT INTO messages(conversation,identity,signature,occurrence,text,time,confidence,partial,revision_of) VALUES(?,?,?,?,?,?,?,?,?)",arrayOf<Any?>(conversation,identity,signature,occurrence,text,time,confidence,if(partial)1 else 0,possible))
             val message = db.rawQuery("SELECT last_insert_rowid()",null).use { it.moveToFirst();it.getLong(0) }
-            db.execSQL("INSERT INTO message_search(docid,content) VALUES(?,?)",arrayOf(message,"$text\n$senderName"))
-            db.execSQL("INSERT INTO message_sources VALUES(?,?,?,?)",arrayOf(message,event,slot,if(historic)1 else 0))
+            db.execSQL("INSERT INTO message_search(docid,content) VALUES(?,?)",arrayOf<Any>(message,"$text\n$senderName"))
+            db.execSQL("INSERT INTO message_sources VALUES(?,?,?,?)",arrayOf<Any>(message,event,slot,if(historic)1 else 0))
         }
         for(i in 0 until history.length())extract(history.getJSONObject(i),i,true)
         // Historic/current overlap represents the same snapshot message, without double-counting.

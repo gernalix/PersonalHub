@@ -38,7 +38,7 @@ class SubstanceInternalPersistenceDeviceTest {
             val db = owner.openHelper.readableDatabase
             db.query(
                 "SELECT scheduled_for_ms, scheduled_for_utc FROM notification_state WHERE kind=? AND entity_id=?",
-                arrayOf(marker, -914263L),
+                arrayOf<Any>(marker, -914263L),
             ).use { cursor ->
                 assertEquals(true, cursor.moveToFirst())
                 assertEquals(scheduledFor, cursor.getLong(0))
@@ -56,7 +56,7 @@ class SubstanceInternalPersistenceDeviceTest {
                 assertEquals("two", cursor.getString(0))
             }
         } finally {
-            owner.openHelper.writableDatabase.execSQL("DELETE FROM notification_state WHERE kind=? AND entity_id=?", arrayOf(marker, -914263L))
+            owner.openHelper.writableDatabase.execSQL("DELETE FROM notification_state WHERE kind=? AND entity_id=?", arrayOf<Any>(marker, -914263L))
             owner.openHelper.writableDatabase.execSQL("DELETE FROM settings WHERE `key`=?", arrayOf(marker))
         }
     }

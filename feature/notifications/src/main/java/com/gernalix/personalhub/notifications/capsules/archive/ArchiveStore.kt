@@ -43,7 +43,7 @@ internal class ArchiveStore(context: Context) : SQLiteOpenHelper(context,
                 put("captured",utc(snapshot.getString("captured"))); put("payload",snapshot.toString())
                 if (reason != null) put("reason",reason)
             })
-            db.execSQL("INSERT INTO event_search(docid,content) VALUES(?,?)", arrayOf(id, searchable(snapshot)))
+            db.execSQL("INSERT INTO event_search(docid,content) VALUES(?,?)", arrayOf<Any>(id, searchable(snapshot)))
             if (requested == "REMOVED") db.delete("active", "nkey=?", arrayOf(key))
             else db.execSQL("INSERT OR IGNORE INTO active(nkey) VALUES(?)", arrayOf(key))
             db.setTransactionSuccessful()

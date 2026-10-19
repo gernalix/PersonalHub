@@ -374,7 +374,7 @@ class HubHistorySearchQaDeviceTest {
                 created_at,updated_at,archived,first_check_in_at_place
             ) VALUES(?,?,?,NULL,NULL,NULL,?,'qa',?,?,0,NULL)
             """.trimIndent(),
-            arrayOf(
+            arrayOf<Any>(
                 placeId,
                 placeName,
                 beforeAddress,
@@ -389,7 +389,7 @@ class HubHistorySearchQaDeviceTest {
         )
         db.execSQL(
             "UPDATE places SET address=?, notes=?, updated_at=? WHERE uuid=?",
-            arrayOf(afterAddress, hiddenAfterNote, now + 1, placeId),
+            arrayOf<Any>(afterAddress, hiddenAfterNote, now + 1, placeId),
         )
 
         val update = runBlocking {

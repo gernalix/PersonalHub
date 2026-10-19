@@ -27,7 +27,7 @@ class LegacySnapshotCompactionDeviceTest {
         var payloadId: Long? = null
         try {
             db.execSQL("INSERT INTO snapshot_history(json,saved_at_ms,kind) VALUES (?,?,'legacy_snapshot')",
-                arrayOf(json, System.currentTimeMillis()))
+                arrayOf<Any>(json, System.currentTimeMillis()))
             historyId = db.query("SELECT id FROM snapshot_history WHERE json=?", arrayOf(json)).use {
                 assertTrue(it.moveToFirst()); it.getLong(0)
             }

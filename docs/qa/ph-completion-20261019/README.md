@@ -30,21 +30,23 @@ Working tree: task/ph-completion-20261019, created with repo-task. Initial featu
 
 ## Current acceptance boundary
 
+Current local follow-up: Google Places6.0.2 requires supported model fields and Kotlin2.4 metadata. The provider and catalog are being updated and validated; application/build inputs now differ from the frozenf949 candidate. Its bytes and all prior QA remain preserved, but a replacement minified/signed candidate and repeated final acceptance are required before publication. No new install or NV increment has occurred.
+
 | Requirement | Current evidence | Still required |
 | --- | --- | --- |
 | Places search, overlap, Where was I, tags and sort criteria | Implemented; focused host tests and isolated native acceptance recorded in the chronological evidence below | Reconcile required regression coverage with the final minified artifact; no automatic PASS from earlier QA package |
 | External OsmAnd and Explore | Official V2 bridge, external native map/return, distance/order/missing-coordinate host checks and isolated native evidence | Final minified bridge/temporary autocomplete acceptance and return/cleanup readback |
 | Countdown, tag separation and compact Home | Implemented with shared engine; host and isolated native checks pass | Final-artifact smoke including all14 accessible actions and persisted layout |
 | Shared internal History and persistent checkbox menu | Twelve module scopes/Alerts ownership and repeated checkbox interactions passed isolated native checks | Final-artifact functional readback, including version70 in global History |
-| Update, external migration and data preservation | Exact frozen70 installed on primary Pixel/schema25; first-foreground/OK/one shared version fact and99-table preservation PASS | Exact version70 UI payload in Audit and History; Audit event type alone is visible (SQLite72) |
+| Update, external migration and data preservation | Exact frozen70 installed on primary Pixel/schema25; first-foreground/OK/one shared version fact and99-table preservation PASS | Exact Audit version70 payload verified in the first real case of readback20261019T050848Z; History readback was interrupted by keyguard. Repeat required final gates on replacement candidate |
 | Home widgets | Root cause fixed in external updater, committed;19 paired +7 installer +2 migration host tests PASS | Restore saved target through launcher and prove actual binding retention; no native PASS claimed |
 | Startup history and shortcuts | Dedicated SQLite active; exact-installed helper with6 host safety cases PASS | Six physical launches/timings on final APK; no reinstall or permission grants |
-| Source verification and integration | Draft PR104 updated toe83c82e6; Capsule FAST13/FULL14 PASS; updated CI is running | All current-head required CI and final owner integration; draft prevents premature integration/collection |
-| Remaining diagnostics | Original393 reduced to26 version-availability warnings, zero errors | Complete compatibility dispositions; no zero-warning claim or blanket suppression |
+| Source verification and integration | Draft PR104 atd689c9bc; all five CI workflows PASS, with actual CI evidence in SQLite87–88. New local dependency matrix is under validation | CI for the newer validated source and final owner integration; draft prevents premature integration/collection |
+| Remaining diagnostics | Original393 reduced to26 version-availability warnings, zero errors | All suggested stable version keys are now updated and Gradle9.8.1 wrapper regenerated with official checksum; combined compile/full-lint validation pending. No zero-warning claim |
 | Inventory residuals | Historical completed/superseded work preserved; issues91/69/71 reconciled | Canonical issue68 acceptance; ADB matrix/Notifications coverage limitations truthfully dispositioned |
 | Delivery and purification | Immutable artifact and rollback pair preserved; no new APK changes from tooling/docs | Publish the exact accepted APK and Telegram link, protected integration and final operational Git purification |
 
-Pixel exclusive window20261019T043528Z closed with verified Fedora/Telegram completion notices after foreground changed externally. A free continuous window was requested; host/repository work continues. TCL identity gate remains unavailable in the latest check. No local emulator use is authorized. App/build inputs are unchanged between frozen sourcef949f4b1 and updated sourcee83c82e6; later commits change host tooling/docs only.
+Latest physical windows closed with both notification channels verified. The first readback passed the exact Audit70 case, then stopped when keyguard appeared; the second stopped during setup. Subsequent passive readback showed unlocked state and another foreground app. The free-window confirmation is pending; no additional UI input was sent. Local application inputs have since changed for the reviewed dependency correction, so the old prepared readback is on hold until a replacement immutable candidate exists.
 
 ## Chronological checkpoints
 
@@ -206,3 +208,17 @@ Review found the app-specific CI function called adb instrumentation directly, w
 Read-only current connectivity: both Pixel and TCL are absent. Pixel Tailscale peer is offline since04:40 UTC; one bounded reconnect to the previously verified LAN endpoint failed identity-gated recovery and was disconnected. Installed keeper binary/unit exactly match remote owner7d876f1; its own runtime validator passes when run against that immutable remote snapshot. The earlier local-checkout drift report was a stale-source comparison, not a runtime defect; no service was restarted or overwritten. Physical final QA remains prepared but not executed.
 
 CI guard source5a3c8819: Capsule reviewed_commit refreshed; FAST13/FULL14 PASS. App/build inputs remain identical to frozen sourcef949f4b1.
+
+## Interrupted full verification and resume
+
+Full verification77628 terminated with exit143, not a test failure or successful gate. No Gradle child remained. Its22 complete JUnit reports contain78 passing cases and were preserved/hash-verified in private full-junit-02 evidence, SQLite176–197. A single detached rerun now has an explicit PID/log/exit receipt so a terminal collection window cannot silently duplicate it. Full verification remains pending. The user confirmed the Pixel is unlocked and available; physical interaction still requires verified Fedora/Telegram pre/post notices.
+
+## Native widget recovery
+
+Recovered the one distinct valid saved Substances target through Nova's native widget picker and Android's explicit Create permission dialog, then the PH configuration screen. The action itself was never activated. Real launcher IDs and saved mapping survived owned suspension, force-stop, unsuspension and primary Activity restart unchanged. Both pre/post Fedora and Telegram receipts are verified. Private receipt: widget-recovery-20261019/window-20261019T060320Z/preservation-receipt.json; two actual native assertions recorded as SQLite198 PASS. Preservation across a subsequent real APK replacement remains a separate pending gate.
+
+An external alarm interrupted an earlier window. The private UI controller now uses fresh unique dump files and refuses unexpected foregrounds; no alarm was dismissed or altered. The Substances widget configuration title visibly overlaps the status bar on the current primary70; a focused system-inset repair is required before final delivery.
+
+Full matrix terminal result:298/298 unit cases PASS (SQLite203–281), architecture PASS,14 full lint XML reports with one warning/no errors. The command failed on seven instrumentation fixture mixed-array inference errors, now repaired explicitly without changing assertions/guards. WordPulse's empty superclass lifecycle call is removed. App compile PASS after the two platform-view widget inset repairs. Shared UI summary freshness regressions3 PASS. Post-repair fixture compilation/widget tests/full lint are running. Capsule contract correctly rejects the old review ref until the validated source commit and ref refresh; no bypass or blanket lint suppression.
+
+Post-repair validation is complete: app compile PASS, Android test fixture compilation PASS, targeted widget7/7 PASS, architecture PASS, full unfiltered lint14 reports with0 errors/0 warnings. SQLite285–287 holds the two JUnit reports plus three distinctly labelled task gates. Earlier full-unit298/298 remains retained. Source checkpoint/ref refresh follows; new minified candidate and physical final feature/replacement acceptance are still pending.

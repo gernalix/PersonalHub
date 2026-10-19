@@ -102,9 +102,10 @@ Passive archive metadata readback found actual Telegram/WhatsApp events and no S
 
 ## Changed project files
 
-Complete source diff against original canonical base `e031f296d0ac8535c9248b262f777b792ab99548`, refreshed at each checkpoint. Exact removed app-string inventory: `~/.local/share/personalhub-qa/removed-unused-resources-20261019.json`.
+All changed project paths against the initial integrated base, including the current owned working changes:
 
 - `.codex/CODE_MAP.tsv`
+- `.gitattributes`
 - `.github/workflows/android-consumer-preflight.yml`
 - `.github/workflows/android-instrumentation-ci.yml`
 - `.github/workflows/android-unit-ci.yml`
@@ -114,11 +115,15 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `NV.txt`
 - `app/build.gradle.kts`
 - `app/src/androidTest/java/com/gernalix/personalhub/CountdownQaDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/GlobalDatabaseInstrumentedTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HistoryAndPatchReviewDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HubHistorySearchQaDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/LegacySnapshotCompactionDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/NotificationsHistoryQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/OsmAndExploreQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/PlacesPixelQaDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/SinceWhenAutonomyDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/SubstanceInternalPersistenceDeviceTest.kt`
 - `app/src/main/java/com/gernalix/personalhub/AppUpdateTracker.kt`
 - `app/src/main/java/com/gernalix/personalhub/HubActivityPresentation.kt`
 - `app/src/main/java/com/gernalix/personalhub/HubDeepLinkActivity.kt`
@@ -141,6 +146,7 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `app/src/test/java/com/gernalix/personalhub/AppUpdateTrackerTest.kt`
 - `app/src/test/java/com/gernalix/personalhub/HubActivityPresentationTest.kt`
 - `app/src/test/java/com/gernalix/personalhub/sincewhen/CounterElapsedTest.kt`
+- `build.gradle.kts`
 - `contracts/database/src/main/java/com/gernalix/personalhub/contracts/database/HubTagEntities.kt`
 - `contracts/database/src/main/java/com/gernalix/personalhub/contracts/database/SinceWhenCounterEntity.kt`
 - `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/AlertLinkPolicy.kt`
@@ -155,14 +161,19 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataFormat.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataSettings.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/history/HistoryQueryCapsule.kt`
+- `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/identity/CanonicalIdentityCapsule.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/mutationevents/MutationEventCapture.kt`
+- `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/mutationevents/MutationEventStore.kt`
 - `core/database/src/main/res/values/strings.xml`
+- `core/database/src/test/java/com/gernalix/personalhub/core/database/HistoryQueryCapsuleTest.kt`
+- `core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/sync/SyncJournalTest.kt`
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/HubContextExplorer.kt`
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/HubContextLinks.kt`
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/ResourceHubAdapter.kt`
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/SharedTagEngine.kt`
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/WorkflowyIntegration.kt`
 - `core/hub-context/src/test/java/com/gernalix/personalhub/core/hubcontext/SharedTagEngineTest.kt`
+- `core/location/src/main/java/com/gernalix/personalhub/core/location/LocationSuggestions.kt`
 - `core/ui/src/main/java/com/gernalix/personalhub/core/ui/ModuleHistoryHost.kt`
 - `core/ui/src/main/res/values/countdown.xml`
 - `core/ui/src/main/res/values/git_patch_review.xml`
@@ -223,6 +234,7 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/quickevents/ui/QuickEventsScreen.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/sincewhen/ui/LifePeriodsScreen.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/debug/DebugRecomposeCounter.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/hub/TimerQuickEventEntryHubAdapter.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/hub/TimerSessionHubAdapter.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/CriticalDataGuard.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SnapshotSqlite.kt`
@@ -293,13 +305,19 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `feature/supercontacts/src/main/java/com/supercontacts/app/ui/app/SuperContactsApp.kt`
 - `feature/supercontacts/src/main/res/values/strings.xml`
 - `feature/wordpulse/src/main/java/com/wordpulse/app/MainActivity.kt`
+- `feature/wordpulse/src/main/java/com/wordpulse/app/ui/WordPulseViewModel.kt`
 - `gradle/libs.versions.toml`
+- `gradle/wrapper/gradle-wrapper.jar`
+- `gradle/wrapper/gradle-wrapper.properties`
+- `gradlew`
+- `gradlew.bat`
 - `project-capsule.yaml`
 - `tools/android_connected_test_gate.py`
 - `tools/android_paired_cutover_v24.py`
 - `tools/android_pixel_apk.py`
 - `tools/android_shortcut_alias_smoke.py`
 - `tools/android_test_history.py`
+- `tools/android_ui_summary.py`
 - `tools/migrate_personalhub_v24_to_v25.py`
 - `tools/run_ci_instrumentation.sh`
 - `tools/test_android_connected_test_gate.py`
@@ -307,5 +325,31 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `tools/test_android_pixel_apk.py`
 - `tools/test_android_shortcut_alias_smoke.py`
 - `tools/test_android_test_history.py`
+- `tools/test_android_ui_summary.py`
 - `tools/test_migrate_personalhub_v24_to_v25.py`
 - `tools/test_run_ci_instrumentation.py`
+
+## Dependency compatibility follow-up (in progress)
+
+- Updated Google Places4.4.1 to6.0.2 after direct inspection of the official AAR. Replaced the removed model fields/getters with their supported equivalents and removed the obsolete deprecation suppression; the suggestion provider contract and session handling are preserved. No Cloud/API-key/billing setting changed. Consumer closure passes; compilation and focused verification are pending. This changes app inputs and requires a new frozen candidate with repeated final QA; the prior70 APK/evidence are retained.
+
+- Aligned Kotlin/Compose compiler plugins2.2.21→2.4.21 because the Places6 artifact actually contains Kotlin2.4 metadata. Explicitly typed four mixed SQL binding arrays for Kotlin2.4 inference, preserving every SQL statement, binding value/order and transaction boundary. Compilation failures remain evidence and corrective validation is in progress.
+
+- Completed the Places6/Kotlin2.4 compile gate and28 focused host cases plus architecture checks. The final SQL compatibility count is12 arrays across six production files, plus2 arrays in existing fixtures. The added types do not change SQL, binding values/order, assertions or transaction boundaries.
+- Updated the14 remaining stable version keys in the catalog and began canonical Gradle9.8.1 wrapper regeneration with the official SHA256. The exact previous/selected matrix and compatibility sources are in LINT.md. Combined-matrix compile/test/full-lint verification is pending; no new APK has been built or installed.
+
+- Added a narrowly scoped Git whitespace attribute for the generated CRLF Windows launcher. All standard blank-at-EOL/EOF and space-before-tab checks remain enabled; canonical wrapper bytes are preserved. `git diff --check` now passes without treating valid CR line endings as trailing spaces.
+- Prepared a private final-device readback controller with explicit artifact/repository selection and manifest-derived version labels, retaining notification, installed-hash, foreground and cleanup guards. It has not been executed against a replacement candidate.
+
+- Corrected Robolectric/JDK shared-memory setup by exporting `java.base/jdk.internal.access` only in Gradle Test JVMs. All10 previously failed Timer tests now pass without changing their assertions or lowering SDK coverage; original failures remain in SQLite. The complete gate is being rerun after this test-environment correction.
+
+- Recovered one distinct saved Substances widget through the real Nova picker and explicit Android binding permission, without recording an intake. Real saved target/binding preservation across owned package suspension and restart now passes; replacement-install preservation remains pending.
+- Hardened the private physical UI controllers against stale Android hierarchy files and unexpected foregrounds; only the observed Android widget-binding permission Activity is allowed during recovery. Interrupted alarm windows preserve their evidence and verified completion notices.
+
+- Applied explicit types to seven additional mixed SQL arrays in five existing Android test fixture files for Kotlin2.4; original SQL, values/order, assertions and physical safety guards are unchanged.
+- Removed the now-explicitly empty ViewModel superclass `onCleared` call in WordPulse; the existing PVT cancellation is preserved.
+- Added system-bar, cutout and keyboard insets to the existing Substances and Timer event widget configuration layouts, preserving their spacing and selection behavior. This repairs the title/status-bar overlap observed on the primary Pixel. Uses the already declared AndroidX API: https://developer.android.com/develop/ui/views/layout/edge-to-edge . Highest app compile PASS; final native visual check pending.
+- Shared android_ui_summary now uses a fresh per-call hierarchy filename, requires Android to confirm that file, validates the XML and cleans only its own file. Three focused host regressions pass, including Android's zero-exit dump failure with stale prior XML.
+- Expanded Project Capsule freshness watches to the real wrapper scripts, NV, tools and scoped Git whitespace policy. Its old review ref correctly fails while source is uncommitted; refresh and canonical validation remain required.
+
+Latest source validation: highest app compile, Android instrumentation source compilation, targeted widget7/7, architecture and all14 full lint reports PASS with0 errors/0 warnings; prior full unit298/298 retained separately. No final replacement APK has been built or installed for these dependency/UI changes.

@@ -39,7 +39,7 @@ class TimerQuickEventEntryHubAdapter(private val context: Context) : HubEntityAd
         } else {
             "SELECT id,title,timestamp_ms,created_at_ms,deleted_at_ms FROM quick_event_entries WHERE deleted_at_ms IS NULL AND title LIKE ? ORDER BY timestamp_ms DESC,id DESC LIMIT ?"
         }
-        val args = if (text.isBlank()) arrayOf(limit.coerceIn(1, 100)) else arrayOf("%$text%", limit.coerceIn(1, 100))
+        val args = if (text.isBlank()) arrayOf(limit.coerceIn(1, 100)) else arrayOf<Any>("%$text%", limit.coerceIn(1, 100))
         database.openHelper.readableDatabase.query(SimpleSQLiteQuery(sql, args)).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) add(

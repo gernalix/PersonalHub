@@ -300,7 +300,7 @@ class SharedTagEngine(
             runCatching { dao.addAlias(HubTagAlias(targetId, target.namespace, source.name, source.normalizedName)) }
             dao.moveAliases(sourceId, targetId, target.namespace)
             check(dao.deleteUnused(sourceId) == 1)
-            db.openHelper.writableDatabase.execSQL("INSERT INTO hub_entity_aliases(alias_canonical_id,canonical_id,reason,created_at) VALUES(?,?,?,?)", arrayOf(sourceId,targetId,"explicit tag merge",System.currentTimeMillis()))
+            db.openHelper.writableDatabase.execSQL("INSERT INTO hub_entity_aliases(alias_canonical_id,canonical_id,reason,created_at) VALUES(?,?,?,?)", arrayOf<Any>(sourceId,targetId,"explicit tag merge",System.currentTimeMillis()))
             if (movedAssignments > 0 || deletedAssignments > 0) dao.refreshUsage()
         }
     }

@@ -130,22 +130,21 @@ class GooglePlacesLocationProvider(
             }
     }
 
-    @Suppress("DEPRECATION")
     override suspend fun resolve(suggestion: LocationSuggestion): ResolvedLocation {
         require(suggestion.source == source) { "Suggestion does not belong to Google Places." }
         check(isConfigured) { "Google Places API key is missing." }
         val request = FetchPlaceRequest.builder(
             suggestion.id,
-            listOf(Place.Field.ADDRESS, Place.Field.LAT_LNG, Place.Field.NAME),
+            listOf(Place.Field.FORMATTED_ADDRESS, Place.Field.LOCATION, Place.Field.DISPLAY_NAME),
         ).setSessionToken(sessionToken()).build()
 
         val place = client().fetchPlace(request).await().place
-        val latLng = place.latLng ?: error("Selected address has no coordinates.")
+        val latLng = place.location ?: error("Selected address has no coordinates.")
         sessionToken = null
         return ResolvedLocation(
             id = suggestion.id,
-            displayName = place.name ?: suggestion.primaryText,
-            address = place.address ?: place.name ?: suggestion.primaryText,
+            displayName = place.displayName ?: suggestion.primaryText,
+            address = place.formattedAddress ?: place.displayName ?: suggestion.primaryText,
             latitude = latLng.latitude,
             longitude = latLng.longitude,
             source = source,

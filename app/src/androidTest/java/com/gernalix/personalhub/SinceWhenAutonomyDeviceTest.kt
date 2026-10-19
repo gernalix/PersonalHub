@@ -73,7 +73,7 @@ class SinceWhenAutonomyDeviceTest {
             if (previous == null) sql.execSQL("DELETE FROM snapshot WHERE id=1")
             else sql.execSQL("INSERT OR REPLACE INTO snapshot(id,json,saved_at_ms) VALUES(1,?,?)", arrayOf(previous.first, previous.second))
             sql.execSQL("DELETE FROM since_when_migration_state WHERE `key`=?", arrayOf(key))
-            if(marker != null) sql.execSQL("INSERT INTO since_when_migration_state(`key`,completedAt) VALUES(?,?)", arrayOf(key, marker))
+            if(marker != null) sql.execSQL("INSERT INTO since_when_migration_state(`key`,completedAt) VALUES(?,?)", arrayOf<Any>(key, marker))
         }
     }
 }

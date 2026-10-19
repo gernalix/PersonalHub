@@ -29,7 +29,7 @@ class SyncJournalTest {
                 assertTrue(it.moveToFirst())
                 it.getString(0)
             }
-            assertArrayEquals(arrayOf("a:b'c", 42L), SyncJournal.keyValues(encoded))
+            assertArrayEquals(arrayOf<Any>("a:b'c", 42L), SyncJournal.keyValues(encoded))
         } finally { owner.close(); context.deleteDatabase("sync-key-helper-test.db") }
     }
     @Test fun gitTrackingIgnoresNoOpUpdatesButRecordsRealUpdates() {

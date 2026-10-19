@@ -121,7 +121,7 @@ object MutationEventStore {
             """INSERT INTO mutation_events(event_id,occurred_at,transaction_id,sequence,module,event_type,
                 entity_type,entity_id,actor_type,actor_source,before_json,after_json,context_json,schema_version)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""".trimIndent(),
-            arrayOf(event.eventId, event.occurredAt, event.transactionId, event.sequence, event.module,
+            arrayOf<Any?>(event.eventId, event.occurredAt, event.transactionId, event.sequence, event.module,
                 event.eventType, event.entityType, event.entityId, event.actorType, event.actorSource,
                 event.beforeJson, event.afterJson, event.contextJson, event.schemaVersion),
         )

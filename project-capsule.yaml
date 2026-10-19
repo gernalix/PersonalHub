@@ -91,6 +91,11 @@ freshness:
     - settings.gradle.kts
     - gradle.properties
     - gradle
+    - gradlew
+    - gradlew.bat
+    - NV.txt
+    - tools
+    - .gitattributes
 artifacts:
   agents: AGENTS.md
   architecture: docs/ARCHITECTURE.md

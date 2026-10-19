@@ -357,7 +357,7 @@ class GlobalDatabaseInstrumentedTest {
             assertEquals(2L, scalar("SELECT COUNT(*) FROM people_photos WHERE contact_id=$contactId"))
             val replacement = HubPhotoMediaStore.stageOriginal(photoBytes[1], "image/*").reference
             owner.withTransaction {
-                db.execSQL("UPDATE contact_fields SET value=? WHERE contact_id=? AND position=0", arrayOf(replacement, contactId))
+                db.execSQL("UPDATE contact_fields SET value=? WHERE contact_id=? AND position=0", arrayOf<Any>(replacement, contactId))
                 PeoplePhotoBinding.attach(owner, contactId)
             }
             HubPhotoMediaStore.discard(replacement)
