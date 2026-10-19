@@ -102,7 +102,7 @@ Passive archive metadata readback found actual Telegram/WhatsApp events and no S
 
 ## Changed project files
 
-All changed project paths against the initial integrated base, including current owned changes (261 paths):
+All changed project paths against the initial integrated base, including current owned changes (267 paths):
 
 - `.codex/CODE_MAP.tsv`
 - `.gitattributes`
@@ -124,6 +124,7 @@ All changed project paths against the initial integrated base, including current
 - `app/src/androidTest/java/com/gernalix/personalhub/HubSearchFieldDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HubTemporalDeferredQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/LegacySnapshotCompactionDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/ModuleSearchCursorQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/NotificationsHistoryQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/OsmAndExploreQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/PersistenceSchemaCoverageDeviceTest.kt`
@@ -136,6 +137,7 @@ All changed project paths against the initial integrated base, including current
 - `app/src/androidTest/java/com/gernalix/personalhub/SubstanceInternalPersistenceDeviceTest.kt`
 - `app/src/main/java/com/gernalix/personalhub/AppUpdateTracker.kt`
 - `app/src/main/java/com/gernalix/personalhub/HubActivityPresentation.kt`
+- `app/src/main/java/com/gernalix/personalhub/HubAuditLogScreen.kt`
 - `app/src/main/java/com/gernalix/personalhub/HubDeepLinkActivity.kt`
 - `app/src/main/java/com/gernalix/personalhub/HubHistorySearchScreen.kt`
 - `app/src/main/java/com/gernalix/personalhub/HubTagsActivity.kt`
@@ -189,13 +191,16 @@ All changed project paths against the initial integrated base, including current
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/WorkflowyIntegration.kt`
 - `core/hub-context/src/test/java/com/gernalix/personalhub/core/hubcontext/SharedTagEngineTest.kt`
 - `core/location/src/main/java/com/gernalix/personalhub/core/location/LocationSuggestions.kt`
+- `core/ui/src/main/java/com/gernalix/personalhub/core/ui/HubUiPrimitives.kt`
 - `core/ui/src/main/java/com/gernalix/personalhub/core/ui/ModuleHistoryHost.kt`
+- `core/ui/src/main/java/com/gernalix/personalhub/core/ui/SearchEditBuffer.kt`
 - `core/ui/src/main/res/values/countdown.xml`
 - `core/ui/src/main/res/values/git_patch_review.xml`
 - `core/ui/src/main/res/values/history_notifications.xml`
 - `core/ui/src/main/res/values/history_query.xml`
 - `core/ui/src/main/res/values/home_layout.xml`
 - `core/ui/src/main/res/values/module_history.xml`
+- `core/ui/src/test/java/com/gernalix/personalhub/core/ui/SearchEditBufferTest.kt`
 - `docs/ANDROID_TEST_HISTORY.md`
 - `docs/DATABASE_SCHEMA_UPGRADES.md`
 - `docs/qa/ph-completion-20261019/CHANGES.md`
@@ -310,6 +315,7 @@ All changed project paths against the initial integrated base, including current
 - `feature/notifications/src/test/java/com/gernalix/personalhub/notifications/capsules/archive/ConversationsTest.kt`
 - `feature/soldi/src/androidTest/java/com/gernalix/personalhub/soldi/BankingRenderDeviceTest.kt`
 - `feature/soldi/src/debug/java/com/gernalix/personalhub/soldi/FinanceSemanticQaBridge.kt`
+- `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/BankingScreen.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/BankingSecureStore.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/FinancePhotoSemanticEngine.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/FinanceReminderScheduler.kt`
@@ -433,3 +439,17 @@ Search validation update: the new test initially failed because assertTextEquals
 Final local search checkpoint: full app16/16 PASS438 after the isolated regression and repetitions. All6 groups/21 executions PASS433–438;17 distinct cases. Canonical emulator stop PASS. Local app compile/QA build, Luoghi lint0 and architecture PASS. Final72 artifact, remote CI/integration and physical exact-artifact acceptance remain pending.
 
 Source checkpointb6257dfb contains the validated compiler/API compatibility and synchronous Places search edits. Capsule reviewed_commit refreshed to that source checkpoint: FAST13/FULL14 PASS; SQLite records2 command gates, not27 unit tests. Remote CI/final72 acceptance remain pending.
+
+## Cross-module search cursor investigation
+
+The user reported spontaneous caret movement across module search filters. A new emulator baseline reproduced the common failure (SQLite440): inserting X in the middle of alpha beta reverted the edit text to alpha beta while the caret moved to6. This is separate evidence from the earlier Places query-loss timeout.
+
+HubSearchField now retains a saveable TextFieldValue edit buffer, including selection and the IME composing range. Filter-state acknowledgements retire pending edits without feeding old text back into the IME. Genuine external saved-query/clear replacements remain supported; explicit clear resets the local buffer and returns focus. Selection-only events do not launch another search. Restoration retains text/selection and resubmits an outstanding filter draft; the composing range is deliberately not reused across a recreated IME session.
+
+The21 existing use sites cover shared History/Tags, Places and Explore, Timer search/tag/quick-event/chain/trash pickers, Soldi search/person picker, Substances, People and WordPulse. Audit, Banking and Notifications archive/conversations/people picker now reuse the same component (5 additional use sites). Labels and callbacks are unchanged; Notifications retains its original multiline behavior through the new optional singleLine parameter. The read-only Timer tag picker display is not an editable query and remains unchanged. WordPulse typing capture is separate and untouched.
+
+Host validation:7 cases PASS441–443, including4 buffer tests for late/conflated acknowledgements, cursor/composition retention and explicit external clear. App compile/QA build, architecture and4 fresh scoped lint reports0 issues PASS. Shared native edit/clear/restoration cases3 PASS444. Actual People/Substances cursor cases PASS in445; that3-case group is globally FAIL because the initial WordPulse launch queried Compose roots before an Activity root existed. Startup polling now handles the transient absence within the original10s deadline; cursor assertions are unchanged. The remaining native regression is in progress. All historical failures remain intact. Six new native cursor cases are explicit CI selections; shell syntax PASS.
+
+Cursor native update: actual People/Substances/WordPulse group3/3 PASS446 and Places draft/scroll/restore PASS447 on the unchanged production QA APK. The5 newly shared fields also gain its existing clear button, with original labels, pagination callbacks and multiline mode preserved. No new string translation or physical-device interaction. App16 regression is running.
+
+Cross-module cursor native closure: app16/16 PASS448; combined final groups444/446/447/448 are23 native cases PASS. All use the same production QA APK. Canonical emulator stop PASS. Native baseline440 is resolved by the unchanged regression assertion passing444. The module startup445 failure is resolved by446. This is source/isolated QA acceptance, not final minified72 acceptance or Pixel installation.

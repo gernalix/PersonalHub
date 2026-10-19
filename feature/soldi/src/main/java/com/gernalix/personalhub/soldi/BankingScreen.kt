@@ -284,11 +284,11 @@ internal fun BankingContent(
             }
             Spacer(Modifier.height(4.dp))
             Text(stringResource(R.string.banking_transactions), style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
+            com.gernalix.personalhub.core.ui.HubSearchField(
                 value = filters.query,
                 onValueChange = { onFilters(filters.copy(query = it)) },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.banking_search)) },
+                label = stringResource(R.string.banking_search),
                 singleLine = true,
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

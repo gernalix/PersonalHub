@@ -95,7 +95,7 @@ internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> 
         if(error || status.getBoolean("capture_error",false)) Text(stringResource(R.string.archive_error))
         exportResult?.let { Text(stringResource(it)) }
         TextButton(onClick=onExport){Text(stringResource(R.string.export_local))}
-        OutlinedTextField(search,{search=it;more=0},label={Text(stringResource(R.string.search))},modifier=Modifier.fillMaxWidth())
+        com.gernalix.personalhub.core.ui.HubSearchField(search,{search=it;more=0},label=stringResource(R.string.search),singleLine=false,modifier=Modifier.fillMaxWidth())
         var menu by remember { mutableStateOf(false) }
         Box { TextButton(onClick={menu=true}){Text(if(app.isBlank()) stringResource(R.string.all_apps) else app)}
             DropdownMenu(menu,{menu=false}) {

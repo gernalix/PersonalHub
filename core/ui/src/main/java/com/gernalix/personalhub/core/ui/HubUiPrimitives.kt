@@ -15,6 +15,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
@@ -71,14 +74,22 @@ fun HubSearchField(
     clearButtonTestTag: String? = null,
     focusRequester: FocusRequester? = null,
     enabled: Boolean = true,
+    singleLine: Boolean = true,
 ) {
+    val buffer = rememberSaveable(saver = SearchEditBuffer.Saver) { SearchEditBuffer(value) }
+    SideEffect {
+        buffer.takeRestoredQuery(value)?.let(onValueChange)
+        buffer.acceptModel(value)
+    }
     val activeFocusRequester = focusRequester ?: remember { FocusRequester() }
     OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = buffer.value,
+        onValueChange = { next ->
+            if (buffer.edit(next)) onValueChange(next.text)
+        },
         modifier = modifier.fillMaxWidth().focusRequester(activeFocusRequester),
         enabled = enabled,
-        singleLine = true,
+        singleLine = singleLine,
         label = label?.let { text -> { Text(text) } },
         placeholder = placeholder?.let { text -> { Text(text) } },
         leadingIcon = if (showSearchIcon) {
@@ -86,11 +97,11 @@ fun HubSearchField(
         } else {
             null
         },
-        trailingIcon = if (value.isNotEmpty()) {
+        trailingIcon = if (buffer.value.text.isNotEmpty()) {
             {
                 IconButton(
                     onClick = {
-                        onValueChange("")
+                        if (buffer.edit(TextFieldValue(""))) onValueChange("")
                         activeFocusRequester.requestFocus()
                     },
                     modifier = clearButtonTestTag?.let { Modifier.testTag(it) } ?: Modifier,

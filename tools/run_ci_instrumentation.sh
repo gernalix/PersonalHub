@@ -34,6 +34,12 @@ run_app_test() {
 }
 
 app_tests=(
+  'HubSearchFieldDeviceTest#delayedFilterAcknowledgementsPreserveMiddleEditsAndCursor'
+  'HubSearchFieldDeviceTest#restorationRetainsTheMiddleCursorAndReplaysTheFilterDraft'
+  'HubSearchFieldDeviceTest#clearButtonEmptiesSearchAndReturnsFocusToField'
+  'ModuleSearchCursorQaDeviceTest#peopleKeepsTheCursorAcrossLiveContactFiltering'
+  'ModuleSearchCursorQaDeviceTest#substancesKeepsTheCursorAcrossLiveStatusRefreshes'
+  'ModuleSearchCursorQaDeviceTest#wordPulseKeepsTheCursorAcrossLiveSearchResults'
   'PlacesSearchDraftDeviceTest#searchKeepsEditsWhileDerivedResultsAreDelayedAndAfterStateRestoration'
   'PlacesEmulatorQaDeviceTest#liveSearchCombinesNameAddressNotesTagsAndTheSelectedTagFilter'
   'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration'

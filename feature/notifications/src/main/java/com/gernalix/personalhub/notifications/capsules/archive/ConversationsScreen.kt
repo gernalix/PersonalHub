@@ -59,7 +59,7 @@ import java.time.Instant
         Row { TextButton(onClick=onBack){Text(stringResource(R.string.back))};Text(stringResource(R.string.conversations_title),style=MaterialTheme.typography.titleLarge) }
         Text(stringResource(R.string.conversations_limits),style=MaterialTheme.typography.bodySmall)
         if(failure)Text(stringResource(R.string.archive_error))
-        OutlinedTextField(search,{search=it;page=0},label={Text(stringResource(R.string.search))},modifier=Modifier.fillMaxWidth())
+        com.gernalix.personalhub.core.ui.HubSearchField(search,{search=it;page=0},label=stringResource(R.string.search),singleLine=false,modifier=Modifier.fillMaxWidth())
         var appMenu by remember { mutableStateOf(false) }
         Row {
             Box { TextButton(onClick={appMenu=true}){Text(if(app.isBlank())stringResource(R.string.all_apps)else app)}
@@ -122,7 +122,7 @@ import java.time.Instant
     var search by remember { mutableStateOf("") };var rows by remember { mutableStateOf(emptyList<PersonChoice>()) };var failure by remember { mutableStateOf(false) }
     LaunchedEffect(search,include) { try { rows=withContext(Dispatchers.IO){(people.resolve(include)+people.search(search)).distinctBy { it.id }};failure=false }catch(_:Exception){failure=true} }
     AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.choose_person))},text={Column {
-        OutlinedTextField(search,{search=it},label={Text(stringResource(R.string.search_people))})
+        com.gernalix.personalhub.core.ui.HubSearchField(search,{search=it},label=stringResource(R.string.search_people),singleLine=false)
         if(failure)Text(stringResource(R.string.archive_error))
         LazyColumn { items(rows,key={it.id}) { p->TextButton(onClick={onSelect(p)}){Text(p.label)} } }
     }},confirmButton={TextButton(onClick=onDismiss){Text(stringResource(R.string.close))}})
