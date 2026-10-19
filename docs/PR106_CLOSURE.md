@@ -22,6 +22,17 @@ Nessuna nuova feature, installazione Pixel o modifica NV; v73 resta immutata.
 
 ## Da completare
 
+Il [run 39299954972](https://github.com/gernalix/PersonalHub/actions/runs/39299954972)
+su `8ed48b1b0486c06ffa28ff1acc1235e905801c44` prova il PASS della guardia
+corretta e dei casi successivi, inclusi widget e recupero dopo process stop.
+Fallisce la seconda preparazione del fixture, alla riga che attende il widget
+volutamente vuoto: il messaggio generico citava erroneamente il foreground.
+Nessun ANR dal boot nei diagnostici. Tre aggiornamenti AppWidget consecutivi
+seguono il binding: l'update asincrono iniziale può sovrascrivere il vuoto.
+La preparazione ora richiede broadcast realmente inattivi prima di costruire
+il fixture vuoto; nessuna asserzione esclusa o scadenza funzionale aumentata.
+Il risultato nativo della correzione resta da verificare.
+
 Attendere il nuovo run nativo sul commit corretto; solo dopo PASS verificare
 merge GitHub tramite owner, preservare il checkout e purificare con gli strumenti
 esistenti. Il piano di purificazione conferma tre checkout storici frozen da

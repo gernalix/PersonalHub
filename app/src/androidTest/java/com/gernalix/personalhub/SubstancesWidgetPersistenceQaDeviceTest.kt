@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.widget.TextView
 import android.widget.RemoteViews
@@ -72,6 +73,14 @@ class SubstancesWidgetPersistenceQaDeviceTest {
             try { assertTrue(manager.bindAppWidgetIdIfAllowed(id, ComponentName(context, SubstancesWidgetProvider::class.java))) }
             finally { instrumentation.uiAutomation.dropShellPermissionIdentity() }
             SubstancesWidgetPrefs.save(context, id, target)
+            // Binding dispatches an asynchronous provider update. Let that
+            // real broadcast finish before deliberately replacing its views
+            // with the blank fixture used across the process boundary.
+            val bindingOutput = ParcelFileDescriptor.AutoCloseInputStream(
+                instrumentation.uiAutomation.executeShellCommand("cmd activity wait-for-broadcast-idle")
+            ).use { it.bufferedReader().readText() }
+            assertTrue("Widget binding broadcasts did not become idle: $bindingOutput",
+                bindingOutput.contains("All broadcast queues are idle!"))
             SubstancesWidgetProvider.updateWidgets(context, manager, intArrayOf(id))
             val view = createView(manager, id)
             awaitLabel(view, title)
@@ -148,6 +157,6 @@ class SubstancesWidgetPersistenceQaDeviceTest {
             if (matches) return
             SystemClock.sleep(50)
         }
-        fail("Normal foreground did not restore the existing widget label")
+        fail("Widget label did not reach the expected value '$title'")
     }
 }
