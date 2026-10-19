@@ -6,6 +6,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
+import java.io.File
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.multitimetracker.api.LegacySinceWhenMigrationApi
 import com.gernalix.personalhub.hub.SinceWhenCounterHubAdapter
@@ -46,7 +49,8 @@ class SinceWhenAutonomyDeviceTest {
             compose.waitUntil(10000) { runBlocking { db.sinceWhenCounterDao().all().any { it.title == title } } && compose.onAllNodesWithTag("sincewhen-save").fetchSemanticsNodes().isEmpty() }
             val counter = db.sinceWhenCounterDao().all().single { it.title == title }
             scenario.recreate()
-            compose.onNodeWithTag("sincewhen-edit-${counter.id}").performClick()
+            compose.onNodeWithTag("sincewhen-edit-${counter.id}", useUnmergedTree = true).performScrollTo().performClick()
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("sincewhen-title").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("sincewhen-title").performTextReplacement("$title edited")
             compose.onNodeWithTag("sincewhen-save").performClick()
             compose.waitUntil(10000) { runBlocking { db.sinceWhenCounterDao().get(counter.id)?.title == "$title edited" } && compose.onAllNodesWithTag("sincewhen-save").fetchSemanticsNodes().isEmpty() }
@@ -67,6 +71,12 @@ class SinceWhenAutonomyDeviceTest {
             assertEquals(source.entityId, sourceRow.sourceEntityId)
             assertEquals("createdAt", sourceRow.sourceTimestampField)
             assertFalse(db.sinceWhenCounterDao().migrationComplete(key))
+        } catch (failure: Throwable) {
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            val evidence = File(context.getExternalFilesDir(null), "sincewhen-autonomy-failure")
+            runCatching { device.takeScreenshot(File(evidence.path + ".png")) }
+            runCatching { device.dumpWindowHierarchy(File(evidence.path + ".xml")) }
+            throw failure
         } finally {
             scenario?.close()
             sourceScenario?.close()

@@ -50,7 +50,8 @@ abstract class CountdownQaScenario {
             val ref = HubEntityRef("since_when", "counter", saved.canonicalId)
             assertEquals(setOf(countdownTag.id), runBlocking { tags.tags(ref).map { it.id }.toSet() })
             compose.onNode(hasText("−", substring = true)).assertIsDisplayed()
-            compose.onNodeWithTag("sincewhen-edit-${saved.id}").performClick()
+            compose.onNodeWithTag("sincewhen-edit-${saved.id}", useUnmergedTree = true).performScrollTo().performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("sincewhen-description").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("sincewhen-description").performTextReplacement("Edited in Countdown")
             compose.onNodeWithTag("sincewhen-save").performClick()
             compose.waitUntil(10_000) { runBlocking { db.sinceWhenCounterDao().get(saved.id)?.description == "Edited in Countdown" } }
