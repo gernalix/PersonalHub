@@ -4,7 +4,6 @@ import os
 import re
 import subprocess
 import tempfile
-import textwrap
 import unittest
 
 
@@ -22,7 +21,9 @@ class CiAppInstrumentationTests(unittest.TestCase):
             adb.write_text(
                 "#!/usr/bin/python3\nimport sys\nfrom pathlib import Path\n"
                 + "with Path(" + repr(str(calls)) + ").open('a') as output: output.write(' '.join(sys.argv[1:]) + '\\n')\n"
-                + "print(" + repr(response) + ")\nraise SystemExit(" + str(exit_code) + ")\n"
+                + "response = " + repr(response) + "\n"
+                + "print(response.get(sys.argv[-1], '') if isinstance(response, dict) else response)\n"
+                + "raise SystemExit(" + str(exit_code) + ")\n"
             )
             adb.chmod(0o700)
             environment = dict(os.environ, PATH=directory + os.pathsep + os.environ["PATH"])
@@ -59,7 +60,7 @@ class CiAppInstrumentationTests(unittest.TestCase):
 
     def test_prelaunch_display_preserves_logical_viewport_and_other_configuration(self):
         source = (ROOT / ".github/workflows/android-instrumentation-ci.yml").read_text()
-        hook = re.search(r"(?m)^ {10}pre-emulator-launch-script: \|\n((?: {12}.*\n)+)", source)
+        hook = re.search(r"(?m)^ {10}pre-emulator-launch-script: (.+)$", source)
         self.assertIsNotNone(hook)
         with tempfile.TemporaryDirectory() as directory:
             avd = Path(directory) / "test.avd"
@@ -67,8 +68,11 @@ class CiAppInstrumentationTests(unittest.TestCase):
             config = avd / "config.ini"
             config.write_text("hw.lcd.width=1080\nhw.lcd.height=2400\nhw.lcd.density=420\n"
                               "skin.name=1080x2400\nhw.cpu.ncore=4\nhw.ramSize=4096M\n")
-            subprocess.run(["bash", "-e", "-c", textwrap.dedent(hook[1])],
-                           env=dict(os.environ, ANDROID_AVD_HOME=directory), check=True, timeout=10)
+            # Match the action's separate-shell-per-line execution, not a
+            # hypothetical shared shell that would incorrectly accept heredocs.
+            subprocess.run(["sh", "-c", hook[1]], cwd=ROOT,
+                           env=dict(os.environ, ANDROID_AVD_HOME=directory, GITHUB_ACTIONS="true"),
+                           check=True, timeout=10, capture_output=True)
             lines = config.read_text().splitlines()
             values = dict(line.split("=", 1) for line in lines)
             self.assertEqual(720, int(values["hw.lcd.width"]))
@@ -80,6 +84,38 @@ class CiAppInstrumentationTests(unittest.TestCase):
             self.assertEqual("4096M", values["hw.ramSize"])
             self.assertEqual("720x1600", values["skin.name"])
             self.assertEqual(len(values), len(lines))
+
+    def test_display_preparation_refuses_non_ci_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            avd = Path(directory) / "test.avd"
+            avd.mkdir()
+            config = avd / "config.ini"
+            original = "hw.lcd.width=1080\n"
+            config.write_text(original)
+            result = subprocess.run(["python3", str(ROOT / "tools/configure_ci_emulator.py")],
+                                    env=dict(os.environ, ANDROID_AVD_HOME=directory, GITHUB_ACTIONS="false"),
+                                    text=True, capture_output=True, timeout=10)
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual(original, config.read_text())
+
+    def test_display_baseline_requires_actual_scaled_size_and_density(self):
+        result, calls = self.run_preparation_function("assert_ci_display", {
+            "size": "Physical size: 720x1600", "density": "Physical density: 280",
+        })
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["-s emulator-host-fixture shell wm size",
+                          "-s emulator-host-fixture shell wm density"], calls)
+
+    def test_unapplied_display_or_readback_error_cannot_pass(self):
+        for response, exit_code in [
+            ({"size": "Physical size: 1080x2400", "density": "Physical density: 420"}, 0),
+            ({"size": "Physical size: 720x1600", "density": "Physical density: 420"}, 0),
+            ("", 1),
+        ]:
+            with self.subTest(response=response, exit_code=exit_code):
+                result, _ = self.run_preparation_function("assert_ci_display", response, exit_code)
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("CAPTURE emulator_display_", result.stdout)
 
     def test_compilation_prepares_only_both_qa_packages(self):
         result, calls = self.run_compilation_function()

@@ -12,8 +12,6 @@ serial=${devices[0]}
 # Device identity is diagnostic only; native emulator-only guards remain required.
 adb -s "$serial" shell getprop ro.product.model
 adb -s "$serial" shell getprop ro.hardware
-adb -s "$serial" shell wm size
-adb -s "$serial" shell wm density
 runner=com.gernalix.personalhub.qa.test/androidx.test.runner.AndroidJUnitRunner
 
 capture_failure() {
@@ -61,6 +59,22 @@ assert_clean_boot() {
     return 1
   fi
 }
+assert_ci_display() {
+  local actual_size actual_density
+  if ! actual_size=$(adb -s "$serial" shell wm size) || \
+     ! actual_density=$(adb -s "$serial" shell wm density); then
+    capture_failure emulator_display_readback
+    return 1
+  fi
+  printf '%s\n%s\n' "$actual_size" "$actual_density"
+  if [[ "$actual_size" != *'Physical size: 720x1600'* || \
+        "$actual_density" != *'Physical density: 280'* ]]; then
+    echo 'CI display preparation was not applied; app tests were not started' >&2
+    capture_failure emulator_display_mismatch
+    return 1
+  fi
+}
+assert_ci_display
 wait_for_broadcast_idle emulator_first_boot
 assert_clean_boot
 adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null

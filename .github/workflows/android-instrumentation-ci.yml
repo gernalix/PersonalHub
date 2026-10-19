@@ -85,17 +85,8 @@ jobs:
           # Preserve the Pixel 6 logical viewport (411x914dp) while rendering
           # 4/9 as many pixels. Both stock launchers have missed first draw on
           # the software-rendered runner before any app instrumentation starts.
-          pre-emulator-launch-script: |
-            python3 - <<'PY'
-            import os
-            from pathlib import Path
-            config = Path(os.environ["ANDROID_AVD_HOME"]) / "test.avd" / "config.ini"
-            updates = {"hw.lcd.width": "720", "hw.lcd.height": "1600", "hw.lcd.density": "280",
-                       "skin.name": "720x1600", "skin.path": "_no_skin", "skin.dynamic": "yes"}
-            lines = [line for line in config.read_text().splitlines()
-                     if line.split("=", 1)[0].strip() not in updates]
-            config.write_text("\n".join(lines + [f"{key}={value}" for key, value in updates.items()]) + "\n")
-            PY
+          # The runner executes hook lines separately; keep this one command.
+          pre-emulator-launch-script: python3 tools/configure_ci_emulator.py
           disable-animations: true
           script: timeout --signal=TERM --kill-after=2m 50m bash tools/run_ci_instrumentation.sh
       - name: Preserve failed app instrumentation diagnostics
