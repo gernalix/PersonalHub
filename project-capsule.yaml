@@ -77,7 +77,7 @@ references:
   megavault: /home/daniele/MegaVault/megavault.sqlite
   c2: https://github.com/gernalix/codex-roadmap/blob/main/docs/project-capsule/README.md
 freshness:
-  reviewed_commit: e396ad0efa9ad1dee3a3098dd129b555fbacac19
+  reviewed_commit: e634fd1444ab0f793aedda6e5fb28121ab18db16
   watch_paths:
     - app
     - contracts
