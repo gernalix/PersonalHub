@@ -25,13 +25,16 @@ object GeoSearch {
     private const val EARTH_RADIUS_M = 6_371_008.8
     private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
 
+    fun validCoordinates(latitude: Double, longitude: Double): Boolean =
+        latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0
+
     fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val rLat1 = Math.toRadians(lat1)
         val rLat2 = Math.toRadians(lat2)
         val a = sin(dLat / 2).pow(2) + cos(rLat1) * cos(rLat2) * sin(dLon / 2).pow(2)
-        return 2 * EARTH_RADIUS_M * asin(sqrt(a))
+        return 2 * EARTH_RADIUS_M * asin(sqrt(a.coerceIn(0.0, 1.0)))
     }
 
     fun boundingBox(lat: Double, lon: Double, radiusM: Double): GeoBoundingBox {

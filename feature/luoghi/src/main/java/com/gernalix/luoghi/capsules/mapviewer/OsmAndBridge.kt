@@ -26,7 +26,7 @@ data class OsmAndReference(val latitude: Double, val longitude: Double, val labe
 data class OsmAndPoint(val id: String, val latitude: Double, val longitude: Double, val label: String, val reference: Boolean)
 
 object OsmAndMapPlan {
-    fun valid(latitude: Double, longitude: Double): Boolean = latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0
+    fun valid(latitude: Double, longitude: Double): Boolean = com.gernalix.luoghi.capsules.places.GeoSearch.validCoordinates(latitude, longitude)
 
     fun points(markers: List<MapMarkerModel>, reference: OsmAndReference): List<OsmAndPoint> {
         require(valid(reference.latitude, reference.longitude))

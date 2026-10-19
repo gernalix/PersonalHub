@@ -41,6 +41,8 @@ abstract class OsmAndExploreQaScenario {
             assertTrue("The real OsmAnd map did not open", device.wait(Until.hasObject(By.pkg("net.osmand")), 25_000))
             assertNotNull("Reference label missing in real OsmAnd", device.wait(Until.findObject(By.textContains("PH QA Reference")), 10_000))
             assertTrue(device.takeScreenshot(File(context.getExternalFilesDir(null), "osmand-reference.png")))
+            assertTrue("OsmAnd settings cover the map; a reference sheet alone cannot prove markers",
+                !device.hasObject(By.text("Plugins")) && !device.hasObject(By.text("Nothing found")))
             device.pressBack()
             // OsmAnd owns its own pre-existing task/back stack. Returning through Recents
             // must resume PH's waiting map entry and release the temporary layer.
@@ -55,7 +57,7 @@ abstract class OsmAndExploreQaScenario {
 @RunWith(AndroidJUnit4::class)
 class OsmAndExploreQaDeviceTest : OsmAndExploreQaScenario() {
     override fun verifyTarget(context: Context) {
-        check(context.packageName == "com.gernalix.personalhub.qa")
+        check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*")))
         check(Build.MODEL.contains("sdk", ignoreCase = true))
     }
 }
@@ -79,7 +81,8 @@ class OsmAndExplorePixelQaDeviceTest : OsmAndExploreQaScenario() {
         context.startActivity(MapViewerCapsule.exploreMapIntent(context,
             OsmAndReference(55.6761, 12.5683, "PH QA permission reference"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        val help = context.getString(com.gernalix.luoghi.R.string.places_osmand_permission_help)
+        val help = context.getString(com.gernalix.luoghi.R.string.places_osmand_permission_help,
+            context.applicationInfo.loadLabel(context.packageManager))
         assertTrue("Expected either the real optional map or actionable permission guidance",
             device.wait(Until.hasObject(By.pkg("net.osmand")), 5_000) ||
                 device.wait(Until.hasObject(By.text(help)), 20_000))

@@ -286,4 +286,5 @@
     <string name="geofence_overlap_help" translatable="false">Overlapping places notify you and ask you to choose before recording an arrival. Departure can close only the visit actually in progress.</string>
     <string name="geofence_manual_alerts_help" translatable="false">Check-in/out alerts are separate: they run when you use the check-in/out buttons, even with background detection off. Manage them in Alerts.</string>
     <string name="geofence_registration_failed" translatable="false">Settings saved, but Android could not update background detection. Check location services and try again.</string>
+    <string name="place_distance_unavailable" translatable="false">Distance unavailable</string>
 </resources>

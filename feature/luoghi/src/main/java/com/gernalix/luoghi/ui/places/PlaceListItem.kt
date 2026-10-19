@@ -80,7 +80,15 @@ fun PlaceListItem(
     val sinceWhenAddedToPh = stringResource(R.string.since_when_added_to_ph)
     val distance = item.distanceMeters?.let {
         stringResource(R.string.place_distance_format, com.gernalix.luoghi.ui.common.localizedDistance(it))
-    } ?: if (showDistance) stringResource(R.string.places_explore_missing_value) else null
+    } ?: if (showDistance) {
+        val lat = place.lat
+        val lon = place.lon
+        stringResource(if (lat != null && lon != null && com.gernalix.luoghi.capsules.places.GeoSearch.validCoordinates(lat, lon)) {
+            R.string.place_distance_unavailable
+        } else {
+            R.string.places_explore_missing_value
+        })
+    } else null
     val metadata = if (item.activeStartedAt != null) {
         stringResource(
             R.string.place_active_meta_format,

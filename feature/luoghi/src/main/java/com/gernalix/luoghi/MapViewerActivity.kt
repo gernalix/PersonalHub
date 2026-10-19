@@ -26,9 +26,6 @@ class MapViewerActivity : ComponentActivity() {
     private var status by mutableStateOf("")
     private var unavailable by mutableStateOf(false)
     private var mapAccessRequired by mutableStateOf(false)
-    private val requestMapAccess = registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-    ) { openMap() }
     private var launched = false
     private var leftForMap = false
 
@@ -46,10 +43,9 @@ class MapViewerActivity : ComponentActivity() {
                 }) { Text(getString(R.string.places_osmand_install)) }
                 if (mapAccessRequired) Button(onClick = {
                     val target = bridge.installedPackage() ?: return@Button
-                    val request = Intent("net.osmand.aidl.REQUEST_PERMISSIONS").setPackage(target)
-                        .putExtra("groups", arrayOf("map"))
-                    if (request.resolveActivity(packageManager) != null) requestMapAccess.launch(request)
-                    else packageManager.getLaunchIntentForPackage(target)?.let(::startActivity)
+                    packageManager.getLaunchIntentForPackage(target)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }?.let(::startActivity)
                 }) { Text(getString(R.string.places_osmand_allow_map_access)) }
                 TextButton(onClick = ::openMap) { Text(getString(R.string.places_action_retry)) }
                 TextButton(onClick = { finish() }) { Text(getString(R.string.places_action_back)) }
@@ -98,7 +94,7 @@ class MapViewerActivity : ComponentActivity() {
                 leftForMap = false
                 withContext(kotlinx.coroutines.NonCancellable) { runCatching { bridge.clear() } }
                 mapAccessRequired = error.message == "Allow PersonalHub map access in OsmAnd external app settings"
-                status = if (mapAccessRequired) getString(R.string.places_osmand_permission_help)
+                status = if (mapAccessRequired) getString(R.string.places_osmand_permission_help, applicationInfo.loadLabel(packageManager))
                     else when (error.message) {
                         "No saved places have valid coordinates" -> getString(R.string.places_map_no_coordinates)
                         "OsmAnd is not installed" -> getString(R.string.places_osmand_optional)
