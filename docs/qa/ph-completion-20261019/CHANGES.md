@@ -457,3 +457,5 @@ Cross-module cursor native closure: app16/16 PASS448; combined final groups444/4
 Source checkpoint2462c321 contains the cross-module cursor correction and all stated validation. Capsule reviewed_commit refreshed: FAST13/FULL14 PASS; SQLite449 records2 command gates, not27 unit tests. Remote CI and exact final72 acceptance remain pending.
 
 Final72 preparation: Pixel metadata/hash readback confirms unchanged71, without UI/disruption. Emulator primary70 and OsmAnd present; facade stop verified. NV71→72 is the next actual primary replacement required by the user, while canonical main remains69; no second increment for pre-install retries. Focused new-visible-value source gate passed: cursor buffer internals never rendered, existing query labels preserved, no new raw backend values. Final build/QA/install/publication remain pending.
+
+Version72 source4fd69d38 reviewed: Capsule FAST13/FULL14 PASS (SQLite450 contains2 command gates). The following metadata checkpoint does not alter app/build inputs. Final minified/signature/manifest/mapping verification and exact-byte native acceptance remain pending.
