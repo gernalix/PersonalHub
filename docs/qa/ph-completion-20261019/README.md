@@ -261,3 +261,5 @@ Cross-module cursor final local checkpoint:7 host PASS441–443; shared3 PASS444
 Source checkpoint2462c321 contains the cross-module cursor correction and all stated validation. Capsule reviewed_commit refreshed: FAST13/FULL14 PASS; SQLite449 records2 command gates, not27 unit tests. Remote CI and exact final72 acceptance remain pending.
 
 Version72 source4fd69d38 reviewed: Capsule FAST13/FULL14 PASS (SQLite450 contains2 command gates). The following metadata checkpoint does not alter app/build inputs. Final minified/signature/manifest/mapping verification and exact-byte native acceptance remain pending.
+
+Optimized72/CI source89e68a61 reviewed: Capsule FAST13/FULL14 PASS457 (2 command gates). This metadata checkpoint changes no app/build inputs. Final artifact optimization/native proof and export-based physical acceptance remain pending.
