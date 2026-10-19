@@ -107,6 +107,9 @@ enum class AddressMessage {
     SEARCH_FAILED,
     RESOLUTION_TIMEOUT,
     RESOLUTION_FAILED,
+    LOCATION_LOADING,
+    LOCATION_PERMISSION_MISSING,
+    LOCATION_UNAVAILABLE,
 }
 
 enum class CheckInMessage {
@@ -421,6 +424,56 @@ class LuoghiHomeViewModel(
         }
     }
 
+    fun useCurrentPlaceLocation() {
+        if (mutableState.value.form.uuid != null) return
+        addressSearchJob?.cancel()
+        addressLatestGate.invalidate()
+        lastAddressSearchQuery = null
+        val request = addressLatestGate.next(mutableState.value.form.address)
+        mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(
+            loading = true, suggestions = emptyList(), message = AddressMessage.LOCATION_LOADING,
+        )) }
+        addressSearchJob = viewModelScope.launch {
+            val location = try {
+                container.location.currentLocation()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (!addressLatestGate.isLatest(request, mutableState.value.form.address)) return@launch
+            mutableState.update { current ->
+                current.copy(
+                    form = if (location != null) current.form.copy(
+                        lat = location.latitude, lon = location.longitude,
+                        locationSource = PlaceLocationSource.CURRENT_LOCATION,
+                    ) else current.form,
+                    addressAutocomplete = current.addressAutocomplete.copy(
+                        loading = false,
+                        message = if (location == null) AddressMessage.LOCATION_UNAVAILABLE else null,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun usePlaceAddressLocation() {
+        if (mutableState.value.form.uuid != null) return
+        addressSearchJob?.cancel()
+        addressLatestGate.invalidate()
+        lastAddressSearchQuery = null
+        mutableState.update { it.copy(form = it.form.copy(
+            lat = null, lon = null, locationSource = PlaceLocationSource.ADDRESS,
+        )) }
+        updateAddress(mutableState.value.form.address)
+    }
+
+    fun onPlaceLocationPermissionDenied() {
+        mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(
+            loading = false, message = AddressMessage.LOCATION_PERMISSION_MISSING,
+        )) }
+    }
+
     fun updateAddress(value: String) {
         val query = value.trim()
         val shouldSearch = AddressAutocompletePolicy.shouldSearch(query, container.addressAutocomplete.isConfigured)
@@ -438,6 +491,7 @@ class LuoghiHomeViewModel(
             )
         }
         if (!shouldSearch) {
+            addressLatestGate.invalidate()
             addressSearchJob?.cancel()
             lastAddressSearchQuery = null
             return
@@ -496,8 +550,8 @@ class LuoghiHomeViewModel(
         addressLatestGate.invalidate()
         lastAddressSearchQuery = null
         val request = addressLatestGate.next(mutableState.value.form.address)
-        viewModelScope.launch {
-            mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(loading = true)) }
+        addressSearchJob = viewModelScope.launch {
+            mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(loading = true, message = null)) }
             runCatching {
                 withTimeoutOrNull(AddressAutocompletePolicy.RESOLVE_TIMEOUT_MS.milliseconds) {
                     withContext(Dispatchers.IO) {
@@ -543,7 +597,7 @@ class LuoghiHomeViewModel(
 
     fun savePlace(onSaved: (String) -> Unit = {}) {
         val form = mutableState.value.form
-        if (form.nickname.isBlank()) return
+        if (form.nickname.isBlank() || mutableState.value.addressAutocomplete.loading) return
         viewModelScope.launch {
             val pendingLocation = mutableState.value.checkIn.pendingCheckInLocation
             val pendingAttemptId = mutableState.value.checkIn.pendingAttemptId
@@ -559,7 +613,8 @@ class LuoghiHomeViewModel(
                 tagNames = parsePlaceTagText(form.tagsText),
                 sourceApp = form.sourceApp,
             )
-            val createdFromUnknownLocation = (pendingLocation != null) && (form.uuid == null)
+            val createdFromUnknownLocation = (pendingLocation != null) && (form.uuid == null) &&
+                form.locationSource == PlaceLocationSource.CURRENT_LOCATION
             val savedUuid = if (createdFromUnknownLocation) {
                 val createdUuid = runCatching { container.checkIns.checkInNewPlace(mutation, pendingLocation) }
                     .onFailure { error ->
@@ -585,7 +640,13 @@ class LuoghiHomeViewModel(
                 }
                 createdUuid
             } else {
-                container.places.save(mutation)
+                val uuid = container.places.save(mutation)
+                if (pendingAttemptId != null) container.checkIns.finishAttempt(
+                    attemptId = pendingAttemptId,
+                    outcome = CheckInAttemptOutcomes.USER_CANCELLED,
+                    stage = "NEW_PLACE_SAVED_WITHOUT_CHECK_IN",
+                )
+                uuid
             }
             container.addressAutocomplete.resetSession()
             addressSearchJob?.cancel()

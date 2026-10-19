@@ -15,23 +15,20 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.gernalix.luoghi.ADDRESS_FIELD_TAG
 import com.gernalix.luoghi.ADDRESS_SUGGESTIONS_TAG
 import com.gernalix.luoghi.AddressAutocompleteState
 import com.gernalix.luoghi.AddressMessage
+import com.gernalix.personalhub.core.ui.HubSearchField
+import com.gernalix.luoghi.PlaceLocationSource
 import com.gernalix.luoghi.PlaceFormState
 import com.gernalix.luoghi.R
 import com.gernalix.luoghi.capsules.addressautocomplete.AddressSuggestion
@@ -53,6 +50,8 @@ fun PlaceEditorDialog(
     onSave: (createSinceWhen: Boolean, selectedSourceId: String?) -> Unit,
     onDismiss: () -> Unit,
     onTagsChange: (String) -> Unit = {},
+    onUseCurrentLocation: () -> Unit = {},
+    onUseAddressLocation: () -> Unit = {},
 ) {
     val pickPhoto = rememberHubPhotoPicker { onPhotoChange(it.reference) }
     val addedAt = remember(form.uuid) { System.currentTimeMillis() }
@@ -69,6 +68,19 @@ fun PlaceEditorDialog(
                     .heightIn(max = 560.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
+                if (form.uuid == null) {
+                    TextButton(onClick = onUseCurrentLocation, enabled = !addressState.loading) {
+                        Text(stringResource(R.string.place_use_current_location))
+                    }
+                    TextButton(onClick = onUseAddressLocation, enabled = !addressState.loading) {
+                        Text(stringResource(R.string.place_use_address_location))
+                    }
+                }
+                Text(stringResource(when (form.locationSource) {
+                    PlaceLocationSource.SAVED -> R.string.place_saved_location_preserved
+                    PlaceLocationSource.CURRENT_LOCATION -> R.string.place_current_location_selected
+                    PlaceLocationSource.ADDRESS -> R.string.place_address_location_help
+                }), style = MaterialTheme.typography.bodySmall)
                 PlaceEditor(
                     form = form,
                     addressState = addressState,
@@ -99,7 +111,7 @@ fun PlaceEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = form.nickname.isNotBlank() && !saving, onClick = {
+            TextButton(enabled = form.nickname.isNotBlank() && !saving && !addressState.loading, onClick = {
                 saving = true
                 onSave(createSinceWhen, "added_at")
             }) {
@@ -173,36 +185,19 @@ fun AddressField(
     onAddressChange: (String) -> Unit,
     onAddressSuggestion: (AddressSuggestion) -> Unit,
 ) {
-    var localAddress by rememberSaveable(form.uuid, form.lat, form.lon, stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(value = TextFieldValue(form.address))
-    }
-    var isFocused by remember { mutableStateOf(value = false) }
-    LaunchedEffect(form.uuid, form.address, isFocused, addressState.suggestions.isEmpty()) {
-        if (((!isFocused) || addressState.suggestions.isEmpty()) && (localAddress.text != form.address)) {
-            localAddress = TextFieldValue(form.address, selection = TextRange(form.address.length))
-        }
-    }
-
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = localAddress,
-            onValueChange = { value ->
-                localAddress = value
-                if (value.text != form.address) onAddressChange(value.text)
-            },
-            label = { Text(stringResource(R.string.address)) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { isFocused = it.isFocused }
-                .testTag(ADDRESS_FIELD_TAG),
-            supportingText = {
-                when {
-                    addressState.message != null -> Text(addressMessageText(addressState.message))
-                    addressState.loading -> Text(stringResource(R.string.address_suggestions_loading))
-                }
-            },
+        HubSearchField(
+            value = form.address,
+            onValueChange = onAddressChange,
+            label = stringResource(R.string.address),
+            enabled = addressState.message != AddressMessage.LOCATION_LOADING,
+            modifier = Modifier.fillMaxWidth().testTag(ADDRESS_FIELD_TAG),
         )
-        AddressSuggestionList(addressState.suggestions, onAddressSuggestion)
+        when {
+            addressState.message != null -> Text(addressMessageText(addressState.message), style = MaterialTheme.typography.bodySmall)
+            addressState.loading -> Text(stringResource(R.string.address_suggestions_loading), style = MaterialTheme.typography.bodySmall)
+        }
+        if (!addressState.loading) AddressSuggestionList(addressState.suggestions, onAddressSuggestion)
     }
 }
 
@@ -213,6 +208,9 @@ private fun addressMessageText(message: AddressMessage): String = when (message)
     AddressMessage.SEARCH_FAILED -> stringResource(R.string.address_suggestions_failed)
     AddressMessage.RESOLUTION_TIMEOUT -> stringResource(R.string.address_resolution_timeout)
     AddressMessage.RESOLUTION_FAILED -> stringResource(R.string.address_resolution_failed)
+    AddressMessage.LOCATION_LOADING -> stringResource(R.string.place_location_loading)
+    AddressMessage.LOCATION_PERMISSION_MISSING -> stringResource(R.string.place_location_permission_missing)
+    AddressMessage.LOCATION_UNAVAILABLE -> stringResource(R.string.place_location_unavailable)
 }
 
 @Composable

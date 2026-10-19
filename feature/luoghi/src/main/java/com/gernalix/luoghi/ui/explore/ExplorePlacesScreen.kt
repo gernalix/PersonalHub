@@ -121,8 +121,8 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
                     Text(stringResource(R.string.places_explore_missing_heading), style = MaterialTheme.typography.titleMedium)
                 }
                 OutlinedCard(onClick = { onOpenPlace(nearby.place) }, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(nearby.place.nickname.ifBlank { unnamedPlace }, modifier = Modifier.weight(1f))
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(nearby.place.nickname.ifBlank { unnamedPlace })
                         Text(nearby.distanceMeters?.roundToLong()?.let { localizedDistance(it) } ?: stringResource(R.string.places_explore_missing_value))
                     }
                 }

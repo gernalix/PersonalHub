@@ -265,4 +265,16 @@
     <string name="places_search_hint" translatable="false">Search places, addresses, notes and tags</string>
     <string name="places_sort_help" translatable="false">Sort the places below. Tap the selected criterion again to reverse the order.</string>
     <string name="where_was_i_overlapping_format" translatable="false">Overlapping visits were recorded at: %1$s</string>
+    <string name="place_directions" translatable="false">Directions</string>
+    <string name="place_directions_missing_location" translatable="false">Directions (location unavailable)</string>
+    <string name="place_directions_coordinates" translatable="false">Address unavailable. Using saved coordinates.</string>
+    <string name="place_directions_unavailable" translatable="false">Install a maps app to open this address.</string>
+    <string name="place_use_current_location" translatable="false">Use current location</string>
+    <string name="place_use_address_location" translatable="false">Use address location</string>
+    <string name="place_saved_location_preserved" translatable="false">The saved position stays unchanged when you edit the address.</string>
+    <string name="place_current_location_selected" translatable="false">Position: current location. Editing the address keeps this position.</string>
+    <string name="place_address_location_help" translatable="false">Position: address. Choose a suggested address to locate this place; you do not need to be there.</string>
+    <string name="place_location_loading" translatable="false">Getting current location…</string>
+    <string name="place_location_permission_missing" translatable="false">Allow foreground location to use your current position, or choose an address.</string>
+    <string name="place_location_unavailable" translatable="false">Current location unavailable. Try again or choose an address.</string>
 </resources>

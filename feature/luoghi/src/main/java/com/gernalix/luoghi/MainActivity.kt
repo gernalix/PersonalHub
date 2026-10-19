@@ -136,6 +136,14 @@ private fun LuoghiNavigation(
     var visitsFilterPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var initialVisitId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorOpen by rememberSaveable { mutableStateOf(value = false) }
+    val editorLocationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (editorOpen && state.form.uuid == null) {
+            if (grants.values.any { it }) vm.useCurrentPlaceLocation()
+            else vm.onPlaceLocationPermissionDenied()
+        }
+    }
     var globalStatsOpen by rememberSaveable { mutableStateOf(value = false) }
     var pendingDeletePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var manualVisitPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -290,6 +298,13 @@ private fun LuoghiNavigation(
             addressState = state.addressAutocomplete,
             onAddressChange = vm::updateAddress,
             onAddressSuggestion = vm::selectAddressSuggestion,
+            onUseCurrentLocation = {
+                if (hasAnyLocationPermission(context)) vm.useCurrentPlaceLocation()
+                else editorLocationPermissionLauncher.launch(arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
+                ))
+            },
+            onUseAddressLocation = vm::usePlaceAddressLocation,
             onNicknameChange = vm::updateNickname,
             onRadiusChange = vm::updateRadius,
             onNotesChange = vm::updateNotes,

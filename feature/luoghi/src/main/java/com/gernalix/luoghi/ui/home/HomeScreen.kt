@@ -224,6 +224,7 @@ fun HomeScreen(
                 items(state.placeItems, key = { it.place.uuid }) { item ->
                     PlaceListItem(
                         item = item,
+                        showDistance = state.placeSort.criterion == PlaceSortCriterion.DISTANCE,
                         onOpen = { onOpenPlace(item) },
                         onEdit = { onEditPlace(item) },
                         onHistory = { onPlaceVisits(item) },
