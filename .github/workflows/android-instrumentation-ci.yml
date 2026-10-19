@@ -76,7 +76,11 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          target: google_apis
+          # This self-contained suite needs Android APIs, not Google services.
+          # The Google image's Pixel Launcher has ANRed during first boot before
+          # instrumentation starts, leaving a system dialog over later tests.
+          # Use the same API/ABI with the official AOSP launcher instead.
+          target: default
           arch: x86_64
           profile: pixel_6
           cores: 4

@@ -21,6 +21,7 @@ capture_failure() {
   adb -s "$serial" logcat -d -b crash > "$diagnostics/crash.log" || true
   adb -s "$serial" shell dumpsys activity lastanr > "$diagnostics/last-anr.txt" || true
   adb -s "$serial" shell dumpsys dropbox --print data_app_anr > "$diagnostics/app-anr-dropbox.txt" || true
+  adb -s "$serial" shell dumpsys dropbox --print system_app_anr > "$diagnostics/system-app-anr-dropbox.txt" || true
   adb -s "$serial" logcat -d -b system -v threadtime > "$diagnostics/system.log" || true
   adb -s "$serial" shell dumpsys meminfo > "$diagnostics/meminfo.txt" || true
   for module in PEOPLE SUBSTANCES WORDPULSE; do
