@@ -21,9 +21,8 @@ run_app_test() {
   local test_name=$1 result
   if ! result=$(timeout --signal=TERM --kill-after=15s 3m \
     adb -s "$serial" shell am instrument -w -r \
-    -e class "com.gernalix.personalhub.$test_name" "$runner" \
-    | awk '/^INSTRUMENTATION_STATUS_CODE:|^OK \(|^FAILURES|^INSTRUMENTATION_CODE:/'); then
-    echo "Instrumentation command failed: $test_name" >&2
+    -e class "com.gernalix.personalhub.$test_name" "$runner" 2>&1); then
+    printf 'Instrumentation command failed: %s\n%s\n' "$test_name" "$result" >&2
     return 1
   fi
   if [[ "$result" != *'OK (1 test)'* || "$result" == *'INSTRUMENTATION_STATUS_CODE: -2'* ]]; then

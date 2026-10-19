@@ -19,7 +19,14 @@ class ArchiveStoreTest {
     private lateinit var store: ArchiveStore
     private val context: Context = ApplicationProvider.getApplicationContext()
     @Before fun setup(){ context.noBackupFilesDir.resolve("notifications.sqlite").delete(); store=ArchiveStore(context) }
-    @After fun close(){store.close()}
+    @After fun close(){
+        store.close()
+        // The public History API opens its own singleton; release that owner too
+        // so the next test cannot reuse a connection to a deleted fixture file.
+        val field=ArchiveStore::class.java.getDeclaredField("instance").apply{isAccessible=true}
+        (field.get(null) as? ArchiveStore)?.close()
+        field.set(null,null)
+    }
     private fun snapshot(key:String="key", text:String="hello", captured:String="2026-10-09T10:00:00Z", app:String="test.app")=JSONObject().put("package",app).put("key",key).put("text",text).put("captured",captured)
     @Test fun appendOnlyRestartRemovalAndReconnection(){
         val first=store.append(snapshot(),"POSTED")

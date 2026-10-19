@@ -185,7 +185,7 @@ class HistoryAndPatchReviewDeviceTest {
         val applies=AtomicInteger()
         @Volatile var appliedRef:String?=null
         @Volatile var appliedHash:String?=null
-        override fun describe(context: Context,ref:String,id:String) = GitDataSync.PatchReview(id,"immutable-revision","verified-hash","Fixture author","Controlled fixture",24,0,1,listOf("finance_accounts"))
+        override fun describe(context: Context,ref:String,id:String) = GitDataSync.PatchReview(id,"immutable-revision","verified-hash","Fixture author","Controlled fixture",PersonalHubDatabase.SCHEMA_VERSION,0,1,listOf("finance_accounts"))
         override fun preview(context:Context,ref:String,id:String):GitPatchPreview {
             check(ref=="immutable-revision")
             check(!fail) { "Controlled preview failure" }

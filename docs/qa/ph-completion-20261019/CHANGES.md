@@ -35,26 +35,49 @@ Status: implementation and QA in progress. This is not a final release or purifi
 - The connected-test gate writes private evidence safely and records runs automatically. Cleanup false-success and nonzero child status remain failures, including in persisted history.
 - Added or extended host/native scenarios for overlaps, search/tags, temporal precision, sorting, Explore, optional/real OsmAnd, Countdown, Home, every module scope, private Notifications History, schema migration, rollback and recorder/gate safety.
 - Existing emulator-only guards remain. Shared scenarios have separate strict Google Pixel 8a/.qa/authorization guards; tests use explicitly serial-targeted instrumentation through the gate.
-- Pixel QA uses only the isolated package. Mandatory Fedora/Telegram pre/post notices are verified. The emulator remains stopped following the user's Fedora-lag instruction.
+- Pixel QA uses only the isolated package. Mandatory Fedora/Telegram pre/post notices are verified. Ordinary QA now uses the canonical emulator per the latest user steering, with verified shutdown at the end; Pixel is reserved for necessary physical/final-delivery checks. The earlier Pixel-only period remains historical evidence.
 - Source consumer closure and app compile gates were applied to changed APIs; architecture gates verify capsule ownership. CODE_MAP and operating/docs routes were updated.
 - The Project Capsule now describes the actual schema, private archive, QA history and retired C2/C3 status; truthful reviewed-commit freshness is refreshed after watched code commits, with FAST/FULL validation.
 - GitHub rejected unpublished commits exposing a private author email. Those commits were preserved in a verified private bundle and rewritten with the account-verified noreply identity, then pushed normally. No force push or account privacy change. An upstream Salute documentation change was preserved and is not claimed as this goal's work.
+
+## Follow-up integration and device checks
+
+- The combined delivery owner advanced NV exactly once from canonical 69 to 70. Primary installation is still pending; corrective builds retain 70.
+- PR #104 was created through repo-task, attached to this chat and queued with the existing integrator. There is no manual merge or bypass.
+- CI exposed a patch-review fixture still declaring schema 24. It now uses the canonical schema constant, preserving the actual compatibility rejection in production.
+- Full Notifications testing exposed an open singleton connection left by the public History API test. Test cleanup now releases both its direct helper and the singleton. The unchanged collector ordering/drain/persistence test and all 21 module tests pass together.
+- CI now runs the new v24-to-v25 migration, installer, QA-history and connected-gate safety suites in its existing host validation stage.
+- CI instrumentation retains the full assertion output when a case fails, rather than discarding the stack through an output filter.
+- All five existing CI workflows use Node 24-compatible checkout/setup-gradle v5 actions where applicable. The official tagged action metadata was checked. Ubuntu is pinned to the same 24.04 image used by the failed job, avoiding today's ubuntu-latest image migration. The emulator job explicitly installs its missing unversioned X11 development libraries.
+- Actual Pixel Wi-Fi-off/LTE/Tailscale shell access passed, including a 6.8-second first handoff probe and the faster following samples; raw numeric latencies and genuine failures remain in the private SQLite history. Wi-Fi enable restoration is awaited rather than assumed immediate.
+- A real Tailscale interruption was observed while commands continued through a freshly identity-verified independent LAN endpoint. The switch-based automatic reconnection failed; the observed Connect control restored the VPN and the Pixel identity was reverified. This is not recorded as an automated end-to-end PASS.
+- All Pixel windows were closed with both notices. The user switched ordinary QA back to the emulator; the current MegaVault PersonalHub and project emulator instructions were re-read. Start/readiness/stop use only the canonical facade. Physical-only guards remain intact.
+- No final version70 APK has yet been built, installed or published. Final artifact creation, its immutable acceptance and publication are still ahead. QA69 artifacts were preserved privately before creating the fresh isolated emulator QA3 build at version70.
+
+Official action metadata: https://github.com/actions/checkout/blob/v5/action.yml and https://github.com/gradle/actions/blob/v5/setup-gradle/action.yml .
 
 ## Evidence and remaining delivery work
 
 Native QA history includes passing live search/tag-filter lifecycle, all eight overlapping candidates with cancel/explicit eighth selection/current visit/checkout, Where was I, all compact actions, twelve History scopes, real notification capture into shared History, Countdown, permission guidance, real external OsmAnd and Explore detail return. Failed attempts remain historical; later PASS is linked by scenario/artifact provenance rather than rewriting old records.
 
-The main app is still version 69/schema 24. NV increment, integrated final minified/signed artifact, validated primary migration/rollback, exact update/Audit/History proof, publication, original-inventory dispositions and operational Git purification remain pending.
+The installed main app is still version 69/schema 24. Source NV is now 70. The integrated final minified/signed artifact, validated primary migration/rollback, exact update/Audit/History proof, publication, original-inventory dispositions and operational Git purification remain pending.
 
 Passive archive metadata readback found actual Telegram/WhatsApp events and no Signal/Google Messages events. No private message/title/sender/key was extracted. The original Notification Access setting is currently disabled and was preserved. This is coverage evidence, not invented incoming-message acceptance.
 
 ## Changed project files
 
-The following paths are the complete current source diff against origin/main (the final report will refresh this list after integration/delivery changes).
+Complete current source diff against the original canonical base `e031f296d0ac8535c9248b262f777b792ab99548`. Final delivery and report updates will refresh this list using this fixed base.
 
 - `.codex/CODE_MAP.tsv`
+- `.github/workflows/android-consumer-preflight.yml`
+- `.github/workflows/android-instrumentation-ci.yml`
+- `.github/workflows/android-unit-ci.yml`
+- `.github/workflows/architecture-boundaries.yml`
+- `.github/workflows/play-store-preflight.yml`
 - `AGENTS.md`
+- `NV.txt`
 - `app/src/androidTest/java/com/gernalix/personalhub/CountdownQaDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/HistoryAndPatchReviewDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HubHistorySearchQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/NotificationsHistoryQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/OsmAndExploreQaDeviceTest.kt`
@@ -88,6 +111,7 @@ The following paths are the complete current source diff against origin/main (th
 - `core/ui/src/main/res/values/module_history.xml`
 - `docs/ANDROID_TEST_HISTORY.md`
 - `docs/DATABASE_SCHEMA_UPGRADES.md`
+- `docs/qa/ph-completion-20261019/CHANGES.md`
 - `docs/qa/ph-completion-20261019/README.md`
 - `feature/luoghi/build.gradle.kts`
 - `feature/luoghi/consumer-rules.pro`
@@ -140,6 +164,7 @@ The following paths are the complete current source diff against origin/main (th
 - `tools/android_pixel_apk.py`
 - `tools/android_test_history.py`
 - `tools/migrate_personalhub_v24_to_v25.py`
+- `tools/run_ci_instrumentation.sh`
 - `tools/test_android_connected_test_gate.py`
 - `tools/test_android_paired_cutover_v24.py`
 - `tools/test_android_pixel_apk.py`
