@@ -1,5 +1,6 @@
 package com.gernalix.personalhub
 
+import androidx.core.content.edit
 import androidx.compose.runtime.mutableIntStateOf
 import com.gernalix.personalhub.notifications.api.NotificationsRoute
 import android.content.Intent
@@ -152,7 +153,7 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         ) {
             TextButton(onClick = {
                 compact = !compact
-                homePreferences.edit().putBoolean("compact", compact).apply()
+                homePreferences.edit { putBoolean("compact", compact)}
             }, modifier = Modifier.testTag("home-layout-switch")) {
                 Text(stringResource(if (compact) com.gernalix.personalhub.core.ui.R.string.home_layout_extended else com.gernalix.personalhub.core.ui.R.string.home_layout_compact))
             }

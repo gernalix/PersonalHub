@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import android.annotation.SuppressLint
 import android.database.sqlite.SQLiteDatabase
 import org.json.JSONObject
 import org.json.JSONArray
@@ -38,6 +39,8 @@ internal object NormalizedArchive {
         db.execSQL("INSERT INTO normalization_state VALUES(1,0)")
         db.execSQL("CREATE VIRTUAL TABLE message_search USING fts4(content)")
     }
+    // Keep normalization cursor advancement inside the explicit batch transaction.
+    @SuppressLint("UseKtx")
     fun process(db: SQLiteDatabase, limit: Int): Int {
         db.beginTransaction()
         try {

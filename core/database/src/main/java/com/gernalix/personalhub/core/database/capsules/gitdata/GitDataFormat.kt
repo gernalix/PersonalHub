@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database.capsules.gitdata
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
@@ -968,6 +969,8 @@ internal object GitStateRestorer {
         }
     }
 
+    // Keep explicit restore transaction completion before foreign-key and integrity verification.
+    @SuppressLint("UseKtx")
     private fun populate(
         context: Context,
         transport: GitHubDataTransport,

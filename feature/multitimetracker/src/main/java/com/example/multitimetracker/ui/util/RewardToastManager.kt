@@ -1,5 +1,6 @@
 package com.example.multitimetracker.ui.util
 
+import androidx.core.content.edit
 import com.gernalix.personalhub.core.ui.HubFeedback
 
 import android.content.Context
@@ -48,14 +49,14 @@ object RewardToastManager {
         val show = (!lastShown) && (Random.nextFloat() < BASE_PROBABILITY)
 
         // Persist counters + last-shown flag (if we didn't show, it becomes false to re-enable next time)
-        prefs.edit()
-            .putInt(KEY_DAY_ID, dayId)
-            .putInt(KEY_HOUR_ID, hourId)
-            .putInt(KEY_TODAY_COUNT, todayCount)
-            .putInt(KEY_HOUR_COUNT, hourCount)
-            .putInt(KEY_LIFETIME_COUNT, lifetime)
-            .putBoolean(KEY_LAST_SHOWN, show)
-            .apply()
+        prefs.edit {
+            putInt(KEY_DAY_ID, dayId)
+                .putInt(KEY_HOUR_ID, hourId)
+                .putInt(KEY_TODAY_COUNT, todayCount)
+                .putInt(KEY_HOUR_COUNT, hourCount)
+                .putInt(KEY_LIFETIME_COUNT, lifetime)
+                .putBoolean(KEY_LAST_SHOWN, show)
+        }
 
         if (!show) return
 

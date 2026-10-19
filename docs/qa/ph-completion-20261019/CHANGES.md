@@ -82,6 +82,8 @@ Official action metadata: https://github.com/actions/checkout/blob/v5/action.yml
 
 ## Evidence and remaining delivery work
 
+The reviewed AndroidX cleanup converts ordinary asynchronous preference edits in Home, Workflowy, Timer counters/snapshots/widgets, Notifications status, Finance settings, Substances preferences/widgets and Git synchronization status. The same keys, values, batching and asynchronous apply behavior are retained. Widget deletion still clears every requested ID in one editor. Receipt consent/aliases, profile switching, the open manifest and recovery/version markers retain checked synchronous commits with explicit lint explanations; no commit/rollback/validation statement in the seven reviewed critical files changed. Finance bitmap creation/scaling uses the equivalent existing AndroidX defaults; drawing rotation now restores the canvas in a finally block. No dependency version, permission, Room schema or physical-device guard changes are part of this cleanup. Compilation passes; all21 focused host cases pass (SQLite56–62), and full unfiltered lint/architecture passes with0 errors and26 available-version suggestions.
+
 Native QA history includes passing live search/tag-filter lifecycle, all eight overlapping candidates with cancel/explicit eighth selection/current visit/checkout, Where was I, all compact actions, twelve History scopes, real notification capture into shared History, Countdown, permission guidance, real external OsmAnd and Explore detail return. Failed attempts remain historical; later PASS is linked by scenario/artifact provenance rather than rewriting old records.
 
 The installed primary Pixel app is still version69/schema24. The canonical emulator is70/schema25 with the first failed candidate and its update still unacknowledged. Source NV is now 70. The integrated final minified/signed artifact, validated primary migration/rollback, exact update/Audit/History proof, publication, original-inventory dispositions and operational Git purification remain pending.
@@ -91,6 +93,7 @@ Passive archive metadata readback found actual Telegram/WhatsApp events and no S
 ## Changed project files
 
 Complete source diff against original canonical base `e031f296d0ac8535c9248b262f777b792ab99548`, refreshed at each checkpoint. Exact removed app-string inventory: `~/.local/share/personalhub-qa/removed-unused-resources-20261019.json`.
+
 
 - `.codex/CODE_MAP.tsv`
 - `.github/workflows/android-consumer-preflight.yml`
@@ -136,9 +139,12 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/HubAndroidPlatform.kt`
 - `core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/25.json`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseGate.kt`
+- `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseProfiles.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseStartupGate.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseVault.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/PersonalHubDatabase.kt`
+- `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataFormat.kt`
+- `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataSettings.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/history/HistoryQueryCapsule.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/mutationevents/MutationEventCapture.kt`
 - `core/database/src/main/res/values/strings.xml`
@@ -199,6 +205,8 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `feature/luoghi/src/test/java/com/gernalix/luoghi/VisitTimestampTest.kt`
 - `feature/multitimetracker/src/main/AndroidManifest.xml`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/MainActivity.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/MainViewModel.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/RandomTimerStore.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/TimeFenceNotifier.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/TimeFenceTimerScheduler.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/alerts/ui/AlertsScreen.kt`
@@ -207,17 +215,23 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/sincewhen/ui/LifePeriodsScreen.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/debug/DebugRecomposeCounter.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/hub/TimerSessionHubAdapter.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/CriticalDataGuard.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SnapshotSqlite.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SnapshotStore.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SyncCountersStore.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/UiPrefsStore.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/AppRoot.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/AlertPopupHost.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/PrecisionTimelineTrack.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SectionHeader.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SessionEditDialog.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SingleSubmitButtons.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/util/RewardToastManager.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickEventWidgetConfigureActivity.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickEventWidgetPrefs.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickTaskWidgetClickActivity.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickTaskWidgetProvider.kt`
 - `feature/multitimetracker/src/main/res/layout/widget_quick_task.xml`
-- `feature/multitimetracker/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
-- `feature/multitimetracker/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
 - `feature/multitimetracker/src/main/res/mipmap-anydpi/ic_launcher.xml`
 - `feature/multitimetracker/src/main/res/mipmap-anydpi/ic_launcher_round.xml`
 - `feature/multitimetracker/src/main/res/mipmap-hdpi/ic_launcher.png`
@@ -238,18 +252,27 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/api/NotificationsHistory.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/api/NotificationsRoute.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/ArchiveStore.kt`
+- `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/CollectorService.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/ConversationsScreen.kt`
+- `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/NormalizedArchive.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/NotificationsActivity.kt`
 - `feature/notifications/src/test/java/com/gernalix/personalhub/notifications/capsules/archive/ArchiveStoreTest.kt`
+- `feature/soldi/src/debug/java/com/gernalix/personalhub/soldi/FinanceSemanticQaBridge.kt`
+- `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/BankingSecureStore.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/FinancePhotoSemanticEngine.kt`
+- `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/FinanceReminderScheduler.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiActivity.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiEditorsUi.kt`
+- `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiUiModels.kt`
+- `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/receipt/ReceiptImport.kt`
 - `feature/soldi/src/main/res/values-it/banking_strings.xml`
 - `feature/soldi/src/main/res/values/banking_strings.xml`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/MainActivity.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/notifications/SostanzeNotificationScheduler.kt`
+- `feature/sostanze/src/main/java/com/gernalix/sostanze/notifications/SostanzeRandomAlertStore.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/ui/SostanzeApp.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/widget/SubstancesWidgetConfigureActivity.kt`
+- `feature/sostanze/src/main/java/com/gernalix/sostanze/widget/SubstancesWidgetPrefs.kt`
 - `feature/sostanze/src/main/res/values-it/strings.xml`
 - `feature/sostanze/src/main/res/values/strings.xml`
 - `feature/sostanze/src/main/res/xml-v31/substances_widget_info.xml`

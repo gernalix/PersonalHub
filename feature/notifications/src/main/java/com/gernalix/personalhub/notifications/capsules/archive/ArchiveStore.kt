@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -28,6 +29,8 @@ internal class ArchiveStore(context: Context) : SQLiteOpenHelper(context,
         check(oldVersion==1 && newVersion==2); NormalizedArchive.create(db)
     }
     @Synchronized fun normalizePending(limit: Int = 100): Int = NormalizedArchive.process(writableDatabase,limit)
+    // Immutable event insertion and change publication share this explicit transaction boundary.
+    @SuppressLint("UseKtx")
     @Synchronized fun append(snapshot: JSONObject, requested: String, reason: Int? = null): Long {
         val db = writableDatabase
         db.beginTransaction()

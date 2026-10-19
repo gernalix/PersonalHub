@@ -2,6 +2,7 @@
 // v470
 package com.example.multitimetracker
 
+import androidx.core.content.edit
 import com.gernalix.personalhub.core.ui.HubFeedback
 
 import com.example.multitimetracker.util.CapsuleWriteApi
@@ -178,13 +179,13 @@ private fun logAppVersionIfNeeded(context: Context) {
             HubFeedback.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
         }
 
-        sp.edit()
-            .putInt("dayKey", dKey)
-            .putInt("dayCount", todayCount)
-            .putInt("hourKey", hKey)
-            .putInt("hourCount", hourCount)
-            .putBoolean("lastWasToast", shouldToast)
-            .apply()
+        sp.edit {
+            putInt("dayKey", dKey)
+                .putInt("dayCount", todayCount)
+                .putInt("hourKey", hKey)
+                .putInt("hourCount", hourCount)
+                .putBoolean("lastWasToast", shouldToast)
+        }
     }
 /* FEATURE CAPSULE: Reinforcement toast (ViewModel) — END */
 

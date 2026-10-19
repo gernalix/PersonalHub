@@ -1,6 +1,7 @@
 // v459
 package com.example.multitimetracker.persistence
 
+import androidx.core.content.edit
 import android.content.ContentValues
 import android.content.Context
 import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
@@ -61,11 +62,11 @@ object SnapshotSqlite {
         quickEventSchemaEnsuredInProcess = false
         context.applicationContext
             .getSharedPreferences(SCHEMA_GUARD_PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .remove(STARTUP_SCHEMA_GUARD_KEY)
-            .remove(STARTUP_SESSION_SCHEMA_GUARD_KEY)
-            .remove(STARTUP_QUICK_EVENT_SCHEMA_GUARD_KEY)
-            .apply()
+            .edit {
+                remove(STARTUP_SCHEMA_GUARD_KEY)
+                .remove(STARTUP_SESSION_SCHEMA_GUARD_KEY)
+                .remove(STARTUP_QUICK_EVENT_SCHEMA_GUARD_KEY)
+            }
     }
 
     fun ensureStartupSchemas(context: Context): Boolean {
@@ -83,7 +84,7 @@ object SnapshotSqlite {
             return false
         }
         val changed = ensureSessionTables(appContext)
-        prefs.edit().putBoolean(STARTUP_SESSION_SCHEMA_GUARD_KEY, true).apply()
+        prefs.edit { putBoolean(STARTUP_SESSION_SCHEMA_GUARD_KEY, true)}
         return changed
     }
 
@@ -98,7 +99,7 @@ object SnapshotSqlite {
             return false
         }
         val changed = ensureQuickEventTables(appContext)
-        prefs.edit().putBoolean(STARTUP_QUICK_EVENT_SCHEMA_GUARD_KEY, true).apply()
+        prefs.edit { putBoolean(STARTUP_QUICK_EVENT_SCHEMA_GUARD_KEY, true)}
         return changed
     }
 

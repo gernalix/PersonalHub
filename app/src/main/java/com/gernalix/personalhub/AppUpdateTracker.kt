@@ -1,5 +1,7 @@
 package com.gernalix.personalhub
 
+import androidx.core.content.edit
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Application
@@ -46,6 +48,8 @@ internal object AppUpdateTracker : Application.ActivityLifecycleCallbacks {
     private const val PREFS = "app-update-acknowledgement"
     private lateinit var coordinator: ResumedUpdateCheck
 
+    // Observed-version persistence must return a checked commit result before prompting.
+    @SuppressLint("UseKtx")
     fun install(app: Application) {
         coordinator = ResumedUpdateCheck(
             CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
@@ -74,8 +78,9 @@ internal object AppUpdateTracker : Application.ActivityLifecycleCallbacks {
                         .setMessage("app aggiornata alla v$pending")
                         .setCancelable(false)
                         .setPositiveButton("OK") { _, _ ->
-                            app.getSharedPreferences(PREFS, 0).edit()
-                                .putLong("acknowledged-version", pending).apply()
+                            app.getSharedPreferences(PREFS, 0).edit {
+                                putLong("acknowledged-version", pending)
+                            }
                         }
                         .create().also { shown ->
                             shown.setOwnerActivity(activity)

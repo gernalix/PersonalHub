@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import androidx.core.content.edit
 import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -15,7 +16,7 @@ class CollectorService : NotificationListenerService() {
         super.onCreate()
         scope.launch { for (write in queue) try { write() } catch (_: Exception) { failure() } }
     }
-    private fun failure() { getSharedPreferences("notification_status",MODE_PRIVATE).edit().putBoolean("capture_error",true).apply() }
+    private fun failure() { getSharedPreferences("notification_status",MODE_PRIVATE).edit { putBoolean("capture_error",true)} }
     private fun enqueue(write: () -> Unit) { if(queue.trySend(write).isFailure) failure() }
     private fun capture(sbn: StatusBarNotification, kind: String, ranking: RankingMap? = null, reason: Int? = null) {
         try {
@@ -29,14 +30,14 @@ class CollectorService : NotificationListenerService() {
         enqueue { ArchiveStore.get(this).connected() }
         // Snapshot of current state, never a claim that we observed its original post.
         try { activeNotifications?.forEach { capture(it,"OBSERVED") } } catch (_: Exception) { failure() }
-        getSharedPreferences("notification_status",MODE_PRIVATE).edit().putBoolean("connected",true).apply()
+        getSharedPreferences("notification_status",MODE_PRIVATE).edit { putBoolean("connected",true)}
     }
     override fun onNotificationPosted(sbn: StatusBarNotification) = capture(sbn,"POSTED")
     override fun onNotificationRemoved(sbn: StatusBarNotification) = capture(sbn,"REMOVED")
     override fun onNotificationPosted(sbn: StatusBarNotification, rankingMap: RankingMap) = capture(sbn,"POSTED",rankingMap)
     override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap, reason: Int) = capture(sbn,"REMOVED",rankingMap,reason)
     override fun onListenerDisconnected() {
-        getSharedPreferences("notification_status",MODE_PRIVATE).edit().putBoolean("connected",false).apply()
+        getSharedPreferences("notification_status",MODE_PRIVATE).edit { putBoolean("connected",false)}
         requestRebind(ComponentName(this,CollectorService::class.java))
     }
     override fun onDestroy() {

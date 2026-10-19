@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
@@ -64,7 +65,7 @@ object WorkflowyIntegrationSettings {
         )
 
     fun setEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+        prefs(context).edit { putBoolean(KEY_ENABLED, enabled)}
     }
 
     fun save(context: Context, apiKey: String, target: String) {
@@ -76,12 +77,12 @@ object WorkflowyIntegrationSettings {
             "Invalid Workflowy API key"
         }
         writeSecret(context, normalizedKey)
-        prefs(context).edit().putString(KEY_TARGET, normalizedTarget).putBoolean(KEY_HAS_API_KEY, true).apply()
+        prefs(context).edit { putString(KEY_TARGET, normalizedTarget).putBoolean(KEY_HAS_API_KEY, true)}
     }
 
     fun clearApiKey(context: Context) {
         secretFile(context).baseFile.delete()
-        prefs(context).edit().putBoolean(KEY_HAS_API_KEY, false).apply()
+        prefs(context).edit { putBoolean(KEY_HAS_API_KEY, false)}
     }
 
     fun observeEnabled(context: Context, onChanged: (Boolean) -> Unit): () -> Unit {

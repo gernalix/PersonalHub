@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
 import com.gernalix.personalhub.contracts.database.*
@@ -156,6 +157,8 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
+                    // The open manifest must be durably committed and its failure checked.
+                    @SuppressLint("UseKtx")
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.install(context, db)
                         MutationEventStore.install(db)

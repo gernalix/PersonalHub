@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.core.content.edit
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -58,7 +59,7 @@ internal object FinanceReminderScheduler {
                 }
             }
         }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putStringSet(PREF_KEYS, scheduled).apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(PREF_KEYS, scheduled)}
         Unit
     }
 

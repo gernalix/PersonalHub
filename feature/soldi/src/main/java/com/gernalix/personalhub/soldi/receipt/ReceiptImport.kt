@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi.receipt
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.gernalix.personalhub.core.database.capsules.soldi.FinanceProduct
 import org.json.JSONArray
@@ -36,6 +37,8 @@ data class ReceiptImportLine(
 class ReceiptEnrichmentPreferences(context: Context) {
     private val prefs = context.getSharedPreferences("soldi_receipt_import", Context.MODE_PRIVATE)
     fun chatGptEnabled(): Boolean = prefs.getBoolean(KEY_CHATGPT, false)
+    // Do not report consent saved if the durable preference commit fails.
+    @SuppressLint("UseKtx")
     fun setChatGptEnabled(value: Boolean) {
         check(prefs.edit().putBoolean(KEY_CHATGPT, value).commit())
     }
@@ -56,6 +59,8 @@ class ReceiptProductAliasStore(context: Context) {
         return products.firstOrNull { it.uuid == uuid }
     }
 
+    // A confirmed alias must persist successfully; KTX edit discards the commit result.
+    @SuppressLint("UseKtx")
     fun remember(rawDescription: String, product: FinanceProduct) {
         val normalized = normalizeProductIdentity(rawDescription)
         if (normalized.isBlank()) return

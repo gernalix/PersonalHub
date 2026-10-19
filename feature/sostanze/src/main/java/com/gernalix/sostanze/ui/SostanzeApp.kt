@@ -5,6 +5,7 @@
 
 package com.gernalix.sostanze.ui
 
+import androidx.core.content.edit
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableDoubleStateOf
 import android.Manifest
@@ -223,7 +224,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                     AppTab.values().forEach { item ->
                         Tab(
                             selected = tab == item,
-                            onClick = { tab = item; tabPreferences.edit().putString("last_tab", item.name).apply() },
+                            onClick = { tab = item; tabPreferences.edit { putString("last_tab", item.name)} },
                             text = { Text(tabTitle(item), maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         )
                     }

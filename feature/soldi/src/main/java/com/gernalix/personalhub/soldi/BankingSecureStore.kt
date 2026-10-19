@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.core.content.edit
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -33,7 +34,7 @@ internal class BankingSecureStore(context: Context) {
         validateToken(token)
         write(credentialFile, encrypt(token, CREDENTIAL_ALIAS))
         check(readCredential() == token) { "Bank credential verification failed" }
-        prefs.edit().putString(KEY_BASE_URL, url).apply()
+        prefs.edit { putString(KEY_BASE_URL, url)}
     }
 
     fun readCredential(): String {
@@ -63,7 +64,7 @@ internal class BankingSecureStore(context: Context) {
     }
 
     fun disconnect() = synchronized(LOCK) {
-        credentialFile.delete(); cacheFile.delete(); reconciliationFile.delete(); prefs.edit().remove(KEY_BASE_URL).apply()
+        credentialFile.delete(); cacheFile.delete(); reconciliationFile.delete(); prefs.edit { remove(KEY_BASE_URL)}
         KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.run {
             deleteEntry(CREDENTIAL_ALIAS); deleteEntry(CACHE_ALIAS); deleteEntry(RECONCILIATION_ALIAS)
         }

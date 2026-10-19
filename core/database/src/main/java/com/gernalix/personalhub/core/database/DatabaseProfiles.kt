@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database
 
+import android.annotation.SuppressLint
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -21,6 +22,8 @@ enum class DatabaseProfileInitMode {
  * Inactive profiles are verified detached snapshots; switching swaps the whole database so
  * every feature changes universe atomically.
  */
+// Profile handoffs require the checked Boolean result of synchronous durable commits.
+@SuppressLint("UseKtx")
 object DatabaseProfiles {
     const val DEFAULT_PROFILE_ID = "personal"
     private const val PREFS = "personalhub_profiles"
