@@ -74,11 +74,18 @@ app_tests=(
   'GlobalDatabaseInstrumentedTest#repeatedImportsDeleteOrphansButProtectAPendingRollbackCopy'
   'QuickEventWidgetClickDeviceTest#twoWidgetEventTapsCreateOneEntryEach'
   'SubstancesWidgetHostDeviceTest#twoWidgetInstancesTargetAndRecordTwoSubstancesOnceEach'
+  'SubstancesWidgetHostDeviceTest#blankBoundWidgetIsRehydratedWithoutRecordingAnIntake'
   'HubDiscoverabilityEpisodesEmulatorTest#homeSearchEpisodesAndFatigueAreReachableFromUi'
   'HubTemporalDeferredQaDeviceTest#homeSearchEpisodesAndFatigueAreReachableFromUi'
 )
 for test_name in "${app_tests[@]}"; do
   run_app_test "$test_name"
+  if [[ "$test_name" == 'SubstancesWidgetHostDeviceTest#blankBoundWidgetIsRehydratedWithoutRecordingAnIntake' ]]; then
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#prepareOwnedWidgetBeforeProcessRestart'
+    # Only the isolated QA process is stopped; keep its existing widget binding.
+    adb -s "$serial" shell am force-stop com.gernalix.personalhub.qa
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#existingWidgetRecoversOnNormalForegroundWithoutRecording'
+  fi
   if [[ "$test_name" == 'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration' ]]; then
     # Upgrade a synthetic, populated clone, not the production package. Reinstall
     # triggers MY_PACKAGE_REPLACED while keeping all 719+ recorded fixtures.

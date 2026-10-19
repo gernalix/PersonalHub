@@ -13,6 +13,7 @@
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="3"
+        android:text="@string/widget_substances_refresh"
         android:textColor="@android:color/white"
         android:textSize="12sp"
         android:textStyle="bold" />

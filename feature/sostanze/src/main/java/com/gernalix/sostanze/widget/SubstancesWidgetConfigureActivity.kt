@@ -15,6 +15,7 @@ import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import com.gernalix.sostanze.R
 import kotlinx.coroutines.runBlocking
 
@@ -33,6 +34,9 @@ class SubstancesWidgetConfigureActivity : Activity() {
             finish()
             return
         }
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
+
+        selected = SubstancesWidgetPrefs.read(applicationContext, appWidgetId)
 
         choices = SubstancesWidgetPicker.choices(
             runBlocking { PersonalHubDatabase.get(applicationContext).dao().allSubstances() }

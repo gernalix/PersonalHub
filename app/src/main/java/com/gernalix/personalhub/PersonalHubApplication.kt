@@ -55,6 +55,7 @@ class PersonalHubApplication : Application(), Configuration.Provider {
         }
         traceStartup("PH.hubRuntimeInit") { initializeHubContextRuntime(this) }
         AppUpdateTracker.install(this)
+        com.gernalix.sostanze.hub.SubstancesWidgetsRuntime.install(this)
         com.gernalix.personalhub.core.ui.ModuleHistoryUi.screen = { moduleId, onBack ->
             HubHistorySearchScreen(onBack = onBack, scopeModuleId = moduleId)
         }
