@@ -62,7 +62,11 @@ class GlobalDatabaseInstrumentedTest {
         }
     }
     private fun requireEmulatorOnly() {
-        check(android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("sdk_gphone")) { "Mutation QA must run on the emulator" }
+        check(android.os.Build.MODEL.contains("sdk", ignoreCase = true) &&
+            android.os.Build.HARDWARE in setOf("ranchu", "goldfish")) { "Mutation QA must run on the emulator" }
+        check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*"))) {
+            "Mutation QA requires the isolated QA package"
+        }
     }
     private fun requireEmulator() {
         requireEmulatorOnly()
