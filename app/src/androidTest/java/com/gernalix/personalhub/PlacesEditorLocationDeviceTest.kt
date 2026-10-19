@@ -5,6 +5,10 @@ import android.os.Build
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import android.os.ParcelFileDescriptor
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.AnnotatedString
 import com.gernalix.luoghi.ADDRESS_FIELD_TAG
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
@@ -25,6 +29,40 @@ class PlacesEditorLocationDeviceTest {
         androidx.core.view.WindowInsetsControllerCompat(compose.activity.window, compose.activity.window.decorView)
             .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
     }
+    private fun openEditor(context: Context) {
+        compose.waitUntil(10_000) {
+            runCatching {
+                compose.onAllNodesWithContentDescription(context.getString(PlacesR.string.new_place))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }.getOrDefault(false)
+        }
+        compose.onNodeWithContentDescription(context.getString(PlacesR.string.new_place)).performClick()
+    }
+    @Test fun rapidAndroidInputPreservesAllPlaceEditorFields() {
+        val context = context()
+        openEditor(context)
+        try {
+            for ((label, expected) in listOf(
+                PlacesR.string.nickname to "PHQANoMatch72",
+                PlacesR.string.radius_m to "123.45",
+                PlacesR.string.notes to "PHQA_first_line_second_line",
+                PlacesR.string.place_tags to "PHQATagAlpha,PHQATagBeta",
+            )) {
+                hideKeyboard()
+                val editor = compose.onNode(hasSetTextAction() and hasText(context.getString(label)))
+                editor.performScrollTo().performTextClearance()
+                editor.performClick()
+                // Real Android key events reproduce rapid typing; semantic replacement hid the bug.
+                val output = InstrumentationRegistry.getInstrumentation().uiAutomation
+                    .executeShellCommand("input text $expected")
+                ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes() }
+                editor.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(expected)))
+            }
+        } finally {
+            hideKeyboard()
+            compose.onNodeWithText(context.getString(PlacesR.string.cancel)).performClick()
+        }
+    }
     @Test fun currentGpsCreatesAPlaceAndLaterAddressEditingKeepsItsCoordinates() {
         val context = context()
         val repository = PlaceRepository(context)
@@ -33,7 +71,7 @@ class PlacesEditorLocationDeviceTest {
         var uuid: String? = null
         val eventsBefore = dao.countEventsBlocking()
         try {
-            compose.onNodeWithContentDescription(context.getString(PlacesR.string.new_place)).performClick()
+            openEditor(context)
             compose.onNode(hasSetTextAction() and hasText(context.getString(PlacesR.string.nickname))).performTextReplacement(name)
             hideKeyboard()
             compose.onNodeWithText(context.getString(PlacesR.string.place_use_current_location)).performScrollTo().performClick()

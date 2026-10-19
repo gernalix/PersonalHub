@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -138,10 +137,11 @@ private fun PlaceEditor(
     onTagsChange: (String) -> Unit = {},
 ) {
     Column {
-        OutlinedTextField(
+        HubSearchField(
             value = form.nickname,
             onValueChange = onNicknameChange,
-            label = { Text(stringResource(R.string.nickname)) },
+            label = stringResource(R.string.nickname),
+            singleLine = false,
             modifier = Modifier.fillMaxWidth(),
         )
         AddressField(
@@ -150,16 +150,18 @@ private fun PlaceEditor(
             onAddressChange = onAddressChange,
             onAddressSuggestion = onAddressSuggestion,
         )
-        OutlinedTextField(
+        HubSearchField(
             value = form.radiusM,
             onValueChange = onRadiusChange,
-            label = { Text(stringResource(R.string.radius_m)) },
+            label = stringResource(R.string.radius_m),
+            singleLine = false,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        HubSearchField(
             value = form.notes,
             onValueChange = onNotesChange,
-            label = { Text(stringResource(R.string.notes)) },
+            label = stringResource(R.string.notes),
+            singleLine = false,
             modifier = Modifier.fillMaxWidth(),
         )
         TextButton(onClick = onPickPhoto) {
@@ -168,13 +170,14 @@ private fun PlaceEditor(
         if (form.photoUri.isNotBlank()) {
             TextButton(onClick = onRemovePhoto) { Text(stringResource(R.string.place_photo_remove)) }
         }
-        OutlinedTextField(
+        HubSearchField(
             value = form.tagsText,
             onValueChange = onTagsChange,
-            label = { Text(stringResource(R.string.place_tags)) },
-            supportingText = { Text(stringResource(R.string.place_tags_hint)) },
+            label = stringResource(R.string.place_tags),
+            singleLine = false,
             modifier = Modifier.fillMaxWidth(),
         )
+        Text(stringResource(R.string.place_tags_hint), style = MaterialTheme.typography.bodySmall)
     }
 }
 
