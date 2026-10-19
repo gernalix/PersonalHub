@@ -98,6 +98,10 @@ for test_name in "${app_tests[@]}"; do
     # Only the isolated QA process is stopped; keep its existing widget binding.
     adb -s "$serial" shell am force-stop com.gernalix.personalhub.qa
     run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#existingWidgetRecoversOnNormalForegroundWithoutRecording'
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#prepareOwnedWidgetBeforeProcessRestart'
+    adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
+    wait_for_broadcast_idle widget_package_replacement
+    run_app_test 'SubstancesWidgetPersistenceQaDeviceTest#existingWidgetRecoversAfterSystemBroadcastWithoutRecording'
   fi
   if [[ "$test_name" == 'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration' ]]; then
     # Upgrade a synthetic, populated clone, not the production package. Reinstall

@@ -113,6 +113,23 @@ class SubstancesWidgetPersistenceQaDeviceTest {
         check(fixture.edit().clear().commit())
     }
 
+    @Test fun existingWidgetRecoversAfterSystemBroadcastWithoutRecording() = runBlocking {
+        val id = fixture.getInt("widget", AppWidgetManager.INVALID_APPWIDGET_ID)
+        assertTrue("The same owned fixture survives the system event", id != AppWidgetManager.INVALID_APPWIDGET_ID)
+        val target = fixture.getLong("target", -1)
+        val title = requireNotNull(fixture.getString("title", null))
+        val manager = AppWidgetManager.getInstance(context)
+        assertNotNull("Widget binding survives the system event", manager.getAppWidgetInfo(id))
+        // No Activity launch and no direct refresh: only the production receiver
+        // can recover the blank view prepared before replacement or reboot.
+        awaitLabel(createView(manager, id), title)
+        assertEquals(target, SubstancesWidgetPrefs.read(context, id))
+        assertEquals(0, PersonalHubDatabase.get(context).dao().recentIntakes().count { it.substanceId == target })
+        host.deleteAppWidgetId(id)
+        SubstancesWidgetPrefs.delete(context, intArrayOf(id))
+        check(fixture.edit().clear().commit())
+    }
+
     private fun createView(manager: AppWidgetManager, id: Int): AppWidgetHostView {
         lateinit var result: AppWidgetHostView
         instrumentation.runOnMainSync {
