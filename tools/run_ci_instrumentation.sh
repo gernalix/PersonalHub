@@ -25,6 +25,14 @@ capture_failure() {
   python3 -c 'import sys; from pathlib import Path; sys.path.insert(0,"tools"); from android_ui_summary import _dump_xml; Path(sys.argv[2]).write_text(_dump_xml(sys.argv[1]))' "$serial" "$diagnostics/window.xml" || true
   adb -s "$serial" exec-out screencap -p > "$diagnostics/screen.png" || true
   adb -s "$serial" logcat -d -b crash > "$diagnostics/crash.log" || true
+  for module in PEOPLE SUBSTANCES WORDPULSE; do
+    for extension in xml png; do
+      local exact=/sdcard/Android/data/com.gernalix.personalhub.qa/files/module-search-startup-$module.$extension
+      if adb -s "$serial" shell test -f "$exact"; then
+        adb -s "$serial" pull "$exact" "$diagnostics/" >/dev/null || true
+      fi
+    done
+  done
 }
 
 run_app_test() {
