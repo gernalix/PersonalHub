@@ -175,7 +175,7 @@ fun PlaceListItem(
                 distance?.let { value ->
                     Text(
                         text = value,
-                        modifier = Modifier.testTag("place-distance"),
+                        modifier = Modifier.fillMaxWidth().testTag("place-distance"),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

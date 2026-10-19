@@ -100,6 +100,7 @@ fun HubSearchField(
         trailingIcon = if (buffer.value.text.isNotEmpty()) {
             {
                 IconButton(
+                    enabled = enabled,
                     onClick = {
                         if (buffer.edit(TextFieldValue(""))) onValueChange("")
                         activeFocusRequester.requestFocus()

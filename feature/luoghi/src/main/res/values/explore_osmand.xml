@@ -3,7 +3,7 @@
     <string name="places_explore_title" translatable="false">Explore places</string>
     <string name="places_action_back" translatable="false">Back</string>
     <string name="places_action_retry" translatable="false">Try again</string>
-    <string name="places_explore_reference_hint" translatable="false">Choose a saved place or search an address</string>
+    <string name="places_explore_reference_hint" translatable="false">Reference</string>
     <string name="places_explore_lookup_failed" translatable="false">Address lookup failed. Try another address or choose a saved place.</string>
     <string name="places_explore_reference_help" translatable="false">Choose the reference above. Distances use that point, not your GPS location. Temporary addresses are not saved.</string>
     <string name="places_explore_distance_help" translatable="false">Straight-line distances from this reference; moving the map does not change them.</string>

@@ -41,8 +41,10 @@ class PlaceDistanceLayoutDeviceTest {
         val layouts = mutableListOf<TextLayoutResult>()
         node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertEquals(1, layouts.size)
-        assertFalse("Distance text is clipped or ellipsized", layouts.single().hasVisualOverflow)
-        assertTrue(layouts.single().layoutInput.text.text.isNotBlank())
+        val layout = layouts.single()
+        if (layout.hasVisualOverflow) screenshot("distance-overflow")
+        assertFalse("Distance overflow: text=${layout.layoutInput.text.text}; size=${layout.size}; constraints=${layout.layoutInput.constraints}; lines=${layout.lineCount}; width=${layout.didOverflowWidth}; height=${layout.didOverflowHeight}", layout.hasVisualOverflow)
+        assertTrue(layout.layoutInput.text.text.isNotBlank())
     }
     private fun screenshot(name: String) {
         val context = ApplicationProvider.getApplicationContext<Context>()
