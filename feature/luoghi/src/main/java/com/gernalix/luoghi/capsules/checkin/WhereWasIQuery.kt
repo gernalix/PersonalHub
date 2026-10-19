@@ -5,6 +5,7 @@ import com.gernalix.luoghi.data.PlaceEntity
 
 sealed interface WhereWasIResult {
     data class Inside(val place: PlaceEntity, val visit: VisitUiModel) : WhereWasIResult
+    data class Overlapping(val places: List<PlaceEntity>) : WhereWasIResult
     data class Between(val previous: PlaceEntity, val next: PlaceEntity) : WhereWasIResult
     data class OnlyPrevious(val previous: PlaceEntity) : WhereWasIResult
     data class OnlyNext(val next: PlaceEntity) : WhereWasIResult
@@ -12,18 +13,24 @@ sealed interface WhereWasIResult {
 }
 
 object WhereWasIQuery {
-    fun at(visits: List<VisitUiModel>, places: List<PlaceEntity>, instantMs: Long): WhereWasIResult {
+    fun at(visits: List<VisitUiModel>, places: List<PlaceEntity>, instantMs: Long, observedAtMs: Long? = null): WhereWasIResult {
         val placesById = places.associateBy { it.uuid }
         val ordered = visits
-            .filter { it.startedAt != null }
+            .filter { it.startedAt != null && it.placeId in placesById }
             .sortedWith(compareBy<VisitUiModel> { it.startedAt }.thenBy { it.stableId })
-        ordered.firstOrNull { visit ->
-            val start = visit.startedAt ?: return@firstOrNull false
-            val end = visit.endedAt ?: Long.MAX_VALUE
+        // Only the current active visit has an open interval, bounded by the observed
+        // duration. An old check-in without checkout is not proof of staying forever.
+        val inside = ordered.filter { visit ->
+            val start = visit.startedAt ?: return@filter false
+            val end = visit.endedAt ?: if (visit.isActive) observedAtMs ?: (start + visit.durationMs) else return@filter false
             instantMs in start..end
-        }?.let { visit ->
-            placesById[visit.placeId]?.let { return WhereWasIResult.Inside(it, visit) }
+        }.let { matches ->
+            if (matches.any { it.startedAt == instantMs }) matches.filterNot { it.endedAt == instantMs && it.startedAt != instantMs }
+            else matches
         }
+        val insidePlaces = inside.mapNotNull { placesById[it.placeId] }.distinctBy { it.uuid }
+        if (insidePlaces.size > 1) return WhereWasIResult.Overlapping(insidePlaces)
+        inside.lastOrNull()?.let { return WhereWasIResult.Inside(placesById.getValue(it.placeId), it) }
         val previous = ordered
             .filter { (it.endedAt ?: it.startedAt ?: Long.MIN_VALUE) < instantMs }
             .maxByOrNull { it.endedAt ?: it.startedAt ?: Long.MIN_VALUE }

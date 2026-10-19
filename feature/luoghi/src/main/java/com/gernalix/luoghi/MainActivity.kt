@@ -10,6 +10,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -66,7 +74,7 @@ class MainActivity : ComponentActivity() {
         hubPlaceId = intent.hubPlaceId()
         setContent {
             LuoghiTheme {
-                Surface(modifier = Modifier.fillMaxSize()) { LuoghiHome(hubPlaceId) }
+                Surface(modifier = Modifier.fillMaxSize()) { com.gernalix.personalhub.core.ui.ModuleHistoryHost("places", hubPlaceId) { LuoghiHome(hubPlaceId) } }
             }
         }
     }
@@ -82,7 +90,7 @@ private fun Intent?.hubPlaceId(): String? = this?.data
     ?.takeIf { it.scheme == "personalhub" && it.host == "module" && it.path == "/places" }
     ?.getQueryParameter("placeId")?.takeIf(String::isNotBlank)
 
-private enum class AppDestination { HOME, PLACE_DETAIL, VISITS }
+private enum class AppDestination { HOME, PLACE_DETAIL, VISITS, EXPLORE }
 
 @Composable
 fun LuoghiHome(initialPlaceId: String? = null) {
@@ -135,17 +143,32 @@ private fun LuoghiNavigation(
     var visitsFilterPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var initialVisitId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorOpen by rememberSaveable { mutableStateOf(value = false) }
+    val editorLocationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (editorOpen && state.form.uuid == null) {
+            if (grants.values.any { it }) vm.useCurrentPlaceLocation()
+            else vm.onPlaceLocationPermissionDenied()
+        }
+    }
     var globalStatsOpen by rememberSaveable { mutableStateOf(value = false) }
     var pendingDeletePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var manualVisitPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var geofencePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     val visitsListState: LazyListState = rememberLazyListState()
+    val destinationState = rememberSaveableStateHolder()
+    var detailFromExplore by rememberSaveable { mutableStateOf(false) }
     val destination = runCatching { AppDestination.valueOf(destinationName) }.getOrDefault(AppDestination.HOME)
-    val selectedItem = selectedPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
+    fun resolveItem(id: String): PlaceListUiModel? = state.placeItems.firstOrNull { it.place.uuid == id }
+        ?: state.places.firstOrNull { it.uuid == id }?.let { place ->
+            com.gernalix.luoghi.capsules.places.PlaceListUiMapper.map(listOf(place), state.stats.places,
+                state.visits, state.placeSort, state.currentListLocation).single()
+        }
+    val selectedItem = selectedPlaceId?.let(::resolveItem)
     val pendingDelete = pendingDeletePlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
 
     LaunchedEffect(initialPlaceId, state.dataLoaded) {
-        if (state.dataLoaded && initialPlaceId != null && state.placeItems.any { it.place.uuid == initialPlaceId }) {
+        if (state.dataLoaded && initialPlaceId != null && state.places.any { it.uuid == initialPlaceId }) {
             selectedPlaceId = initialPlaceId
             destinationName = AppDestination.PLACE_DETAIL.name
         }
@@ -158,6 +181,7 @@ private fun LuoghiNavigation(
         initialVisitId = null
     }
     fun openDetail(item: PlaceListUiModel) {
+        detailFromExplore = destination == AppDestination.EXPLORE
         selectedPlaceId = item.place.uuid
         destinationName = AppDestination.PLACE_DETAIL.name
     }
@@ -176,7 +200,8 @@ private fun LuoghiNavigation(
     fun navigateBack() {
         when (destination) {
             AppDestination.HOME -> Unit
-            AppDestination.PLACE_DETAIL -> openHome()
+            AppDestination.EXPLORE -> openHome()
+            AppDestination.PLACE_DETAIL -> if (detailFromExplore) destinationName = AppDestination.EXPLORE.name else openHome()
 
             AppDestination.VISITS -> {
                 val detail = visitsFilterPlaceId?.let { id -> state.placeItems.firstOrNull { it.place.uuid == id } }
@@ -185,8 +210,10 @@ private fun LuoghiNavigation(
         }
     }
 
-    LaunchedEffect(state.checkIn.pendingCheckInLocation) {
-        if (state.checkIn.pendingCheckInLocation != null) editorOpen = true
+    LaunchedEffect(state.checkIn.pendingCheckInLocation, state.checkIn.message) {
+        if (state.checkIn.pendingCheckInLocation != null && state.checkIn.message == CheckInMessage.UNKNOWN_PLACE) {
+            editorOpen = true
+        }
     }
     LaunchedEffect(selectedPlaceId, selectedItem, state.dataLoaded) {
         if (state.dataLoaded && (selectedPlaceId != null) && (selectedItem == null)) openHome()
@@ -198,6 +225,8 @@ private fun LuoghiNavigation(
             state = state,
             onCheckAction = onCheckAction,
             onAmbiguousCheckIn = vm::selectAmbiguousCheckIn,
+            onCancelAmbiguousCheckIn = vm::newPlace,
+            onPlaceQueryChange = vm::updatePlaceQuery,
             onOpenPlace = ::openDetail,
             onEditPlace = ::edit,
             onPlaceVisits = { openVisits(it.place.uuid) },
@@ -206,6 +235,7 @@ private fun LuoghiNavigation(
             onSortPlaces = vm::updatePlaceSort,
             onRefreshLocation = vm::refreshListLocation,
             onToggleTagFilter = vm::togglePlaceTagFilter,
+            onExplore = { destinationName = AppDestination.EXPLORE.name },
             onGlobalMap = {
                 context.startActivity(MapViewerCapsule.globalMapIntent(context, state.placeItems.map { it.place }))
             },
@@ -223,11 +253,16 @@ private fun LuoghiNavigation(
             },
         )
 
+        AppDestination.EXPLORE -> destinationState.SaveableStateProvider("explore") {
+            com.gernalix.luoghi.ui.explore.ExplorePlacesScreen(state.places, ::openHome) { place ->
+                resolveItem(place.uuid)?.let(::openDetail)
+            }
+        }
         AppDestination.PLACE_DETAIL -> selectedItem?.let { item ->
             PlaceDetailScreen(
                 item = item,
                 stats = state.stats.places.firstOrNull { it.place.uuid == item.place.uuid },
-                onBack = ::openHome,
+                onBack = ::navigateBack,
                 onEdit = { edit(item) },
                 onMap = { showMap(item) },
                 onHistory = {
@@ -270,6 +305,13 @@ private fun LuoghiNavigation(
             addressState = state.addressAutocomplete,
             onAddressChange = vm::updateAddress,
             onAddressSuggestion = vm::selectAddressSuggestion,
+            onUseCurrentLocation = {
+                if (hasAnyLocationPermission(context)) vm.useCurrentPlaceLocation()
+                else editorLocationPermissionLauncher.launch(arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
+                ))
+            },
+            onUseAddressLocation = vm::usePlaceAddressLocation,
             onNicknameChange = vm::updateNickname,
             onRadiusChange = vm::updateRadius,
             onNotesChange = vm::updateNotes,
@@ -348,6 +390,7 @@ private fun LuoghiNavigation(
         val place = state.places.firstOrNull { it.uuid == placeId }
         if (place != null) {
             GeofenceSettingsDialog(
+                place = place,
                 initial = state.geofenceConfigs[placeId] ?: PlaceGeofenceConfigEntity(placeUuid = placeId),
                 onDismiss = { geofencePlaceId = null },
                 onSave = {
@@ -367,6 +410,8 @@ private fun LuoghiNavigation(
                         when (message) {
                             GeofenceMessage.SAVED -> R.string.geofence_saved
                             GeofenceMessage.PERMISSION_MISSING -> R.string.geofence_permission_missing
+                            GeofenceMessage.COORDINATES_MISSING -> R.string.geofence_coordinates_required
+                            GeofenceMessage.REGISTRATION_FAILED -> R.string.geofence_registration_failed
                         }
                     )
                 )
@@ -441,6 +486,7 @@ private fun ManualVisitDialog(
 
 @Composable
 private fun GeofenceSettingsDialog(
+    place: com.gernalix.luoghi.data.PlaceEntity,
     initial: PlaceGeofenceConfigEntity,
     onDismiss: () -> Unit,
     onSave: (PlaceGeofenceConfigEntity) -> Unit,
@@ -458,23 +504,46 @@ private fun GeofenceSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.geofence_settings)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(place.nickname.ifBlank { stringResource(R.string.unnamed_place) }, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.geofence_radius_help,
+                    com.gernalix.luoghi.capsules.checkin.CheckInPolicy.effectiveRadiusM(place).toInt()),
+                    style = MaterialTheme.typography.bodySmall)
+                if (place.lat == null || place.lon == null) {
+                    Text(stringResource(R.string.geofence_coordinates_required), color = MaterialTheme.colorScheme.error)
+                }
                 CheckRow(checked = enabled, label = stringResource(R.string.geofence_enabled), onCheckedChange = { enabled = it })
-                Text(
-                    stringResource(R.string.geofence_background_disclosure),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                CheckRow(checked = enterEnabled, label = stringResource(R.string.geofence_enter_enabled), onCheckedChange = { enterEnabled = it })
-                ActionRow(
+                Text(stringResource(R.string.geofence_background_disclosure), style = MaterialTheme.typography.bodySmall)
+                if (enabled && !com.gernalix.luoghi.capsules.geofence.PlaceGeofenceRegistrar.hasBackgroundLocationPermission(LocalContext.current)) {
+                    val context = LocalContext.current
+                    Text(stringResource(R.string.geofence_permission_guidance), color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = {
+                        context.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.fromParts("package", context.packageName, null)))
+                    }) { Text(stringResource(R.string.geofence_open_app_settings)) }
+                }
+                GeofenceTransitionChoices(
+                    title = stringResource(R.string.geofence_arrival),
+                    automaticLabel = stringResource(R.string.geofence_automatic_checkin),
+                    transitionEnabled = enterEnabled,
                     automatic = enterAutomatic,
-                    onAutomaticChange = { enterAutomatic = it },
+                    enabled = enabled,
+                    onChoice = { active, automatic -> enterEnabled = active; enterAutomatic = automatic },
                 )
-                CheckRow(checked = exitEnabled, label = stringResource(R.string.geofence_exit_enabled), onCheckedChange = { exitEnabled = it })
-                ActionRow(
+                GeofenceTransitionChoices(
+                    title = stringResource(R.string.geofence_departure),
+                    automaticLabel = stringResource(R.string.geofence_automatic_checkout),
+                    transitionEnabled = exitEnabled,
                     automatic = exitAutomatic,
-                    onAutomaticChange = { exitAutomatic = it },
+                    enabled = enabled,
+                    onChoice = { active, automatic -> exitEnabled = active; exitAutomatic = automatic },
                 )
+                Text(stringResource(R.string.geofence_overlap_help), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.geofence_manual_alerts_help), style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
@@ -496,22 +565,38 @@ private fun GeofenceSettingsDialog(
 
 @Composable
 private fun CheckRow(checked: Boolean, label: String, onCheckedChange: (Boolean) -> Unit) {
-    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
         Text(label)
     }
 }
 
 @Composable
-private fun ActionRow(automatic: Boolean, onAutomaticChange: (Boolean) -> Unit) {
-    Column {
-        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            RadioButton(selected = !automatic, onClick = { onAutomaticChange(false) })
-            Text(stringResource(R.string.geofence_action_notify))
-        }
-        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            RadioButton(selected = automatic, onClick = { onAutomaticChange(true) })
-            Text(stringResource(R.string.geofence_action_automatic))
+private fun GeofenceTransitionChoices(
+    title: String,
+    automaticLabel: String,
+    transitionEnabled: Boolean,
+    automatic: Boolean,
+    enabled: Boolean,
+    onChoice: (Boolean, Boolean) -> Unit,
+) {
+    Column(Modifier.selectableGroup()) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        listOf(
+            Triple(stringResource(R.string.geofence_action_off), !transitionEnabled, { onChoice(false, automatic) }),
+            Triple(stringResource(R.string.geofence_action_notify), transitionEnabled && !automatic, { onChoice(true, false) }),
+            Triple(automaticLabel, transitionEnabled && automatic, { onChoice(true, true) }),
+        ).forEach { (label, selected, select) ->
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = select),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = selected, enabled = enabled, onClick = null)
+                Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.multitimetracker
 
+import androidx.core.content.edit
 import android.content.Context
 import com.example.multitimetracker.model.SessionUi
 
@@ -12,11 +13,11 @@ object RandomTimerStore {
     fun saveRun(context: Context, sessionId: Long, targetMinutes: Int) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val ids = prefs.getStringSet(KEY_IDS, emptySet()).orEmpty() + sessionId.toString()
-        prefs.edit()
-            .putStringSet(KEY_IDS, ids)
-            .putInt(KEY_TARGET_PREFIX + sessionId, targetMinutes.coerceAtLeast(1))
-            .putBoolean(KEY_ANSWERED_PREFIX + sessionId, false)
-            .apply()
+        prefs.edit {
+            putStringSet(KEY_IDS, ids)
+                .putInt(KEY_TARGET_PREFIX + sessionId, targetMinutes.coerceAtLeast(1))
+                .putBoolean(KEY_ANSWERED_PREFIX + sessionId, false)
+        }
     }
 
     fun randomSessionIds(context: Context): Set<Long> =
@@ -48,8 +49,8 @@ object RandomTimerStore {
 
     fun markAnswered(context: Context, sessionId: Long) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_ANSWERED_PREFIX + sessionId, true)
-            .apply()
+            .edit {
+                putBoolean(KEY_ANSWERED_PREFIX + sessionId, true)
+            }
     }
 }

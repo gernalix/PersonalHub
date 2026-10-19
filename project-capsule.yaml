@@ -6,14 +6,14 @@ identity:
 scope:
   purpose: Android personal information hub with local-first feature modules and one canonical Room database.
   boundaries:
-    - C2 owns task lifecycle and repository integration.
+    - The active development chat owns ordinary task execution; repo-task and the repository integrator own protected Git integration. C2/C3 are historical archives only.
     - MegaVault owns cross-project identity and repository inventory.
     - PersonalHub owns app behavior and its local data contract.
 repository:
   canonical_workdir: /home/daniele/projects/PersonalHub
   branch_policy: main is canonical; changes use isolated task branches and the repository single writer for integration.
 architecture:
-  summary: The Android app composes feature capsules over shared contracts and core services; personalhub.db is the sole writable runtime database.
+  summary: The Android app composes feature capsules over shared contracts and core services; personalhub.db owns canonical module data, while the Notifications capsule retains its original private append-only archive.
   entrypoints:
     - app/src/main/java/com/gernalix/personalhub/MainActivity.kt
     - settings.gradle.kts
@@ -25,7 +25,7 @@ architecture:
     - docs/ARCHITECTURE.md
     - .codex/CODE_MAP.tsv
 data:
-  schema: Room owns personalhub.db; the current exported schema is version 23 at core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/23.json.
+  schema: Room owns canonical personalhub.db at schema25, exported to core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/25.json. Notifications owns its private notifications.sqlite archive; shared History reads its public API without copying facts into Room/Git. Host QA history lives outside app data and Git at ~/.local/share/personalhub-qa/test-history.sqlite3.
   migrations: The APK does not perform historical migrations; use the checked-in external migration tools and docs/DATABASE_SCHEMA_UPGRADES.md before any schema-incompatible install.
 runtime:
   services: []
@@ -33,7 +33,7 @@ runtime:
   containers: []
 devices:
   - Android emulator for routine UI and functional QA.
-  - Physical Android devices only when acceptance requires real hardware or a device-specific check.
+  - Physical Android devices when acceptance requires real hardware, a device-specific check or explicit user selection.
 dependencies:
   - name: Android SDK and Gradle wrapper
     purpose: Build, lint and test the Android application.
@@ -44,7 +44,7 @@ dependencies:
   - name: MegaVault
     purpose: Cross-project identity, canonical repository and shared operational context.
   - name: codex-roadmap
-    purpose: C2 work-item lifecycle and Project Capsule v1 contract.
+    purpose: Historical Project Capsule v1 format reference; no active runtime or lifecycle dependency.
 commands:
   setup: {not_applicable: 'The checked-in Gradle wrapper and declared Android toolchain provide the project setup entrypoint.'}
   build: {argv: [./gradlew, assembleDebug], cwd: .}
@@ -58,7 +58,7 @@ commands:
     full: {argv: [python3, tools/project_capsule.py, --repo, ., --mode, FULL], cwd: .}
 safety:
   invariants:
-    - personalhub.db is the only writable runtime database; SAF is the user-controlled backup path and Git Data is the versioned history and explicit recovery path.
+    - personalhub.db is the canonical module database; keep the private Notifications archive under its capsule owner. SAF is the user-controlled backup path and Git Data is the versioned history and explicit recovery path.
     - Preserve existing device data; APK installation does not migrate the database.
     - Keep feature implementation private behind capsule APIs and shared contracts.
   risky_operations:
@@ -77,7 +77,7 @@ references:
   megavault: /home/daniele/MegaVault/megavault.sqlite
   c2: https://github.com/gernalix/codex-roadmap/blob/main/docs/project-capsule/README.md
 freshness:
-  reviewed_commit: 5ce494cf5fdbbe5d928a07aef322fcfc2e64add7
+  reviewed_commit: 9af92dcff5c635752b48c0c71970d37085c9abc4
   watch_paths:
     - app
     - contracts
@@ -91,10 +91,15 @@ freshness:
     - settings.gradle.kts
     - gradle.properties
     - gradle
+    - gradlew
+    - gradlew.bat
+    - NV.txt
+    - tools
+    - .gitattributes
 artifacts:
   agents: AGENTS.md
   architecture: docs/ARCHITECTURE.md
-  database_schema: core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/23.json
+  database_schema: core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/25.json
 validation_hooks:
   - id: project-capsule-contract
     argv: [python3, -m, unittest, discover, -s, tests, -p, test_project_capsule.py]

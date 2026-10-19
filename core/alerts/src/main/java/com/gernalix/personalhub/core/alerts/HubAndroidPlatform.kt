@@ -30,11 +30,7 @@ object HubNotificationPlatform {
             ) == PackageManager.PERMISSION_GRANTED
 
     fun pendingIntentFlags(base: Int = PendingIntent.FLAG_UPDATE_CURRENT): Int =
-        base or if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_IMMUTABLE
-        } else {
-            0
-        }
+        base or PendingIntent.FLAG_IMMUTABLE
 
     fun ensureChannel(
         context: Context,
@@ -44,7 +40,6 @@ object HubNotificationPlatform {
         description: String? = null,
         configure: NotificationChannel.() -> Unit = {},
     ): NotificationChannel? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
         manager.getNotificationChannel(id)?.let { return it }
         val channel = NotificationChannel(id, name, importance).apply {
@@ -104,11 +99,7 @@ object HubAlarmPlatform {
                 }
 
                 HubAlarmPrecision.ALLOW_WHILE_IDLE -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, operation)
-                    } else {
-                        manager.set(AlarmManager.RTC_WAKEUP, triggerAtMs, operation)
-                    }
+                    manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, operation)
                 }
 
                 HubAlarmPrecision.EXACT -> {
@@ -124,14 +115,12 @@ object HubAlarmPlatform {
                             visibleIntent,
                             operation,
                         )
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    } else {
                         manager.setExactAndAllowWhileIdle(
                             AlarmManager.RTC_WAKEUP,
                             triggerAtMs,
                             operation,
                         )
-                    } else {
-                        manager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMs, operation)
                     }
                 }
             }

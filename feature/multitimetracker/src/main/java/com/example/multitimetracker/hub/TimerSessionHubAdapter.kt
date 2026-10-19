@@ -19,9 +19,6 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
     private fun local(id: String) = identities.localKey("timer/session", id)?.toLongOrNull()
     private val sessions = DefaultSessionCore(context.applicationContext)
     private val appContext = context.applicationContext
-    private val fallbackStringId by lazy(LazyThreadSafetyMode.NONE) {
-        appContext.resources.getIdentifier("hub_session_time_fallback", "string", appContext.packageName)
-    }
 
     override suspend fun exists(canonicalId: String) = local(canonicalId)?.let(sessions::readSessionById) != null
     override suspend fun lifecycle(canonicalId: String) = if (exists(canonicalId)) HubEntityLifecycle.ACTIVE else HubEntityLifecycle.DELETED
@@ -115,5 +112,5 @@ class TimerSessionHubAdapter(private val context: Context) : HubEntityAdapter, H
         HubTimeFormat.pattern(startMs, "yyyy-MM-dd HH:mm")
 
     private fun mergedFallbackString(value: String): String =
-        if (fallbackStringId != 0) appContext.getString(fallbackStringId, value) else "Session on $value"
+        appContext.getString(com.example.multitimetracker.R.string.hub_session_time_fallback, value)
 }

@@ -9,7 +9,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.SQLiteMode
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
@@ -20,7 +19,7 @@ import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
-@SQLiteMode(SQLiteMode.Mode.NATIVE)
+
 class FinanceAccountsTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     private fun db(block: suspend (PersonalHubDatabase,FinanceCapsule) -> Unit) = runBlocking {

@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,13 +30,13 @@ import java.time.Instant
     var selected by remember { mutableStateOf<ConversationRow?>(null) }
     var person by remember { mutableStateOf<PersonChoice?>(null) }
     var search by remember { mutableStateOf("") };var app by remember { mutableStateOf("") }
-    var from by remember { mutableStateOf("") };var until by remember { mutableStateOf("") };var page by remember(search,app,from,until,selected,person,changes,profile) { mutableStateOf(0) }
-    var conversationPage by remember(app,changes) { mutableStateOf(0) }
+    var from by remember { mutableStateOf("") };var until by remember { mutableStateOf("") };var page by remember(search,app,from,until,selected,person,changes,profile) { mutableIntStateOf(0) }
+    var conversationPage by remember(app,changes) { mutableIntStateOf(0) }
     var failure by remember { mutableStateOf(false) };var pickPerson by remember { mutableStateOf(false) }
     var mapping by remember { mutableStateOf<Pair<String,String>?>(null) }
     var sources by remember { mutableStateOf<List<ArchiveEvent>?>(null) }
     var senderChoices by remember { mutableStateOf<List<IdentityRow>?>(null) }
-    var normalized by remember { mutableStateOf(0L) }
+    var normalized by remember { mutableLongStateOf(0L) }
     LaunchedEffect(changes) {
         try { withContext(Dispatchers.IO) { while(archive.normalizePending()==100) yield() };normalized++;failure=false }
         catch(_:Exception){failure=true}
@@ -57,7 +59,7 @@ import java.time.Instant
         Row { TextButton(onClick=onBack){Text(stringResource(R.string.back))};Text(stringResource(R.string.conversations_title),style=MaterialTheme.typography.titleLarge) }
         Text(stringResource(R.string.conversations_limits),style=MaterialTheme.typography.bodySmall)
         if(failure)Text(stringResource(R.string.archive_error))
-        OutlinedTextField(search,{search=it;page=0},label={Text(stringResource(R.string.search))},modifier=Modifier.fillMaxWidth())
+        com.gernalix.personalhub.core.ui.HubSearchField(search,{search=it;page=0},label=stringResource(R.string.search),singleLine=false,modifier=Modifier.fillMaxWidth())
         var appMenu by remember { mutableStateOf(false) }
         Row {
             Box { TextButton(onClick={appMenu=true}){Text(if(app.isBlank())stringResource(R.string.all_apps)else app)}
@@ -120,7 +122,7 @@ import java.time.Instant
     var search by remember { mutableStateOf("") };var rows by remember { mutableStateOf(emptyList<PersonChoice>()) };var failure by remember { mutableStateOf(false) }
     LaunchedEffect(search,include) { try { rows=withContext(Dispatchers.IO){(people.resolve(include)+people.search(search)).distinctBy { it.id }};failure=false }catch(_:Exception){failure=true} }
     AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.choose_person))},text={Column {
-        OutlinedTextField(search,{search=it},label={Text(stringResource(R.string.search_people))})
+        com.gernalix.personalhub.core.ui.HubSearchField(search,{search=it},label=stringResource(R.string.search_people),singleLine=false)
         if(failure)Text(stringResource(R.string.archive_error))
         LazyColumn { items(rows,key={it.id}) { p->TextButton(onClick={onSelect(p)}){Text(p.label)} } }
     }},confirmButton={TextButton(onClick=onDismiss){Text(stringResource(R.string.close))}})
@@ -128,7 +130,7 @@ import java.time.Instant
 
 @Composable private fun MappingDialog(people: PeopleBridge,store: ConversationsStore,profile: String,target: Pair<String,String>,onDismiss: () -> Unit,onFailure: () -> Unit) {
     val scope=rememberCoroutineScope()
-    var linked by remember { mutableStateOf(emptyList<String>()) };var resolved by remember { mutableStateOf(emptyList<PersonChoice>()) };var pick by remember { mutableStateOf(false) };var reload by remember { mutableStateOf(0) }
+    var linked by remember { mutableStateOf(emptyList<String>()) };var resolved by remember { mutableStateOf(emptyList<PersonChoice>()) };var pick by remember { mutableStateOf(false) };var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { try { linked=withContext(Dispatchers.IO){store.linked(profile,target.first,target.second)};resolved=withContext(Dispatchers.IO){people.resolve(linked)} }catch(_:Exception){onFailure()} }
     AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.people_links))},text={Column {
         Text(stringResource(R.string.manual_link_help))

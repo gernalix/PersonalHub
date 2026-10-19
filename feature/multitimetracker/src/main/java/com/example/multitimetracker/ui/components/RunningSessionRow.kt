@@ -1,5 +1,6 @@
 // v478
 package com.example.multitimetracker.ui.components
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
@@ -72,26 +73,30 @@ fun RunningSessionRow(
 
     key(sessionId) {
         val deleteRequested = remember(sessionId) { AtomicBoolean(false) }
-        val dismissState = rememberSwipeToDismissBoxState(
-            confirmValueChange = { value ->
-                when (value) {
-                    SwipeToDismissBoxValue.StartToEnd -> {
-                        onEdit()
-                        false
-                    }
-
-                    SwipeToDismissBoxValue.EndToStart -> {
-                        if (deleteRequested.compareAndSet(false, true)) onDelete()
-                        true
-                    }
-
-                    else -> false
-                }
-            }
-        )
+        val swipeScope = androidx.compose.runtime.rememberCoroutineScope()
+        val swipeActionInFlight = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+        val dismissState = rememberSwipeToDismissBoxState()
 
         SwipeToDismissBox(
             state = dismissState,
+            onDismiss = { direction ->
+                if (swipeActionInFlight.compareAndSet(false, true)) {
+                    when (direction) {
+                        SwipeToDismissBoxValue.StartToEnd -> swipeScope.launch {
+                            try { onEdit() }
+                            finally {
+                                try { dismissState.reset() }
+                                finally { swipeActionInFlight.set(false) }
+                            }
+                        }
+                        SwipeToDismissBoxValue.EndToStart -> {
+                            // Keep the dismissed row until its owner removes it, exactly once.
+                            if (deleteRequested.compareAndSet(false, true)) onDelete()
+                        }
+                        SwipeToDismissBoxValue.Settled -> swipeActionInFlight.set(false)
+                    }
+                }
+            },
             backgroundContent = {
                 val isEdit = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
                 val isDelete = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart

@@ -80,6 +80,13 @@ class AndroidPixelApkTests(unittest.TestCase):
             timeout=180.0,
         )
 
+    def test_paired_rollback_explicitly_allows_apk_downgrade(self) -> None:
+        completed = subprocess.CompletedProcess([], 0, "Success\n", "")
+        with mock.patch.object(installer.preflight, "resolve_tool", return_value="/sdk/adb"):
+            with mock.patch.object(installer.subprocess, "run", return_value=completed) as run:
+                installer.install(Path("/tmp/previous.apk"), "pixel-serial", paired_rollback=True)
+        self.assertEqual(["/sdk/adb", "-s", "pixel-serial", "install", "-r", "-d", "/tmp/previous.apk"], run.call_args.args[0])
+
     def test_install_timeout_is_reported_without_retry(self) -> None:
         with mock.patch.object(installer.preflight, "resolve_tool", return_value="/sdk/adb"):
             with mock.patch.object(

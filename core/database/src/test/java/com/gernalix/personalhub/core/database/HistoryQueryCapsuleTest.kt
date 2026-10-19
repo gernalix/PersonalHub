@@ -71,7 +71,7 @@ class HistoryQueryCapsuleTest {
         val latest = java.time.Instant.parse("2026-10-07T14:57:28.450Z").toEpochMilli()
         db.beginTransaction()
         try {
-            repeat(719) { i -> db.execSQL("INSERT INTO intake_events(id,substance_id,timestamp_ms,timestamp_utc,dose,dose_unit,tap_group_id,quantity,applied_stock_delta,prescription_id) VALUES(?,1,?,?,1,'mg',NULL,1,1,NULL)",arrayOf(i+1,latest-i*1000,latest-i*1000)) }
+            repeat(719) { i -> db.execSQL("INSERT INTO intake_events(id,substance_id,timestamp_ms,timestamp_utc,dose,dose_unit,tap_group_id,quantity,applied_stock_delta,prescription_id) VALUES(?,1,?,?,1,'mg',NULL,1,1,NULL)",arrayOf<Any>(i+1,latest-i*1000,latest-i*1000)) }
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
         val filter=HistoryQueryCapsule.Filter(modules=setOf("substances"),query="ketoconazolo")

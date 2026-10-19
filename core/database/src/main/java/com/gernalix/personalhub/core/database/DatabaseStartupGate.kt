@@ -104,7 +104,7 @@ object DatabaseStartupGate {
     private fun showBlocked(activity: Activity, status: DatabaseStartupStatus) {
         val density = activity.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
-        val current = status.currentVersion?.toString() ?: "unreadable"
+        val current = status.currentVersion?.toString() ?: activity.getString(R.string.personalhub_database_schema_unreadable)
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
@@ -115,23 +115,22 @@ object DatabaseStartupGate {
             )
         }
         root.addView(TextView(activity).apply {
-            text = "Database update required"
+            text = activity.getString(R.string.personalhub_database_update_required)
             textSize = 24f
             setTypeface(typeface, Typeface.BOLD)
         })
         root.addView(TextView(activity).apply {
-            text = buildString {
-                append("PersonalHub blocked this screen before any module could access the database.\n\n")
-                append("Installed schema: $current\n")
-                append("Required schema: ${status.requiredVersion}\n\n")
-                append(status.reason ?: "The database is not ready.")
-                append("\n\nRun the external database migration, then reopen PersonalHub.")
-            }
+            text = activity.getString(
+                R.string.personalhub_database_blocked_details,
+                current,
+                status.requiredVersion,
+                status.reason ?: activity.getString(R.string.personalhub_database_not_ready),
+            )
             textSize = 16f
             setPadding(0, dp(16), 0, dp(20))
         })
         root.addView(Button(activity).apply {
-            text = "Close PersonalHub"
+            text = activity.getString(R.string.personalhub_database_close)
             setOnClickListener { activity.finishAffinity() }
         })
         activity.setContentView(root)

@@ -1,4 +1,9 @@
 <resources>
     <string name="personalhub_database_preparing">Preparing PersonalHub database…</string>
     <string name="personalhub_database_startup_failed">Database startup check failed; existing data was preserved.</string>
+    <string name="personalhub_database_update_required" translatable="false">Database update required</string>
+    <string name="personalhub_database_schema_unreadable" translatable="false">unreadable</string>
+    <string name="personalhub_database_not_ready" translatable="false">The database is not ready.</string>
+    <string name="personalhub_database_blocked_details" translatable="false">PersonalHub blocked this screen before any module could access the database.\n\nInstalled schema: %1$s\nRequired schema: %2$d\n\n%3$s\n\nRun the external database migration, then reopen PersonalHub.</string>
+    <string name="personalhub_database_close" translatable="false">Close PersonalHub</string>
 </resources>

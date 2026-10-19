@@ -1,6 +1,7 @@
 package com.example.multitimetracker.widget
 
 import android.app.Activity
+import android.content.Intent
 import android.appwidget.AppWidgetManager
 import android.os.Bundle
 import android.view.ViewGroup
@@ -11,6 +12,8 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.example.multitimetracker.R
 import com.example.multitimetracker.core.quickevent.DefaultQuickEventCore
 import com.example.multitimetracker.core.quickevent.QuickEventTarget
@@ -73,12 +76,23 @@ class QuickEventWidgetConfigureActivity : Activity() {
                 val target = selected ?: return@setOnClickListener
                 QuickEventWidgetPrefs.save(applicationContext, appWidgetId, target)
                 QuickEventWidgetProvider.updateOne(applicationContext, appWidgetId)
-                setResult(RESULT_OK, intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+                setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
                 finish()
             }
         }
         root.addView(saveButton)
+        // These platform-view pickers also run under enforced edge-to-edge.
+        // Preserve their existing spacing while keeping controls outside system UI.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val safe = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.ime()
+            )
+            view.setPadding(32 + safe.left, 32 + safe.top, 32 + safe.right, 32 + safe.bottom)
+            insets
+        }
         setContentView(root)
+        ViewCompat.requestApplyInsets(root)
         search.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {

@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -70,7 +70,7 @@ class SinceWhenEditorRoundTripDeviceTest {
             assertEquals(17, Instant.ofEpochMilli(created.initialTimestamp).atZone(ZoneId.systemDefault()).minute)
             assertEquals(listOf(tag.id), runBlocking { tags.tags(HubEntityRef("since_when", "counter", created.canonicalId)).map { it.id } })
             scenario.recreate()
-            node("sincewhen-edit-${created.id}").performClick()
+            compose.onNodeWithTag("sincewhen-edit-${created.id}", useUnmergedTree = true).performScrollTo().performClick()
             waitEditor()
             node("sincewhen-description").assertTextContains("Created through autonomous UI")
             click("sincewhen-color-4281032106") // selected color stays selected
@@ -88,7 +88,7 @@ class SinceWhenEditorRoundTripDeviceTest {
             assertEquals(23, Instant.ofEpochMilli(edited.endTimestamp!!).atZone(ZoneId.systemDefault()).hour)
             assertEquals(52, Instant.ofEpochMilli(edited.endTimestamp!!).atZone(ZoneId.systemDefault()).minute)
             scenario.recreate()
-            node("sincewhen-edit-${edited.id}").performClick()
+            compose.onNodeWithTag("sincewhen-edit-${edited.id}", useUnmergedTree = true).performScrollTo().performClick()
             waitEditor()
             time("sincewhen-start", "13", "47") // unchanged picker must preserve milliseconds
             click("sincewhen-has-end")

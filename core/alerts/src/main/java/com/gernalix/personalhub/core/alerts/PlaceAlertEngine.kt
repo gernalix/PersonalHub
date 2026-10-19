@@ -22,6 +22,13 @@ class PlaceAlertEngine(
         placeUuid: String,
         eventTrigger: AlertTrigger,
         firedAtMs: Long = System.currentTimeMillis(),
+    ): Int = onPlaceEvents(listOf(placeUuid), eventTrigger, firedAtMs)
+
+    /** One explicit action can match several nearby places, but each rule fires at most once. */
+    suspend fun onPlaceEvents(
+        placeUuids: Collection<String>,
+        eventTrigger: AlertTrigger,
+        firedAtMs: Long = System.currentTimeMillis(),
     ): Int {
         require(
             eventTrigger == AlertTrigger.PLACE_CHECK_IN || eventTrigger == AlertTrigger.PLACE_CHECK_OUT
@@ -31,18 +38,20 @@ class PlaceAlertEngine(
         val rules = alertDao.activeRules(AlertDomain.PLACE.name)
         if (rules.isEmpty()) return 0
 
-        val place = database.placeDao().getPlace(placeUuid) ?: return 0
-        val actualTags = SharedTagEngine(database).tags(HubEntityRef("places", "place", placeUuid))
-        val actualTagIds = actualTags.mapTo(linkedSetOf()) { it.id }
+        val candidates = placeUuids.distinct().mapNotNull { placeUuid ->
+            val place = database.placeDao().getPlace(placeUuid) ?: return@mapNotNull null
+            val tags = SharedTagEngine(database).tags(HubEntityRef("places", "place", placeUuid))
+            Triple(place, tags, AlertEventSpec(
+                domain = AlertDomain.PLACE,
+                trigger = eventTrigger,
+                entityId = placeUuid,
+                tagIds = tags.mapTo(linkedSetOf()) { it.id },
+            ))
+        }
+        if (candidates.isEmpty()) return 0
         val tagTargets = alertDao.placeTagTargets(rules.map { it.id })
             .groupBy { it.ruleId }
             .mapValues { (_, rows) -> rows.mapTo(linkedSetOf()) { it.placeTagId } }
-        val event = AlertEventSpec(
-            domain = AlertDomain.PLACE,
-            trigger = eventTrigger,
-            entityId = placeUuid,
-            tagIds = actualTagIds,
-        )
 
         var firedCount = 0
         for (rule in rules) {
@@ -60,7 +69,12 @@ class PlaceAlertEngine(
                 cooldownMs = rule.cooldownMs,
                 lastFiredAtMs = rule.lastFiredAt,
             )
-            if (!AlertMatching.ruleMatches(spec, event, firedAtMs)) continue
+            // Do not union tags across places: ALL tags must match one actual candidate.
+            val (place, actualTags, event) = candidates.firstOrNull {
+                AlertMatching.ruleMatches(spec, it.third, firedAtMs)
+            } ?: continue
+            val placeUuid = place.uuid
+            val actualTagIds = event.tagIds
 
             val fire = AlertFire(
                 ruleId = rule.id,

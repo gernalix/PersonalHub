@@ -3,8 +3,8 @@ package com.gernalix.personalhub.core.alerts
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.content.pm.ResolveInfo
-import android.net.Uri
+import android.content.ComponentName
+import android.content.IntentFilter
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.hubcontext.WorkflowyIntegrationSettings
@@ -29,16 +29,28 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class AlertNotificationTapTest {
+    private fun registerBrowser(context: Context) {
+        val manager = shadowOf(context.packageManager)
+        val browser = ComponentName("browser.test", "Viewer")
+        manager.addOrUpdateActivity(ActivityInfo().apply {
+            packageName = browser.packageName
+            name = browser.className
+            exported = true
+        })
+        manager.addIntentFilterForActivity(browser, IntentFilter(Intent.ACTION_VIEW).apply {
+            addCategory(Intent.CATEGORY_DEFAULT)
+            addCategory(Intent.CATEGORY_BROWSABLE)
+            addDataScheme("https")
+        })
+    }
+
     @Test fun placesTimerAndRestartedRandomAlertTapsRespectGateAndPersistentLinks() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val adapters = listOf(QaAlertAdapter("places"), QaAlertAdapter("timer"), ResourceHubAdapter(context))
         HubContextRuntime.initialize(context, adapters)
         WorkflowyIntegrationSettings.setEnabled(context, true)
         val url = "https://workflowy.com/#/59d823cea257"
-        val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
-        shadowOf(context.packageManager).addResolveInfoForIntent(view, ResolveInfo().apply {
-            activityInfo = ActivityInfo().apply { packageName = "browser.test"; name = "Viewer" }
-        })
+        registerBrowser(context)
         val anchors = listOf(
             HubEntityRef("places", "alert", UUID.randomUUID().toString()),
             HubEntityRef("timer", "alert", UUID.randomUUID().toString()),
@@ -100,10 +112,7 @@ class AlertNotificationTapTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         WorkflowyIntegrationSettings.setEnabled(context, true)
         val url = "https://workflowy.com/#/59d823cea257"
-        val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
-        shadowOf(context.packageManager).addResolveInfoForIntent(view, ResolveInfo().apply {
-            activityInfo = ActivityInfo().apply { packageName = "browser.test"; name = "Viewer" }
-        })
+        registerBrowser(context)
 
         val pending = AlertNotificationDispatcher.contentPendingIntent(
             context, 9917, "Remember this", linkedUrl = url,

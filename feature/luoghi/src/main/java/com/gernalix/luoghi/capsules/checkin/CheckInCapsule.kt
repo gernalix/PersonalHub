@@ -24,14 +24,20 @@ class CheckInCapsule(
     fun choosePlace(places: List<PlaceEntity>, location: LocationSample): CheckInMatchDecision =
         CheckInPolicy.choosePlace(places, location)
 
-    suspend fun checkIn(placeUuid: String, location: LocationSample, source: String = "Luoghi"): Long {
+    suspend fun checkIn(
+        placeUuid: String,
+        location: LocationSample,
+        source: String = "Luoghi",
+        geofencePlaceUuids: Collection<String> = emptyList(),
+    ): Long {
         val id = repository.recordPlaceEvent(
             placeUuid = placeUuid,
             eventType = PlaceEventTypes.CHECK_IN,
             location = location,
             source = source,
+            geofencePlaceUuids = geofencePlaceUuids,
         )
-        alertEngine?.onPlaceEvent(placeUuid, AlertTrigger.PLACE_CHECK_IN)
+        alertEngine?.onPlaceEvents(repository.geofencePlacesForEvent(id), AlertTrigger.PLACE_CHECK_IN)
         return id
     }
 
@@ -55,7 +61,7 @@ class CheckInCapsule(
             location = location,
             source = source,
         )
-        alertEngine?.onPlaceEvent(placeUuid, AlertTrigger.PLACE_CHECK_OUT)
+        alertEngine?.onPlaceEvents(repository.geofencePlacesForEvent(id), AlertTrigger.PLACE_CHECK_OUT)
         return id
     }
 
@@ -65,9 +71,10 @@ class CheckInCapsule(
         location: LocationSample? = null,
         source: String = "Luoghi manual",
     ): HistoryMutationResult {
+        val candidateIds = repository.geofencePlacesForActiveVisit(placeUuid)
         val result = repository.closeCanonicalVisit(placeUuid, timestamp, location, source)
         if (result is HistoryMutationResult.Success) {
-            alertEngine?.onPlaceEvent(placeUuid, AlertTrigger.PLACE_CHECK_OUT, timestamp)
+            alertEngine?.onPlaceEvents(candidateIds, AlertTrigger.PLACE_CHECK_OUT, timestamp)
         }
         return result
     }
@@ -90,8 +97,8 @@ class CheckInCapsule(
             radiusM = mutation.radiusM ?: CheckInPolicy.DEFAULT_RADIUS_M,
             notes = mutation.notes,
             sourceApp = mutation.sourceApp,
+            tagNames = mutation.tagNames,
         )
-        repository.setPlaceTags(uuid, mutation.tagNames)
         checkIn(uuid, location)
         return uuid
     }

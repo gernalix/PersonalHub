@@ -1,5 +1,6 @@
 package com.gernalix.personalhub
 
+import androidx.core.net.toUri
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -107,7 +108,7 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
         confirmButton = {
             if (duplicateId != null) {
                 TextButton(enabled = !saving, onClick = {
-                    context.startActivity(Intent(context, SinceWhenActivity::class.java).setData(android.net.Uri.parse("personalhub://sincewhen/v1/counter/$duplicateId")))
+                    context.startActivity(Intent(context, SinceWhenActivity::class.java).setData(("personalhub://sincewhen/v1/counter/$duplicateId").toUri()))
                     onBack()
                 }) { Text(stringResource(R.string.since_when_open_counter)) }
             } else {

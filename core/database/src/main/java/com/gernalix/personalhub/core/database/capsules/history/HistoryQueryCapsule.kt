@@ -135,8 +135,10 @@ object HistoryQueryCapsule {
                     "instr(lower('Typing session WordPulse'),?)>0"
                 },
         )
+        val recordModule = "CASE WHEN e.local_table='since_when_counters' THEN " +
+            "(SELECT CASE WHEN c.mode='COUNTDOWN' THEN 'countdown' ELSE 'since_when' END FROM since_when_counters c WHERE CAST(c.id AS TEXT)=e.local_key) ELSE e.owning_module END"
         val clauses = mutableListOf("e.lifecycle='ACTIVE'")
-        filter.modules?.let { modules -> clauses += "e.owning_module IN (${modules.joinToString(",") { "?" }})"; args.addAll(modules.sorted()) }
+        filter.modules?.let { modules -> clauses += "$recordModule IN (${modules.joinToString(",") { "?" }})"; args.addAll(modules.sorted()) }
         filter.fromMs?.let { clauses += "r.occurred_at>=?"; args += it }
         filter.toMs?.let { clauses += "r.occurred_at<=?"; args += it }
         filter.entityKind?.let { clauses += "e.entity_kind=?"; args += it }
@@ -147,7 +149,7 @@ object HistoryQueryCapsule {
         }
         args += limit+1
         val sql = "WITH records AS (${sources.joinToString(" UNION ALL ")}) " +
-            "SELECT e.canonical_id,e.owning_module,r.occurred_at,e.entity_kind,r.label,r.detail FROM records r " +
+            "SELECT e.canonical_id,$recordModule,r.occurred_at,e.entity_kind,r.label,r.detail FROM records r " +
             "JOIN hub_entities e ON e.local_table=r.local_table AND e.local_key=r.local_key WHERE " +
             clauses.joinToString(" AND ") + " ORDER BY r.occurred_at DESC,e.canonical_id DESC LIMIT ?"
         val rows = db.query(sql,args.toTypedArray()).use { c -> buildList {
@@ -161,7 +163,9 @@ object HistoryQueryCapsule {
     private fun moduleCase(column: String): String {
         val tables = GIT_PEOPLE_TABLES + GIT_PLACES_TABLES + GIT_SUBSTANCES_TABLES + GIT_WORDPULSE_TABLES + GIT_TIMER_TABLES + GIT_TAG_TABLES
         return "CASE WHEN $column LIKE 'finance_%' THEN 'soldi' WHEN $column LIKE 'health_%' THEN 'salute' " +
-            "WHEN $column='since_when_counters' THEN 'since_when' " +
+            "WHEN $column='since_when_counters' THEN COALESCE(" +
+            "(SELECT CASE WHEN c.mode='COUNTDOWN' THEN 'countdown' ELSE 'since_when' END FROM since_when_counters c WHERE c.canonical_id=e.canonical_id)," +
+            "(SELECT m.module FROM mutation_events m WHERE m.canonical_id=e.canonical_id AND m.entity_kind='since_when/counter' ORDER BY m.occurred_at DESC,m.sequence DESC LIMIT 1),'since_when') " +
             tables.joinToString(" ") { "WHEN $column='$it' THEN '${moduleForTable(it)}'" } + " ELSE 'hub' END"
     }
 

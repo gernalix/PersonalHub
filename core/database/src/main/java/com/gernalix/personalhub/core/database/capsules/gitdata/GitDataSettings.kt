@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database.capsules.gitdata
 
+import androidx.core.content.edit
 import android.content.Context
 import com.gernalix.personalhub.core.database.DatabaseProfiles
 import android.security.keystore.KeyGenParameterSpec
@@ -214,45 +215,45 @@ object GitDataSettings {
     }
 
     internal fun setRuntimeState(context: Context, state: String) {
-        statusPrefs(context).edit().putString("runtime_state", state).apply()
+        statusPrefs(context).edit { putString("runtime_state", state)}
     }
 
     internal fun recordError(context: Context, error: Throwable) {
-        statusPrefs(context).edit()
-            .putString("runtime_state", "retry")
-            .putString("last_error", error.message ?: error.javaClass.simpleName)
-            .apply()
+        statusPrefs(context).edit {
+            putString("runtime_state", "retry")
+                .putString("last_error", error.message ?: error.javaClass.simpleName)
+        }
     }
 
     internal fun recordAttention(context: Context, message: String) {
-        statusPrefs(context).edit()
-            .putString("runtime_state", "attention")
-            .putString("last_error", message)
-            .apply()
+        statusPrefs(context).edit {
+            putString("runtime_state", "attention")
+                .putString("last_error", message)
+        }
     }
 
     internal fun markPushed(context: Context, generation: Long, revision: String) {
-        statusPrefs(context).edit()
-            .putString("runtime_state", "complete")
-            .putLong("last_push_at", System.currentTimeMillis())
-            .putLong("last_pushed_generation", generation)
-            .putString("last_remote_revision", revision)
-            .remove("last_error")
-            .apply()
+        statusPrefs(context).edit {
+            putString("runtime_state", "complete")
+                .putLong("last_push_at", System.currentTimeMillis())
+                .putLong("last_pushed_generation", generation)
+                .putString("last_remote_revision", revision)
+                .remove("last_error")
+        }
     }
 
     internal fun markPulled(context: Context, revision: String) {
-        statusPrefs(context).edit()
-            .putLong("last_pull_at", System.currentTimeMillis())
-            .putString("last_remote_revision", revision)
-            .remove("last_error")
-            .apply()
+        statusPrefs(context).edit {
+            putLong("last_pull_at", System.currentTimeMillis())
+                .putString("last_remote_revision", revision)
+                .remove("last_error")
+        }
     }
 
     internal fun recordPendingPatches(context: Context, ids: Collection<String>) {
-        statusPrefs(context).edit()
-            .putStringSet("pending_patch_ids", ids.toSortedSet())
-            .apply()
+        statusPrefs(context).edit {
+            putStringSet("pending_patch_ids", ids.toSortedSet())
+        }
     }
 
     @Synchronized
@@ -286,6 +287,6 @@ object GitDataSettings {
             .orEmpty()
             .toMutableSet()
         pending.remove(patchId)
-        statusPrefs(context).edit().putStringSet("pending_patch_ids", pending).apply()
+        statusPrefs(context).edit { putStringSet("pending_patch_ids", pending)}
     }
 }

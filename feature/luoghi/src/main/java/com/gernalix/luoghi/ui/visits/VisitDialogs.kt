@@ -205,7 +205,7 @@ fun VisitEventEditDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                val timestamp = parseVisitTimestampInput(timestampText)
+                val timestamp = parseVisitTimestampInput(timestampText, event.timestamp)
                 if (timestamp == null) parseFailed = true else onSave(timestamp, notesText)
             }) { Text(stringResource(R.string.save)) }
         },
@@ -294,13 +294,22 @@ private fun anomalyList(anomalies: Set<VisitAnomaly>): String {
 fun formatVisitTimestampForInput(timestamp: Long): String =
     HISTORY_EDIT_FORMATTER.format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
 
-fun parseVisitTimestampInput(value: String): Long? = try {
-    LocalDateTime.parse(value.trim(), HISTORY_EDIT_FORMATTER)
-        .atZone(ZoneId.systemDefault())
-        .toInstant()
-        .toEpochMilli()
-} catch (_: DateTimeParseException) {
-    null
+fun parseVisitTimestampInput(value: String, unchangedTimestamp: Long? = null): Long? {
+    val text = value.trim()
+    // Editing only notes must preserve milliseconds and the chosen DST offset.
+    if (unchangedTimestamp != null && text == formatVisitTimestampForInput(unchangedTimestamp)) return unchangedTimestamp
+    for (formatter in HISTORY_INPUT_FORMATTERS) {
+        val local = try { LocalDateTime.parse(text, formatter) } catch (_: DateTimeParseException) { continue }
+        val zone = ZoneId.systemDefault()
+        if (zone.rules.getValidOffsets(local).isEmpty()) return null
+        return local.atZone(zone).toInstant().toEpochMilli()
+    }
+    return null
 }
 
-private val HISTORY_EDIT_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("d/M/yy HH:mm")
+private val HISTORY_EDIT_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("d/M/uuuu HH:mm:ss", java.util.Locale.ROOT)
+private val HISTORY_INPUT_FORMATTERS = listOf("d/M/uuuu HH:mm", "d/M/uu HH:mm").map { pattern ->
+    java.time.format.DateTimeFormatterBuilder().appendPattern(pattern)
+        .optionalStart().appendPattern(":ss").optionalEnd()
+        .toFormatter(java.util.Locale.ROOT).withResolverStyle(java.time.format.ResolverStyle.STRICT)
+}

@@ -56,10 +56,40 @@ class SharedTagEngineTest {
         assertTrue(engine.matches(canonicalFixture(database, "people", "person", "untagged"), HubTagFilter(noTags = true)))
     }
 
+    @Test fun countdownSharesCountersButKeepsTagsAndHistorySeparate() = runBlocking {
+        val dao = database.sinceWhenCounterDao()
+        val sinceId = dao.insert(com.gernalix.personalhub.contracts.database.SinceWhenCounterEntity(title = "Since", initialTimestamp = 1, createdAt = 1))
+        val countdownId = dao.insert(com.gernalix.personalhub.contracts.database.SinceWhenCounterEntity(title = "Countdown", initialTimestamp = 2, createdAt = 1,
+            mode = com.gernalix.personalhub.contracts.database.CounterModes.COUNTDOWN))
+        val since = requireNotNull(dao.get(sinceId))
+        val countdown = requireNotNull(dao.get(countdownId))
+        val sinceRef = HubEntityRef("since_when", "counter", since.canonicalId)
+        val countdownRef = HubEntityRef("since_when", "counter", countdown.canonicalId)
+        val sinceTag = engine.getOrCreate(HubTagNamespaces.SINCE_WHEN, "Focus")
+        val countdownTag = engine.getOrCreate(HubTagNamespaces.COUNTDOWN, "Focus")
+        val timerTag = engine.getOrCreate(HubTagNamespaces.TIMER_NOW, "Focus")
+        engine.assign(sinceRef, listOf(sinceTag.id))
+        engine.assign(countdownRef, listOf(countdownTag.id))
+        assertFails { engine.assign(countdownRef, listOf(sinceTag.id)) }
+        assertFails { engine.assign(sinceRef, listOf(countdownTag.id)) }
+        assertFails { engine.assign(countdownRef, listOf(timerTag.id)) }
+        val sql = database.openHelper.readableDatabase
+        val filter = com.gernalix.personalhub.core.database.capsules.history.HistoryQueryCapsule.Filter(modules = setOf("countdown"))
+        val query = com.gernalix.personalhub.core.database.capsules.history.HistoryQueryCapsule
+        assertEquals(listOf(countdown.canonicalId), query.records(sql, filter).groups.map { it.groupId })
+        assertTrue(query.page(sql, filter).groups.isNotEmpty())
+        assertTrue(query.page(sql, filter).groups.all { it.module == "countdown" })
+        assertEquals(setOf(countdownTag.id), engine.tags(countdownRef).map { it.id }.toSet())
+        dao.delete(countdown)
+        assertTrue(query.records(sql, filter).groups.isEmpty())
+        assertTrue(query.page(sql, filter).groups.isNotEmpty())
+        assertEquals(setOf(sinceTag.id), engine.tags(sinceRef).map { it.id }.toSet())
+    }
+
     @Test fun timerNamespacesRemainIndependentForRenameArchiveDeleteAndMerge() = runBlocking {
         val now = engine.createStable("timer.now:7", HubTagNamespaces.TIMER_NOW, "Focus")
         val events = engine.createStable("timer.events:7", HubTagNamespaces.TIMER_EVENTS, "Focus")
-        val since = engine.createStable("timer.since_when:7", HubTagNamespaces.TIMER_SINCE_WHEN, "Focus")
+        val since = engine.createStable("timer.since_when:7", HubTagNamespaces.SINCE_WHEN, "Focus")
         engine.assign(canonicalFixture(database, "timer", "session", "1"), listOf(now.id))
         engine.assign(canonicalFixture(database, "timer", "quick_event_entry", "2"), listOf(events.id))
         engine.assign(canonicalFixture(database, "timer", "life_period", "3"), listOf(since.id))

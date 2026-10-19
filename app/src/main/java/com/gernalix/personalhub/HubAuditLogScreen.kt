@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -80,11 +79,11 @@ fun HubAuditLogScreen(onBack: () -> Unit) {
             Text(stringResource(R.string.audit_title), style = MaterialTheme.typography.headlineMedium)
         }
         Text(stringResource(R.string.audit_mutation_source), style = MaterialTheme.typography.bodySmall)
-        OutlinedTextField(
+        com.gernalix.personalhub.core.ui.HubSearchField(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.audit_search_hint)) },
+            label = stringResource(R.string.audit_search_hint),
             singleLine = true,
         )
         LazyColumn(

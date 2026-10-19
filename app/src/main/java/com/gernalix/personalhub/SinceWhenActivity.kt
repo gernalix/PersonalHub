@@ -21,7 +21,15 @@ class SinceWhenActivity : ComponentActivity() {
         setContent {
             PersonalHubTheme {
                 Surface(Modifier.fillMaxSize()) {
-                    SinceWhenScreen(onBack = ::finish, initialCounterId = counterId)
+                    val mode = androidx.compose.runtime.produceState<String?>(null, counterId) {
+                        value = counterId?.let { com.gernalix.personalhub.core.database.PersonalHubDatabase.get(this@SinceWhenActivity).sinceWhenCounterDao().get(it)?.mode }
+                            ?: com.gernalix.personalhub.contracts.database.CounterModes.SINCE_WHEN
+                    }.value
+                    mode?.let {
+                        com.gernalix.personalhub.core.ui.ModuleHistoryHost(com.gernalix.personalhub.contracts.database.CounterModes.module(it), counterId) {
+                            SinceWhenScreen(onBack = ::finish, initialCounterId = counterId, mode = it)
+                        }
+                    }
                 }
             }
         }

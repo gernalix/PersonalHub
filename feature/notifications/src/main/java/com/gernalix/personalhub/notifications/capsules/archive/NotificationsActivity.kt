@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import androidx.compose.runtime.mutableIntStateOf
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
@@ -29,7 +30,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class NotificationsActivity : ComponentActivity() {
-    private var generation by mutableStateOf(0)
+    private var generation by mutableIntStateOf(0)
     private var exportResult by mutableStateOf<Int?>(null)
     private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.sqlite3")) { uri ->
         if (uri != null) {
@@ -44,10 +45,12 @@ class NotificationsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContent { MaterialTheme { Surface {
+            com.gernalix.personalhub.core.ui.ModuleHistoryHost("notifications", intent.getLongExtra(com.gernalix.personalhub.notifications.api.NotificationsRoute.EXTRA_EVENT_ID, -1)) {
             var conversations by remember { mutableStateOf(false) }
             if(conversations) ConversationsScreen(onBack={conversations=false}) else ArchiveScreen(generation, exportResult,
+            initialEventId=intent.getLongExtra(com.gernalix.personalhub.notifications.api.NotificationsRoute.EXTRA_EVENT_ID, -1).takeIf { it > 0 },
             onConversations={conversations=true},
-            onExport={export.launch("notifications.sqlite")}, onPermission={startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}, onBack={finish()}) } } }
+            onExport={export.launch("notifications.sqlite")}, onPermission={startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))}, onBack={finish()}) } } } }
     }
     override fun onResume() { super.onResume(); generation++ }
     internal suspend fun writeExport(uri: android.net.Uri) {
@@ -59,7 +62,7 @@ class NotificationsActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> Unit, onPermission: () -> Unit, onBack: () -> Unit, onConversations: () -> Unit) {
+internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> Unit, onPermission: () -> Unit, onBack: () -> Unit, onConversations: () -> Unit, initialEventId: Long? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val store = remember { ArchiveStore.get(context) }
     val changed by ArchiveStore.changes.collectAsState()
@@ -67,7 +70,13 @@ internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> 
     var from by remember { mutableStateOf("") }; var until by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf(emptyList<ArchiveEvent>()) }; var apps by remember { mutableStateOf(emptyList<String>()) }
     var selected by remember { mutableStateOf<ArchiveEvent?>(null) }
-    var error by remember { mutableStateOf(false) }; var more by remember(search,app,from,until,changed) { mutableStateOf(0) }
+    var error by remember { mutableStateOf(false) }; var more by remember(search,app,from,until,changed) { mutableIntStateOf(0) }
+    LaunchedEffect(initialEventId) {
+        initialEventId?.let { id ->
+            try { selected = withContext(Dispatchers.IO) { store.event(id) } }
+            catch (_: Exception) { error = true }
+        }
+    }
     val granted = remember(generation) { context.getSystemService(NotificationManager::class.java).isNotificationListenerAccessGranted(ComponentName(context,CollectorService::class.java)) }
     val status = context.getSharedPreferences("notification_status",0)
     LaunchedEffect(search,app,from,until,changed,more) {
@@ -86,7 +95,7 @@ internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> 
         if(error || status.getBoolean("capture_error",false)) Text(stringResource(R.string.archive_error))
         exportResult?.let { Text(stringResource(it)) }
         TextButton(onClick=onExport){Text(stringResource(R.string.export_local))}
-        OutlinedTextField(search,{search=it;more=0},label={Text(stringResource(R.string.search))},modifier=Modifier.fillMaxWidth())
+        com.gernalix.personalhub.core.ui.HubSearchField(search,{search=it;more=0},label=stringResource(R.string.search),singleLine=false,modifier=Modifier.fillMaxWidth())
         var menu by remember { mutableStateOf(false) }
         Box { TextButton(onClick={menu=true}){Text(if(app.isBlank()) stringResource(R.string.all_apps) else app)}
             DropdownMenu(menu,{menu=false}) {

@@ -2,6 +2,7 @@
 // v443
 package com.example.multitimetracker.persistence
 
+import androidx.core.content.edit
 import android.content.Context
 import com.example.multitimetracker.util.CapsuleAudit
 import com.example.multitimetracker.util.CapsuleWriteApi
@@ -408,9 +409,9 @@ object SnapshotStore {
         // 3) Legacy: keep prefs for backward compatibility across incremental installs.
         runCatching {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_JSON, json)
-                .apply()
+                .edit {
+                    putString(KEY_JSON, json)
+                }
         }
 
         // Autoexport is triggered by SnapshotSqlite.writeSnapshot after the DB transaction commits.

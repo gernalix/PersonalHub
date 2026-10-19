@@ -1,0 +1,2 @@
+# The generated Windows launcher uses CRLF; retain every standard whitespace check.
+gradlew.bat whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

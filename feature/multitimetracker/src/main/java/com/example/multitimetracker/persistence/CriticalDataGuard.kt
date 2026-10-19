@@ -1,5 +1,6 @@
 package com.example.multitimetracker.persistence
 
+import androidx.core.content.edit
 import android.content.Context
 import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
 import org.json.JSONObject
@@ -220,9 +221,9 @@ object CriticalDataGuard {
 
     fun rememberLastGood(context: Context, counts: CriticalDataCounts) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_LAST_COUNTS, counts.toJson().toString())
-            .apply()
+            .edit {
+                putString(KEY_LAST_COUNTS, counts.toJson().toString())
+            }
     }
 
     fun lastGood(context: Context): CriticalDataCounts? {

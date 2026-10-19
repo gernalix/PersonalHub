@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -28,6 +29,8 @@ internal class ArchiveStore(context: Context) : SQLiteOpenHelper(context,
         check(oldVersion==1 && newVersion==2); NormalizedArchive.create(db)
     }
     @Synchronized fun normalizePending(limit: Int = 100): Int = NormalizedArchive.process(writableDatabase,limit)
+    // Immutable event insertion and change publication share this explicit transaction boundary.
+    @SuppressLint("UseKtx")
     @Synchronized fun append(snapshot: JSONObject, requested: String, reason: Int? = null): Long {
         val db = writableDatabase
         db.beginTransaction()
@@ -40,7 +43,7 @@ internal class ArchiveStore(context: Context) : SQLiteOpenHelper(context,
                 put("captured",utc(snapshot.getString("captured"))); put("payload",snapshot.toString())
                 if (reason != null) put("reason",reason)
             })
-            db.execSQL("INSERT INTO event_search(docid,content) VALUES(?,?)", arrayOf(id, searchable(snapshot)))
+            db.execSQL("INSERT INTO event_search(docid,content) VALUES(?,?)", arrayOf<Any>(id, searchable(snapshot)))
             if (requested == "REMOVED") db.delete("active", "nkey=?", arrayOf(key))
             else db.execSQL("INSERT OR IGNORE INTO active(nkey) VALUES(?)", arrayOf(key))
             db.setTransactionSuccessful()
@@ -62,13 +65,35 @@ internal class ArchiveStore(context: Context) : SQLiteOpenHelper(context,
         if(app.isNotBlank()){clauses += "package=?";args+=app}
         if(from.isNotBlank()){clauses += "captured>=?";args+=utc(from)}
         if(until.isNotBlank()){clauses += "captured<?";args+=utc(until)}
-        val terms = Regex("[\\p{L}\\p{N}_]+").findAll(search).map { "\"${it.value}\"*" }.toList()
-        if(terms.isNotEmpty()){clauses += "id IN (SELECT docid FROM event_search WHERE content MATCH ?)";args+=terms.joinToString(" AND ")}
+        val terms = Regex("[\\p{L}\\p{N}_]+").findAll(search).map { "\"${it.value}*\"" }.toList()
+        if(terms.isNotEmpty()){clauses += "id IN (SELECT docid FROM event_search WHERE content MATCH ?)";args+=terms.joinToString(" ")}
         return readableDatabase.rawQuery("SELECT id,kind,payload,reason FROM events WHERE ${clauses.joinToString(" AND ")} ORDER BY captured DESC,id DESC LIMIT 100",args.toTypedArray()).use { c ->
             buildList { while(c.moveToNext())add(ArchiveEvent(c.getLong(0),c.getString(1),JSONObject(c.getString(2)),if(c.isNull(3)) null else c.getInt(3))) }
         }
     }
     @Synchronized fun apps(): List<String> = readableDatabase.rawQuery("SELECT DISTINCT package FROM events ORDER BY package",null).use { c -> buildList { while(c.moveToNext())add(c.getString(0)) } }
+    /** Shares History's descending time/key cursor without attaching or exporting this database. */
+    @Synchronized fun historyEvents(search: String, fromMs: Long?, toMs: Long?, beforeAt: Long?, beforeKey: String?, limit: Int): List<ArchiveEvent> {
+        require(limit in 1..101 && (beforeAt == null) == (beforeKey == null))
+        val clauses = mutableListOf("1=1")
+        val args = mutableListOf<String>()
+        fun timestamp(value: Long) = utc(java.time.Instant.ofEpochMilli(value).toString())
+        fromMs?.let { clauses += "captured>=?"; args += timestamp(it) }
+        toMs?.let { clauses += "captured<=?"; args += timestamp(it) }
+        beforeAt?.let {
+            clauses += "(captured<? OR (captured=? AND ('notifications:'||printf('%020d',id))<?))"
+            args += listOf(timestamp(it), timestamp(it), requireNotNull(beforeKey))
+        }
+        val terms = Regex("[\\p{L}\\p{N}_]+").findAll(search).map { "\"${it.value}*\"" }.toList()
+        if (search.isNotBlank() && terms.isEmpty()) return emptyList()
+        if (terms.isNotEmpty()) {
+            clauses += "id IN (SELECT docid FROM event_search WHERE content MATCH ?)"
+            args += terms.joinToString(" ")
+        }
+        return readableDatabase.rawQuery("SELECT id,kind,payload,reason FROM events WHERE ${clauses.joinToString(" AND ")} ORDER BY captured DESC,id DESC LIMIT $limit", args.toTypedArray()).use { c ->
+            buildList { while(c.moveToNext()) add(ArchiveEvent(c.getLong(0), c.getString(1), JSONObject(c.getString(2)), if(c.isNull(3)) null else c.getInt(3))) }
+        }
+    }
     /** VACUUM creates a coherent independent SQLite file; WAL/live files are never exported. */
     @Synchronized fun export(output: OutputStream) {
         val file = File(databaseName + ".export")

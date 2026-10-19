@@ -30,7 +30,7 @@ class QuickEventWidgetClickActivity : Activity() {
 
         val result = QuickEventWidgetTapRunner(
             core = DefaultQuickEventCore(appCtx),
-            audit = { _, _, _, _, _ -> Unit },
+            audit = { _, _, _, _, _ -> },
             afterSuccessfulWrite = {
                 PersistentMutationTracker.requestExport(appCtx)
                 appCtx.sendBroadcast(

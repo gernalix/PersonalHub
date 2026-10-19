@@ -48,7 +48,7 @@ class PersistenceSchemaCoverageDeviceTest {
             val clazz = Class.forName("com.gernalix.personalhub.$className")
             val method = clazz.getDeclaredMethod(methodName)
             assertTrue("$table probe is not a JUnit test", method.isAnnotationPresent(Test::class.java))
-            assertTrue("$table not declared by $probe", table in method.getAnnotation(TableProbe::class.java).tables)
+            assertTrue("$table not declared by $probe", table in requireNotNull(method.getAnnotation(TableProbe::class.java)).tables)
         }
         assertTrue("TABLE_COVERAGE=${registry.size - missing.size}/${registry.size}; UNTESTED=$missing", missing.isEmpty())
     }

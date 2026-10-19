@@ -1,96 +1,122 @@
 package com.gernalix.luoghi
 
 import android.content.Intent
+import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import com.gernalix.luoghi.capsules.mapviewer.MapCallerMode
-import com.gernalix.luoghi.capsules.location.FusedLocationCapsule
-import com.gernalix.luoghi.capsules.mapviewer.MapCurrentLocation
-import com.gernalix.luoghi.capsules.mapviewer.MapMarkerMode
-import com.gernalix.luoghi.capsules.mapviewer.MapOverlayMarker
-import com.gernalix.luoghi.capsules.mapviewer.MapViewerModel
-import com.gernalix.luoghi.capsules.mapviewer.MapViewerRepository
-import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
+import androidx.lifecycle.lifecycleScope
+import com.gernalix.luoghi.capsules.mapviewer.*
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
 
+/** Compatibility entry point for existing PH map intents; rendering belongs entirely to OsmAnd. */
 class MapViewerActivity : ComponentActivity() {
-    private var mapView: MapView? = null
+    private lateinit var bridge: OsmAndBridge
+    private var opening: Job? = null
+    private var status by mutableStateOf("")
+    private var unavailable by mutableStateOf(false)
+    private var mapAccessRequired by mutableStateOf(false)
+    private var launched = false
+    private var leftForMap = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Configuration.getInstance().userAgentValue = BuildConfig.APPLICATION_ID
+        if (DatabaseStartupGate.blockIfNotReady(this)) return
+        bridge = OsmAndBridge(this)
+        status = getString(R.string.places_osmand_opening)
+        setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(getString(R.string.places_osmand_title), style = MaterialTheme.typography.headlineMedium)
+                Text(status)
+                if (unavailable) Button(onClick = {
+                    startActivity(Intent(Intent.ACTION_VIEW, "https://osmand.net/docs/versions/free-versions/".toUri()))
+                }) { Text(getString(R.string.places_osmand_install)) }
+                if (mapAccessRequired) Button(onClick = {
+                    bridge.mapLaunchIntent()?.let(::startActivity)
+                }) { Text(getString(R.string.places_osmand_allow_map_access)) }
+                TextButton(onClick = ::openMap) { Text(getString(R.string.places_action_retry)) }
+                TextButton(onClick = { finish() }) { Text(getString(R.string.places_action_back)) }
+            }
+        } } }
+        openMap()
+    }
 
-        val title = intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.map_default_title)
-        val callerMode = MapCallerMode.parse(intent.getStringExtra(EXTRA_CALLER_MODE))
-        val markerMode = MapMarkerMode.parse(intent.getStringExtra(EXTRA_MARKER_MODE))
-        val uuids = intent.stringListExtra(EXTRA_PLACE_UUIDS)
-        val labels = intent.stringListExtra(EXTRA_LABELS)
-
-        setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    var state by remember { mutableStateOf<MapViewerUiState>(MapViewerUiState.Loading) }
-                    LaunchedEffect(title, callerMode, markerMode, uuids, labels) {
-                        state = runCatching {
-                            withContext(Dispatchers.IO) {
-                                val currentLocation = if (callerMode == MapCallerMode.GLOBAL) {
-                                    FusedLocationCapsule(applicationContext).currentLocation()?.let {
-                                        MapCurrentLocation(it.latitude, it.longitude)
-                                    }
-                                } else {
-                                    null
-                                }
-                                MapViewerRepository(PersonalHubDatabase.get(applicationContext).placeDao())
-                                    .load(title, callerMode, markerMode, uuids, labels, currentLocation)
-                            }
-                        }.fold(
-                            onSuccess = { MapViewerUiState.Ready(it) },
-                            onFailure = { MapViewerUiState.Fallback(title, it.message ?: getString(R.string.map_fallback_error)) },
-                        )
-                    }
-                    MapViewerContent(state) { mapView = it }
+    private fun openMap() {
+        if (opening?.isActive == true) return
+        if (bridge.installedPackage() == null) {
+            unavailable = true
+            status = getString(R.string.places_osmand_optional)
+            return
+        }
+        unavailable = false
+        mapAccessRequired = false
+        opening = lifecycleScope.launch {
+            try {
+                status = getString(R.string.places_osmand_preparing)
+                val model = withContext(Dispatchers.IO) {
+                    MapViewerRepository(PersonalHubDatabase.get(applicationContext).placeDao(), getString(R.string.unnamed_place)).load(
+                        intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.map_default_title),
+                        MapCallerMode.parse(intent.getStringExtra(EXTRA_CALLER_MODE)),
+                        MapMarkerMode.parse(intent.getStringExtra(EXTRA_MARKER_MODE)),
+                        intent.getStringArrayListExtra(EXTRA_PLACE_UUIDS).orEmpty(),
+                        intent.getStringArrayListExtra(EXTRA_LABELS).orEmpty(),
+                    )
                 }
+                val reference = if (intent.hasExtra(EXTRA_REFERENCE_LAT) && intent.hasExtra(EXTRA_REFERENCE_LON)) {
+                    OsmAndReference(intent.getDoubleExtra(EXTRA_REFERENCE_LAT, Double.NaN),
+                        intent.getDoubleExtra(EXTRA_REFERENCE_LON, Double.NaN),
+                        intent.getStringExtra(EXTRA_REFERENCE_LABEL)?.takeUnless(String::isBlank) ?: getString(R.string.places_map_reference), intent.getStringExtra(EXTRA_REFERENCE_ID))
+                } else {
+                    val first = model.markers.firstOrNull() ?: error("No saved places have valid coordinates")
+                    OsmAndReference(first.latitude, first.longitude, first.title, first.uuid)
+                }
+                bridge.connect()
+                bridge.publish(model.markers, reference)
+                launched = true
+                bridge.showReference(reference)
+                status = getString(R.string.places_osmand_return_hint)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                launched = false
+                leftForMap = false
+                withContext(kotlinx.coroutines.NonCancellable) { runCatching { bridge.clear() } }
+                mapAccessRequired = error.message == "Allow PersonalHub map access in OsmAnd external app settings"
+                status = if (mapAccessRequired) getString(R.string.places_osmand_permission_help, applicationInfo.loadLabel(packageManager))
+                    else when (error.message) {
+                        "No saved places have valid coordinates" -> getString(R.string.places_map_no_coordinates)
+                        "OsmAnd is not installed" -> getString(R.string.places_osmand_optional)
+                        else -> getString(R.string.places_osmand_unable)
+                    }
+                bridge.close()
             }
         }
     }
 
+    override fun onPause() { super.onPause(); if (launched) leftForMap = true }
     override fun onResume() {
         super.onResume()
-        mapView?.onResume()
+        if (leftForMap && ::bridge.isInitialized) {
+            leftForMap = false
+            lifecycleScope.launch { try { runCatching { bridge.clear() } } finally { bridge.close(); finish() } }
+        }
     }
-
-    override fun onPause() {
-        mapView?.onPause()
-        super.onPause()
+    override fun onDestroy() {
+        if (::bridge.isInitialized) {
+            val ownedBridge = bridge
+            // Binder cleanup does not block the UI or introduce a long-lived service.
+            Thread({ kotlinx.coroutines.runBlocking { try { runCatching { ownedBridge.clear() } } finally { ownedBridge.close() } } }, "ph-map-cleanup").start()
+        }
+        super.onDestroy()
     }
 
     companion object {
@@ -100,144 +126,9 @@ class MapViewerActivity : ComponentActivity() {
         const val EXTRA_CALLER_MODE = "com.gernalix.luoghi.extra.CALLER_MODE"
         const val EXTRA_LABELS = "com.gernalix.luoghi.extra.LABELS"
         const val EXTRA_MARKER_MODE = "com.gernalix.luoghi.extra.MARKER_MODE"
+        const val EXTRA_REFERENCE_LAT = "com.gernalix.luoghi.extra.REFERENCE_LAT"
+        const val EXTRA_REFERENCE_LON = "com.gernalix.luoghi.extra.REFERENCE_LON"
+        const val EXTRA_REFERENCE_LABEL = "com.gernalix.luoghi.extra.REFERENCE_LABEL"
+        const val EXTRA_REFERENCE_ID = "com.gernalix.luoghi.extra.REFERENCE_ID"
     }
 }
-
-private sealed interface MapViewerUiState {
-    data object Loading : MapViewerUiState
-    data class Ready(val model: MapViewerModel) : MapViewerUiState
-    data class Fallback(val title: String, val reason: String) : MapViewerUiState
-}
-
-@Composable
-private fun MapViewerContent(
-    state: MapViewerUiState,
-    onMapReady: (MapView) -> Unit,
-) {
-    when (state) {
-        MapViewerUiState.Loading -> Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(stringResource(R.string.map_default_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-        is MapViewerUiState.Fallback -> MapFallback(state.title, state.reason)
-        is MapViewerUiState.Ready -> {
-            if (state.model.markers.isEmpty()) {
-                MapFallback(state.model.title, stringResource(R.string.map_no_markers))
-            } else {
-                RealMap(model = state.model, onMapReady = onMapReady)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RealMap(
-    model: MapViewerModel,
-    onMapReady: (MapView) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(model.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.map_mode_format, model.callerMode.name, model.markerMode.name))
-            if (model.usesPerformanceClusterFallback) {
-                Text(stringResource(R.string.map_cluster_fallback_format, model.markers.size, model.overlays.size))
-            }
-            if (model.missingCoordinateCount > 0) {
-                Text(stringResource(R.string.map_missing_coordinates_format, model.missingCoordinateCount))
-            }
-        }
-        Box(modifier = Modifier.fillMaxSize()) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { context ->
-                    MapView(context).apply {
-                        setTileSource(TileSourceFactory.MAPNIK)
-                        setMultiTouchControls(true)
-                        minZoomLevel = 2.0
-                        maxZoomLevel = 20.0
-                        onMapReady(this)
-                    }
-                },
-                update = { map ->
-                    onMapReady(map)
-                    map.renderMarkers(model)
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun MapFallback(title: String, reason: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.map_fallback_title), fontWeight = FontWeight.SemiBold)
-        Text(reason)
-    }
-}
-
-private fun MapView.renderMarkers(model: MapViewerModel) {
-    val signature = model.markers.joinToString("|") { it.uuid } + "@${model.currentLocation}"
-    if (tag == signature) return
-    tag = signature
-    overlays.clear()
-    val overlayMarkers = model.overlays
-    overlayMarkers.forEach { markerModel ->
-        overlays.add(markerFor(markerModel, model.markerMode))
-    }
-    val current = model.currentLocation
-    val center = if (current != null) {
-        GeoPoint(current.latitude, current.longitude)
-    } else {
-        GeoPoint(
-            overlayMarkers.map { it.latitude }.average(),
-            overlayMarkers.map { it.longitude }.average(),
-        )
-    }
-    controller.setCenter(center)
-    controller.setZoom(if (current != null || overlayMarkers.size == 1) 16.0 else 12.0)
-    if (model.markerMode == MapMarkerMode.BALLOON_ALL && overlayMarkers.size <= MAX_PERMANENT_BALLOONS) {
-        overlays.filterIsInstance<Marker>().forEach { it.showInfoWindow() }
-    }
-    invalidate()
-}
-
-private fun MapView.markerFor(markerModel: MapOverlayMarker, markerMode: MapMarkerMode): Marker =
-    Marker(this).apply {
-        position = GeoPoint(markerModel.latitude, markerModel.longitude)
-        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        title = markerModel.title
-        snippet = markerModel.snippet
-        setOnMarkerClickListener { marker, _ ->
-            if (markerMode != MapMarkerMode.SIMPLE) marker.showInfoWindow()
-            markerModel.uuid?.let { uuid ->
-                context.startActivity(
-                    Intent(context, MainActivity::class.java).apply {
-                        data = HubDeepLinkContract.moduleUri("places", "placeId" to uuid)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    }
-                )
-            }
-            true
-        }
-    }
-
-private fun android.content.Intent.stringListExtra(key: String): List<String> =
-    getStringArrayListExtra(key) ?: getStringArrayExtra(key)?.toList().orEmpty()
-
-private const val MAX_PERMANENT_BALLOONS = 50

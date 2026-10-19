@@ -10,6 +10,7 @@ android {
 
     defaultConfig {
         minSdk = 26
+        consumerProguardFiles("consumer-rules.pro")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "APPLICATION_ID", "\"com.gernalix.luoghi\"")
         buildConfigField("int", "VERSION_CODE", "15")
@@ -38,7 +39,7 @@ android {
     }
     sourceSets {
         named("testDebug") {
-            assets.srcDir(rootProject.file("core/database/src/main/assets"))
+            assets.directories.add(rootProject.file("core/database/src/main/assets").absolutePath)
         }
     }
 }
@@ -66,7 +67,7 @@ dependencies {
     implementation(libs.google.places)
     implementation(libs.google.play.services.location)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.osmdroid.android)
+    implementation(files("libs/osmand-aidl-api-20261019.jar"))
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.androidx.test.core)

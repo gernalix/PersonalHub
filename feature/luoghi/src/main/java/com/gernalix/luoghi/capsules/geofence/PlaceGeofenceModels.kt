@@ -25,6 +25,7 @@ enum class PlaceGeofenceTransition(val storageName: String, val geofenceTransiti
 sealed interface PlaceGeofenceResult {
     data object Success : PlaceGeofenceResult
     data object PermissionMissing : PlaceGeofenceResult
+    data object RegistrationFailed : PlaceGeofenceResult
     data object PlaceMissing : PlaceGeofenceResult
     data object CoordinatesMissing : PlaceGeofenceResult
     data object AmbiguousTransition : PlaceGeofenceResult

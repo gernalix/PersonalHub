@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.core.graphics.scale
+import androidx.core.net.toUri
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -202,7 +204,7 @@ private class TinyClipRuntime(files: FinanceSemanticFiles) : AutoCloseable {
             val scale = 224f / minOf(source.width, source.height)
             val width = (source.width * scale).roundToInt().coerceAtLeast(224)
             val height = (source.height * scale).roundToInt().coerceAtLeast(224)
-            val resized = Bitmap.createScaledBitmap(source, width, height, true)
+            val resized = source.scale(width, height)
             val left = ((width - 224) / 2).coerceAtLeast(0)
             val top = ((height - 224) / 2).coerceAtLeast(0)
             val crop = Bitmap.createBitmap(resized, left, top, 224, 224)
@@ -397,7 +399,7 @@ internal class FinancePhotoSemanticEngine(
     }
 
     private suspend fun readBytes(reference: String): ByteArray = withContext(Dispatchers.IO) {
-        val uri = Uri.parse(reference)
+        val uri = (reference).toUri()
         val stream = when (uri.scheme?.lowercase()) {
             "http", "https" -> {
                 val connection = URL(reference).openConnection()

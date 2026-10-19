@@ -1,5 +1,6 @@
 package com.example.multitimetracker.widget
 
+import androidx.core.content.edit
 import android.content.Context
 import com.example.multitimetracker.core.quickevent.QuickEventTarget
 import com.gernalix.personalhub.core.database.DatabaseProfiles
@@ -15,10 +16,10 @@ object QuickEventWidgetPrefs {
             is QuickEventTarget.Macro -> "$MACRO_PREFIX${target.macroId}"
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(key(appWidgetId), encoded)
-            .putString(profileKey(appWidgetId), DatabaseProfiles.activeProfileId(context))
-            .apply()
+            .edit {
+                putString(key(appWidgetId), encoded)
+                .putString(profileKey(appWidgetId), DatabaseProfiles.activeProfileId(context))
+            }
     }
 
     fun read(context: Context, appWidgetId: Int): QuickEventTarget? {
@@ -33,9 +34,9 @@ object QuickEventWidgetPrefs {
     }
 
     fun delete(context: Context, appWidgetIds: IntArray) {
-        val edit = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        appWidgetIds.forEach { edit.remove(key(it)).remove(profileKey(it)) }
-        edit.apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            appWidgetIds.forEach { remove(key(it)).remove(profileKey(it)) }
+        }
     }
 
     private fun key(appWidgetId: Int): String = "target_$appWidgetId"

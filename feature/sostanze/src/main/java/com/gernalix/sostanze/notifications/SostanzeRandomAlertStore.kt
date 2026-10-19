@@ -1,5 +1,6 @@
 package com.gernalix.sostanze.notifications
 
+import androidx.core.content.edit
 import android.content.Context
 
 enum class SostanzeRandomAlertWindow(val millis: Long) {
@@ -54,14 +55,14 @@ object SostanzeRandomAlertStore {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val ids = prefs.getStringSet(IDS, emptySet()).orEmpty() + config.substanceId.toString()
         val prefix = "${config.substanceId}."
-        prefs.edit()
-            .putStringSet(IDS, ids)
-            .putString(prefix + "label", config.label)
-            .putBoolean(prefix + "enabled", config.enabled)
-            .putInt(prefix + "count", config.count.coerceAtLeast(0))
-            .putString(prefix + "window", config.window.name)
-            .putStringSet(prefix + "scheduled", config.scheduledAtMs.map { it.toString() }.toSet())
-            .apply()
+        prefs.edit {
+            putStringSet(IDS, ids)
+                .putString(prefix + "label", config.label)
+                .putBoolean(prefix + "enabled", config.enabled)
+                .putInt(prefix + "count", config.count.coerceAtLeast(0))
+                .putString(prefix + "window", config.window.name)
+                .putStringSet(prefix + "scheduled", config.scheduledAtMs.map { it.toString() }.toSet())
+        }
     }
 }
 

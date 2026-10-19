@@ -57,7 +57,7 @@ def resolve_pixel(*, timeout_s: float = 30.0) -> dict[str, str]:
     return {str(key): str(value) for key, value in target.items() if value is not None}
 
 
-def install(apk: Path, serial: str, *, timeout_s: float = 30.0) -> str:
+def install(apk: Path, serial: str, *, timeout_s: float = 30.0, paired_rollback: bool = False) -> str:
     """Install one already-resolved APK on exactly one Pixel.
 
     APK installation can legitimately take far longer than the 30-second cap used
@@ -70,7 +70,8 @@ def install(apk: Path, serial: str, *, timeout_s: float = 30.0) -> str:
         adb = preflight.resolve_tool("adb")
     except FileNotFoundError as exc:
         raise PixelApkError(str(exc)) from exc
-    args = [adb, "-s", serial, "install", "-r", str(apk)]
+    # Downgrade is reserved for an explicit paired APK/database rollback.
+    args = [adb, "-s", serial, "install", "-r"] + (["-d"] if paired_rollback else []) + [str(apk)]
     try:
         result = subprocess.run(
             args,

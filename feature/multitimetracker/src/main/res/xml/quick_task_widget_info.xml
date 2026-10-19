@@ -4,8 +4,8 @@
     android:minHeight="40dp"
     android:minResizeWidth="40dp"
     android:minResizeHeight="40dp"
-    android:targetCellWidth="1"
-    android:targetCellHeight="1"
+
+
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_quick_task"
     android:resizeMode="none"

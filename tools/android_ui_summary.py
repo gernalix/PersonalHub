@@ -5,14 +5,15 @@ import argparse
 import re
 import subprocess
 import sys
+import uuid
 import xml.etree.ElementTree as ET
-
-DEVICE_DUMP_PATH = "/sdcard/window.xml"
 
 
 def _adb(serial: str, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["adb", "-s", serial, *args],
+        # ADB shell forwards inherited stdin; never let it drain UI controller commands.
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -21,15 +22,22 @@ def _adb(serial: str, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _dump_xml(serial: str) -> str:
-    dumped = _adb(serial, "shell", "uiautomator", "dump", DEVICE_DUMP_PATH)
-    if dumped.returncode != 0:
-        raise RuntimeError(
-            dumped.stderr.strip() or dumped.stdout.strip() or "uiautomator dump failed"
-        )
-    pulled = _adb(serial, "exec-out", "cat", DEVICE_DUMP_PATH)
-    if pulled.returncode != 0 or not pulled.stdout.lstrip().startswith("<?xml"):
-        raise RuntimeError(pulled.stderr.strip() or "cannot read UI XML")
-    return pulled.stdout
+    # uiautomator can report an error with exit 0 and leave an old dump intact.
+    # A per-call file prevents stale coordinates from driving the current UI.
+    path = f"/sdcard/ph-ui-{uuid.uuid4().hex}.xml"
+    try:
+        dumped = _adb(serial, "shell", "uiautomator", "dump", path)
+        if dumped.returncode != 0 or path not in dumped.stdout:
+            raise RuntimeError(
+                dumped.stderr.strip() or dumped.stdout.strip() or "uiautomator dump failed"
+            )
+        pulled = _adb(serial, "exec-out", "cat", path)
+        if pulled.returncode != 0 or not pulled.stdout.lstrip().startswith("<?xml"):
+            raise RuntimeError(pulled.stderr.strip() or "cannot read fresh UI XML")
+        ET.fromstring(pulled.stdout)
+        return pulled.stdout
+    finally:
+        _adb(serial, "shell", "rm", "-f", path)
 
 
 def _truthy(value: str | None) -> bool:

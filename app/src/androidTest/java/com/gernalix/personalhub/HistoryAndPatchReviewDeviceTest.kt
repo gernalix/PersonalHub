@@ -8,7 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.room.withTransaction
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -185,7 +185,7 @@ class HistoryAndPatchReviewDeviceTest {
         val applies=AtomicInteger()
         @Volatile var appliedRef:String?=null
         @Volatile var appliedHash:String?=null
-        override fun describe(context: Context,ref:String,id:String) = GitDataSync.PatchReview(id,"immutable-revision","verified-hash","Fixture author","Controlled fixture",24,0,1,listOf("finance_accounts"))
+        override fun describe(context: Context,ref:String,id:String) = GitDataSync.PatchReview(id,"immutable-revision","verified-hash","Fixture author","Controlled fixture",PersonalHubDatabase.SCHEMA_VERSION,0,1,listOf("finance_accounts"))
         override fun preview(context:Context,ref:String,id:String):GitPatchPreview {
             check(ref=="immutable-revision")
             check(!fail) { "Controlled preview failure" }

@@ -283,8 +283,8 @@ object NowCapsuleUi {
         hideHoursIfZero: Boolean
     ): DurationPresentation {
         if (session.expectedEndMs != null) {
-            val remainingMs = (session.expectedEndMs ?: nowMs) - nowMs
-            val totalMs = ((session.expectedEndMs ?: nowMs) - session.startMs).coerceAtLeast(1L)
+            val remainingMs = session.expectedEndMs - nowMs
+            val totalMs = (session.expectedEndMs - session.startMs).coerceAtLeast(1L)
             val elapsedMs = NowCapsuleViewModel.runningDurationMs(nowMs, session)
             val durationText = if (session.id in elapsedModeSessionIds) {
                 formatDuration(elapsedMs, showSeconds = showSeconds, hideHoursIfZero = hideHoursIfZero)

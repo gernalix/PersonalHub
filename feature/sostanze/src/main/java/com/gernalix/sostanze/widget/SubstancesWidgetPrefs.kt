@@ -1,5 +1,6 @@
 package com.gernalix.sostanze.widget
 
+import androidx.core.content.edit
 import android.content.Context
 
 object SubstancesWidgetPrefs {
@@ -7,9 +8,9 @@ object SubstancesWidgetPrefs {
 
     fun save(context: Context, appWidgetId: Int, substanceId: Long) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putLong(key(appWidgetId), substanceId)
-            .apply()
+            .edit {
+                putLong(key(appWidgetId), substanceId)
+            }
     }
 
     fun read(context: Context, appWidgetId: Int): Long? {
@@ -19,9 +20,9 @@ object SubstancesWidgetPrefs {
     }
 
     fun delete(context: Context, appWidgetIds: IntArray) {
-        val edit = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        appWidgetIds.forEach { edit.remove(key(it)) }
-        edit.apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            appWidgetIds.forEach { remove(key(it)) }
+        }
     }
 
     private fun key(appWidgetId: Int): String = "substance_$appWidgetId"

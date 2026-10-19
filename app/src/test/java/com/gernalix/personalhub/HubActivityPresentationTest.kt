@@ -20,6 +20,28 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class HubActivityPresentationTest {
     @Test
+    fun countdownGitRowsKeepTheirScopeAfterDeletionAndHideStorageEncodings() = kotlinx.coroutines.runBlocking {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val database = com.gernalix.personalhub.core.database.PersonalHubDatabase.openTemporary(context, "countdown-git-qa.db")
+        try {
+            val dao = database.sinceWhenCounterDao()
+            val id = dao.insert(com.gernalix.personalhub.contracts.database.SinceWhenCounterEntity(title = "Trip", initialTimestamp = 1, createdAt = 1,
+                mode = com.gernalix.personalhub.contracts.database.CounterModes.COUNTDOWN))
+            val sql = database.openHelper.readableDatabase
+            val key = sql.query("SELECT hex(quote(?))", arrayOf(id)).use { it.moveToFirst(); it.getString(0) }
+            val row = GitHistoryItem(id = "counter", occurredAt = 1, author = "user", source = "app", reason = null,
+                groupId = null, table = "since_when_counters", operation = "INSERT", rowKey = key,
+                changedColumns = "title,mode,color_argb,initial_timestamp", historyPath = "h", commitSha = "c", revertedBy = null,
+                displayAfter = "{\"title\":\"Trip\",\"mode\":\"COUNTDOWN\",\"color_argb\":4279663235,\"initial_timestamp\":1790000000000}")
+            assertEquals("countdown", gitHistoryModule(row, sql))
+            dao.delete(requireNotNull(dao.get(id)))
+            assertEquals("countdown", gitHistoryModule(row, sql))
+            val rendered = humanizeGitHistory(row, "Countdown")
+            listOf("COUNTDOWN", "4279663235", "1790000000000").forEach { assertFalse(rendered.searchText.contains(it)) }
+        } finally { database.close(); context.deleteDatabase("countdown-git-qa.db") }
+    }
+
+    @Test
     fun gitTechnicalWritesShareOneLogicalRow() {
         val first = GitHistoryItem(
             id = "one", occurredAt = 1L, author = "user", source = "app", reason = null,

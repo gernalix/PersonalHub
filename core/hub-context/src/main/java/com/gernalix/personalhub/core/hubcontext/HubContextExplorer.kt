@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -124,7 +125,7 @@ internal fun HubContextExplorerDialog(anchor: HubEntityRef, onDismiss: () -> Uni
                                 runCatching {
                                     val target = HubContextRuntime.adapter(candidate.summary.ref.moduleId, candidate.summary.ref.entityKind).openTarget(candidate.summary.ref.canonicalId)
                                         ?: error(cannotOpen)
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    val intent = Intent(Intent.ACTION_VIEW, (target.uri).toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     target.activityClassName?.let { intent.setClassName(context.packageName, it) }
                                     context.startActivity(intent)
                                 }.onFailure {

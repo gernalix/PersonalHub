@@ -41,7 +41,7 @@ class CheckInAccuracyPolicyTest {
     }
 
     @Test
-    fun realCarloVisdaAttemptPrefersClearlySeparatedNearestPlace() {
+    fun realOverlappingAttemptRequiresChoiceEvenWithAccurateGps() {
         val location = LocationSample(
             latitude = 55.6607845,
             longitude = 12.6215530,
@@ -53,9 +53,8 @@ class CheckInAccuracyPolicyTest {
             location = location,
         )
 
-        assertTrue(decision is CheckInMatchDecision.Matched)
-        assertEquals("carlo-visda", (decision as CheckInMatchDecision.Matched).candidate.place.uuid)
-        assertTrue(decision.candidate.distanceM < 10.0)
+        assertTrue(decision is CheckInMatchDecision.Ambiguous)
+        assertEquals(listOf("carlo-visda", "rema"), (decision as CheckInMatchDecision.Ambiguous).candidates.map { it.place.uuid })
     }
 
     @Test

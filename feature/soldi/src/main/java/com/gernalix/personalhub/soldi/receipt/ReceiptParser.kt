@@ -170,9 +170,9 @@ class ReceiptParser {
             if (chain == ReceiptChain.NETTO && pending != null) {
                 compactOcrPrice(line)?.let { compact ->
                     result += ParsedReceiptLine(
-                        description = pending!!.name,
-                        quantity = pending!!.quantity,
-                        unitPrice = pending!!.unitPrice,
+                        description = pending.name,
+                        quantity = pending.quantity,
+                        unitPrice = pending.unitPrice,
                         totalPrice = compact,
                         confidence = 0.78f,
                         source = "local-netto-compact-price",

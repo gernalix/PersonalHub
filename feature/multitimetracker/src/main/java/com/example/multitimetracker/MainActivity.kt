@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MultiTimeTrackerTheme {
+                com.gernalix.personalhub.core.ui.ModuleHistoryHost("timer", "$hubSessionId:$hubQuickEventEntryId:$pendingQuickEventTarget") {
                 MultiTimeTrackerApp(
                     hubSessionId = hubSessionId,
                     onHubSessionDismiss = { hubSessionId = null },
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     onPendingQuickEventTargetConsumed = { pendingQuickEventTarget = null },
                     alertRequest = alertRequest,
                 )
+                }
             }
         }
     }

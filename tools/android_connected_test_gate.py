@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -82,13 +83,22 @@ def target_error(command: list[str], *, allow_physical_device: bool = False) -> 
     return None
 
 
-def run(command: list[str], *, allow_physical_device: bool = False) -> int:
+def run(command: list[str], *, allow_physical_device: bool = False,
+        history_context: dict | None = None, history_log: Path | None = None) -> int:
     if not command:
         raise ValueError("missing command")
     error = target_error(command, allow_physical_device=allow_physical_device)
     if error:
         print(f"FAIL-CLOSED: {error}", file=sys.stderr)
         return 2
+    if history_context is not None and history_log is None:
+        raise ValueError("History recording requires its own --history-log path")
+    if history_context is not None:
+        # Validate recording metadata before touching a device.
+        if not history_context.get("device_kind"):
+            raise ValueError("History context requires device_kind")
+        history_log = history_log.expanduser().resolve()
+        history_log.parent.mkdir(parents=True, exist_ok=True)
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -98,13 +108,29 @@ def run(command: list[str], *, allow_physical_device: bool = False) -> int:
     )
     assert process.stdout is not None
     detected: str | None = None
+    output: list[str] = []
     with process.stdout:
         for line in process.stdout:
+            if history_context is not None:
+                output.append(line)
             sys.stdout.write(line)
             sys.stdout.flush()
             if detected is None:
                 detected = next((marker for marker in FAILURE_MARKERS if marker in line), None)
     returncode = process.wait()
+    if history_context is not None:
+        import android_test_history as history
+        descriptor = os.open(history_log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(descriptor, "w") as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write("".join(output))
+        context = dict(history_context, process_exit_code=returncode or (2 if detected is not None else 0))
+        try:
+            saved = history.record(history.DEFAULT_DB, history_log, "instrumentation", context)
+            print("QA history: " + json.dumps(saved, sort_keys=True))
+        except Exception as exc:
+            print(f"FAIL-CLOSED: cannot persist QA history ({type(exc).__name__})", file=sys.stderr)
+            return returncode or 3
     if returncode != 0:
         return returncode
     if detected is not None:
@@ -123,13 +149,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Permit explicitly serial-targeted physical adb instrumentation only after safety notifications",
     )
     parser.add_argument("command", nargs=argparse.REMAINDER)
+    parser.add_argument("--history-context", type=Path, help="Non-secret device/build metadata JSON for SQLite history")
+    parser.add_argument("--history-log", type=Path, help="Evidence log written and imported by this gate")
     args = parser.parse_args(argv)
     command = list(args.command)
     if command and command[0] == "--":
         command = command[1:]
     if not command:
         parser.error("command required after --")
-    return run(command, allow_physical_device=args.allow_physical_device)
+    context = json.loads(args.history_context.read_text()) if args.history_context else None
+    return run(command, allow_physical_device=args.allow_physical_device,
+               history_context=context, history_log=args.history_log)
 
 
 if __name__ == "__main__":

@@ -9,11 +9,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.SQLiteMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
-@SQLiteMode(SQLiteMode.Mode.NATIVE)
+
 class SyncJournalTest {
 
     @Test fun compositePrimaryKeyEncodingRoundTripsTypedValues() {
@@ -29,7 +28,7 @@ class SyncJournalTest {
                 assertTrue(it.moveToFirst())
                 it.getString(0)
             }
-            assertArrayEquals(arrayOf("a:b'c", 42L), SyncJournal.keyValues(encoded))
+            assertArrayEquals(arrayOf<Any>("a:b'c", 42L), SyncJournal.keyValues(encoded))
         } finally { owner.close(); context.deleteDatabase("sync-key-helper-test.db") }
     }
     @Test fun gitTrackingIgnoresNoOpUpdatesButRecordsRealUpdates() {

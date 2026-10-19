@@ -10,6 +10,16 @@ on:
       - 'tools/test_android_pixel_apk.py'
       - 'tools/android_connected_test_gate.py'
       - 'tools/test_android_connected_test_gate.py'
+      - 'tools/android_target_preflight.py'
+      - 'tools/test_android_target_preflight.py'
+      - 'tools/test_android_target_preflight_regressions.py'
+      - 'tools/android_emulator_control.py'
+      - 'tools/test_android_emulator_control.py'
+      - 'tools/test_android_emulator_stack.py'
+      - 'tools/android_ui_summary.py'
+      - 'tools/test_android_ui_summary.py'
+      - 'tools/android_paired_cutover_v24.py'
+      - 'tools/test_android_paired_cutover_v24.py'
       - '.github/workflows/android-consumer-preflight.yml'
   pull_request:
     paths:
@@ -19,6 +29,16 @@ on:
       - 'tools/test_android_pixel_apk.py'
       - 'tools/android_connected_test_gate.py'
       - 'tools/test_android_connected_test_gate.py'
+      - 'tools/android_target_preflight.py'
+      - 'tools/test_android_target_preflight.py'
+      - 'tools/test_android_target_preflight_regressions.py'
+      - 'tools/android_emulator_control.py'
+      - 'tools/test_android_emulator_control.py'
+      - 'tools/test_android_emulator_stack.py'
+      - 'tools/android_ui_summary.py'
+      - 'tools/test_android_ui_summary.py'
+      - 'tools/android_paired_cutover_v24.py'
+      - 'tools/test_android_paired_cutover_v24.py'
       - '.github/workflows/android-consumer-preflight.yml'
 
 permissions:
@@ -26,10 +46,10 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -40,3 +60,6 @@ jobs:
           python3 tools/test_android_consumer_preflight.py
           python3 tools/test_android_pixel_apk.py
           python3 tools/test_android_connected_test_gate.py
+          python3 tools/test_android_ui_summary.py
+          python3 tools/test_android_paired_cutover_v24.py
+          python3 tools/test_android_emulator_stack.py

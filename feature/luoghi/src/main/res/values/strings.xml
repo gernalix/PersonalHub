@@ -12,7 +12,7 @@
     <string name="saved_places_empty">No saved places yet.</string>
     <string name="nickname">Nickname</string>
     <string name="address">Address</string>
-    <string name="address_suggestions_loading">Searching addresses...</string>
+    <string name="address_suggestions_loading">Searching addresses…</string>
     <string name="address_suggestions_config_missing">Address suggestions are not configured. Manual entry still works.</string>
     <string name="address_suggestions_timeout">Address search took too long. Try again.</string>
     <string name="address_suggestions_failed">Address suggestions are temporarily unavailable.</string>
@@ -29,7 +29,7 @@
     <string name="global_ratio_tracked_format">Tracked / first check-in: %1$s</string>
     <string name="global_checkins_format">Total check-ins: %1$d</string>
     <string name="distance_traveled_title">Distance traveled</string>
-    <string name="distance_loading">Distance: calculating...</string>
+    <string name="distance_loading">Distance: calculating…</string>
     <string name="distance_today_label">Today</string>
     <string name="distance_week_label">Week</string>
     <string name="distance_month_label">Month</string>
@@ -46,7 +46,7 @@
     <string name="delete_place">Delete place</string>
     <string name="delete_place_confirm_format">Remove %1$s from active places?</string>
     <string name="delete_place_deleted">Place deleted.</string>
-    <string name="delete_place_archived_referenced">This place is used by Finance, so it was archived instead of deleted. Financial history was preserved.</string>
+    <string name="delete_place_archived_referenced">This place is linked to other records, so it was archived instead of deleted. Linked history was preserved.</string>
     <string name="delete_place_not_found">Place no longer exists.</string>
     <string name="delete">Delete</string>
     <string name="edit">Edit</string>
@@ -60,13 +60,13 @@
     <string name="map_fallback_title">Map fallback</string>
     <string name="map_fallback_error">The map engine could not load.</string>
     <string name="map_no_markers">No places with saved coordinates are available for this map.</string>
-    <string name="map_cluster_fallback_format">Performance fallback: %1$d places rendered as %2$d grouped markers.</string>
-    <string name="map_missing_coordinates_format">%1$d places were skipped because they do not have saved coordinates.</string>
+    <string name="map_cluster_fallback_format" translatable="false">Performance fallback · Places: %1$d · Grouped markers: %2$d</string>
+    <string name="map_missing_coordinates_format" translatable="false">Skipped places without saved coordinates: %1$d</string>
     <string name="checkin_not_checked_in">Not checked in</string>
     <string name="checkin_checked_in_format">Checked in: %1$s since %2$s</string>
     <string name="checkin_button">Check in</string>
     <string name="checkout_button">Check out</string>
-    <string name="checkin_working">Working...</string>
+    <string name="checkin_working">Working…</string>
     <string name="checkin_permission_denied">Location permission is required to check in.</string>
     <string name="checkin_location_unavailable">Current location is unavailable. Try again in a moment.</string>
     <string name="checkin_message_checked_in_format">Checked in at %1$s.</string>
@@ -99,9 +99,9 @@
     <string name="history_delete_session_confirm">Delete the whole session? Audit and undo will keep a recoverable trace.</string>
     <string name="history_delete_session">Delete session</string>
     <string name="history_edit_event_title">Edit history event</string>
-    <string name="history_timestamp">Timestamp</string>
-    <string name="history_timestamp_hint">Format: d/M/yy HH:mm</string>
-    <string name="history_timestamp_invalid">Use d/M/yy HH:mm, for example 6/7/26 14:30.</string>
+    <string name="history_timestamp" translatable="false">Date and time</string>
+    <string name="history_timestamp_hint" translatable="false">For example 19/10/2026 14:30:15. Seconds are optional.</string>
+    <string name="history_timestamp_invalid" translatable="false">Enter a valid local date and time, for example 19/10/2026 14:30:15.</string>
     <string name="history_anomaly_open">open check-in</string>
     <string name="history_anomaly_missing_check_in">missing check-in</string>
     <string name="history_anomaly_negative_duration">negative duration</string>
@@ -151,7 +151,7 @@
     <string name="visit_interval_active_format">%1$s → in progress</string>
     <string name="visit_orphan_checkout_format">Unassociated exit at %1$s</string>
     <string name="visit_time_unavailable">Time unavailable</string>
-    <string name="in_progress">In progress</string>
+    <string name="places_in_progress">In progress</string>
     <string name="active_duration_format">Duration %1$s</string>
     <string name="visit_complete">Complete visit</string>
     <string name="visit_missing_checkout">Entry without exit</string>
@@ -189,7 +189,7 @@
     <string name="history_empty_visits_support">Completed and active visits will appear here.</string>
     <string name="places">Places</string>
     <string name="statistics">Statistics</string>
-    <string name="places_count_format">%1$d places</string>
+    <string name="places_count_format" translatable="false">Places: %1$d</string>
     <string name="sort_distance">Distance</string>
     <string name="sort_last_visit">Last visit</string>
     <string name="sort_total_time">Total time</string>
@@ -216,13 +216,10 @@
     <string name="manual_visit_check_in">Check-in time</string>
     <string name="manual_visit_check_out">Check-out time</string>
     <string name="manual_visit_open_hint">Leave empty only for an open visit.</string>
-    <string name="geofence_settings">Geofence settings</string>
-    <string name="geofence_enabled">Use background geofence for this place</string>
-    <string name="geofence_enter_enabled">Handle ENTER</string>
-    <string name="geofence_exit_enabled">Handle EXIT</string>
+    <string name="geofence_settings">Background place detection</string>
+    <string name="geofence_enabled">Detect arrivals and departures automatically</string>
     <string name="geofence_action_notify">Notification only</string>
-    <string name="geofence_action_automatic">Automatic check-in/check-out</string>
-    <string name="geofence_background_disclosure">Geofencing uses Android background location only for places where you enable it. Places, manual visits, history and maps keep working when that permission is unavailable.</string>
+    <string name="geofence_background_disclosure">Android monitors the saved position in the background only when this switch is on. Background location permission is required.</string>
     <string name="geofence_saved">Geofence settings saved.</string>
     <string name="geofence_permission_missing">Settings saved. Background location is required before Android geofences can be registered.</string>
     <string name="geofence_channel_name">Places geofences</string>
@@ -232,7 +229,7 @@
     <string name="geofence_notification_checkin_format">Checked in at %1$s.</string>
     <string name="geofence_notification_checkout_format">Checked out from %1$s.</string>
     <string name="geofence_ambiguous_title">Place geofence needs review</string>
-    <string name="geofence_ambiguous_message_format">%1$d geofences fired together. Open Places to choose the right one.</string>
+    <string name="geofence_ambiguous_message_format" translatable="false">Nearby places detected: %1$d. Open Places and tap Check-in to choose your visit.</string>
     <string name="stat_global_share">Share of global lifetime</string>
     <string name="stat_place_lifetime_share">Share of place lifetime</string>
     <string name="notes_empty">No notes</string>
@@ -262,4 +259,32 @@
     <string name="place_alert_edit">Edit</string>
     <string name="place_alert_existing">Existing Places alerts</string>
     <string name="place_alert_specific_place">Specific place</string>
+    <string name="places_search_hint" translatable="false">Search places, addresses, notes and tags</string>
+    <string name="places_sort_help" translatable="false">Sort the places below. Tap the selected criterion again to reverse the order.</string>
+    <string name="where_was_i_overlapping_format" translatable="false">Overlapping visits were recorded at: %1$s</string>
+    <string name="place_directions" translatable="false">Directions</string>
+    <string name="place_directions_missing_location" translatable="false">Directions (location unavailable)</string>
+    <string name="place_directions_coordinates" translatable="false">Address unavailable. Using saved coordinates.</string>
+    <string name="place_directions_unavailable" translatable="false">Install a maps app to open this address.</string>
+    <string name="place_use_current_location" translatable="false">Use current location</string>
+    <string name="place_use_address_location" translatable="false">Use address location</string>
+    <string name="place_saved_location_preserved" translatable="false">The saved position stays unchanged when you edit the address.</string>
+    <string name="place_current_location_selected" translatable="false">Position: current location. Editing the address keeps this position.</string>
+    <string name="place_address_location_help" translatable="false">Position: address. Choose a suggested address to locate this place; you do not need to be there.</string>
+    <string name="place_location_loading" translatable="false">Getting current location…</string>
+    <string name="place_location_permission_missing" translatable="false">Allow foreground location to use your current position, or choose an address.</string>
+    <string name="place_location_unavailable" translatable="false">Current location unavailable. Try again or choose an address.</string>
+    <string name="geofence_radius_help" translatable="false">Detection radius: %1$d m around the saved position. Edit the place to change its radius.</string>
+    <string name="geofence_coordinates_required" translatable="false">This place needs a saved position before background detection can work.</string>
+    <string name="geofence_permission_guidance" translatable="false">Background location is not allowed. In app settings, open Permissions → Location and choose Allow all the time with precise location. Your choices will still be saved.</string>
+    <string name="geofence_open_app_settings" translatable="false">Open app settings</string>
+    <string name="geofence_arrival" translatable="false">On arrival</string>
+    <string name="geofence_departure" translatable="false">On departure</string>
+    <string name="geofence_action_off" translatable="false">Do nothing</string>
+    <string name="geofence_automatic_checkin" translatable="false">Record check-in and notify</string>
+    <string name="geofence_automatic_checkout" translatable="false">Record check-out and notify</string>
+    <string name="geofence_overlap_help" translatable="false">Overlapping places notify you and ask you to choose before recording an arrival. Departure can close only the visit actually in progress.</string>
+    <string name="geofence_manual_alerts_help" translatable="false">Check-in/out alerts are separate: they run when you use the check-in/out buttons, even with background detection off. Manage them in Alerts.</string>
+    <string name="geofence_registration_failed" translatable="false">Settings saved, but Android could not update background detection. Check location services and try again.</string>
+    <string name="place_distance_unavailable" translatable="false">Distance unavailable</string>
 </resources>

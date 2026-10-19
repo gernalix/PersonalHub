@@ -60,15 +60,15 @@ class PlacesHistoryMapGeofencingTest {
     }
 
     @Test
-    fun overlappingNearbyPlacesPreferClearlySeparatedNearestCandidate() {
+    fun overlappingNearbyPlacesAlwaysRequireExplicitSelection() {
         val near = place("near", "Near", 0.0, 0.0, radiusM = 2_000.0)
         val far = place("far", "Far", 0.0, 0.015, radiusM = 2_000.0)
         val decision = CheckInPolicy.choosePlace(
             places = listOf(near, far),
             location = LocationSample(0.0, 0.0, accuracyM = 4.0),
         )
-        assertTrue(decision is CheckInMatchDecision.Matched)
-        assertEquals("near", (decision as CheckInMatchDecision.Matched).candidate.place.uuid)
+        assertTrue(decision is CheckInMatchDecision.Ambiguous)
+        assertEquals(listOf("near", "far"), (decision as CheckInMatchDecision.Ambiguous).candidates.map { it.place.uuid })
     }
 
     @Test
@@ -93,6 +93,40 @@ class PlacesHistoryMapGeofencingTest {
         assertTrue(WhereWasIQuery.at(visits, listOf(home, office), 6_000L) is WhereWasIResult.OnlyPrevious)
         assertTrue(WhereWasIQuery.at(visits, listOf(home, office), 500L) is WhereWasIResult.OnlyNext)
         assertTrue(WhereWasIQuery.at(emptyList(), listOf(home, office), 3_000L) is WhereWasIResult.NoData)
+    }
+
+    @Test
+    fun checkInDoesNotHideOverlappingPlacesBeyondTheFirstFive() {
+        val places = (1..8).map { place("place-$it", "Place $it", 0.0, 0.0) }
+        val decision = CheckInPolicy.choosePlace(places, LocationSample(0.0, 0.0, accuracyM = 0.0))
+        assertEquals(8, (decision as CheckInMatchDecision.Ambiguous).candidates.size)
+    }
+
+    @Test
+    fun whereWasIDoesNotTreatAnOldUnclosedVisitAsPermanentOrPredictFuture() {
+        val places = listOf(place("home", "Home"), place("office", "Office"))
+        val visits = VisitMapper.map(listOf(
+            event("home", PlaceEventTypes.CHECK_IN, 1_000L, "old"),
+            event("office", PlaceEventTypes.CHECK_IN, 3_000L, "current"),
+        ), places, 5_000L)
+        val current = WhereWasIQuery.at(visits, places, 4_000L) as WhereWasIResult.Inside
+        assertEquals("office", current.place.uuid)
+        assertTrue(WhereWasIQuery.at(visits, places, 6_000L) !is WhereWasIResult.Inside)
+        assertTrue(WhereWasIQuery.at(visits, places, 6_000L, observedAtMs = 6_500L) is WhereWasIResult.Inside)
+        assertTrue(WhereWasIQuery.at(visits, places, 7_000L, observedAtMs = 6_500L) !is WhereWasIResult.Inside)
+    }
+
+    @Test
+    fun whereWasIReportsConflictingRecordedLocationsInsteadOfChoosingOne() {
+        val places = listOf(place("home", "Home"), place("office", "Office"))
+        val visits = VisitMapper.map(listOf(
+            event("home", PlaceEventTypes.CHECK_IN, 1_000L, "a"),
+            event("home", PlaceEventTypes.CHECK_OUT, 4_000L, "a"),
+            event("office", PlaceEventTypes.CHECK_IN, 2_000L, "b"),
+            event("office", PlaceEventTypes.CHECK_OUT, 5_000L, "b"),
+        ), places, 6_000L)
+        val result = WhereWasIQuery.at(visits, places, 3_000L) as WhereWasIResult.Overlapping
+        assertEquals(setOf("home", "office"), result.places.map { it.uuid }.toSet())
     }
 
     @Test
@@ -127,6 +161,34 @@ class PlacesHistoryMapGeofencingTest {
             sort = PlaceSortState(PlaceSortCriterion.LAST_VISIT, PlaceSortDirection.ASC),
         )
         assertEquals(listOf("near", "far", "unknown"), byLastVisitAsc.map { it.place.uuid })
+    }
+
+    @Test
+    fun allFourSortCriteriaChangeOrderAndReverseKnownValues() {
+        val a = place("a", "Alpha", 0.0, 0.0)
+        val b = place("b", "Beta", 0.0, 0.01)
+        val c = place("c", "Gamma", null, null)
+        val places = listOf(c, b, a)
+        val visits = VisitMapper.map(listOf(
+            event("a", PlaceEventTypes.CHECK_IN, 1_000L, "a1"), event("a", PlaceEventTypes.CHECK_OUT, 2_000L, "a1"),
+            event("a", PlaceEventTypes.CHECK_IN, 4_000L, "a2"), event("a", PlaceEventTypes.CHECK_OUT, 5_000L, "a2"),
+            event("b", PlaceEventTypes.CHECK_IN, 6_000L, "b1"), event("b", PlaceEventTypes.CHECK_OUT, 9_000L, "b1"),
+        ), places, 10_000L)
+        val stats = listOf(a to 2_000L, b to 3_000L, c to 0L).map { (place, time) ->
+            com.gernalix.luoghi.capsules.stats.PlaceStatsUi(place, time, null, null)
+        }
+        val expected = mapOf(
+            PlaceSortCriterion.DISTANCE to (listOf("a", "b", "c") to listOf("b", "a", "c")),
+            PlaceSortCriterion.LAST_VISIT to (listOf("a", "b", "c") to listOf("b", "a", "c")),
+            PlaceSortCriterion.TOTAL_TIME to (listOf("c", "a", "b") to listOf("b", "a", "c")),
+            PlaceSortCriterion.VISIT_COUNT to (listOf("c", "b", "a") to listOf("a", "b", "c")),
+        )
+        expected.forEach { (criterion, orders) ->
+            listOf(PlaceSortDirection.ASC to orders.first, PlaceSortDirection.DESC to orders.second).forEach { (direction, order) ->
+                assertEquals("$criterion $direction", order, PlaceListUiMapper.map(places, stats, visits,
+                    PlaceSortState(criterion, direction), PlaceListLocation(0.0, 0.0)).map { it.place.uuid })
+            }
+        }
     }
 
     @Test

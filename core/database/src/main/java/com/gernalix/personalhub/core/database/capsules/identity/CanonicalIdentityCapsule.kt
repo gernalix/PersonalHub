@@ -62,7 +62,7 @@ class CanonicalIdentityCapsule(context: Context) {
                 db.setTransactionSuccessful()
                 return existing.first
             }
-            db.execSQL("INSERT INTO hub_external_identities(id,canonical_id,entity_kind,system,source_scope,external_id,external_id_normalized,link_method,first_seen_at,last_seen_at,verified_at,lifecycle,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",arrayOf(identity.id,identity.canonicalId,identity.entityKind,identity.system,identity.sourceScope,identity.externalId,identity.externalIdNormalized,identity.linkMethod,identity.firstSeenAt,identity.lastSeenAt,identity.verifiedAt,identity.lifecycle,identity.metadataJson,identity.createdAt,identity.updatedAt))
+            db.execSQL("INSERT INTO hub_external_identities(id,canonical_id,entity_kind,system,source_scope,external_id,external_id_normalized,link_method,first_seen_at,last_seen_at,verified_at,lifecycle,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",arrayOf<Any?>(identity.id,identity.canonicalId,identity.entityKind,identity.system,identity.sourceScope,identity.externalId,identity.externalIdNormalized,identity.linkMethod,identity.firstSeenAt,identity.lastSeenAt,identity.verifiedAt,identity.lifecycle,identity.metadataJson,identity.createdAt,identity.updatedAt))
             db.setTransactionSuccessful()
             return identity.id
         } finally { db.endTransaction() }
@@ -108,11 +108,11 @@ class CanonicalIdentityCapsule(context: Context) {
                 require(keys.add(key)) { "Duplicate Timer alert ID" }
                 val existing = db.query("SELECT canonical_id FROM hub_entities WHERE local_table='snapshot.timeFenceRules' AND local_key=?",arrayOf(key)).use { if(it.moveToFirst()) it.getString(0) else null }
                 val lifecycle = if(rule.optBoolean("isDeleted")) "TOMBSTONED" else "ACTIVE"
-                if (existing == null) db.execSQL("INSERT INTO hub_entities VALUES(?,'timer/alert','timer','snapshot.timeFenceRules',?,?,?,?)",arrayOf(java.util.UUID.randomUUID().toString(),key,lifecycle,now,now))
-                else db.execSQL("UPDATE hub_entities SET lifecycle=?,updated_at=? WHERE canonical_id=? AND lifecycle<>'MERGED'",arrayOf(lifecycle,now,existing))
+                if (existing == null) db.execSQL("INSERT INTO hub_entities VALUES(?,'timer/alert','timer','snapshot.timeFenceRules',?,?,?,?)",arrayOf<Any>(java.util.UUID.randomUUID().toString(),key,lifecycle,now,now))
+                else db.execSQL("UPDATE hub_entities SET lifecycle=?,updated_at=? WHERE canonical_id=? AND lifecycle<>'MERGED'",arrayOf<Any>(lifecycle,now,existing))
             }
             val removed = db.query("SELECT canonical_id,local_key FROM hub_entities WHERE local_table='snapshot.timeFenceRules' AND lifecycle='ACTIVE'").use { c -> buildList { while(c.moveToNext()) if(c.getString(1) !in keys) add(c.getString(0)) } }
-            removed.forEach { db.execSQL("UPDATE hub_entities SET lifecycle='TOMBSTONED',updated_at=? WHERE canonical_id=?",arrayOf(now,it)) }
+            removed.forEach { db.execSQL("UPDATE hub_entities SET lifecycle='TOMBSTONED',updated_at=? WHERE canonical_id=?",arrayOf<Any>(now,it)) }
         }
 
         const val MUTATION_TRIGGER = "canonical_mutation_resolution"

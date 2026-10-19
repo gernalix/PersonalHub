@@ -95,6 +95,7 @@ object PlaceListUiMapper {
         val lat = place.lat ?: return null
         val lon = place.lon ?: return null
         val location = currentLocation ?: return null
+        if (!GeoSearch.validCoordinates(lat, lon) || !GeoSearch.validCoordinates(location.latitude, location.longitude)) return null
         return GeoSearch.distanceMeters(location.latitude, location.longitude, lat, lon).roundToLong()
     }
 }

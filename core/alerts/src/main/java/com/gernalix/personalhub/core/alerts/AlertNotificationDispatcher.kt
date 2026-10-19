@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.alerts
 
+import androidx.core.net.toUri
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -73,7 +74,7 @@ object AlertNotificationDispatcher {
         fallbackIntent: Intent? = null,
         linkedUrl: String? = null,
     ): PendingIntent {
-        val chosen = linkedUrl?.let { directUriIntentOrNull(context, android.net.Uri.parse(it)) }
+        val chosen = linkedUrl?.let { directUriIntentOrNull(context, (it).toUri()) }
             ?: directLinkIntentOrNull(context, message)
             ?: fallbackIntent
             ?: launchAppIntent(context)

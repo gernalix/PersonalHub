@@ -1,9 +1,12 @@
 package com.gernalix.luoghi.ui.places
 
 import android.content.Intent
+import android.content.ActivityNotFoundException
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -61,6 +65,7 @@ fun PlaceListItem(
     onMap: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    showDistance: Boolean = false,
 ) {
     val place = item.place
     val context = LocalContext.current
@@ -75,7 +80,15 @@ fun PlaceListItem(
     val sinceWhenAddedToPh = stringResource(R.string.since_when_added_to_ph)
     val distance = item.distanceMeters?.let {
         stringResource(R.string.place_distance_format, com.gernalix.luoghi.ui.common.localizedDistance(it))
-    }
+    } ?: if (showDistance) {
+        val lat = place.lat
+        val lon = place.lon
+        stringResource(if (lat != null && lon != null && com.gernalix.luoghi.capsules.places.GeoSearch.validCoordinates(lat, lon)) {
+            R.string.place_distance_unavailable
+        } else {
+            R.string.places_explore_missing_value
+        })
+    } else null
     val metadata = if (item.activeStartedAt != null) {
         stringResource(
             R.string.place_active_meta_format,
@@ -83,14 +96,13 @@ fun PlaceListItem(
             activeDuration.orEmpty(),
         )
     } else {
-        listOf(stringResource(R.string.place_meta_format, totalDuration, visits, radius), distance)
-            .filterNotNull()
-            .joinToString(" · ")
+        stringResource(R.string.place_meta_format, totalDuration, visits, radius)
     }
+    val accessibleMetadata = listOfNotNull(metadata, distance).joinToString(" · ")
     val accessibility = if (item.activeStartedAt != null) {
-        stringResource(R.string.place_accessibility_active_format, displayName, address, metadata)
+        stringResource(R.string.place_accessibility_active_format, displayName, address, accessibleMetadata)
     } else {
-        stringResource(R.string.place_accessibility_format, displayName, address, metadata)
+        stringResource(R.string.place_accessibility_format, displayName, address, accessibleMetadata)
     }
     Card(
         onClick = onOpen,
@@ -123,14 +135,13 @@ fun PlaceListItem(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
                         text = displayName,
-                        modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -169,12 +180,33 @@ fun PlaceListItem(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                distance?.let { value ->
+                    Text(
+                        text = value,
+                        modifier = Modifier.fillMaxWidth().testTag("place-distance"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             PlaceOverflowMenu(
                 displayName = displayName,
                 onEdit = onEdit,
                 onHistory = onHistory,
                 onMap = onMap,
+                canOpenDirections = PlaceDirections.intent(place.address, place.lat, place.lon) != null,
+                onDirections = {
+                    PlaceDirections.intent(place.address, place.lat, place.lon)?.let { intent ->
+                        try {
+                            context.startActivity(intent)
+                            if (place.address.isNullOrBlank()) {
+                                Toast.makeText(context, R.string.place_directions_coordinates, Toast.LENGTH_LONG).show()
+                            }
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(context, R.string.place_directions_unavailable, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
                 onDelete = onDelete,
                 onCreateSinceWhen = {
                     val source = SinceWhenSourceDescriptor(
@@ -201,6 +233,8 @@ private fun PlaceOverflowMenu(
     onEdit: () -> Unit,
     onHistory: () -> Unit,
     onMap: () -> Unit,
+    canOpenDirections: Boolean,
+    onDirections: () -> Unit,
     onDelete: () -> Unit,
     onCreateSinceWhen: () -> Unit,
 ) {
@@ -238,6 +272,15 @@ private fun PlaceOverflowMenu(
                 onClick = {
                     expanded = false
                     onMap()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(if (canOpenDirections) R.string.place_directions else R.string.place_directions_missing_location)) },
+                enabled = canOpenDirections,
+                leadingIcon = { Icon(Icons.Outlined.Map, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onDirections()
                 },
             )
             DropdownMenuItem(

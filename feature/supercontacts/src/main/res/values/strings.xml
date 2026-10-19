@@ -34,7 +34,7 @@
     <string name="search">Search</string>
     <string name="open">Open</string>
     <string name="close">Close</string>
-    <string name="loading">Loading...</string>
+    <string name="loading">Loading…</string>
     <string name="clear">Clear</string>
     <string name="dismiss">Dismiss</string>
     <string name="sort_asc">ASC</string>
@@ -62,14 +62,14 @@
     <string name="home_metadata_distance_unavailable">Distance: not available</string>
     <string name="home_metadata_distance_value">Distance: %1$s km away</string>
     <string name="home_sort_distance_unavailable">Distance sorting needs contacts with saved coordinates and a current device location.</string>
-    <string name="home_visible_contacts_count">%1$d contacts shown</string>
+    <string name="home_visible_contacts_count" translatable="false">Visible contacts: %1$d</string>
     <string name="bulk_select_all">Select all</string>
     <string name="bulk_deselect_all">Deselect all</string>
-    <string name="bulk_selected_count">%1$d selected</string>
+    <string name="bulk_selected_count" translatable="false">Selected: %1$d</string>
     <string name="bulk_add_tag">Tag</string>
-    <string name="bulk_add_tag_title">Add tag to %1$d contacts</string>
+    <string name="bulk_add_tag_title" translatable="false">Add tag · Contacts: %1$d</string>
     <string name="bulk_archive">Archive</string>
-    <string name="bulk_archive_confirm_title">Archive %1$d contacts?</string>
+    <string name="bulk_archive_confirm_title" translatable="false">Archive contacts (%1$d)?</string>
     <string name="bulk_archive_confirm_body">Archived contacts disappear from Home and receive the exact tag archivio.</string>
     <string name="call_overlay_test">Call test</string>
     <string name="call_overlay_title">SuperContacts call</string>
@@ -85,7 +85,7 @@
     <string name="call_overlay_permission_open_app_info">Open app info</string>
     <string name="saved_searches">Saved searches</string>
     <string name="saved_searches_entry">🔖 Saved searches</string>
-    <string name="saved_searches_count">%1$d saved</string>
+    <string name="saved_searches_count" translatable="false">Saved: %1$d</string>
     <string name="saved_searches_empty">No saved searches yet.</string>
     <string name="saved_search_save">Save search</string>
     <string name="saved_search_title">Save search</string>
@@ -121,7 +121,6 @@
     <string name="birth_date">Birth date</string>
     <string name="manual_age">Current age</string>
     <string name="age_edit_hint">Use birth date as YYYY-MM-DD, or current age if the birth date is unknown.</string>
-    <string name="age_value_years">%1$d years</string>
     <string name="age_source_birth_date">Calculated from birth date</string>
     <string name="age_source_manual">Estimated from manually entered age</string>
     <string name="address_source_luoghi">Luoghi</string>
@@ -137,7 +136,7 @@
     <string name="distance_missing_permission">Location permission is required to calculate distance.</string>
     <string name="distance_location_unavailable">Current location is unavailable.</string>
     <string name="distance_geocoding_failed">Address could not be located.</string>
-    <string name="distance_calculating">Calculating distance...</string>
+    <string name="distance_calculating">Calculating distance…</string>
     <string name="distance_value">%1$s km away</string>
     <string name="open_maps">Open in Maps</string>
     <string name="social">Social</string>
@@ -198,7 +197,7 @@
     <string name="edit_field_description_for">Edit description for %1$s: %2$s</string>
     <string name="filtered_by">Filtered by: %1$s</string>
     <string name="home_tag_filter_content_description">Filter by tag</string>
-    <string name="home_tag_filter_active_content_description">Filter by tag, %1$d selected</string>
+    <string name="home_tag_filter_active_content_description" translatable="false">Filter by tag · Selected: %1$d</string>
     <string name="home_tag_filter_title">Filter by tag</string>
     <string name="home_tag_filter_search">Search tags</string>
     <string name="home_tag_filter_empty">No tags available yet.</string>
@@ -219,7 +218,7 @@
     <string name="history_calendar">Calendar</string>
     <string name="history_selected_range">Selected range</string>
     <string name="history_range_value">%1$s to %2$s</string>
-    <string name="history_day_count">%1$d events</string>
+    <string name="history_day_count" translatable="false">Events: %1$d</string>
     <string name="no_history_in_range">No history in this range.</string>
     <string name="history_timestamp_edit">Edit timestamp</string>
     <string name="global_event_row">%1$s - %2$s</string>
@@ -245,13 +244,9 @@
     <string name="stats_my_last_initiative">My last initiative</string>
     <string name="stats_their_last_initiative">Their last initiative</string>
     <string name="stats_open_count">Opened</string>
-    <string name="stats_open_count_value">%1$d times</string>
+    <string name="stats_open_count_value" translatable="false">%1$d</string>
     <string name="stats_known_since">Known for</string>
     <string name="stats_missing">Not available</string>
-    <string name="stats_days">%1$d days</string>
-    <string name="stats_weeks">%1$d weeks</string>
-    <string name="stats_months">%1$d months</string>
-    <string name="stats_years_months">%1$d years, %2$d months</string>
     <string name="possible_existing_contacts">Possible existing contacts</string>
     <string name="duplicate_reason_same_number">same number</string>
     <string name="duplicate_reason_same_email">same email</string>

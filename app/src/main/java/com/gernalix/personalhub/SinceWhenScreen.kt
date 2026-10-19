@@ -1,5 +1,7 @@
 package com.gernalix.personalhub
 
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.core.net.toUri
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,22 +36,40 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubOpenTarget
 import com.gernalix.personalhub.contracts.database.SinceWhenCounterEntity
+import com.gernalix.personalhub.contracts.database.CounterModes
+import com.gernalix.personalhub.sincewhen.CounterElapsed
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import org.json.JSONArray
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null) {
+internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null, mode: String = CounterModes.SINCE_WHEN) {
     val context = LocalContext.current
     val dao = remember { PersonalHubDatabase.get(context).sinceWhenCounterDao() }
-    val counters by dao.observeAll().collectAsState(initial = emptyList())
+    val allCounters by dao.observeAll().collectAsState(initial = emptyList())
+    val counters = remember(allCounters, mode) { allCounters.filter { it.mode == mode } }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(mode, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) { now = System.currentTimeMillis(); delay(1_000) }
+        }
+    }
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf<SinceWhenCounterEntity?>(null) }
     var initialEditorOpened by remember(initialCounterId) { mutableStateOf(false) }
@@ -86,11 +106,11 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.since_when_title)) },
+                title = { Text(stringResource(if (mode == CounterModes.COUNTDOWN) com.gernalix.personalhub.core.ui.R.string.countdown_title else R.string.since_when_title)) },
                 navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.since_when_back)) } },
                 actions = { TextButton(modifier = Modifier.testTag("sincewhen-history"), onClick = {
                     context.startActivity(Intent(Intent.ACTION_VIEW,
-                        com.gernalix.personalhub.contracts.database.HubDeepLinkContract.moduleHistoryUri("since_when")).setPackage(context.packageName))
+                        com.gernalix.personalhub.contracts.database.HubDeepLinkContract.moduleHistoryUri(CounterModes.module(mode))).setPackage(context.packageName))
                 }) { Text(stringResource(R.string.activity_title)) } },
             )
         },
@@ -101,7 +121,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
         },
     ) { padding ->
         if (counters.isEmpty()) {
-            Text(stringResource(R.string.since_when_empty), modifier = Modifier.padding(padding).padding(20.dp))
+            Text(stringResource(if (mode == CounterModes.COUNTDOWN) com.gernalix.personalhub.core.ui.R.string.countdown_empty else R.string.since_when_empty), modifier = Modifier.padding(padding).padding(20.dp))
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -115,6 +135,8 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
                                 Column(Modifier.weight(1f)) {
                                     Text(counter.title, style = MaterialTheme.typography.titleMedium)
                                     Text(formatSinceWhenDate(counter.initialTimestamp), style = MaterialTheme.typography.bodyMedium)
+                                    Text(counterDurationText(counter, now), style = MaterialTheme.typography.headlineSmall,
+                                        color = androidx.compose.ui.graphics.Color(counter.colorArgb))
                                 }
                                 IconButton(modifier = Modifier.testTag("sincewhen-edit-${counter.id}"), onClick = { editing = counter; showCreate = true }) {
                                     Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.since_when_edit_action))
@@ -136,7 +158,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
                                 Text(
                                     "↳ ${stringResource(sourceTypeRes(counter.sourceEntityType))}: $label",
                                     modifier = Modifier.clickable {
-                                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target.uri))
+                                        val intent = Intent(Intent.ACTION_VIEW, (target.uri).toUri())
                                         target.activityClassName?.let { intent.setClassName(context.packageName, it) }
                                         context.startActivity(intent)
                                     },
@@ -152,6 +174,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null)
     if (showCreate) {
         com.gernalix.personalhub.sincewhen.SinceWhenEditorDialog(
             initial = editing,
+            mode = mode,
             onDismiss = { showCreate = false },
             onSaved = { showCreate = false },
         )
@@ -168,4 +191,29 @@ private fun sourceTypeRes(entityType: String?): Int = when (entityType) {
     "substances/substance" -> R.string.since_when_source_substance
     "tags/tag" -> R.string.since_when_source_tag
     else -> R.string.since_when_source_personalhub
+}
+
+@Composable
+private fun counterDurationText(counter: SinceWhenCounterEntity, now: Long): String {
+    val array = remember(counter.displayUnitsJson) { JSONArray(counter.displayUnitsJson) }
+    val selected = remember(array) { (0 until array.length()).map { array.getString(it) }.toSet() }
+    if (counter.mode == CounterModes.SINCE_WHEN && now < counter.initialTimestamp) {
+        return stringResource(com.gernalix.personalhub.core.ui.R.string.counter_not_started)
+    }
+    val reference = counter.endTimestamp?.let { minOf(now, it) } ?: now
+    val duration = CounterElapsed.between(counter.initialTimestamp, reference, selected, ZoneId.systemDefault())
+    val resources = LocalResources.current
+    val text = duration.parts.joinToString(" ") { (unit, amount) ->
+        val plural = when (unit) {
+            ChronoUnit.YEARS -> com.gernalix.personalhub.core.ui.R.plurals.counter_years
+            ChronoUnit.MONTHS -> com.gernalix.personalhub.core.ui.R.plurals.counter_months
+            ChronoUnit.WEEKS -> com.gernalix.personalhub.core.ui.R.plurals.counter_weeks
+            ChronoUnit.DAYS -> com.gernalix.personalhub.core.ui.R.plurals.counter_days
+            ChronoUnit.HOURS -> com.gernalix.personalhub.core.ui.R.plurals.counter_hours
+            ChronoUnit.MINUTES -> com.gernalix.personalhub.core.ui.R.plurals.counter_minutes
+            else -> com.gernalix.personalhub.core.ui.R.plurals.counter_seconds
+        }
+        resources.getQuantityString(plural, amount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), amount)
+    }
+    return (if (duration.negative) "−" else "") + text
 }

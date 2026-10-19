@@ -53,6 +53,11 @@ object PlaceGeofenceNotifier {
         ensureChannel(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher)
+            .setContentIntent(PendingIntent.getActivity(context, AMBIGUOUS_NOTIFICATION_ID,
+                Intent(context, MainActivity::class.java).apply {
+                    data = HubDeepLinkContract.moduleUri("places")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                }, HubNotificationPlatform.pendingIntentFlags()))
             .setContentTitle(context.safeString(R.string.geofence_ambiguous_title, "Place geofence needs review"))
             .setContentText(context.safeString(R.string.geofence_ambiguous_message_format, "%d geofences fired together.", placeCount))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

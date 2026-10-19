@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SostanzeTheme {
-                SostanzeApp(hubSubstanceId, initialIntakeId = hubIntakeId)
+                com.gernalix.personalhub.core.ui.ModuleHistoryHost("substances", "$hubSubstanceId:$hubIntakeId") { SostanzeApp(hubSubstanceId, initialIntakeId = hubIntakeId) }
             }
         }
     }

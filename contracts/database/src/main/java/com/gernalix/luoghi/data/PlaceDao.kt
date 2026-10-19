@@ -189,6 +189,9 @@ interface PlaceDao {
     @Query("SELECT * FROM place_links WHERE place_uuid = :placeUuid ORDER BY updated_at DESC")
     suspend fun linksForPlace(placeUuid: String): List<PlaceLinkEntity>
 
+    @Query("SELECT * FROM place_links WHERE owner_app = :ownerApp AND owner_type = :ownerType AND owner_id = :ownerId ORDER BY id ASC")
+    suspend fun linksForOwner(ownerApp: String, ownerType: String, ownerId: String): List<PlaceLinkEntity>
+
     @Query("DELETE FROM place_links WHERE id = :id")
     fun deleteLinkByIdBlocking(id: Long): Int
 
@@ -439,6 +442,9 @@ interface PlaceDao {
 
     @Query("DELETE FROM place_geofence_configs WHERE place_uuid = :placeUuid")
     suspend fun deleteGeofenceConfig(placeUuid: String): Int
+
+    @Query("DELETE FROM place_geofence_transition_log WHERE id = :id")
+    suspend fun deleteGeofenceTransitionLog(id: Long): Int
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertGeofenceTransitionLog(log: PlaceGeofenceTransitionLogEntity): Long

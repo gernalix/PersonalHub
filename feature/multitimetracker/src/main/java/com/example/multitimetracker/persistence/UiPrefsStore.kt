@@ -1,6 +1,7 @@
 // v376
 package com.example.multitimetracker.persistence
 
+import androidx.core.content.edit
 import android.content.Context
 import android.content.SharedPreferences
 import com.gernalix.personalhub.core.database.LegacyDatabase as SQLiteDatabase
@@ -261,7 +262,7 @@ private fun getLongCompat(p: SharedPreferences, key: String): Long? {
         else -> null
     }
     if (v != null && raw !is Long) {
-        p.edit().putLong(key, v).apply()
+        p.edit { putLong(key, v)}
     }
     return v
 }

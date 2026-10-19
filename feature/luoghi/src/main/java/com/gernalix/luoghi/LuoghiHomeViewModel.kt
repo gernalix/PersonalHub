@@ -48,6 +48,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
+enum class PlaceLocationSource { ADDRESS, CURRENT_LOCATION, SAVED }
+
 data class PlaceFormState(
     val uuid: String? = null,
     val nickname: String = "",
@@ -59,7 +61,23 @@ data class PlaceFormState(
     val photoUri: String = "",
     val tagsText: String = "",
     val sourceApp: String = "Luoghi",
+    val locationSource: PlaceLocationSource = PlaceLocationSource.ADDRESS,
 ) {
+    /** Address metadata must never silently move an existing or GPS-positioned place. */
+    fun withAddressText(value: String): PlaceFormState =
+        if (uuid == null && locationSource == PlaceLocationSource.ADDRESS) {
+            copy(address = value, lat = null, lon = null)
+        } else {
+            copy(address = value)
+        }
+
+    fun withResolvedAddress(value: String, latitude: Double?, longitude: Double?): PlaceFormState =
+        if (uuid == null && locationSource == PlaceLocationSource.ADDRESS) {
+            copy(address = value, lat = latitude, lon = longitude)
+        } else {
+            copy(address = value)
+        }
+
     companion object {
         fun from(place: PlaceEntity) = PlaceFormState(
             uuid = place.uuid,
@@ -71,6 +89,7 @@ data class PlaceFormState(
             notes = place.notes.orEmpty(),
             photoUri = place.photoUri.orEmpty(),
             sourceApp = place.sourceApp.orEmpty().ifBlank { "Luoghi" },
+            locationSource = PlaceLocationSource.SAVED,
         )
     }
 }
@@ -88,6 +107,9 @@ enum class AddressMessage {
     SEARCH_FAILED,
     RESOLUTION_TIMEOUT,
     RESOLUTION_FAILED,
+    LOCATION_LOADING,
+    LOCATION_PERMISSION_MISSING,
+    LOCATION_UNAVAILABLE,
 }
 
 enum class CheckInMessage {
@@ -121,6 +143,8 @@ enum class HistoryMessage {
 enum class GeofenceMessage {
     SAVED,
     PERMISSION_MISSING,
+    COORDINATES_MISSING,
+    REGISTRATION_FAILED,
 }
 
 enum class PlaceDeleteMessage {
@@ -155,6 +179,7 @@ data class HistoryUiState(
 
 data class HomeUiState(
     val dataLoaded: Boolean = false,
+    val placeQuery: String = "",
     val places: List<PlaceEntity> = emptyList(),
     val placeItems: List<PlaceListUiModel> = emptyList(),
     val visits: List<VisitUiModel> = emptyList(),
@@ -216,8 +241,14 @@ class LuoghiHomeViewModel(
         val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
         val placeTagIds = tagAssignments.filter { it.moduleId == "places" && it.entityKind == "place" }
             .groupBy({ it.canonicalId }, { it.tagId }).mapValues { it.value.toSet() }
-        val visiblePlaces = if (state.selectedPlaceTagIds.isEmpty()) places else places.filter { place ->
-            placeTagIds[place.uuid].orEmpty().containsAll(state.selectedPlaceTagIds)
+        val activeTagIds = tags.filterNot { it.archived }.map { it.id }.toSet()
+        val selectedTags = state.selectedPlaceTagIds.intersect(activeTagIds)
+        val tagNames = tags.associate { it.id to it.name }
+        val visiblePlaces = places.filter { place ->
+            val assigned = placeTagIds[place.uuid].orEmpty()
+            assigned.containsAll(selectedTags) && com.gernalix.luoghi.capsules.places.PlaceSearch.matches(
+                place, assigned.mapNotNull(tagNames::get), state.placeQuery,
+            )
         }
         state.copy(
             dataLoaded = true,
@@ -237,6 +268,7 @@ class LuoghiHomeViewModel(
             ),
             placeTagIds = placeTagIds,
             placeTags = tags,
+            selectedPlaceTagIds = selectedTags,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -247,6 +279,10 @@ class LuoghiHomeViewModel(
     init {
         observeHistoryActions()
         viewModelScope.launch { container.checkIns.recoverInterruptedAttempts() }
+    }
+
+    fun updatePlaceQuery(value: String) {
+        mutableState.update { it.copy(placeQuery = value) }
     }
 
     fun togglePlaceTagFilter(tagId: String) {
@@ -390,13 +426,63 @@ class LuoghiHomeViewModel(
         }
     }
 
+    fun useCurrentPlaceLocation() {
+        if (mutableState.value.form.uuid != null) return
+        addressSearchJob?.cancel()
+        addressLatestGate.invalidate()
+        lastAddressSearchQuery = null
+        val request = addressLatestGate.next(mutableState.value.form.address)
+        mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(
+            loading = true, suggestions = emptyList(), message = AddressMessage.LOCATION_LOADING,
+        )) }
+        addressSearchJob = viewModelScope.launch {
+            val location = try {
+                container.location.currentLocation()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (!addressLatestGate.isLatest(request, mutableState.value.form.address)) return@launch
+            mutableState.update { current ->
+                current.copy(
+                    form = if (location != null) current.form.copy(
+                        lat = location.latitude, lon = location.longitude,
+                        locationSource = PlaceLocationSource.CURRENT_LOCATION,
+                    ) else current.form,
+                    addressAutocomplete = current.addressAutocomplete.copy(
+                        loading = false,
+                        message = if (location == null) AddressMessage.LOCATION_UNAVAILABLE else null,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun usePlaceAddressLocation() {
+        if (mutableState.value.form.uuid != null) return
+        addressSearchJob?.cancel()
+        addressLatestGate.invalidate()
+        lastAddressSearchQuery = null
+        mutableState.update { it.copy(form = it.form.copy(
+            lat = null, lon = null, locationSource = PlaceLocationSource.ADDRESS,
+        )) }
+        updateAddress(mutableState.value.form.address)
+    }
+
+    fun onPlaceLocationPermissionDenied() {
+        mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(
+            loading = false, message = AddressMessage.LOCATION_PERMISSION_MISSING,
+        )) }
+    }
+
     fun updateAddress(value: String) {
         val query = value.trim()
         val shouldSearch = AddressAutocompletePolicy.shouldSearch(query, container.addressAutocomplete.isConfigured)
         val duplicateSearch = shouldSearch && AddressAutocompletePolicy.isDuplicateSearch(lastAddressSearchQuery, value)
         mutableState.update {
             it.copy(
-                form = it.form.copy(address = value, lat = null, lon = null),
+                form = it.form.withAddressText(value),
                 addressAutocomplete = if (duplicateSearch) {
                     it.addressAutocomplete
                 } else {
@@ -407,6 +493,7 @@ class LuoghiHomeViewModel(
             )
         }
         if (!shouldSearch) {
+            addressLatestGate.invalidate()
             addressSearchJob?.cancel()
             lastAddressSearchQuery = null
             return
@@ -464,8 +551,9 @@ class LuoghiHomeViewModel(
         addressSearchJob?.cancel()
         addressLatestGate.invalidate()
         lastAddressSearchQuery = null
-        viewModelScope.launch {
-            mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(loading = true)) }
+        val request = addressLatestGate.next(mutableState.value.form.address)
+        addressSearchJob = viewModelScope.launch {
+            mutableState.update { it.copy(addressAutocomplete = it.addressAutocomplete.copy(loading = true, message = null)) }
             runCatching {
                 withTimeoutOrNull(AddressAutocompletePolicy.RESOLVE_TIMEOUT_MS.milliseconds) {
                     withContext(Dispatchers.IO) {
@@ -474,12 +562,13 @@ class LuoghiHomeViewModel(
                 } ?: throw AddressOperationTimeoutException()
             }
                 .onSuccess { resolved ->
+                    if (!addressLatestGate.isLatest(request, mutableState.value.form.address)) return@onSuccess
                     mutableState.update {
                         it.copy(
-                            form = it.form.copy(
-                                address = resolved.address,
-                                lat = resolved.latitude,
-                                lon = resolved.longitude,
+                            form = it.form.withResolvedAddress(
+                                resolved.address,
+                                resolved.latitude,
+                                resolved.longitude,
                             ),
                             addressAutocomplete = it.addressAutocomplete.copy(
                                 loading = false,
@@ -491,6 +580,7 @@ class LuoghiHomeViewModel(
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
+                    if (!addressLatestGate.isLatest(request, mutableState.value.form.address)) return@onFailure
                     mutableState.update {
                         it.copy(
                             addressAutocomplete = it.addressAutocomplete.copy(
@@ -509,7 +599,7 @@ class LuoghiHomeViewModel(
 
     fun savePlace(onSaved: (String) -> Unit = {}) {
         val form = mutableState.value.form
-        if (form.nickname.isBlank()) return
+        if (form.nickname.isBlank() || mutableState.value.addressAutocomplete.loading) return
         viewModelScope.launch {
             val pendingLocation = mutableState.value.checkIn.pendingCheckInLocation
             val pendingAttemptId = mutableState.value.checkIn.pendingAttemptId
@@ -525,7 +615,8 @@ class LuoghiHomeViewModel(
                 tagNames = parsePlaceTagText(form.tagsText),
                 sourceApp = form.sourceApp,
             )
-            val createdFromUnknownLocation = (pendingLocation != null) && (form.uuid == null)
+            val createdFromUnknownLocation = (pendingLocation != null) && (form.uuid == null) &&
+                form.locationSource == PlaceLocationSource.CURRENT_LOCATION
             val savedUuid = if (createdFromUnknownLocation) {
                 val createdUuid = runCatching { container.checkIns.checkInNewPlace(mutation, pendingLocation) }
                     .onFailure { error ->
@@ -551,7 +642,13 @@ class LuoghiHomeViewModel(
                 }
                 createdUuid
             } else {
-                container.places.save(mutation)
+                val uuid = container.places.save(mutation)
+                if (pendingAttemptId != null) container.checkIns.finishAttempt(
+                    attemptId = pendingAttemptId,
+                    outcome = CheckInAttemptOutcomes.USER_CANCELLED,
+                    stage = "NEW_PLACE_SAVED_WITHOUT_CHECK_IN",
+                )
+                uuid
             }
             container.addressAutocomplete.resetSession()
             addressSearchJob?.cancel()
@@ -636,12 +733,16 @@ class LuoghiHomeViewModel(
 
     fun selectAmbiguousCheckIn(placeUuid: String) {
         val checkInState = mutableState.value.checkIn
+        if (checkInState.working) return
         val location = checkInState.pendingCheckInLocation ?: return
         val attemptId = checkInState.pendingAttemptId
         val candidate = checkInState.ambiguousCandidates.firstOrNull { it.place.uuid == placeUuid } ?: return
         viewModelScope.launch {
             mutableState.update { it.copy(checkIn = it.checkIn.copy(working = true)) }
-            val inserted = runCatching { container.checkIns.checkIn(placeUuid, location) }
+            val inserted = runCatching {
+                container.checkIns.checkIn(placeUuid, location,
+                    geofencePlaceUuids = checkInState.ambiguousCandidates.map { it.place.uuid })
+            }
             inserted.onSuccess {
                 if (attemptId != null) {
                     container.checkIns.finishAttempt(
@@ -757,10 +858,11 @@ class LuoghiHomeViewModel(
             val result = container.geofences.save(config)
             mutableState.update {
                 it.copy(
-                    geofenceMessage = if (result is com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.PermissionMissing) {
-                        GeofenceMessage.PERMISSION_MISSING
-                    } else {
-                        GeofenceMessage.SAVED
+                    geofenceMessage = when (result) {
+                        com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.Success -> GeofenceMessage.SAVED
+                        com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.PermissionMissing -> GeofenceMessage.PERMISSION_MISSING
+                        com.gernalix.luoghi.capsules.geofence.PlaceGeofenceResult.CoordinatesMissing -> GeofenceMessage.COORDINATES_MISSING
+                        else -> GeofenceMessage.REGISTRATION_FAILED
                     }
                 )
             }
@@ -901,6 +1003,7 @@ class LuoghiHomeViewModel(
                             form = PlaceFormState(
                                 lat = location.latitude,
                                 lon = location.longitude,
+                                locationSource = PlaceLocationSource.CURRENT_LOCATION,
                                 radiusM = CheckInPolicy.DEFAULT_RADIUS_M.toInt().toString(),
                                 notes = "",
                             ),

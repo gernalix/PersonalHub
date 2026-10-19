@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.core.content.edit
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -63,13 +64,13 @@ internal class SoldiViewPrefs(context: Context) {
     )
 
     fun save(value: ViewOptions) {
-        prefs.edit()
-            .putBoolean("daily_balance", value.dailyBalance)
-            .putBoolean("hide_future", value.hideFuture)
-            .putBoolean("ignore_transfers", value.ignoreTransfers)
-            .putBoolean("show_account_currency", value.showAccountCurrency)
-            .putBoolean("group_by_day", value.groupByDay)
-            .apply()
+        prefs.edit {
+            putBoolean("daily_balance", value.dailyBalance)
+                .putBoolean("hide_future", value.hideFuture)
+                .putBoolean("ignore_transfers", value.ignoreTransfers)
+                .putBoolean("show_account_currency", value.showAccountCurrency)
+                .putBoolean("group_by_day", value.groupByDay)
+        }
     }
 }
 

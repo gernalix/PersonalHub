@@ -170,14 +170,14 @@ class PersistenceUiRegressionDeviceTest {
             tapText("Save")
             assertEquals(1L, scalar(
                 "SELECT COUNT(*) FROM contact_fields WHERE contact_id=? AND field_type='name' AND value=?",
-                id!!, "${name}Edited",
+                id, "${name}Edited",
             ))
             device.pressBack()
             tapText("${name}Edited")
             text("${name}Edited")
             tapDescription("Delete")
             tapText("Delete")
-            assertEquals(0L, scalar("SELECT COUNT(*) FROM contacts WHERE id=? AND deleted_at IS NULL", id!!))
+            assertEquals(0L, scalar("SELECT COUNT(*) FROM contacts WHERE id=? AND deleted_at IS NULL", id))
         } finally {
             id?.let { db.execSQL("DELETE FROM contacts WHERE id=?", arrayOf(it)) }
             cleanActivityRows(name)
@@ -203,13 +203,13 @@ class PersistenceUiRegressionDeviceTest {
             tapText("+ refill")
             setFirstEditor("10")
             tapText("Save")
-            assertEquals(10L, scalar("SELECT CAST(stock_current AS INTEGER) FROM substances WHERE id=?", id!!))
+            assertEquals(10L, scalar("SELECT CAST(stock_current AS INTEGER) FROM substances WHERE id=?", id))
             tapText("Home")
             tapText(name)
-            assertEquals(1L, scalar("SELECT COUNT(*) FROM intake_events WHERE substance_id=?", id!!))
+            assertEquals(1L, scalar("SELECT COUNT(*) FROM intake_events WHERE substance_id=?", id))
             text(name) // The completed dose must remain reachable for edit and cleanup.
-            assertEquals(9L, scalar("SELECT CAST(stock_current AS INTEGER) FROM substances WHERE id=?", id!!))
-            assertEquals(2L, scalar("SELECT COUNT(*) FROM stock_adjustments WHERE substance_id=?", id!!))
+            assertEquals(9L, scalar("SELECT CAST(stock_current AS INTEGER) FROM substances WHERE id=?", id))
+            assertEquals(2L, scalar("SELECT COUNT(*) FROM stock_adjustments WHERE substance_id=?", id))
             assertTrue("App process crashed after dose tap", device.hasObject(By.text("PersonalHub")))
         } finally {
             id?.let { db.execSQL("DELETE FROM substances WHERE id=?", arrayOf(it)) }

@@ -1,5 +1,6 @@
 package com.example.multitimetracker
 
+import androidx.core.net.toUri
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -36,7 +37,7 @@ object TimeFenceNotifier {
     }
 
     fun openFullScreenIntentSettings(context: Context) {
-        val packageUri = Uri.parse("package:${context.packageName}")
+        val packageUri = ("package:${context.packageName}").toUri()
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
                 data = packageUri
@@ -194,7 +195,6 @@ object TimeFenceNotifier {
     }
 
     private fun hasActiveTimedSessionNotification(nm: NotificationManager, notificationId: Int): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
         return runCatching {
             nm.activeNotifications.any { sbn ->
                 if (sbn.id != notificationId) return@any false

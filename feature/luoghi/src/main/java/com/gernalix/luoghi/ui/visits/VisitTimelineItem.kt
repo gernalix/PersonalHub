@@ -181,7 +181,7 @@ private fun VisitStatusBadge(visit: VisitUiModel, duration: String) {
         shape = MaterialTheme.shapes.small,
     ) {
         Text(
-            text = if (visit.isActive) stringResource(R.string.in_progress) else duration,
+            text = if (visit.isActive) stringResource(R.string.places_in_progress) else duration,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
@@ -210,7 +210,7 @@ private fun visitInterval(visit: VisitUiModel): String = when {
 @Composable
 private fun visitStatus(visit: VisitUiModel): String = when (visit.pairingStatus) {
     VisitPairingStatus.PAIRED -> stringResource(R.string.visit_complete)
-    VisitPairingStatus.ACTIVE -> stringResource(R.string.in_progress)
+    VisitPairingStatus.ACTIVE -> stringResource(R.string.places_in_progress)
     VisitPairingStatus.INCOMPLETE -> stringResource(R.string.visit_missing_checkout)
     VisitPairingStatus.ORPHAN_CHECK_OUT -> stringResource(R.string.visit_orphan_checkout)
     VisitPairingStatus.ANOMALOUS -> stringResource(R.string.visit_data_to_review)

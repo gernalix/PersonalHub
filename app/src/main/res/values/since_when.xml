@@ -5,14 +5,11 @@
     <string name="since_when_back">Back</string>
     <string name="since_when_create">Create counter</string>
     <string name="since_when_create_action">Create</string>
-    <string name="since_when_edit">Edit counter</string>
     <string name="since_when_edit_action">Edit</string>
     <string name="since_when_delete">Delete</string>
     <string name="since_when_cancel">Cancel</string>
     <string name="since_when_empty">No counters yet.</string>
     <string name="since_when_counter_name">Counter name</string>
-    <string name="since_when_description">Description</string>
-    <string name="since_when_starts_from">Starts from: %1$s</string>
     <string name="since_when_source_event">Event</string>
     <string name="since_when_source_session">Session</string>
     <string name="since_when_source_transaction">Transaction</string>
@@ -25,6 +22,4 @@
     <string name="since_when_already_created">Since when counter already created</string>
     <string name="since_when_open_counter">Open counter</string>
     <string name="since_when_save_error">Could not save the counter. Try again.</string>
-    <string name="since_when_loading">Loading counters…</string>
-    <string name="since_when_migration_error">Could not load saved counters. Try again later.</string>
 </resources>

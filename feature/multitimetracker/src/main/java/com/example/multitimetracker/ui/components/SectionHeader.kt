@@ -17,8 +17,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SectionHeader(
     title: String,
+    modifier: Modifier = Modifier,
     subtitle: String? = null,
-    modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(

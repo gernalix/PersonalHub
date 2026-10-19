@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
+import sqlite3
+import tempfile
 import subprocess
 import sys
 import unittest
@@ -10,8 +13,34 @@ import android_connected_test_gate as gate
 
 
 class AndroidConnectedTestGateTests(unittest.TestCase):
+    def test_failed_run_is_automatically_saved_without_overriding_gate_failure(self) -> None:
+        import android_test_history as history
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "results.sqlite3"
+            log = Path(tmp) / "evidence.log"
+            with patch.object(history, "DEFAULT_DB", db):
+                result = gate.run([sys.executable, "-c", 'print("INSTRUMENTATION_RESULT: shortMsg=Process crashed.")'],
+                                  history_context={"device_kind": "host"}, history_log=log)
+            self.assertEqual(2, result)
+            with sqlite3.connect(db) as connection:
+                self.assertEqual("FAIL", connection.execute("SELECT status FROM runs").fetchone()[0])
+            self.assertIn("Process crashed", log.read_text())
+
     def test_success_without_failure_markers_passes(self) -> None:
         self.assertEqual(0, gate.run([sys.executable, "-c", 'print("BUILD SUCCESSFUL")']))
+
+    def test_cleanup_failure_overrides_a_successful_instrumentation_summary_in_history(self) -> None:
+        import android_test_history as history
+        import test_android_test_history as fixtures
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "results.sqlite3"
+            with patch.object(history, "DEFAULT_DB", db):
+                output = fixtures.SUCCESS + "DELETE_FAILED_INTERNAL_ERROR\n"
+                result = gate.run([sys.executable, "-c", "print(" + repr(output) + ")"],
+                                  history_context={"device_kind": "host"}, history_log=Path(tmp)/"evidence.log")
+            self.assertEqual(2, result)
+            with sqlite3.connect(db) as connection:
+                self.assertEqual("FAIL", connection.execute("SELECT status FROM runs").fetchone()[0])
 
     def test_instrumentation_failed_is_fail_closed_even_when_child_exits_zero(self) -> None:
         self.assertEqual(

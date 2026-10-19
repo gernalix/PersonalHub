@@ -2,6 +2,8 @@
 
 package com.gernalix.personalhub
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -105,6 +107,7 @@ private data class ActivityUiItem(
     val provenance: String? = null,
     val patchId: String? = null,
     val patchRef: String? = null,
+    val notificationEventId: Long? = null,
 )
 
 private data class ParsedHistoryBoundary(
@@ -132,7 +135,7 @@ fun HubHistorySearchScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val modules = remember { HubModule.entries.toList() }
-    val allModuleIds = remember(modules) { modules.map { it.shortcutPath }.toSet() + setOf("since_when", "tags", "hub", "settings") }
+    val allModuleIds = remember(modules) { modules.map { it.shortcutPath }.toSet() + setOf("since_when", "countdown", "notifications", "tags", "hub", "settings") }
     val initialSelection = remember(scopeModuleId, initialModules, allModuleIds) {
         when {
             scopeModuleId != null -> setOf(scopeModuleId)
@@ -153,23 +156,34 @@ fun HubHistorySearchScreen(
         mutableStateOf(initialToMs?.let(::formatHubDateTime).orEmpty())
     }
     var showRecords by rememberSaveable { mutableStateOf(false) }
-    var requestRevision by remember { mutableStateOf(0) }
+    var requestRevision by remember { mutableIntStateOf(0) }
     var entries by remember { mutableStateOf<List<ActivityUiItem>>(emptyList()) }
     var nextPage by remember { mutableStateOf<HistoryQueryCapsule.Cursor?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var reviewingPatch by remember { mutableStateOf<Pair<String,String>?>(null) }
     var eventMissing by remember(initialEventId) { mutableStateOf(false) }
-    var undoRevision by remember { mutableStateOf(0) }
+    var undoRevision by remember { mutableIntStateOf(0) }
 
     val selectedSet = remember(selectedModuleIds) { selectedModuleIds.toSet() }
+    // Preserve the archive's existing screenshot protection when its contents are shown here.
+    val window = generateSequence(context) { current ->
+        (current as? android.content.ContextWrapper)?.baseContext?.takeUnless { it === current }
+    }.filterIsInstance<android.app.Activity>().firstOrNull()?.window
+    val containsPrivateNotifications = "notifications" in selectedSet || entries.any { it.moduleId == "notifications" }
+    androidx.compose.runtime.DisposableEffect(window, containsPrivateNotifications) {
+        val alreadySecure = window?.attributes?.flags?.and(android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0
+        val ownSecureFlag = window != null && containsPrivateNotifications && !alreadySecure
+        if (ownSecureFlag) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { if (ownSecureFlag) window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE) }
+    }
     val parsedFrom = remember(fromText) { parseHistoryBoundary(fromText) }
     val parsedTo = remember(toText) { parseHistoryBoundary(toText) }
     val invalidRange = parsedFrom.valid &&
         parsedTo.valid &&
         parsedFrom.value != null &&
         parsedTo.value != null &&
-        parsedFrom.value!! > parsedTo.value!!
+        parsedFrom.value > parsedTo.value
     val filtersDirty = query.isNotBlank() ||
         fromText.isNotBlank() ||
         toText.isNotBlank() ||
@@ -192,10 +206,37 @@ fun HubHistorySearchScreen(
                 fromMs = parsedFrom.value, toMs = parsedTo.value, query = query,
                 entityKind = initialEntityKind, entityId = initialEntityId, eventId = initialEventId,
             )
-            val page = if (showRecords) HistoryQueryCapsule.records(db, filter, if (append) nextPage else null, HISTORY_PAGE_SIZE)
+            val corePage = if (showRecords) HistoryQueryCapsule.records(db, filter, if (append) nextPage else null, HISTORY_PAGE_SIZE)
                 else HistoryQueryCapsule.page(db, filter, if (append) nextPage else null, HISTORY_PAGE_SIZE)
+            val boundary = if (append) nextPage else null
+            val notificationRows = if (!showRecords && initialEventId == null && initialEntityKind == null && initialEntityId == null &&
+                (filter.modules == null || "notifications" in filter.modules!!)) {
+                com.gernalix.personalhub.notifications.api.NotificationsHistory.query(context, query, filter.fromMs, filter.toMs,
+                    boundary?.occurredAt, boundary?.key, HISTORY_PAGE_SIZE + 1)
+            } else emptyList()
+            val notificationByKey = notificationRows.associateBy { it.key }
+            val allGroups = (corePage.groups + notificationRows.map { row ->
+                HistoryQueryCapsule.Group("notifications", row.eventId.toString(), "notifications", row.occurredAt, row.key)
+            }).sortedWith(compareByDescending<HistoryQueryCapsule.Group> { it.occurredAt }.thenByDescending { it.key })
+            val groups = allGroups.take(HISTORY_PAGE_SIZE)
+            val hasMore = corePage.next != null || allGroups.size > HISTORY_PAGE_SIZE
+            val page = HistoryQueryCapsule.Page(groups, if (hasMore) groups.lastOrNull()?.let { HistoryQueryCapsule.Cursor(it.occurredAt, it.key) } else null)
             val items = page.groups.flatMap { group ->
                 when (group.source) {
+                    "notifications" -> {
+                        val row = notificationByKey.getValue(group.key)
+                        val action = context.getString(when (row.kind) {
+                            "POSTED" -> UiR.string.history_notification_posted
+                            "UPDATED" -> UiR.string.history_notification_updated
+                            "REMOVED" -> UiR.string.history_notification_removed
+                            else -> UiR.string.history_notification_observed
+                        })
+                        listOf(ActivityUiItem(id = row.key, occurredAt = row.occurredAt, moduleId = "notifications",
+                            title = row.title, detail = listOfNotNull(action, row.body).joinToString("\n"),
+                            searchText = listOfNotNull(row.title, row.appLabel, row.body).joinToString(" "),
+                            relatedCount = 1, navigationRef = null, undoActivityId = null,
+                            provenance = row.appLabel, notificationEventId = row.eventId))
+                    }
                     "patch" -> {
                         val json = db.query("SELECT metadata_json FROM hub_git_applied_patches WHERE id=?",arrayOf(group.groupId)).use { c ->
                             if(c.moveToFirst() && !c.isNull(0)) JSONObject(c.getString(0)) else JSONObject()
@@ -223,7 +264,7 @@ fun HubHistorySearchScreen(
                     "semantic" -> semanticHistoryRows(MutationEventStore.byTransaction(db, group.groupId)
                         .filter { (if (it.module == "money") "soldi" else it.module) == group.module }).map { row ->
                         val primary = row.primaryEvent
-                        val ref = primary?.let { event ->
+                        val ref = primary.let { event ->
                             val kind = event.entityKind
                             if (kind != null && event.canonicalId != null) HubEntityRef(
                                 kind.substringBefore('/'), kind.substringAfter('/'), event.canonicalId!!,
@@ -241,9 +282,9 @@ fun HubHistorySearchScreen(
                     "git" -> {
                         val rows = GitHistoryStore.byGroup(db, group.groupId).ifEmpty {
                             listOfNotNull(GitHistoryStore.find(db, group.groupId))
-                        }.filter { gitHistoryModule(it.table) == group.module }
+                        }.filter { gitHistoryModule(it, db) == group.module }
                         if (rows.isEmpty() || !displayableGitHistoryGroup(rows)) emptyList() else {
-                            val (item, text) = humanizeGitHistoryGroup(rows) { module -> moduleDisplayName(context, module) }
+                            val (item, text) = humanizeGitHistoryGroup(rows) { module -> moduleDisplayName(context, if (module == "since_when" && group.module == "countdown") "countdown" else module) }
                             val canonical = runCatching { CanonicalIdentityCapsule.eventRef(db, item.table, item.rowKey) }.getOrNull()
                             listOf(ActivityUiItem(
                                 id = group.key, occurredAt = group.occurredAt, moduleId = group.module,
@@ -373,10 +414,13 @@ fun HubHistorySearchScreen(
                                     onClick = {
                                         selectedModuleIds = (if (checked) selectedSet - moduleId
                                             else selectedSet + moduleId).sorted()
-                                        moduleMenuOpen = false
                                     },
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(android.R.string.ok)) },
+                                onClick = { moduleMenuOpen = false },
+                            )
                         }
                     }
                 }
@@ -586,7 +630,7 @@ private fun ActivityCard(
     val context = LocalContext.current
     var gitUndoSafe by remember(item.id) { mutableStateOf(false) }
     var semanticUndoSafe by remember(item.id) { mutableStateOf(false) }
-    val canOpen = item.navigationRef != null || (item.patchId != null && item.patchRef != null)
+    val canOpen = item.navigationRef != null || item.notificationEventId != null || (item.patchId != null && item.patchRef != null)
     var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
     LaunchedEffect(item.semanticTransactionId, expanded, undoRevision) {
         semanticUndoSafe = false
@@ -681,7 +725,7 @@ private fun ActivityCard(
                 item.git?.let { git ->
                     TextButton(onClick = {
                         val repository = GitDataSettings.configuration(context).repositoryUrl.removeSuffix(".git").trimEnd('/')
-                        context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("$repository/commit/${git.commitSha}")))
+                        context.startActivity(Intent(Intent.ACTION_VIEW,("$repository/commit/${git.commitSha}").toUri()))
                     }) { Text(stringResource(UiR.string.history_view_git)) }
                 }
                 if (canOpen) {
@@ -780,6 +824,9 @@ private fun navigationRef(activity: HubActivityEntity): HubEntityRef? {
 }
 
 private suspend fun openActivityTarget(context: Context, item: ActivityUiItem): Boolean {
+    item.notificationEventId?.let { id ->
+        return runCatching { context.startActivity(com.gernalix.personalhub.notifications.api.NotificationsRoute.eventIntent(context, id)); true }.getOrDefault(false)
+    }
     val ref = item.navigationRef
     val target = ref?.let { entityRef ->
         runCatching {
@@ -789,7 +836,7 @@ private suspend fun openActivityTarget(context: Context, item: ActivityUiItem): 
         }.getOrNull()
     }
     if (target != null) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri))
+        val intent = Intent(Intent.ACTION_VIEW, (target.uri).toUri())
         target.activityClassName?.let { intent.setClassName(context.packageName, it) }
         return runCatching { context.startActivity(intent); true }.getOrDefault(false)
     }
@@ -803,6 +850,8 @@ private fun moduleDisplayName(context: Context, moduleId: String): String =
             "settings" -> context.getString(R.string.settings_title)
             "tags" -> "Tags"
             "since_when" -> context.getString(R.string.since_when_title)
+            "countdown" -> context.getString(com.gernalix.personalhub.core.ui.R.string.countdown_title)
+            "notifications" -> com.gernalix.personalhub.core.alerts.AlertText.get(context, R.string.home_notifications, R.string.home_notifications_it)
             else -> moduleId
                 .replace('_', ' ')
                 .replaceFirstChar(Char::uppercase)

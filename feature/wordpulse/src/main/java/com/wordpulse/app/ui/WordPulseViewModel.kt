@@ -377,7 +377,6 @@ class WordPulseViewModel(
 
     override fun onCleared() {
         pvtJob?.cancel()
-        super.onCleared()
     }
 
     private suspend fun refreshSleepContextNow() {

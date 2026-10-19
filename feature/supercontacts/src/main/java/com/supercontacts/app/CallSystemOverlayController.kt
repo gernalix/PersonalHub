@@ -1,12 +1,13 @@
 package com.supercontacts.app
 
+import android.annotation.SuppressLint
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.net.Uri
-import android.os.Build
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -38,6 +39,8 @@ internal class CallOverlayRequestGate {
     fun isCurrent(token: Long): Boolean = token == generation
 }
 
+// Process-owned window uses only applicationContext and is removed and cleared by dismissCurrent.
+@SuppressLint("StaticFieldLeak")
 object CallSystemOverlayController {
     private const val TAG = "SC_CallOverlay"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -80,12 +83,7 @@ object CallSystemOverlayController {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            },
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -189,7 +187,7 @@ object CallSystemOverlayController {
     }
 
     private fun openContact(context: Context, publicId: String) {
-        val uri = Uri.parse(ContactDeepLink.create(publicId))
+        val uri = (ContactDeepLink.create(publicId)).toUri()
         val intent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = uri

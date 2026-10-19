@@ -39,8 +39,8 @@ class PlacesCapsule(private val repository: PlaceRepository) {
             notes = mutation.notes,
             photoUri = mutation.photoUri,
             sourceApp = mutation.sourceApp,
+            tagNames = mutation.tagNames,
         )
-        repository.setPlaceTags(uuid, mutation.tagNames)
         return uuid
     }
 

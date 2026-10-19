@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.withRotation
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -138,36 +140,35 @@ object FinanceSemanticQaBridge {
     }
 
     private fun jacketBitmap(background: Int, rotation: Float): Bitmap =
-        Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888).also { bitmap ->
+        createBitmap(320, 320).also { bitmap ->
             val canvas = Canvas(bitmap)
             canvas.drawColor(background)
-            canvas.save()
-            canvas.rotate(rotation, 160f, 160f)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(25, 25, 30) }
-            val path = Path().apply {
-                moveTo(105f, 70f)
-                lineTo(145f, 55f)
-                lineTo(175f, 55f)
-                lineTo(215f, 70f)
-                lineTo(260f, 135f)
-                lineTo(225f, 160f)
-                lineTo(205f, 130f)
-                lineTo(205f, 270f)
-                lineTo(115f, 270f)
-                lineTo(115f, 130f)
-                lineTo(95f, 160f)
-                lineTo(60f, 135f)
-                close()
+            canvas.withRotation(rotation, 160f, 160f) {
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(25, 25, 30) }
+                val path = Path().apply {
+                    moveTo(105f, 70f)
+                    lineTo(145f, 55f)
+                    lineTo(175f, 55f)
+                    lineTo(215f, 70f)
+                    lineTo(260f, 135f)
+                    lineTo(225f, 160f)
+                    lineTo(205f, 130f)
+                    lineTo(205f, 270f)
+                    lineTo(115f, 270f)
+                    lineTo(115f, 130f)
+                    lineTo(95f, 160f)
+                    lineTo(60f, 135f)
+                    close()
+                }
+                drawPath(path, paint)
+                paint.color = Color.LTGRAY
+                paint.strokeWidth = 5f
+                drawLine(160f, 65f, 160f, 265f, paint)
             }
-            canvas.drawPath(path, paint)
-            paint.color = Color.LTGRAY
-            paint.strokeWidth = 5f
-            canvas.drawLine(160f, 65f, 160f, 265f, paint)
-            canvas.restore()
         }
 
     private fun shoeBitmap(): Bitmap =
-        Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888).also { bitmap ->
+        createBitmap(320, 320).also { bitmap ->
             val canvas = Canvas(bitmap)
             canvas.drawColor(Color.rgb(235, 235, 225))
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(120, 70, 35) }

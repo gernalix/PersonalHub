@@ -1,5 +1,6 @@
 package com.example.multitimetracker.persistence
 
+import androidx.core.content.edit
 import android.content.Context
 
 /**
@@ -20,12 +21,12 @@ object SyncCountersStore {
         val totalKey = "count_total"
         val firstKey = "first_ms"
 
-        s.edit()
-            .putLong(countKey, s.getLong(countKey, 0L) + 1L)
-            .putLong(lastKey, nowMs)
-            .putLong(totalKey, s.getLong(totalKey, 0L) + 1L)
-            .putLong(firstKey, s.getLong(firstKey, nowMs).let { if (it == 0L) nowMs else it })
-            .apply()
+        s.edit {
+            putLong(countKey, s.getLong(countKey, 0L) + 1L)
+                .putLong(lastKey, nowMs)
+                .putLong(totalKey, s.getLong(totalKey, 0L) + 1L)
+                .putLong(firstKey, s.getLong(firstKey, nowMs).let { if (it == 0L) nowMs else it })
+        }
     }
 
     data class Snapshot(

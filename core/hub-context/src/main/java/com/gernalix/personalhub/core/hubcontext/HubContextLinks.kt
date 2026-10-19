@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import androidx.core.net.toUri
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -252,7 +253,7 @@ fun HubContextLinks(anchor: HubEntityRef, modifier: Modifier = Modifier) {
                             val target = HubContextRuntime
                                 .adapter(summary.ref.moduleId, summary.ref.entityKind)
                                 .openTarget(summary.ref.canonicalId) ?: return@launch
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri))
+                            val intent = Intent(Intent.ACTION_VIEW, (target.uri).toUri())
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             target.activityClassName?.let { intent.setClassName(context.packageName, it) }
                             runCatching { context.startActivity(intent) }

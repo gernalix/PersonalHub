@@ -20,8 +20,8 @@ import androidx.compose.ui.Modifier
 @Composable
 fun SingleSubmitTextButton(
     onClick: () -> Unit,
-    enabled: Boolean = true,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     var submitted by remember { mutableStateOf(false) }
@@ -40,8 +40,8 @@ fun SingleSubmitTextButton(
 @Composable
 fun SingleSubmitButton(
     onClick: () -> Unit,
-    enabled: Boolean = true,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     var submitted by remember { mutableStateOf(false) }
@@ -60,8 +60,8 @@ fun SingleSubmitButton(
 @Composable
 fun SingleSubmitOutlinedButton(
     onClick: () -> Unit,
-    enabled: Boolean = true,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
     var submitted by remember { mutableStateOf(false) }

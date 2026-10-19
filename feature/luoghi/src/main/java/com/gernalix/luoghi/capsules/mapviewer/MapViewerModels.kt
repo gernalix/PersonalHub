@@ -36,12 +36,13 @@ data class MapMarkerModel(
     val longitude: Double,
 ) {
     companion object {
-        fun from(place: PlaceEntity, label: String?): MapMarkerModel? {
+        fun from(place: PlaceEntity, label: String?, unnamedLabel: String = "Unnamed place"): MapMarkerModel? {
             val lat = place.lat ?: return null
             val lon = place.lon ?: return null
+            if (!OsmAndMapPlan.valid(lat, lon)) return null
             return MapMarkerModel(
                 uuid = place.uuid,
-                title = label?.takeIf { it.isNotBlank() } ?: place.nickname.ifBlank { place.uuid.take(8) },
+                title = label?.takeIf { it.isNotBlank() } ?: place.nickname.ifBlank { unnamedLabel },
                 address = place.address,
                 notes = place.notes,
                 latitude = lat,
@@ -51,15 +52,6 @@ data class MapMarkerModel(
     }
 }
 
-data class MapOverlayMarker(
-    val uuid: String?,
-    val latitude: Double,
-    val longitude: Double,
-    val title: String,
-    val snippet: String?,
-    val count: Int = 1,
-)
-
 data class MapViewerModel(
     val title: String,
     val callerMode: MapCallerMode,
@@ -67,60 +59,9 @@ data class MapViewerModel(
     val markers: List<MapMarkerModel>,
     val missingCoordinateCount: Int,
     val currentLocation: MapCurrentLocation? = null,
-) {
-    val overlays: List<MapOverlayMarker> = MapMarkerClusterer.overlays(markers)
-    val usesPerformanceClusterFallback: Boolean = markers.size > MapMarkerClusterer.MAX_DIRECT_MARKERS
-}
+)
 
 data class MapCurrentLocation(
     val latitude: Double,
     val longitude: Double,
 )
-
-object MapMarkerClusterer {
-    const val MAX_DIRECT_MARKERS = 500
-    private const val CLUSTER_CELL_DEGREES = 0.02
-
-    fun overlays(markers: List<MapMarkerModel>): List<MapOverlayMarker> {
-        if (markers.size <= MAX_DIRECT_MARKERS) {
-            return markers.map { marker ->
-                MapOverlayMarker(
-                    uuid = marker.uuid,
-                    latitude = marker.latitude,
-                    longitude = marker.longitude,
-                    title = marker.title,
-                    snippet = listOfNotNull(marker.address, marker.notes).joinToString("\n").takeIf { it.isNotBlank() },
-                )
-            }
-        }
-        return markers
-            .groupBy { marker ->
-                Pair(
-                    (marker.latitude / CLUSTER_CELL_DEGREES).toInt(),
-                    (marker.longitude / CLUSTER_CELL_DEGREES).toInt(),
-                )
-            }
-            .values
-            .map { bucket ->
-                if (bucket.size == 1) {
-                    val marker = bucket.single()
-                    MapOverlayMarker(
-                        uuid = marker.uuid,
-                        latitude = marker.latitude,
-                        longitude = marker.longitude,
-                        title = marker.title,
-                        snippet = marker.address,
-                    )
-                } else {
-                    MapOverlayMarker(
-                        uuid = null,
-                        latitude = bucket.map { it.latitude }.average(),
-                        longitude = bucket.map { it.longitude }.average(),
-                        title = "${bucket.size} places",
-                        snippet = bucket.take(5).joinToString("\n") { it.title },
-                        count = bucket.size,
-                    )
-                }
-            }
-    }
-}

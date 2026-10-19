@@ -1,5 +1,6 @@
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.LibraryExtension
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     alias(libs.plugins.android.application) apply false
@@ -23,6 +24,11 @@ private fun org.gradle.api.Project.configureLibraryTranslationLint() {
 }
 
 subprojects {
+    tasks.withType<Test>().configureEach {
+        // Robolectric's Android shared-memory setup calls this public JDK interface.
+        // Export it only to host test JVMs; application/runtime configuration is unchanged.
+        jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+    }
     pluginManager.withPlugin("com.android.application") { configureTranslationLint() }
     pluginManager.withPlugin("com.android.library") { configureLibraryTranslationLint() }
 }

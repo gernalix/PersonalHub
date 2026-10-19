@@ -1,3 +1,5 @@
+import org.gradle.api.configuration.BuildFeatures
+import javax.inject.Inject
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -7,6 +9,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+abstract class SigningBuildFeatureAccess @Inject constructor(val features: BuildFeatures)
 
 val canonicalSigningEnvFile = File("/home/daniele/.config/codex/secrets/android_signing.env")
 val canonicalSigningProperties = Properties().apply {
@@ -51,7 +55,7 @@ if (signingArtifactRequested && !unsignedPlayBundlePreflight && !ciDebugInstrume
         "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
             "Only the CI Play preflight or ephemeral CI emulator instrumentation may opt out of canonical signing."
     }
-    require(!gradle.startParameter.isConfigurationCacheRequested) {
+    require(!objects.newInstance<SigningBuildFeatureAccess>().features.configurationCache.active.get()) {
         "Signed APK/AAB/device tasks require --no-configuration-cache."
     }
 }
@@ -107,6 +111,9 @@ android {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
             // Final Pixel delivery uses the existing R8/signing pipeline; worker/test builds stay unchanged.
             if (providers.gradleProperty("personalhub.minifiedDebug").getOrElse("false").toBoolean()) {
+                // AGP disables optimization/obfuscation when debuggable remains true.
+                // Only the final opt-in is optimized; ordinary debug stays debuggable.
+                isDebuggable = false
                 isMinifyEnabled = true
                 isShrinkResources = true
                 proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -131,8 +138,11 @@ android {
             require(qaSuffix.matches(Regex("\\.qa[0-9]*"))) { "QA suffix must remain an isolated .qa package" }
             applicationIdSuffix = qaSuffix
             // QA supports 32-bit devices, the physical Pixel arm64, and the x86_64 emulator.
-            // Default QA retains instrumentation hooks. The minifiedDebug opt-in also permits
-            // manual clone checks with R8; instrumentation must use the unminified default.
+            // QA remains independently debuggable/unminified, even while the final
+            // debug opt-in is enabled in the same Gradle invocation.
+            isDebuggable = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64") }
         }
         create("benchmark") {
@@ -157,9 +167,16 @@ android {
     }
     sourceSets {
         named("testDebug") {
-            assets.srcDir(rootProject.file("core/database/src/main/assets"))
+            assets.directories.add(rootProject.file("core/database/src/main/assets").absolutePath)
         }
     }
+}
+
+composeCompiler {
+    // Places6 includes pre-obfuscated Compose methods that the optional group-key
+    // mapping collector cannot tokenize. Keep standard R8 class/line mappings and
+    // optimization; disable only this incompatible diagnostic mapping add-on.
+    includeComposeMappingFile.set(false)
 }
 
 androidComponents {
@@ -235,5 +252,5 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.uiautomator)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation("androidx.test.espresso:espresso-intents:3.7.0")
+    androidTestImplementation(libs.androidx.espresso.intents)
 }

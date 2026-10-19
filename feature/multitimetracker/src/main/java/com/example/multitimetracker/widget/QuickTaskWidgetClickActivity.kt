@@ -38,12 +38,7 @@ class QuickSessionWidgetClickActivity : Activity() {
                 }
 
                 if (vibrator?.hasVibrator() == true) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vibrator.vibrate(VibrationEffect.createOneShot(60, 255))
-                    } else {
-                        @Suppress("DEPRECATION")
-                        vibrator.vibrate(60)
-                    }
+                    vibrator.vibrate(VibrationEffect.createOneShot(60, 255))
                 }
             }
         }

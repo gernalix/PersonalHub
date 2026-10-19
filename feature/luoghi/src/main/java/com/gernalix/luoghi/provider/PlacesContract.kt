@@ -1,6 +1,7 @@
 package com.gernalix.luoghi.provider
 
 import android.net.Uri
+import androidx.core.net.toUri
 import android.provider.BaseColumns
 
 object PlacesContract {
@@ -8,7 +9,7 @@ object PlacesContract {
     const val AUTHORITY = "com.gernalix.personalhub.luoghi.places"
     const val READ_PERMISSION = "com.gernalix.personalhub.permission.READ_PLACES"
     const val WRITE_PERMISSION = "com.gernalix.personalhub.permission.WRITE_PLACES"
-    val BASE_URI: Uri = Uri.parse("content://$AUTHORITY")
+    val BASE_URI: Uri = "content://$AUTHORITY".toUri()
 
     object Places : BaseColumns {
         val CONTENT_URI: Uri = BASE_URI.buildUpon().appendPath("places").build()

@@ -7,6 +7,12 @@ import com.gernalix.luoghi.R
 import com.gernalix.luoghi.data.PlaceEntity
 
 object MapViewerCapsule {
+    fun exploreMapIntent(context: Context, reference: OsmAndReference): Intent = globalMapIntent(context, emptyList())
+        .putExtra(MapViewerActivity.EXTRA_REFERENCE_LAT, reference.latitude)
+        .putExtra(MapViewerActivity.EXTRA_REFERENCE_LON, reference.longitude)
+        .putExtra(MapViewerActivity.EXTRA_REFERENCE_LABEL, reference.label)
+        .putExtra(MapViewerActivity.EXTRA_REFERENCE_ID, reference.placeId)
+
     fun globalMapIntent(context: Context, places: List<PlaceEntity>): Intent =
         Intent(MapViewerActivity.ACTION_SHOW_MAP).setClass(context, MapViewerActivity::class.java)
             .putExtra(MapViewerActivity.EXTRA_TITLE, context.getString(R.string.map_default_title))
@@ -18,6 +24,6 @@ object MapViewerCapsule {
             )
             .putStringArrayListExtra(
                 MapViewerActivity.EXTRA_LABELS,
-                ArrayList(places.map { it.nickname.ifBlank { it.uuid.take(8) } }),
+                ArrayList(places.map { it.nickname.ifBlank { context.getString(R.string.unnamed_place) } }),
             )
 }

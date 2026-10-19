@@ -1,5 +1,6 @@
 package com.example.multitimetracker.capsules.alerts.ui
 
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -357,7 +358,7 @@ private fun UnifiedAlertEditor(
     var placeTags by remember(key) { mutableStateOf(places.targets[place?.id].orEmpty()) }
     var targetKind by remember(key) { mutableStateOf(runCatching { AlertTargetKind.valueOf(place?.targetKind.orEmpty()) }.getOrDefault(AlertTargetKind.ENTITY)) }
     var placeId by remember(key) { mutableStateOf(place?.entityId ?: initialPlaceId.orEmpty()) }
-    var cooldown by remember(key) { mutableStateOf(timer?.cooldownMs ?: 0L) }
+    var cooldown by remember(key) { mutableLongStateOf(timer?.cooldownMs ?: 0L) }
     var randomEnabled by remember(key) { mutableStateOf(timer?.randomAlertsEnabled ?: false) }
     var randomCount by remember(key) { mutableStateOf((timer?.randomAlertsCount ?: 1).coerceAtLeast(1).toString()) }
     var randomWindow by remember(key) { mutableStateOf(RandomAlertWindow.parse(timer?.randomAlertsWindow ?: RandomAlertWindow.DAY.name)) }

@@ -1,0 +1,5 @@
+<resources>
+    <string name="module_content_tab" translatable="false">Module</string>
+    <string name="module_history_tab" translatable="false">History</string>
+    <string name="module_history_unavailable" translatable="false">History is unavailable.</string>
+</resources>

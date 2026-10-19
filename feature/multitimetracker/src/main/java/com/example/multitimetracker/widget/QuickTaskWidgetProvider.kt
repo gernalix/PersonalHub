@@ -1,6 +1,7 @@
 // v471
 package com.example.multitimetracker.widget
 
+import androidx.core.content.edit
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -39,7 +40,7 @@ class QuickSessionWidgetProvider : AppWidgetProvider() {
             appWidgetIds.forEach { appWidgetId ->
                 val profileKey = "profile_$appWidgetId"
                 if (!prefs.contains(profileKey)) {
-                    prefs.edit().putString(profileKey, DatabaseProfiles.activeProfileId(context)).apply()
+                    prefs.edit { putString(profileKey, DatabaseProfiles.activeProfileId(context))}
                 }
                 val rv = RemoteViews(context.packageName, R.layout.widget_quick_task)
                 rv.setOnClickPendingIntent(R.id.widgetRoot, buildClickIntent(context, appWidgetId))

@@ -2,6 +2,7 @@
 
 package com.supercontacts.app.ui.app
 
+import androidx.core.net.toUri
 import com.gernalix.personalhub.core.ui.HubFeedback
 
 import com.gernalix.personalhub.core.ui.HubFeedbackHost
@@ -108,6 +109,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
@@ -337,7 +339,7 @@ fun SuperContactsApp(
 
     val pickDetailPhoto = rememberHubPhotoPicker { selected ->
         val contactId = selectedContactId ?: return@rememberHubPhotoPicker
-        viewModel.saveContactPhotoForContact(contactId, Uri.parse(selected.reference)) { path ->
+        viewModel.saveContactPhotoForContact(contactId, (selected.reference).toUri()) { path ->
             viewModel.updateContactPhoto(contactId, path)
         }
     }
@@ -3228,7 +3230,7 @@ private fun ContactEditScreen(
         photoPath = photoPath,
     )
     val pickPhoto = rememberHubPhotoPicker { selected ->
-        onSavePhoto(Uri.parse(selected.reference)) { path ->
+        onSavePhoto((selected.reference).toUri()) { path ->
             if (photoPath.isNotBlank() && photoPath != initialInput.photoPath) {
                 onDeleteUnusedPhoto(photoPath)
             }
@@ -4032,8 +4034,8 @@ private fun ContactTextField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    singleLine: Boolean = true,
     modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
     trailingIcon: (@Composable (() -> Unit))? = null,
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -4805,7 +4807,7 @@ private fun AgeFieldSection(
             onMoreClick = {},
         )
         Text(
-            text = stringResource(R.string.age_value_years, age.years),
+            text = pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_years, age.years, age.years),
             modifier = Modifier.clickable { onOpen() },
             style = MaterialTheme.typography.bodyLarge,
         )
@@ -4889,7 +4891,7 @@ private fun PhoneFieldSection(
                         link = link,
                         onClick = {
                             onOpen()
-                            openUri(context, Uri.parse(link.deepLink))
+                            openUri(context, (link.deepLink).toUri())
                         },
                     )
                 }
@@ -5274,7 +5276,7 @@ private fun SocialLinksSection(
                 label = stringResource(R.string.open_instagram),
                 icon = InstagramIcon,
                 fieldType = ContactFieldType.InstagramUsername,
-                uri = Uri.parse("https://www.instagram.com/${Uri.encode(username)}"),
+                uri = ("https://www.instagram.com/${Uri.encode(username)}").toUri(),
             )
         },
         detail.facebookUserId.trim().takeIf { it.isNotBlank() }?.let { facebookUserId ->
@@ -5282,7 +5284,7 @@ private fun SocialLinksSection(
                 label = stringResource(R.string.open_facebook),
                 icon = FacebookIcon,
                 fieldType = ContactFieldType.FacebookUserId,
-                uri = Uri.parse("https://facebook.com/${Uri.encode(facebookUserId)}"),
+                uri = ("https://facebook.com/${Uri.encode(facebookUserId)}").toUri(),
             )
         },
         detail.facebookUserId.trim().takeIf { it.isNotBlank() }?.let { facebookUserId ->
@@ -5290,7 +5292,7 @@ private fun SocialLinksSection(
                 label = stringResource(R.string.open_messenger),
                 icon = MessengerIcon,
                 fieldType = ContactFieldType.FacebookUserId,
-                uri = Uri.parse("fb-messenger://user/${Uri.encode(facebookUserId)}"),
+                uri = ("fb-messenger://user/${Uri.encode(facebookUserId)}").toUri(),
             )
         },
     )
@@ -5412,7 +5414,7 @@ private fun MessagingLinksSection(
         undecidedLinks.forEach { link ->
             MessagingActionRequiredCard(
                 link = link,
-                onOpen = { openUri(context, Uri.parse(link.deepLink)) },
+                onOpen = { openUri(context, (link.deepLink).toUri()) },
                 onConfirm = onConfirm,
                 onReject = onReject,
                 onReset = onReset,
@@ -5621,15 +5623,18 @@ private fun formatKnownDuration(sinceUtc: Long): String {
     val today = LocalDate.now(zone)
     val days = ChronoUnit.DAYS.between(start, today).coerceAtLeast(0)
     return when {
-        days < 7 -> stringResource(R.string.stats_days, days)
-        days < 30 -> stringResource(R.string.stats_weeks, days / 7)
-        days < 365 -> stringResource(R.string.stats_months, (days / 30).coerceAtLeast(1))
+        days < 7 -> pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_days, days.toInt(), days)
+        days < 30 -> pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_weeks, (days / 7).toInt(), days / 7)
+        days < 365 -> pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_months, (days / 30).coerceAtLeast(1).toInt(), (days / 30).coerceAtLeast(1))
         else -> {
             val totalMonths = ChronoUnit.MONTHS.between(start.withDayOfMonth(1), today.withDayOfMonth(1))
                 .coerceAtLeast(12)
             val years = totalMonths / 12
             val months = totalMonths % 12
-            stringResource(R.string.stats_years_months, years, months)
+            listOf(
+                pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_years, years.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), years),
+                pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_months, months.toInt(), months),
+            ).joinToString(", ")
         }
     }
 }
@@ -5852,9 +5857,8 @@ private fun String.initials(): String {
 private fun openLink(context: Context, value: String) {
     val trimmed = value.trim()
     if (trimmed.isBlank()) return
-    val uri = Uri.parse(
-        if (trimmed.contains("://")) trimmed else "https://$trimmed",
-    )
+    val uri = (
+        if (trimmed.contains("://")) trimmed else "https://$trimmed").toUri()
     openUri(context, uri)
 }
 
@@ -5919,11 +5923,11 @@ private fun openTelegram(context: Context, storedValue: String) {
     val username = telegramUsernameFromStoredValue(trimmed)
     val phoneDigits = telegramPhoneDigitsFromStoredValue(trimmed)
     val preferredUri = when {
-        username != null -> Uri.parse("tg://resolve?domain=${Uri.encode(username)}")
-        phoneDigits != null -> Uri.parse("tg://resolve?phone=${Uri.encode(phoneDigits)}")
-        else -> Uri.parse(trimmed)
+        username != null -> ("tg://resolve?domain=${Uri.encode(username)}").toUri()
+        phoneDigits != null -> ("tg://resolve?phone=${Uri.encode(phoneDigits)}").toUri()
+        else -> (trimmed).toUri()
     }
-    val fallbackUri = username?.let { Uri.parse("https://t.me/${Uri.encode(it)}") }
+    val fallbackUri = username?.let { ("https://t.me/${Uri.encode(it)}").toUri() }
     if (!openUriIfResolvable(context, preferredUri) && fallbackUri != null) {
         openUri(context, fallbackUri)
     }
@@ -5931,12 +5935,9 @@ private fun openTelegram(context: Context, storedValue: String) {
 
 private fun openUriIfResolvable(context: Context, uri: Uri): Boolean {
     val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    val canResolve = intent.resolveActivity(context.packageManager) != null
-    if (canResolve) {
-        runCatching { context.startActivity(intent) }
-            .onSuccess { return true }
-    }
-    return false
+    // Launchability does not require package visibility; a preflight query can
+    // hide installed handlers on Android11+. Keep fallback tied to actual launch.
+    return runCatching { context.startActivity(intent) }.isSuccess
 }
 
 private fun telegramLinkForPhone(phone: String): String? {
@@ -6008,9 +6009,7 @@ private fun openMaps(context: Context, detail: ContactDetail, linkedPlace: Resol
     val mapsIntent = Intent(Intent.ACTION_VIEW, uris.first())
         .setPackage("com.google.android.apps.maps")
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (mapsIntent.resolveActivity(context.packageManager) != null &&
-        runCatching { context.startActivity(mapsIntent) }.isSuccess
-    ) {
+    if (runCatching { context.startActivity(mapsIntent) }.isSuccess) {
         return
     }
     uris.drop(1).firstOrNull { openUriIfResolvable(context, it) }?.let { return }
@@ -6029,15 +6028,13 @@ internal fun buildMapsUris(
     val result = mutableListOf<Uri>()
     if (latitude != null && longitude != null) {
         val coordinateLabel = trimmedLabel.ifBlank { trimmedAddress }
-        result += Uri.parse(
-            "geo:$latitude,$longitude?q=" + Uri.encode("$latitude,$longitude($coordinateLabel)"),
-        )
+        result += (
+            "geo:$latitude,$longitude?q=" + Uri.encode("$latitude,$longitude($coordinateLabel)")).toUri()
     }
     if (trimmedAddress.isNotBlank()) {
-        result += Uri.parse("geo:0,0?q=${Uri.encode(trimmedAddress)}")
-        result += Uri.parse(
-            "https://www.google.com/maps/search/?api=1&query=${Uri.encode(trimmedAddress)}",
-        )
+        result += ("geo:0,0?q=${Uri.encode(trimmedAddress)}").toUri()
+        result += (
+            "https://www.google.com/maps/search/?api=1&query=${Uri.encode(trimmedAddress)}").toUri()
     }
     return result.distinct()
 }
@@ -6161,6 +6158,7 @@ private suspend fun getCurrentLocationOnce(context: Context): Location? {
 
                 override fun onProviderDisabled(provider: String) = Unit
                 override fun onProviderEnabled(provider: String) = Unit
+                @Deprecated("Required callback for legacy Android LocationListener implementations.")
                 override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
             }
             continuation.invokeOnCancellation { locationManager.removeUpdates(listener) }

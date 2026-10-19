@@ -70,6 +70,7 @@ private fun renderSemanticEvent(event: MutationEvent): HumanActivityText? {
     }
     val quoted = "“$name”"
     val title = when (event.eventType) {
+        "app.version.updated" -> name
         "workflowy.link.assigned" ->
             if (name == "Workflowy") "Linked Workflowy node" else "Linked $quoted to Workflowy"
         "workflowy.link.unlinked" ->

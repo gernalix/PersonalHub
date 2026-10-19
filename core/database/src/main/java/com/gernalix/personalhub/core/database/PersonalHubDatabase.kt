@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
 import com.gernalix.personalhub.contracts.database.*
@@ -101,7 +102,7 @@ import java.security.MessageDigest
     SinceWhenMigrationState::class,
 
     HubCanonicalEntity::class, HubExternalIdentity::class, HubEntityAlias::class,
-], version = 24, exportSchema = true)
+], version = 25, exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -122,7 +123,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 24
+        const val SCHEMA_VERSION = 25
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null
@@ -156,6 +157,8 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .openHelperFactory(GatedOpenHelperFactory())
                 .addCallback(object : Callback() {
+                    // The open manifest must be durably committed and its failure checked.
+                    @SuppressLint("UseKtx")
                     override fun onOpen(db: SupportSQLiteDatabase) {
                         com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.install(context, db)
                         MutationEventStore.install(db)

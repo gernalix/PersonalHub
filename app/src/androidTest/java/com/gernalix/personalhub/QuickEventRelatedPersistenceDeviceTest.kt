@@ -17,6 +17,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
+// Isolated-package integration fixtures deliberately exercise the owning write APIs.
+@OptIn(com.example.multitimetracker.util.CapsuleWriteApi::class)
 @RunWith(AndroidJUnit4::class)
 class QuickEventRelatedPersistenceDeviceTest {
     @TableProbe("snapshot")
@@ -77,7 +79,7 @@ class QuickEventRelatedPersistenceDeviceTest {
             }
         } finally {
             if (previous == null) db.execSQL("DELETE FROM integrity_stats WHERE id=1")
-            else db.execSQL("UPDATE integrity_stats SET json=?, computed_at_ms=? WHERE id=1", arrayOf(previous.first, previous.second))
+            else db.execSQL("UPDATE integrity_stats SET json=?, computed_at_ms=? WHERE id=1", arrayOf<Any>(previous.first, previous.second))
         }
     }
 

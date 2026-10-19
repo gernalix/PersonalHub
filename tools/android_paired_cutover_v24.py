@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guarded, paired schema-23→24 cutover for an already-tested final APK.
+"""Guarded, paired schema-23→24 or schema-24→25 cutover for a tested final APK.
 
 This is an explicit production operation, NOT an ordinary test. Never invoke
 without a verified exclusive Pixel notification window. The default is no-op.
@@ -76,11 +76,16 @@ class Pixel:
             raise CutoverBlocked("Specified device is not the verified physical Pixel")
         self.serial = serial
         self.adb = resolve_tool("adb")
+        self._suspension_owned = False
+        self._enabled_before_freeze: int | None = None
 
     def run(self, *args: str, input_bytes: bytes | None = None) -> bytes:
         result = subprocess.run(
             [self.adb, "-s", self.serial, *args],
-            input=input_bytes, check=True, capture_output=True, timeout=120,
+            # Only explicit DB transfer payloads may use stdin. Ordinary ADB calls
+            # must leave the parent controller's queued commands untouched.
+            **({"input": input_bytes} if input_bytes is not None else {"stdin": subprocess.DEVNULL}),
+            check=True, capture_output=True, timeout=120,
         )
         return result.stdout
 
@@ -107,17 +112,51 @@ class Pixel:
             raise CutoverBlocked("Expected a single installed APK for paired rollback")
         return matches[0].removeprefix("package:")
 
+    def package_state(self) -> tuple[bool, int]:
+        """Read only user 0; never guess state from another Android profile."""
+        dump = self.shell("dumpsys", "package", PACKAGE)
+        user = re.search(r"(?m)^\s*User 0:([^\n]*)$", dump)
+        if user is None:
+            raise CutoverBlocked("Cannot verify PersonalHub user-0 package state")
+        suspended = re.search(r"\bsuspended=(true|false)\b", user[1])
+        enabled = re.search(r"\benabled=(\d+)\b", user[1])
+        if suspended is None or enabled is None:
+            raise CutoverBlocked("Incomplete PersonalHub package suspension/enabled state")
+        return suspended[1] == "true", int(enabled[1])
+
     def freeze(self) -> None:
-        self.shell("pm", "disable-user", "--user", "0", PACKAGE)
+        # Disabling a package removes its widget providers and their launcher
+        # bindings. Suspension masks widgets temporarily without deleting them.
+        suspended, enabled = self.package_state()
+        if enabled not in (0, 1):
+            raise CutoverBlocked("PersonalHub was already disabled; preserve its original state")
+        if suspended and not self._suspension_owned:
+            raise CutoverBlocked("PersonalHub was already suspended by another operation")
+        if self._enabled_before_freeze is None:
+            self._enabled_before_freeze = enabled
+        if enabled != self._enabled_before_freeze:
+            raise CutoverBlocked("PersonalHub enabled state changed during cutover")
+        if not suspended:
+            # Retain cleanup ownership even if the shell loses the response
+            # after Android has already applied the requested suspension.
+            self._suspension_owned = True
+            self.shell("pm", "suspend", "--user", "0", PACKAGE)
         self.shell("am", "force-stop", PACKAGE)
-        if not self.frozen():
-            raise CutoverBlocked("PersonalHub is still running after package disable")
+        actual_suspended, actual_enabled = self.package_state()
+        if not actual_suspended or actual_enabled != enabled or not self.frozen():
+            raise CutoverBlocked("PersonalHub suspension/process freeze was not verified")
 
     def enable(self) -> None:
-        self.shell("pm", "default-state", "--user", "0", PACKAGE)
+        if not self._suspension_owned:
+            return
+        self.shell("pm", "unsuspend", "--user", "0", PACKAGE)
+        suspended, enabled = self.package_state()
+        if suspended or enabled != self._enabled_before_freeze:
+            raise CutoverBlocked("PersonalHub suspension restoration was not verified")
+        self._suspension_owned = False
 
 
-def read_frozen_database(device: Pixel, root: Path) -> tuple[Path, dict[str, str]]:
+def read_frozen_database(device: Pixel, root: Path, source_version: int = 23) -> tuple[Path, dict[str, str]]:
     """Retrieve only the DB and sidecars; produce a coherent, WAL-aware snapshot."""
     if not device.frozen():
         raise CutoverBlocked("The application resumed; cannot snapshot live data")
@@ -147,15 +186,15 @@ def read_frozen_database(device: Pixel, root: Path) -> tuple[Path, dict[str, str
             out.write_bytes(archive.extractfile(entry).read())
             out.chmod(0o600)
             file_hashes[entry.name] = sha(out)
-    source = root / "frozen-v23.db"
+    source = root / f"frozen-v{source_version}.db"
     with sqlite3.connect(f"file:{root / 'raw/databases/personalhub.db'}?mode=ro", uri=True) as src:
         with sqlite3.connect(source) as dest:
             src.backup(dest)
     source.chmod(0o600)
     with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as check:
-        if check.execute("PRAGMA user_version").fetchone()[0] != 23:
-            raise CutoverBlocked("v23→v24 cutover requested for a non-v23 source")
-        validate_room(check, 23)
+        if check.execute("PRAGMA user_version").fetchone()[0] != source_version:
+            raise CutoverBlocked(f"Cutover requires schema {source_version}; source has a different schema")
+        validate_room(check, source_version)
     return source, file_hashes
 
 
@@ -171,9 +210,9 @@ def assert_still_frozen(device: Pixel, expected: dict[str, str]) -> None:
             raise CutoverBlocked("Frozen DB or WAL changed after snapshot; aborting")
 
 
-def stage_and_swap(device: Pixel, prepared: Path, report: dict, expected: dict[str, str], token: str) -> str:
+def stage_and_swap(device: Pixel, prepared: Path, report: dict, expected: dict[str, str], token: str, target_version: int = 24) -> str:
     assert_still_frozen(device, expected)
-    stage = "databases/.ph-v24-" + token
+    stage = f"databases/.ph-v{target_version}-" + token
     rollback = "files/ph-cutover-rollback-" + token
     if device.app("test ! -e " + stage + " && test ! -e " + rollback + " && echo ok") != "ok":
         raise CutoverBlocked("Existing stage or rollback path conflicts with this cutover")
@@ -192,11 +231,11 @@ def stage_and_swap(device: Pixel, prepared: Path, report: dict, expected: dict[s
         if device.app("sha256sum databases/" + DATABASE).split()[0] != report["output_sha256"]:
             raise CutoverBlocked("Published database differs from prepared validation")
     except Exception:
-        # If no original file moved, preserve the live v23 DB as-is.
-        # Otherwise the only possible file at the live path is the staged v24.
+        # If no original file moved, preserve the original live DB as-is.
+        # Otherwise the only possible file at the live path is the staged target.
         if moved:
             device.app("test ! -f databases/" + DATABASE +
-                       " || mv databases/" + DATABASE + " " + rollback + "/failed-v24.db")
+                       " || mv databases/" + DATABASE + " " + rollback + f"/failed-v{target_version}.db")
         for file in reversed(moved):
             device.app("mv " + rollback + "/" + Path(file).name + " " + file)
         raise
@@ -204,7 +243,7 @@ def stage_and_swap(device: Pixel, prepared: Path, report: dict, expected: dict[s
 
 
 def paired_rollback(device: Pixel, rollback: str, old_apk: Path, token: str) -> None:
-    """Restore old schema and old APK while disabled; keep failed new data."""
+    """Restore old schema and old APK while suspended; keep failed new data."""
     device.freeze()
     failed = "files/ph-cutover-failed-" + token
     device.app("umask 077; mkdir " + failed)
@@ -213,7 +252,7 @@ def paired_rollback(device: Pixel, rollback: str, old_apk: Path, token: str) -> 
                    " || mv databases/" + file + " " + failed + "/" + file)
         device.app("test ! -f " + rollback + "/" + file +
                    " || mv " + rollback + "/" + file + " databases/" + file)
-    install_apk(old_apk, device.serial, timeout_s=120)
+    install_apk(old_apk, device.serial, timeout_s=120, paired_rollback=True)
     if device.shell("sha256sum", device.installed_apk()).split()[0] != sha(old_apk):
         raise CutoverBlocked("Old APK rollback hash mismatch; package remains disabled")
     device.enable()
@@ -225,6 +264,10 @@ def execute(args: argparse.Namespace) -> dict:
         raise CutoverBlocked("Both --execute and --allow-production are required")
     if args.output_dir.exists() or args.output_dir.resolve().is_relative_to(ROOT):
         raise CutoverBlocked("Output directory must be new, private and outside the repository")
+    upgrade = getattr(args, "schema_upgrade", "23-to-24")
+    if upgrade not in ("23-to-24", "24-to-25"):
+        raise CutoverBlocked("Unsupported schema upgrade")
+    source_version, target_version = (24, 25) if upgrade == "24-to-25" else (23, 24)
     verify_final_apk(args.new_apk)
     os.umask(0o077)
     args.output_dir.mkdir(mode=0o700, parents=True)
@@ -241,15 +284,21 @@ def execute(args: argparse.Namespace) -> dict:
         old_apk.chmod(0o600)
         frozen = True
         device.freeze()
-        source, file_hashes = read_frozen_database(device, args.output_dir)
-        target = args.output_dir / "prepared-v24.db"
-        report = migrate(source, target, qa_overlay_decision=args.qa_overlay_decision)
+        source, file_hashes = read_frozen_database(device, args.output_dir, source_version)
+        target = args.output_dir / f"prepared-v{target_version}.db"
+        if source_version == 24:
+            from migrate_personalhub_v24_to_v25 import migrate as migrate_countdown
+            report = migrate_countdown(source, target)
+        else:
+            report = migrate(source, target, qa_overlay_decision=args.qa_overlay_decision)
+        if report.get("source_version") != source_version or report.get("target_version") != target_version:
+            raise CutoverBlocked("Migration reported an unexpected source or target schema")
         if report["status"] != "PASS" or report["source_snapshot_sha256"] != sha(source):
             raise CutoverBlocked("Migration continuity validation failed")
         if report["output_sha256"] != sha(target):
             raise CutoverBlocked("Prepared database hash mismatch")
         assert_still_frozen(device, file_hashes)
-        rollback = stage_and_swap(device, target, report, file_hashes, token)
+        rollback = stage_and_swap(device, target, report, file_hashes, token, target_version)
         swapped = True
         install_apk(args.new_apk, device.serial, timeout_s=120)
         installed = device.shell("sha256sum", device.installed_apk()).split()[0]
@@ -262,7 +311,7 @@ def execute(args: argparse.Namespace) -> dict:
             "previous_apk_sha256": sha(old_apk),
             "source_sha256": report["source_snapshot_sha256"],
             "new_db_sha256": report["output_sha256"],
-            "source_schema": 23, "target_schema": 24,
+            "source_schema": source_version, "target_schema": target_version,
             "rollback_on_device": rollback, "previous_apk": str(old_apk),
             "pre_notifications_verified": True, "post_notifications_required": True,
             "no_clear_data": True, "profile_count": 1,
@@ -276,20 +325,20 @@ def execute(args: argparse.Namespace) -> dict:
                 frozen = False
             except Exception as recovery:
                 raise CutoverBlocked(
-                    "Cutover failed and paired rollback failed; leave app disabled. "
+                    "Cutover failed and paired rollback failed; keep the app frozen. "
                     f"Original: {type(exc).__name__}; rollback: {type(recovery).__name__}"
                 ) from recovery
         raise
     finally:
         if frozen and not swapped:
-            # Never re-enable after an uncertain partial swap. Stage-and-swap
+            # Never unfreeze after an uncertain partial swap. Stage-and-swap
             # must have restored every original byte before this assertion passes.
             try:
                 if file_hashes:
                     assert_still_frozen(device, file_hashes)
             except Exception as unsafe:
                 raise CutoverBlocked(
-                    "Original database state unverified; leave package disabled for recovery"
+                    "Original database state unverified; keep package frozen for recovery"
                 ) from unsafe
             device.enable()
 
@@ -300,6 +349,7 @@ def main() -> int:
     parser.add_argument("--new-apk", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--pre-notification", required=True, type=Path)
+    parser.add_argument("--schema-upgrade", choices=["23-to-24", "24-to-25"], default="23-to-24")
     parser.add_argument("--qa-overlay-decision", choices=["preserve"])
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--allow-production", action="store_true")
