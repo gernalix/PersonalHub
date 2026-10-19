@@ -9,6 +9,9 @@ if (( ${#devices[@]} != 1 )) || [[ "${devices[0]:-}" != emulator-* ]]; then
   exit 1
 fi
 serial=${devices[0]}
+# Device identity is diagnostic only; native emulator-only guards remain required.
+adb -s "$serial" shell getprop ro.product.model
+adb -s "$serial" shell getprop ro.hardware
 runner=com.gernalix.personalhub.qa.test/androidx.test.runner.AndroidJUnitRunner
 
 capture_failure() {

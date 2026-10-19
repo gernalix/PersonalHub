@@ -28,7 +28,10 @@ class ModuleSearchCursorQaDeviceTest {
     private fun checkModule(module: HubModule) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         assertTrue(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*")))
-        assertTrue(Build.MODEL.startsWith("sdk") && Build.HARDWARE in setOf("goldfish", "ranchu"))
+        assertTrue(
+            "Expected SDK emulator, got ${Build.MODEL}/${Build.HARDWARE}",
+            Build.MODEL.contains("sdk", ignoreCase = true) && Build.HARDWARE in setOf("goldfish", "ranchu"),
+        )
         // This test measures editing, not cold creation of the full canonical DB.
         // Ensure its real isolated fixture exists before the module startup deadline.
         com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context).openHelper.writableDatabase
