@@ -28,7 +28,29 @@ Working tree: task/ph-completion-20261019, created with repo-task. Initial featu
 - [ ] Persist repeatable test outcomes and meaningful performance measurements in the dedicated SQLite QA history, with artifact/device provenance and failures retained.
 - [ ] Resolve encountered failures/warnings/blockers before claiming completion; final report covers every change, including small fixes, and final repository purification follows its operational definition.
 
-## Current checkpoint
+## Current acceptance boundary
+
+| Requirement | Current evidence | Still required |
+| --- | --- | --- |
+| Places search, overlap, Where was I, tags and sort criteria | Implemented; focused host tests and isolated native acceptance recorded in the chronological evidence below | Reconcile required regression coverage with the final minified artifact; no automatic PASS from earlier QA package |
+| External OsmAnd and Explore | Official V2 bridge, external native map/return, distance/order/missing-coordinate host checks and isolated native evidence | Final minified bridge/temporary autocomplete acceptance and return/cleanup readback |
+| Countdown, tag separation and compact Home | Implemented with shared engine; host and isolated native checks pass | Final-artifact smoke including all14 accessible actions and persisted layout |
+| Shared internal History and persistent checkbox menu | Twelve module scopes/Alerts ownership and repeated checkbox interactions passed isolated native checks | Final-artifact functional readback, including version70 in global History |
+| Update, external migration and data preservation | Exact frozen70 installed on primary Pixel/schema25; first-foreground/OK/one shared version fact and99-table preservation PASS | Exact version70 UI payload in Audit and History; Audit event type alone is visible (SQLite72) |
+| Home widgets | Root cause fixed in external updater, committed;19 paired +7 installer +2 migration host tests PASS | Restore saved target through launcher and prove actual binding retention; no native PASS claimed |
+| Startup history and shortcuts | Dedicated SQLite active; exact-installed helper with6 host safety cases PASS | Six physical launches/timings on final APK; no reinstall or permission grants |
+| Source verification and integration | Draft PR104 updated toe83c82e6; Capsule FAST13/FULL14 PASS; updated CI is running | All current-head required CI and final owner integration; draft prevents premature integration/collection |
+| Remaining diagnostics | Original393 reduced to26 version-availability warnings, zero errors | Complete compatibility dispositions; no zero-warning claim or blanket suppression |
+| Inventory residuals | Historical completed/superseded work preserved; issues91/69/71 reconciled | Canonical issue68 acceptance; ADB matrix/Notifications coverage limitations truthfully dispositioned |
+| Delivery and purification | Immutable artifact and rollback pair preserved; no new APK changes from tooling/docs | Publish the exact accepted APK and Telegram link, protected integration and final operational Git purification |
+
+Pixel exclusive window20261019T043528Z closed with verified Fedora/Telegram completion notices after foreground changed externally. A free continuous window was requested; host/repository work continues. TCL identity gate remains unavailable in the latest check. No local emulator use is authorized. App/build inputs are unchanged between frozen sourcef949f4b1 and updated sourcee83c82e6; later commits change host tooling/docs only.
+
+## Chronological checkpoints
+
+The sections below retain earlier observations and completed process handles for provenance. Their old pending statements describe that checkpoint and must not override the current acceptance boundary above. Do not restart an old build merely from a historical session handle.
+
+## Initial implementation checkpoint (historical)
 
 Implemented locally, pending compile/tests/device acceptance:
 
