@@ -62,7 +62,7 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
             catch (_: Exception) { error = true }
         }
     }
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp).testTag("places-explore-list"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onBack) { Text(stringResource(R.string.places_action_back)) }

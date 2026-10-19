@@ -105,6 +105,60 @@ class PlacesPixelQaDeviceTest {
         }
     }
 
+    @Test fun exploreUsesTheChosenReferenceAndPreservesItAfterOpeningADetail() {
+        val context = context()
+        val repository = PlaceRepository(context)
+        val dao = PersonalHubDatabase.get(context).placeDao()
+        val marker = "QA Explore ${System.currentTimeMillis()}"
+        val origin = "$marker Origin"
+        val near = "$marker Near"
+        val far = "$marker Far"
+        val missing = "$marker Missing"
+        val ids = mutableListOf<String>()
+        try {
+            runBlocking {
+                ids += repository.savePlace(null, origin, null, 55.6761, 12.5683, 75.0, null, "QA")
+                ids += repository.savePlace(null, near, null, 55.6761, 12.5693, 75.0, null, "QA")
+                ids += repository.savePlace(null, far, null, 55.6761, 12.5783, 75.0, null, "QA")
+                ids += repository.savePlace(null, missing, null, null, null, null, null, "QA")
+            }
+            val before = dao.listPlacesBlocking()
+            compose.onNodeWithTag("places-explore").performScrollTo().performClick()
+            compose.onNodeWithTag("explore-reference-search").performTextReplacement(origin)
+            compose.runOnIdle {
+                androidx.core.view.WindowInsetsControllerCompat(compose.activity.window, compose.activity.window.decorView)
+                    .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+            }
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasText(origin) and hasClickAction() and !hasSetTextAction())
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNode(hasText(origin) and hasClickAction() and !hasSetTextAction()).performClick()
+            compose.onNodeWithTag("explore-open-osmand").assertExists()
+            val list = compose.onNodeWithTag("places-explore-list")
+            list.performScrollToNode(hasText(far))
+            val nearY = compose.onNodeWithText(near).fetchSemanticsNode().positionInRoot.y
+            val farY = compose.onNodeWithText(far).fetchSemanticsNode().positionInRoot.y
+            assertTrue("Nearer place must precede the farther place", nearY < farY)
+            list.performScrollToNode(hasText(missing))
+            compose.onNodeWithText(context.getString(PlacesR.string.places_explore_missing_heading)).assertExists()
+            assertEquals("Choosing a reference must not write place data", before, dao.listPlacesBlocking())
+            list.performScrollToNode(hasText(near))
+            compose.onNodeWithText(near).performClick()
+            compose.onNodeWithContentDescription("hub-detail-places/place/${ids[1]}").assertExists()
+            compose.onNodeWithContentDescription(context.getString(PlacesR.string.navigate_back)).performClick()
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("places-explore-list").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("places-explore-list").performScrollToNode(hasTestTag("explore-open-osmand"))
+            compose.onNodeWithTag("explore-open-osmand").assertExists()
+            compose.onNodeWithTag("explore-reference-search").assertTextContains(origin)
+            assertEquals("Returning from detail must preserve all place data", before, dao.listPlacesBlocking())
+        } finally {
+            runBlocking { ids.forEach { repository.deletePlace(it) } }
+        }
+    }
+
     @Test fun whereWasIIsOnHomeAndFindsARecordedVisitAtTheRequestedSecond() {
         val context = context()
         val repository = PlaceRepository(context)
