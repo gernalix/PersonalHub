@@ -243,3 +243,5 @@ The first version71 freeze incorrectly copied a stale mapping from outputs/mappi
 The quiet compile gates intentionally suppress warning logging. Warning acceptance now additionally needs a warnings-visible comprehensive compilation after corrections; zero lint does not imply zero Kotlin/Gradle warnings. Current CI snapshot contains75 unique compiler/script warnings, plus generic Gradle deprecation reporting. Corrections are in progress; final NV72 is not bumped or built yet.
 
 Search-draft final local checkpoint: source compile, QA build, Luoghi lint0, architecture PASS; native6 groups/21 executed cases PASS433–438. Canonical emulator stop PASS. Same production APK retained while correcting only the label-inclusive test assertion; historical432 remains FAIL. No NV bump, Pixel update or publication occurred.
+
+Source checkpointb6257dfb contains the validated compiler/API compatibility and synchronous Places search edits. Capsule reviewed_commit refreshed to that source checkpoint: FAST13/FULL14 PASS; SQLite records2 command gates, not27 unit tests. Remote CI/final72 acceptance remain pending.
