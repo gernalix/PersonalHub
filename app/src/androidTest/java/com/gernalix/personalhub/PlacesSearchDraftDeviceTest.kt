@@ -3,7 +3,6 @@ package com.gernalix.personalhub
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import com.gernalix.luoghi.HomeUiState
@@ -41,18 +40,18 @@ class PlacesSearchDraftDeviceTest {
             .performScrollToNode(hasTestTag("places-live-search"))
         showField()
         field().performTextReplacement(query)
-        field().assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(query)))
+        assertEquals(query, field().fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.runOnIdle { assertEquals(query, submitted.last()) }
         // Force lazy content to leave/re-enter the visible viewport.
         compose.onNodeWithTag("places-home-list").performScrollToIndex(0)
         showField()
-        field().assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(query)))
+        assertEquals(query, field().fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         restoration.emulateSavedInstanceStateRestore()
         showField()
-        field().assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(query)))
+        assertEquals(query, field().fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.runOnIdle { assertEquals(query, submitted.last()) }
         field().performTextReplacement("second")
-        field().assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("second")))
+        assertEquals("second", field().fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.runOnIdle { assertEquals("second", submitted.last()) }
     }
 }

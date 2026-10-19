@@ -16,7 +16,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.test.performTextInputSelection
 import org.junit.Assert.assertEquals
@@ -46,12 +45,14 @@ class HubSearchFieldDeviceTest {
         field.performClick()
         field.performTextInputSelection(TextRange(5))
         field.performTextInput("X")
-        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("alphaX beta")))
+        assertEquals("alphaX beta", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         field.performTextInput("Y")
         field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(7)))
+        // Compare query characters, not IME-provided AnnotatedString styling.
+        // Cursor assertions remain separate and exact.
         // The first filter result arrives after the second keystroke.
         composeRule.runOnIdle { model = "alphaX beta" }
-        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("alphaXY beta")))
+        assertEquals("alphaXY beta", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(7)))
         field.performTextInputSelection(TextRange(2))
         composeRule.runOnIdle { model = "alphaXY beta" }
@@ -59,7 +60,7 @@ class HubSearchFieldDeviceTest {
         composeRule.runOnIdle { assertEquals(listOf("alphaX beta", "alphaXY beta"), submitted) }
         // An explicit saved-query replacement must still work.
         composeRule.runOnIdle { model = "saved query" }
-        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("saved query")))
+        assertEquals("saved query", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
     }
 
     @Test
@@ -78,7 +79,7 @@ class HubSearchFieldDeviceTest {
         field.performTextInput("X")
         field.performTextInputSelection(TextRange(2, 4))
         restoration.emulateSavedInstanceStateRestore()
-        field.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("alphaX beta")))
+        assertEquals("alphaX beta", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(2, 4)))
         composeRule.runOnIdle { assertEquals("alphaX beta", submitted.last()); model = "alphaX beta" }
         field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(2, 4)))
@@ -102,9 +103,8 @@ class HubSearchFieldDeviceTest {
         composeRule.onNodeWithTag("search-input").performClick()
         composeRule.onNodeWithTag("search-input").performTextInput(" refill")
         composeRule.onNodeWithTag("clear-search").performClick()
-        composeRule.onNodeWithTag("search-input").assert(
-            SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(""))
-        )
+        assertEquals("", composeRule.onNodeWithTag("search-input")
+            .fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         composeRule.onNodeWithTag("search-input").assertIsFocused()
     }
 }

@@ -5,7 +5,6 @@ import android.os.Build
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
@@ -65,7 +64,7 @@ class ModuleSearchCursorQaDeviceTest {
             field.assertIsDisplayed().performClick().performTextReplacement("alpha beta")
             field.performTextInputSelection(TextRange(5))
             field.performTextInput("XY")
-            field.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("alphaXY beta")))
+            assertEquals("alphaXY beta", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
             field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(7)))
             field.performTextInputSelection(TextRange(2))
             // Real collectors and periodic module state may update while the user
@@ -73,7 +72,7 @@ class ModuleSearchCursorQaDeviceTest {
             repeat(4) {
                 Thread.sleep(350)
                 compose.waitForIdle()
-                field.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("alphaXY beta")))
+                assertEquals("alphaXY beta", field.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
                 field.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(2)))
             }
         } finally {
