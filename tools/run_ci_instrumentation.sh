@@ -48,6 +48,31 @@ adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
 adb -s "$serial" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk >/dev/null
 wait_for_broadcast_idle instrumentation_package_installation
 
+# Fresh QA APKs are unminified and have no installed ART profile. Compile them
+# before instrumentation: otherwise interpreting first-database creation while
+# the Google image finishes booting can exhaust Android's process-start limit
+# before the runner executes even its first test. Keep this preparation scoped
+# to the two isolated QA packages, bounded and fail-closed (never retry a test).
+prepare_qa_compilation() {
+  local package_name result
+  for package_name in com.gernalix.personalhub.qa com.gernalix.personalhub.qa.test; do
+    if ! result=$(timeout --signal=TERM --kill-after=5s 3m \
+      adb -s "$serial" shell cmd package compile -m speed -f "$package_name" 2>&1); then
+      printf 'QA compilation failed: %s\n%s\n' "$package_name" "$result" >&2
+      capture_failure "compile_$package_name"
+      return 1
+    fi
+    if [[ "$result" != 'Success' ]]; then
+      printf 'Unexpected QA compilation result: %s\n%s\n' "$package_name" "$result" >&2
+      capture_failure "compile_$package_name"
+      return 1
+    fi
+    printf 'Prepared ART compilation: %s\n' "$package_name"
+  done
+}
+prepare_qa_compilation
+wait_for_broadcast_idle instrumentation_package_compilation
+
 run_app_test() {
   local test_name=$1 result
   if ! result=$(python3 tools/android_connected_test_gate.py -- \
