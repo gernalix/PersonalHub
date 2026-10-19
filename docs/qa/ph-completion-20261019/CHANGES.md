@@ -102,7 +102,7 @@ Passive archive metadata readback found actual Telegram/WhatsApp events and no S
 
 ## Changed project files
 
-All changed project paths against the initial integrated base, including the current owned working changes:
+All changed project paths against the initial integrated base, including current owned changes (261 paths):
 
 - `.codex/CODE_MAP.tsv`
 - `.gitattributes`
@@ -117,12 +117,22 @@ All changed project paths against the initial integrated base, including the cur
 - `app/src/androidTest/java/com/gernalix/personalhub/CountdownQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/GlobalDatabaseInstrumentedTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HistoryAndPatchReviewDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/HistoryUpgradeDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/HubContextPersistenceDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/HubDiscoverabilityEpisodesEmulatorTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HubHistorySearchQaDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/HubSearchFieldDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/HubTemporalDeferredQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/LegacySnapshotCompactionDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/NotificationsHistoryQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/OsmAndExploreQaDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/PersistenceSchemaCoverageDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/PersistenceUiRegressionDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/PlacesPixelQaDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/PlacesSearchDraftDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/QuickEventRelatedPersistenceDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/SinceWhenAutonomyDeviceTest.kt`
+- `app/src/androidTest/java/com/gernalix/personalhub/SinceWhenEditorRoundTripDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/SubstanceInternalPersistenceDeviceTest.kt`
 - `app/src/main/java/com/gernalix/personalhub/AppUpdateTracker.kt`
 - `app/src/main/java/com/gernalix/personalhub/HubActivityPresentation.kt`
@@ -145,6 +155,7 @@ All changed project paths against the initial integrated base, including the cur
 - `app/src/test/AndroidManifest.xml`
 - `app/src/test/java/com/gernalix/personalhub/AppUpdateTrackerTest.kt`
 - `app/src/test/java/com/gernalix/personalhub/HubActivityPresentationTest.kt`
+- `app/src/test/java/com/gernalix/personalhub/ProfileRuntimeCoordinatorTest.kt`
 - `app/src/test/java/com/gernalix/personalhub/sincewhen/CounterElapsedTest.kt`
 - `build.gradle.kts`
 - `contracts/database/src/main/java/com/gernalix/personalhub/contracts/database/HubTagEntities.kt`
@@ -152,7 +163,9 @@ All changed project paths against the initial integrated base, including the cur
 - `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/AlertLinkPolicy.kt`
 - `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/AlertNotificationDispatcher.kt`
 - `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/HubAndroidPlatform.kt`
+- `core/alerts/src/test/java/com/gernalix/personalhub/core/alerts/AlertNotificationTapTest.kt`
 - `core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/25.json`
+- `core/database/src/androidTest/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataRestoreDeviceTest.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseGate.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseProfiles.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseStartupGate.kt`
@@ -165,7 +178,9 @@ All changed project paths against the initial integrated base, including the cur
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/mutationevents/MutationEventCapture.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/capsules/mutationevents/MutationEventStore.kt`
 - `core/database/src/main/res/values/strings.xml`
+- `core/database/src/test/java/com/gernalix/personalhub/core/database/CanonicalIdentityCapsuleTest.kt`
 - `core/database/src/test/java/com/gernalix/personalhub/core/database/HistoryQueryCapsuleTest.kt`
+- `core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/gitdata/GitDataFinalValidationTest.kt`
 - `core/database/src/test/java/com/gernalix/personalhub/core/database/capsules/sync/SyncJournalTest.kt`
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/HubContextExplorer.kt`
 - `core/hub-context/src/main/java/com/gernalix/personalhub/core/hubcontext/HubContextLinks.kt`
@@ -223,6 +238,12 @@ All changed project paths against the initial integrated base, including the cur
 - `feature/luoghi/src/test/java/com/gernalix/luoghi/PlacesHistoryMapGeofencingTest.kt`
 - `feature/luoghi/src/test/java/com/gernalix/luoghi/PlacesProximityTest.kt`
 - `feature/luoghi/src/test/java/com/gernalix/luoghi/VisitTimestampTest.kt`
+- `feature/multitimetracker/src/androidTest/java/com/example/multitimetracker/CanonicalTimerFixtures.kt`
+- `feature/multitimetracker/src/androidTest/java/com/example/multitimetracker/capsules/now/ui/NowTimerRulesRegressionInstrumentedTest.kt`
+- `feature/multitimetracker/src/androidTest/java/com/example/multitimetracker/capsules/now/ui/QuickStartIdleLayoutInstrumentedTest.kt`
+- `feature/multitimetracker/src/androidTest/java/com/example/multitimetracker/capsules/now/ui/QuickStartTagLauncherInstrumentedTest.kt`
+- `feature/multitimetracker/src/androidTest/java/com/example/multitimetracker/capsules/now/ui/QuickStartTimedHierarchyInstrumentedTest.kt`
+- `feature/multitimetracker/src/androidTest/java/com/example/multitimetracker/ui/components/SessionEditDialogRegressionInstrumentedTest.kt`
 - `feature/multitimetracker/src/main/AndroidManifest.xml`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/MainActivity.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/MainViewModel.kt`
@@ -230,6 +251,7 @@ All changed project paths against the initial integrated base, including the cur
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/TimeFenceNotifier.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/TimeFenceTimerScheduler.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/alerts/ui/AlertsScreen.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/now/ui/NowCapsuleUi.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/now/ui/NowScreen.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/quickevents/ui/QuickEventsScreen.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/capsules/sincewhen/ui/LifePeriodsScreen.kt`
@@ -237,17 +259,21 @@ All changed project paths against the initial integrated base, including the cur
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/hub/TimerQuickEventEntryHubAdapter.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/hub/TimerSessionHubAdapter.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/CriticalDataGuard.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SessionRepository.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SnapshotSqlite.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SnapshotStore.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/SyncCountersStore.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/persistence/UiPrefsStore.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/AppRoot.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/AlertPopupHost.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/AppTopBar.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/PrecisionTimelineTrack.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/RunningSessionRow.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SectionHeader.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SessionEditDialog.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SingleSubmitButtons.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/util/RewardToastManager.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickEventWidgetClickActivity.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickEventWidgetConfigureActivity.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickEventWidgetPrefs.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickTaskWidgetClickActivity.kt`
@@ -276,8 +302,13 @@ All changed project paths against the initial integrated base, including the cur
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/CollectorService.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/ConversationsScreen.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/NormalizedArchive.kt`
+- `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/NotificationSnapshot.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/NotificationsActivity.kt`
+- `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/PeopleBridge.kt`
 - `feature/notifications/src/test/java/com/gernalix/personalhub/notifications/capsules/archive/ArchiveStoreTest.kt`
+- `feature/notifications/src/test/java/com/gernalix/personalhub/notifications/capsules/archive/CollectorServiceTest.kt`
+- `feature/notifications/src/test/java/com/gernalix/personalhub/notifications/capsules/archive/ConversationsTest.kt`
+- `feature/soldi/src/androidTest/java/com/gernalix/personalhub/soldi/BankingRenderDeviceTest.kt`
 - `feature/soldi/src/debug/java/com/gernalix/personalhub/soldi/FinanceSemanticQaBridge.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/BankingSecureStore.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/FinancePhotoSemanticEngine.kt`
@@ -286,8 +317,11 @@ All changed project paths against the initial integrated base, including the cur
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiEditorsUi.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiUiModels.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/receipt/ReceiptImport.kt`
+- `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/receipt/ReceiptParser.kt`
 - `feature/soldi/src/main/res/values-it/banking_strings.xml`
 - `feature/soldi/src/main/res/values/banking_strings.xml`
+- `feature/soldi/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceAccountsTest.kt`
+- `feature/soldi/src/test/java/com/gernalix/personalhub/core/database/capsules/soldi/FinanceCapsuleTest.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/MainActivity.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/notifications/SostanzeNotificationScheduler.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/notifications/SostanzeRandomAlertStore.kt`
@@ -298,6 +332,8 @@ All changed project paths against the initial integrated base, including the cur
 - `feature/sostanze/src/main/res/values/strings.xml`
 - `feature/sostanze/src/main/res/xml-v31/substances_widget_info.xml`
 - `feature/sostanze/src/main/res/xml/substances_widget_info.xml`
+- `feature/sostanze/src/test/java/com/gernalix/sostanze/SostanzeCampaignTest.kt`
+- `feature/sostanze/src/test/java/com/gernalix/sostanze/widget/SubstancesWidgetTest.kt`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/CallOverlayPermission.kt`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/CallSystemOverlayController.kt`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/MainActivity.kt`
@@ -306,6 +342,7 @@ All changed project paths against the initial integrated base, including the cur
 - `feature/supercontacts/src/main/res/values/strings.xml`
 - `feature/wordpulse/src/main/java/com/wordpulse/app/MainActivity.kt`
 - `feature/wordpulse/src/main/java/com/wordpulse/app/ui/WordPulseViewModel.kt`
+- `feature/wordpulse/src/test/java/com/wordpulse/app/domain/AlertnessTest.kt`
 - `gradle/libs.versions.toml`
 - `gradle/wrapper/gradle-wrapper.jar`
 - `gradle/wrapper/gradle-wrapper.properties`
@@ -355,3 +392,42 @@ All changed project paths against the initial integrated base, including the cur
 Latest source validation: highest app compile, Android instrumentation source compilation, targeted widget7/7, architecture and all14 full lint reports PASS with0 errors/0 warnings; prior full unit298/298 retained separately. No final replacement APK has been built or installed for these dependency/UI changes.
 
 - Advanced source NV70→71 for the next real primary Pixel replacement, after live version70 and canonical main69 readback. The user explicitly requires a new NV for every actual update; old70 artifacts and acceptance remain historical. No QA-only compilation or test increments NV. Version71 still requires minified signing, real update-prompt/event/binding/feature acceptance and exact-byte publication.
+
+## Compiler and native follow-up after version71
+
+- Preserved actual71 install/update6 PASS,150-table data comparison and six startup measurements. Derived only actually emitted native case names/statuses into JUnit; original failed/incomplete suites remain. Corrected private QA handling of absent default preferences, existing Since when title casing and owner tab selection. Unexpected Telegram foreground stops input.
+- Corrected the private artifact verifier to match all program DEX R8 map IDs against the actual minify task mapping; rejected old output-directory mapping is retained. APK71 bytes never changed.
+- Fixed nullable mixed-array inference in the existing Timer library fixture, retaining its isolated-package guard and exact SQL/values.
+- Made four additional mixed arrays explicit for future Kotlin compatibility; removed30 compiler-proven redundant null operators at their exact locations plus the downstream redundant session-tag safe call; removed three unreachable Elvis fallbacks without changing branches/data.
+- Replaced old primary/scrollable tab APIs and existing top-bar color factory with current equivalents; migrated11 Compose test factory import files to v2, preserving assertions and physical guards.
+- Moved the two clipboard copies to the current typed/suspending API with the exact original plain text; alert links now use LinkAnnotation while retaining the existing scheme/launch policy.
+- Moved both swipe rows to Material3 onDismiss with guarded actions, explicit reset for edit/confirmation and the existing exactly-once deletion protection. Runtime verification remains pending.
+- Preserved the exact notification profile ID with a local compatibility declaration: UserHandle has no public numeric identifier in the actual SDK, so the attempted replacement correctly failed compilation and was repaired. Used the canonical Since When namespace constant with the same literal. Legacy phone/location callback compatibility is documented narrowly. Heterogeneous allowlisted notification scalars retain their explicit type gate with one local deprecation declaration.
+- Build scripts now use AGP asset directories and the public injected Gradle BuildFeatures service for the existing fail-closed signed-build Configuration Cache guard. Isolated persistence fixtures explicitly opt into their owning write API; annotation-coverage lookup now requires the expected annotation. None of these changes weakens device/data/signing protections.
+
+These current source changes are under compilation, not final validation or delivery. A new actual Pixel app replacement will be72, once all source/CI gates are satisfied.
+
+- Latest user instruction supersedes the emulator prohibition. Canonical Pixel_8a startup/readiness passed; isolated serial-targeted QA will close it through the facade in finally. Updated the external current inventory while preserving its initial snapshot byte-for-byte. Hardened the private physical readback against foreign interactive overlays covering a PH control; no device acceptance inferred.
+
+## Full compilation and emulator follow-up
+
+- Comprehensive visible-warning execution completed with101 fresh host JUnit reports:375 PASS,1 existing AndroidKeyStore-dependent SKIP,0 failures (SQLite312–412). Fresh full lint14 reports contain0 issues; all requested compilation tasks and architecture gate completed successfully (413). Compiler warnings are a separate open boundary.
+- Removed the remaining compiler-proven nullable operators/dead fallbacks in the guarded cross-currency fee field and History range; kept all test assertions while removing redundant operators in ProfileRuntimeCoordinator and WordPulse test code.
+- Removed ten now-redundant explicit SQLiteMode.NATIVE annotations. Native SQLite is the unchanged default in the selected Robolectric4.17; no legacy backend was selected. Official migration guidance: https://robolectric.org/upgrade_to_version_4/ . Replaced the two deprecated fake-browser registrations with the existing supported ActivityInfo/IntentFilter APIs, preserving the Workflowy tap assertions.
+- Migrated six additional library Compose test factories to v2; the previous11 app factory files and assertions remain. Replaced the unused Unit loop expression in the native restore fixture with an empty body, preserving HTTP header reads.
+- Extracted the four existing real Places module/ViewModel/Room/tag scenarios into a shared test base. The Pixel runner retains all original package/manufacturer/model/explicit-authorization checks; the new runner additionally requires the isolated QA package and actual emulator model/hardware. No physical guard was weakened; CODE_MAP now routes to these scenarios.
+- Current highest-consumer quiet app compile PASS after these leaf edits. A nonincremental Kotlin compile and signed isolated QA build is running to expose warnings from unchanged files too. No Pixel update/NV increment/publication occurred.
+- The remaining Gradle setVisible warning is traced to26 calls inside the official AGP9.4.1 source archive, confirmed as the latest stable Google Maven coordinate. No PH caller, stable replacement or warning suppression has been introduced; upstream diagnostic remains OPEN with private provenance.
+
+- Native validation and harness repairs: the isolated Timer fixture still had schema24. Reused the existing external24→25 migrator and atomic stage/swap with coherent DB/WAL backup, projection preservation, integrity and on-device rollback; no data clearing or production guard change. Same Timer APK now37/37 PASS; Places library12, native restore2 and Banking UI2 also PASS.
+- A real QA update71 modal blocked the legacy History button. Verified the exact pending native dialog and acknowledgement state, then used the actual OK control; no direct acknowledgement preference edit. The previously failing History entry passes. The next app suite exposed a separate live-search count timeout, now instrumented with exact query/count, lifecycle, foreground and pre-cleanup screenshot/UI capture. The existing assertions and10-second bound remain unchanged.
+- Removed the remaining deprecated Since When alias in one host test, preserving its exact value; retained three synthetic notification priority constructors behind narrow compatibility declarations because the replacement overload is absent from the actual public SDK; every field and assertion is unchanged. The failed replacement compile is preserved.
+- Repaired local native stripping prerequisites by installing the official AGP9.4 default NDK28.2.13676358. SDK-manager’s truncated/invalid ZIP attempt is retained; the replacement download verifies all byte ranges,722261334-byte total, official SHA1a7b54a5de87fecd125a17d54f73c446199e72a64, ZIP integrity, package revision and executable llvm-strip before installation. No native-library keep/suppression rule or APK bytes were altered manually. Packaging acceptance still pending.
+
+## Places search draft and reproduced timeout
+
+Isolated repetitions after a full16-case app PASS reproduced an empty query with10 unfiltered places instead of1 (SQLite431;429/430 PASS). The derived Home state combines Room, visits, statistics and context changes before echoing the text. HomeScreen now owns an immediate saveable edit draft outside LazyColumn and submits it to the existing filter callback, including after state restoration. This prevents delayed derived-state values from controlling the edit buffer. New PlacesSearchDraftDeviceTest deliberately holds the derived state unchanged and checks typing, scrolling, restoration and subsequent replacement. Native regression/repetitions remain pending at this checkpoint; no timeout or result assertion was weakened.
+
+Search validation update: the new test initially failed because assertTextEquals combines a field label and EditableText, although the recorded EditableText was exactly correct (432;16 other cases PASS). The assertion now checks the exact EditableText property, preserving the intended invariant. Delayed-state/scroll/restoration regression PASS433 and four isolated real search repetitions PASS434–437. Both cases are now explicit CI selections; bash syntax validation PASS. The same production APK was reused unchanged while rebuilding only its corrected test APK.
+
+Final local search checkpoint: full app16/16 PASS438 after the isolated regression and repetitions. All6 groups/21 executions PASS433–438;17 distinct cases. Canonical emulator stop PASS. Local app compile/QA build, Luoghi lint0 and architecture PASS. Final72 artifact, remote CI/integration and physical exact-artifact acceptance remain pending.

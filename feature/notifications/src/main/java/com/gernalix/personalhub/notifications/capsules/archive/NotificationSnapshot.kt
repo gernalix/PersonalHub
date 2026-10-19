@@ -27,13 +27,21 @@ internal object NotificationSnapshot {
         listOf(Notification.EXTRA_TITLE, Notification.EXTRA_TEXT, Notification.EXTRA_BIG_TEXT,
             Notification.EXTRA_SUB_TEXT, Notification.EXTRA_SUMMARY_TEXT, Notification.EXTRA_CONVERSATION_TITLE,
             Notification.EXTRA_IS_GROUP_CONVERSATION, Notification.EXTRA_TEMPLATE).forEach { key ->
-            when (val value = e.get(key)) {
+            // Third-party extras can use different scalar types for the same allowed key.
+            // Preserve the existing type check without deserializing arbitrary parcelables.
+            @Suppress("DEPRECATION")
+            val value = e.get(key)
+            when (value) {
                 is CharSequence -> extras.put(key, value.toString())
                 is Boolean, is Number -> extras.put(key, value)
             }
         }
+        // UserHandle exposes no public numeric identifier in our Android SDK.
+        // Keep the notification's exact profile ID for archive identity.
+        @Suppress("DEPRECATION")
+        val userId = sbn.userId
         return JSONObject().put("package", sbn.packageName).put("key", sbn.key).put("id", sbn.id)
-            .put("user", sbn.userId).put("tag", sbn.tag).put("channel", n.channelId)
+            .put("user", userId).put("tag", sbn.tag).put("channel", n.channelId)
             .put("shortcut", n.shortcutId).put("conversation", conversation).put("group", sbn.groupKey)
             .put("summary", n.flags and Notification.FLAG_GROUP_SUMMARY != 0).put("category", n.category)
             .put("posted", Instant.ofEpochMilli(sbn.postTime).toString())

@@ -25,7 +25,7 @@ fun ModuleHistoryHost(
     val savedState = rememberSaveableStateHolder()
     BackHandler(enabled = historyOpen) { historyOpen = false }
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-        TabRow(selectedTabIndex = if (historyOpen) 1 else 0) {
+        PrimaryTabRow(selectedTabIndex = if (historyOpen) 1 else 0) {
             Tab(selected = !historyOpen, onClick = { historyOpen = false },
                 modifier = Modifier.testTag("module-content-tab"),
                 text = { Text(stringResource(R.string.module_content_tab)) })

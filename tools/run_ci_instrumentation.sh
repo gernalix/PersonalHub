@@ -34,6 +34,8 @@ run_app_test() {
 }
 
 app_tests=(
+  'PlacesSearchDraftDeviceTest#searchKeepsEditsWhileDerivedResultsAreDelayedAndAfterStateRestoration'
+  'PlacesEmulatorQaDeviceTest#liveSearchCombinesNameAddressNotesTagsAndTheSelectedTagFilter'
   'HistoryAndPatchReviewDeviceTest#scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration'
   'HistoryAndPatchReviewDeviceTest#supportedUndoRestoresSyntheticPlaceAndRecordsCompensation'
   'HistoryAndPatchReviewDeviceTest#patchPreviewFailureAndExplicitConfirmationGateApplication'

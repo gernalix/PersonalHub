@@ -112,7 +112,7 @@ class CanonicalIdentityCapsule(context: Context) {
                 else db.execSQL("UPDATE hub_entities SET lifecycle=?,updated_at=? WHERE canonical_id=? AND lifecycle<>'MERGED'",arrayOf<Any>(lifecycle,now,existing))
             }
             val removed = db.query("SELECT canonical_id,local_key FROM hub_entities WHERE local_table='snapshot.timeFenceRules' AND lifecycle='ACTIVE'").use { c -> buildList { while(c.moveToNext()) if(c.getString(1) !in keys) add(c.getString(0)) } }
-            removed.forEach { db.execSQL("UPDATE hub_entities SET lifecycle='TOMBSTONED',updated_at=? WHERE canonical_id=?",arrayOf(now,it)) }
+            removed.forEach { db.execSQL("UPDATE hub_entities SET lifecycle='TOMBSTONED',updated_at=? WHERE canonical_id=?",arrayOf<Any>(now,it)) }
         }
 
         const val MUTATION_TRIGGER = "canonical_mutation_resolution"

@@ -10,9 +10,8 @@ import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.SQLiteMode
 
-@RunWith(RobolectricTestRunner::class) @Config(sdk=[35]) @SQLiteMode(SQLiteMode.Mode.NATIVE)
+@RunWith(RobolectricTestRunner::class) @Config(sdk=[35])
 class ConversationsTest {
     private val context:Context=ApplicationProvider.getApplicationContext()
     private lateinit var archive:ArchiveStore

@@ -3,7 +3,7 @@ package com.gernalix.personalhub
 import android.content.Context
 import android.os.Build
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -22,16 +22,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import com.gernalix.luoghi.R as PlacesR
 
-/** Exercises the real module, ViewModel, Room and shared tags in the isolated QA app. */
-@RunWith(AndroidJUnit4::class)
-class PlacesPixelQaDeviceTest {
+/** Shared real module/ViewModel/Room/tag scenarios, with separate strict target guards. */
+abstract class PlacesQaScenario {
+    protected abstract fun verifyTarget(context: Context)
     @get:Rule val compose = createAndroidComposeRule<com.gernalix.luoghi.MainActivity>()
 
     private fun context(): Context {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        check(context.packageName == "com.gernalix.personalhub.qa")
-        check(Build.MANUFACTURER.equals("Google", true) && Build.MODEL == "Pixel 8a")
-        check(InstrumentationRegistry.getArguments().getString("physicalQaAuthorized") == "true")
+        verifyTarget(context)
         return context
     }
 
@@ -45,15 +43,22 @@ class PlacesPixelQaDeviceTest {
                     true
                 }.getOrDefault(false)
             }
-        } catch (failure: AssertionError) {
+        } catch (failure: ComposeTimeoutException) {
             val actual = runCatching {
                 compose.onNodeWithTag("places-count").fetchSemanticsNode().config[
                     androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
             }.getOrDefault("unavailable")
-            val foreground = androidx.test.uiautomator.UiDevice.getInstance(
-                InstrumentationRegistry.getInstrumentation()).currentPackageName
+            val device = androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            val foreground = device.currentPackageName
+            val query = runCatching {
+                compose.onNodeWithTag("places-live-search").fetchSemanticsNode().config[
+                    androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+            }.getOrDefault("unavailable")
+            val evidence = java.io.File(context.getExternalFilesDir(null), "places-search-timeout-${System.currentTimeMillis()}")
+            runCatching { device.dumpWindowHierarchy(java.io.File(evidence.path + ".xml")) }
+            runCatching { device.takeScreenshot(java.io.File(evidence.path + ".png")) }
             val lifecycle = compose.activity.lifecycle.currentState
-            throw AssertionError("Places counter expected $label, actual $actual; foreground=$foreground; lifecycle=$lifecycle", failure)
+            throw AssertionError("Places counter expected $label, actual $actual; query=$query; foreground=$foreground; lifecycle=$lifecycle; evidence=${evidence.name}", failure)
         }
     }
 
@@ -229,5 +234,24 @@ class PlacesPixelQaDeviceTest {
                 ids.forEach { repository.deletePlace(it) }
             }
         }
+    }
+}
+
+/** Physical QA keeps its original identity, package and explicit authorization checks. */
+@RunWith(AndroidJUnit4::class)
+class PlacesPixelQaDeviceTest : PlacesQaScenario() {
+    override fun verifyTarget(context: Context) {
+        check(context.packageName == "com.gernalix.personalhub.qa")
+        check(Build.MANUFACTURER.equals("Google", true) && Build.MODEL == "Pixel 8a")
+        check(InstrumentationRegistry.getArguments().getString("physicalQaAuthorized") == "true")
+    }
+}
+
+@RunWith(AndroidJUnit4::class)
+class PlacesEmulatorQaDeviceTest : PlacesQaScenario() {
+    override fun verifyTarget(context: Context) {
+        check(context.packageName == "com.gernalix.personalhub.qa")
+        check(Build.MODEL.contains("sdk", ignoreCase = true))
+        check(Build.HARDWARE in setOf("goldfish", "ranchu"))
     }
 }

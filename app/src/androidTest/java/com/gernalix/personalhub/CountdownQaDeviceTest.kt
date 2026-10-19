@@ -3,7 +3,7 @@ package com.gernalix.personalhub
 import android.content.Context
 import android.os.Build
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.gernalix.personalhub.contracts.database.*
@@ -45,18 +45,18 @@ abstract class CountdownQaScenario {
             compose.onNodeWithTag("sincewhen-save").performClick()
             compose.waitUntil(10_000) { runBlocking { db.sinceWhenCounterDao().all().any { it.title == title } } }
             saved = runBlocking { db.sinceWhenCounterDao().all().single { it.title == title } }
-            assertEquals(CounterModes.COUNTDOWN, saved!!.mode)
-            assertTrue(saved!!.initialTimestamp > System.currentTimeMillis())
-            val ref = HubEntityRef("since_when", "counter", saved!!.canonicalId)
+            assertEquals(CounterModes.COUNTDOWN, saved.mode)
+            assertTrue(saved.initialTimestamp > System.currentTimeMillis())
+            val ref = HubEntityRef("since_when", "counter", saved.canonicalId)
             assertEquals(setOf(countdownTag.id), runBlocking { tags.tags(ref).map { it.id }.toSet() })
             compose.onNode(hasText("−", substring = true)).assertIsDisplayed()
-            compose.onNodeWithTag("sincewhen-edit-${saved!!.id}").performClick()
+            compose.onNodeWithTag("sincewhen-edit-${saved.id}").performClick()
             compose.onNodeWithTag("sincewhen-description").performTextReplacement("Edited in Countdown")
             compose.onNodeWithTag("sincewhen-save").performClick()
-            compose.waitUntil(10_000) { runBlocking { db.sinceWhenCounterDao().get(saved!!.id)?.description == "Edited in Countdown" } }
-            val edited = runBlocking { requireNotNull(db.sinceWhenCounterDao().get(saved!!.id)) }
-            assertEquals(saved!!.initialTimestamp, edited.initialTimestamp)
-            assertEquals(saved!!.canonicalId, edited.canonicalId)
+            compose.waitUntil(10_000) { runBlocking { db.sinceWhenCounterDao().get(saved.id)?.description == "Edited in Countdown" } }
+            val edited = runBlocking { requireNotNull(db.sinceWhenCounterDao().get(saved.id)) }
+            assertEquals(saved.initialTimestamp, edited.initialTimestamp)
+            assertEquals(saved.canonicalId, edited.canonicalId)
             compose.onNodeWithTag("module-history-tab").performClick()
             compose.onNodeWithTag("history-module-filter").assertDoesNotExist()
             compose.waitUntil(10_000) { compose.onAllNodesWithText(title, substring = true).fetchSemanticsNodes().isNotEmpty() }

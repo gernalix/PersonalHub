@@ -174,8 +174,8 @@ fun HubHistorySearchScreen(
     androidx.compose.runtime.DisposableEffect(window, containsPrivateNotifications) {
         val alreadySecure = window?.attributes?.flags?.and(android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0
         val ownSecureFlag = window != null && containsPrivateNotifications && !alreadySecure
-        if (ownSecureFlag) window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { if (ownSecureFlag) window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE) }
+        if (ownSecureFlag) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { if (ownSecureFlag) window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE) }
     }
     val parsedFrom = remember(fromText) { parseHistoryBoundary(fromText) }
     val parsedTo = remember(toText) { parseHistoryBoundary(toText) }
@@ -183,7 +183,7 @@ fun HubHistorySearchScreen(
         parsedTo.valid &&
         parsedFrom.value != null &&
         parsedTo.value != null &&
-        parsedFrom.value!! > parsedTo.value!!
+        parsedFrom.value > parsedTo.value
     val filtersDirty = query.isNotBlank() ||
         fromText.isNotBlank() ||
         toText.isNotBlank() ||
@@ -264,7 +264,7 @@ fun HubHistorySearchScreen(
                     "semantic" -> semanticHistoryRows(MutationEventStore.byTransaction(db, group.groupId)
                         .filter { (if (it.module == "money") "soldi" else it.module) == group.module }).map { row ->
                         val primary = row.primaryEvent
-                        val ref = primary?.let { event ->
+                        val ref = primary.let { event ->
                             val kind = event.entityKind
                             if (kind != null && event.canonicalId != null) HubEntityRef(
                                 kind.substringBefore('/'), kind.substringAfter('/'), event.canonicalId!!,

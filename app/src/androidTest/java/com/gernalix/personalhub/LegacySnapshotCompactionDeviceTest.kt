@@ -33,8 +33,8 @@ class LegacySnapshotCompactionDeviceTest {
             }
             assertTrue(SnapshotSqlite.compactSnapshotHistoryStorage(context))
             payloadId = db.query("SELECT payload_id FROM snapshot_history WHERE id=? AND kind='checkpoint' AND json=''",
-                arrayOf(historyId!!)).use { assertTrue(it.moveToFirst()); it.getLong(0) }
-            db.query("SELECT json,size_bytes FROM snapshot_payloads WHERE id=?", arrayOf(payloadId!!)).use {
+                arrayOf(historyId)).use { assertTrue(it.moveToFirst()); it.getLong(0) }
+            db.query("SELECT json,size_bytes FROM snapshot_payloads WHERE id=?", arrayOf(payloadId)).use {
                 assertTrue(it.moveToFirst())
                 assertEquals(json, it.getString(0))
                 assertEquals(json.toByteArray(Charsets.UTF_8).size.toLong(), it.getLong(1))

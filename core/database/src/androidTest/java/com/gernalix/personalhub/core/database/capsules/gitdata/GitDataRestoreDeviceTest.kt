@@ -190,7 +190,7 @@ private class LocalRawHttpServer(
                 client.use {
                     val reader = BufferedReader(InputStreamReader(it.getInputStream()))
                     val request = reader.readLine().orEmpty()
-                    while (reader.readLine()?.isNotEmpty() == true) Unit
+                    while (reader.readLine()?.isNotEmpty() == true) { }
                     val path = request.split(" ").getOrNull(1)?.substringBefore("?").orEmpty()
                     val body = files[path]
                     val out = it.getOutputStream()

@@ -81,6 +81,6 @@ class ProfileRuntimeCoordinatorTest {
         }
 
         assertSame(switchFailure, thrown)
-        assertTrue(thrown?.suppressed?.contains(restoreFailure) == true)
+        assertTrue(thrown.suppressed.contains(restoreFailure))
     }
 }

@@ -80,10 +80,10 @@ class HubContextPersistenceDeviceTest {
             refs.forEach { bindingIds += repo.bind(it).id }
             assertEquals(2L, count("hub_entity_bindings", "module_id", "qa914263"))
             contextId = repo.createContext(bindingIds.map { HubContextMemberDraft(it, "people") }, marker, marker)
-            assertEquals(marker, repo.context(contextId!!)?.context?.title)
-            assertEquals(2L, count("hub_context_members", "context_id", contextId!!))
-            repo.updateContext(contextId!!, bindingIds.map { HubContextMemberDraft(it, "people") }, marker, "${marker}Edited")
-            assertEquals("${marker}Edited", repo.context(contextId!!)?.context?.title)
+            assertEquals(marker, repo.context(contextId)?.context?.title)
+            assertEquals(2L, count("hub_context_members", "context_id", contextId))
+            repo.updateContext(contextId, bindingIds.map { HubContextMemberDraft(it, "people") }, marker, "${marker}Edited")
+            assertEquals("${marker}Edited", repo.context(contextId)?.context?.title)
             repo.saveType(HubContextType(marker, "${marker}Edited", now, now), listOf(
                 HubContextTypeField(marker, "people", 0, "People updated", acceptedModuleId = "qa914263", acceptedEntityKind = "fixture", minCardinality = 2),
             ))

@@ -12,15 +12,16 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.SQLiteMode
 
-@RunWith(RobolectricTestRunner::class) @Config(sdk=[35]) @SQLiteMode(SQLiteMode.Mode.NATIVE)
+@RunWith(RobolectricTestRunner::class) @Config(sdk=[35])
 class CollectorServiceTest {
     @Test fun callbacksPersistOrderedSnapshotsAsynchronously() = runBlocking {
         val context:Context=ApplicationProvider.getApplicationContext()
         context.noBackupFilesDir.resolve("notifications.sqlite").delete()
         val lifecycle=Robolectric.buildService(CollectorService::class.java).create()
         val service=lifecycle.get();val store=ArchiveStore.get(context)
+        // Keep the actual Android notification type; the non-priority overload is not public SDK.
+        @Suppress("DEPRECATION")
         fun notification(text:String)=StatusBarNotification("synthetic.app","synthetic.app",5,null,1,1,0,
             Notification.Builder(context,"synthetic").setContentTitle("Synthetic").setContentText(text).build(),android.os.Process.myUserHandle(),1000)
         service.onNotificationPosted(notification("first"));service.onNotificationPosted(notification("second"));service.onNotificationRemoved(notification("second"))

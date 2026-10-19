@@ -13,7 +13,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.ZoneId
 
-@org.robolectric.annotation.SQLiteMode(org.robolectric.annotation.SQLiteMode.Mode.NATIVE)
+
 @RunWith(RobolectricTestRunner::class) @Config(sdk=[35])
 class ArchiveStoreTest {
     private lateinit var store: ArchiveStore
@@ -63,12 +63,16 @@ class ArchiveStoreTest {
     @Test fun structuredAndMissingNotificationFields(){
         val sender=Person.Builder().setName("Same name").setKey("sender-id").build()
         val n=Notification.Builder(context,"channel").setStyle(Notification.MessagingStyle(Person.Builder().setName("Me").build()).addMessage("hello",1000,sender)).build()
+        // The public SDK exposes only the deprecated priority constructor for this fixture.
+        @Suppress("DEPRECATION")
         val sbn=StatusBarNotification("test.app","test.app",1,null,1,1,0,n,android.os.Process.myUserHandle(),2000)
         val s=NotificationSnapshot.capture(sbn,3000,"thread")
         assertEquals("sender-id",s.getJSONArray("messages").getJSONObject(0).getJSONObject("sender").getString("key"))
         assertEquals("1970-01-01T00:00:01Z",s.getJSONArray("messages").getJSONObject(0).getString("timestamp"))
         assertEquals("thread",s.getString("conversation"))
-        assertEquals(0,NotificationSnapshot.capture(StatusBarNotification("test.app","test.app",2,null,1,1,0,Notification(),android.os.Process.myUserHandle(),2000)).getJSONArray("messages").length())
+        @Suppress("DEPRECATION")
+        val emptyNotification=StatusBarNotification("test.app","test.app",2,null,1,1,0,Notification(),android.os.Process.myUserHandle(),2000)
+        assertEquals(0,NotificationSnapshot.capture(emptyNotification).getJSONArray("messages").length())
     }
     @Test fun pagingUsesCapturedTimeWithNonMonotonicClock(){
         repeat(105){i->store.append(snapshot(key="$i", captured=if(i==104)"2026-10-08T10:00:00Z" else "2026-10-09T10:00:00Z"),"POSTED")}

@@ -58,7 +58,7 @@ internal class SessionRepository(private val context: Context) {
                             deletedAtMs = deletedAtMs
                         )
                     }
-                    if (tagId != null) acc?.tagIds?.add(tagId)
+                    if (tagId != null) acc.tagIds.add(tagId)
                 }
             }
 

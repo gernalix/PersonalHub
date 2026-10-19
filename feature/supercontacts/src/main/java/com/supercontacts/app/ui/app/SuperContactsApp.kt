@@ -6158,6 +6158,7 @@ private suspend fun getCurrentLocationOnce(context: Context): Location? {
 
                 override fun onProviderDisabled(provider: String) = Unit
                 override fun onProviderEnabled(provider: String) = Unit
+                @Deprecated("Required callback for legacy Android LocationListener implementations.")
                 override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
             }
             continuation.invokeOnCancellation { locationManager.removeUpdates(listener) }

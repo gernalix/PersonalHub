@@ -611,7 +611,7 @@ internal fun RecurrenceEditorV2(
                     item {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(value.feeAmount.orEmpty(), { text -> onChange(value.copy(feeAmount = text.trim().takeIf { it.isNotEmpty() })) }, label = { Text("Commissione") }, modifier = Modifier.weight(1f), singleLine = true)
-                            CurrencyField(value.feeCurrency ?: target?.currency ?: source?.currency ?: "DKK", accounts.map { it.currency }.distinct()) { onChange(value.copy(feeCurrency = it)) }
+                            CurrencyField(value.feeCurrency ?: target.currency, accounts.map { it.currency }.distinct()) { onChange(value.copy(feeCurrency = it)) }
                         }
                     }
                 }

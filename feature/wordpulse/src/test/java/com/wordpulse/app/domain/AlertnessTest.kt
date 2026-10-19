@@ -39,7 +39,7 @@ class AlertnessTest {
         assertNotNull(evaluation.fatigueScore)
         assertTrue(evaluation.fatigueScore!! >= 50)
         assertTrue(evaluation.domains.speed!! > evaluation.domains.control!!)
-        assertEquals(100 - evaluation.fatigueScore!!, evaluation.alertnessScore)
+        assertEquals(100 - evaluation.fatigueScore, evaluation.alertnessScore)
     }
 
     @Test

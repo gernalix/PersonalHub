@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,11 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.ClipEntry
+import android.content.ClipData
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gernalix.luoghi.CHECKIN_BUTTON_TAG
@@ -57,6 +59,7 @@ import com.gernalix.luoghi.CheckInHomeState
 import com.gernalix.luoghi.CheckInMessage
 import com.gernalix.luoghi.HomeUiState
 import com.gernalix.luoghi.R
+import kotlinx.coroutines.launch
 import com.gernalix.luoghi.capsules.checkin.CheckInCandidate
 import com.gernalix.luoghi.capsules.places.PlaceListUiModel
 import com.gernalix.luoghi.capsules.places.PlaceSortCriterion
@@ -93,6 +96,11 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val recentVisits = state.visits.take(3)
+    // Echo edits synchronously. The derived Room/statistics flow can acknowledge
+    // them later; feeding its older value back to the IME can discard an edit.
+    // Keep this outside the lazy item so scrolling cannot discard the draft.
+    var placeQueryDraft by rememberSaveable { mutableStateOf(state.placeQuery) }
+    LaunchedEffect(Unit) { onPlaceQueryChange(placeQueryDraft) }
     var diagnosticsOpen by remember { mutableStateOf(false) }
     var whereWasIOpen by rememberSaveable { mutableStateOf(false) }
     Scaffold(
@@ -169,8 +177,11 @@ fun HomeScreen(
             }
             item(key = "places-query") {
                 com.gernalix.personalhub.core.ui.HubSearchField(
-                    value = state.placeQuery,
-                    onValueChange = onPlaceQueryChange,
+                    value = placeQueryDraft,
+                    onValueChange = { value ->
+                        placeQueryDraft = value
+                        onPlaceQueryChange(value)
+                    },
                     label = stringResource(R.string.places_search_hint),
                     modifier = Modifier.fillMaxWidth().testTag("places-live-search"),
                 )
@@ -269,7 +280,8 @@ fun HomeScreen(
 
 @Composable
 private fun CheckInDiagnosticsContent(attempts: List<CheckInAttemptDiagnostic>) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val clipboardScope = androidx.compose.runtime.rememberCoroutineScope()
     var outcomeFilter by remember { mutableStateOf("") }
     var placeFilter by remember { mutableStateOf("") }
     val filteredAttempts = filteredDiagnosticAttempts(attempts, outcomeFilter, placeFilter)
@@ -309,7 +321,7 @@ private fun CheckInDiagnosticsContent(attempts: List<CheckInAttemptDiagnostic>) 
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    IconButton(onClick = { clipboard.setText(AnnotatedString(diagnosticReport(diagnostic))) }) {
+                    IconButton(onClick = { clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("plain text", diagnosticReport(diagnostic)))) } }) {
                         Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.checkin_diagnostics_copy))
                     }
                 }

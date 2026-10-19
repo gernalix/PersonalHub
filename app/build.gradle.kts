@@ -1,3 +1,5 @@
+import org.gradle.api.configuration.BuildFeatures
+import javax.inject.Inject
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -7,6 +9,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+abstract class SigningBuildFeatureAccess @Inject constructor(val features: BuildFeatures)
 
 val canonicalSigningEnvFile = File("/home/daniele/.config/codex/secrets/android_signing.env")
 val canonicalSigningProperties = Properties().apply {
@@ -51,7 +55,7 @@ if (signingArtifactRequested && !unsignedPlayBundlePreflight && !ciDebugInstrume
         "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
             "Only the CI Play preflight or ephemeral CI emulator instrumentation may opt out of canonical signing."
     }
-    require(!gradle.startParameter.isConfigurationCacheRequested) {
+    require(!objects.newInstance<SigningBuildFeatureAccess>().features.configurationCache.active.get()) {
         "Signed APK/AAB/device tasks require --no-configuration-cache."
     }
 }
@@ -157,7 +161,7 @@ android {
     }
     sourceSets {
         named("testDebug") {
-            assets.srcDir(rootProject.file("core/database/src/main/assets"))
+            assets.directories.add(rootProject.file("core/database/src/main/assets").absolutePath)
         }
     }
 }

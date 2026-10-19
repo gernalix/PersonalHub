@@ -3,7 +3,7 @@ package com.gernalix.personalhub
 import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -71,7 +71,7 @@ class SinceWhenAutonomyDeviceTest {
             scenario?.close()
             sourceScenario?.close()
             if (previous == null) sql.execSQL("DELETE FROM snapshot WHERE id=1")
-            else sql.execSQL("INSERT OR REPLACE INTO snapshot(id,json,saved_at_ms) VALUES(1,?,?)", arrayOf(previous.first, previous.second))
+            else sql.execSQL("INSERT OR REPLACE INTO snapshot(id,json,saved_at_ms) VALUES(1,?,?)", arrayOf<Any>(previous.first, previous.second))
             sql.execSQL("DELETE FROM since_when_migration_state WHERE `key`=?", arrayOf(key))
             if(marker != null) sql.execSQL("INSERT INTO since_when_migration_state(`key`,completedAt) VALUES(?,?)", arrayOf<Any>(key, marker))
         }

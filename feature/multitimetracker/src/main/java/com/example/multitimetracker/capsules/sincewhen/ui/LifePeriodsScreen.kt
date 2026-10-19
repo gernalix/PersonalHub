@@ -4,6 +4,7 @@
 )
 
 package com.example.multitimetracker.capsules.sincewhen.ui
+import kotlinx.coroutines.launch
 
 import androidx.compose.runtime.mutableLongStateOf
 import android.content.res.Resources
@@ -305,24 +306,29 @@ private fun LifePeriodCard(
     }
 
     key(period.id) {
-        val dismissState = rememberSwipeToDismissBoxState(
-            confirmValueChange = { value ->
-                when (value) {
-                    SwipeToDismissBoxValue.StartToEnd -> {
-                        onEdit()
-                        false
-                    }
-                    SwipeToDismissBoxValue.EndToStart -> {
-                        onDelete()
-                        false
-                    }
-                    else -> false
-                }
-            }
-        )
+        val swipeScope = androidx.compose.runtime.rememberCoroutineScope()
+        val swipeActionInFlight = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+        val dismissState = rememberSwipeToDismissBoxState()
 
         SwipeToDismissBox(
             state = dismissState,
+            onDismiss = { direction ->
+                if (swipeActionInFlight.compareAndSet(false, true)) {
+                    swipeScope.launch {
+                        try {
+                            when (direction) {
+                                SwipeToDismissBoxValue.StartToEnd -> onEdit()
+                                SwipeToDismissBoxValue.EndToStart -> onDelete()
+                                SwipeToDismissBoxValue.Settled -> Unit
+                            }
+                        } finally {
+                            // Editing/deletion confirmation keeps the original row in place.
+                            try { dismissState.reset() }
+                            finally { swipeActionInFlight.set(false) }
+                        }
+                    }
+                }
+            },
             backgroundContent = {
                 val isEdit = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
                 val isDelete = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
@@ -787,7 +793,7 @@ private fun formatLifePeriodDuration(
     val endReferenceMs = when {
         period.endMs != null && nowMs > period.endMs -> period.endMs
         else -> nowMs
-    } ?: nowMs
+    }
 
     if (mode == LifePeriodDurationMode.CALENDAR_DAYS) {
         val calendarDays = lifePeriodCalendarDaysBetween(

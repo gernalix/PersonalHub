@@ -39,7 +39,7 @@ android {
     }
     sourceSets {
         named("testDebug") {
-            assets.srcDir(rootProject.file("core/database/src/main/assets"))
+            assets.directories.add(rootProject.file("core/database/src/main/assets").absolutePath)
         }
     }
 }

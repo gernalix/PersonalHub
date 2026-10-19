@@ -11,7 +11,8 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -145,16 +146,23 @@ private fun AlertPopupCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     if (annotatedMessage.text.isNotBlank()) {
-                        ClickableText(
-                            text = annotatedMessage,
-                            style = MaterialTheme.typography.bodyMedium
-                                .copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
-                            onClick = { offset ->
-                                annotatedMessage
-                                    .getStringAnnotations("url", offset, offset)
-                                    .firstOrNull()
-                                    ?.let { openAlertLink(context, it.item) }
-                            }
+                        val linkedMessage = remember(annotatedMessage, context) {
+                            AnnotatedString.Builder(annotatedMessage).apply {
+                                annotatedMessage.getStringAnnotations("url", 0, annotatedMessage.length).forEach { link ->
+                                    addLink(
+                                        LinkAnnotation.Url(link.item, linkInteractionListener = {
+                                            openAlertLink(context, link.item)
+                                        }),
+                                        link.start,
+                                        link.end,
+                                    )
+                                }
+                            }.toAnnotatedString()
+                        }
+                        Text(
+                            text = linkedMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }

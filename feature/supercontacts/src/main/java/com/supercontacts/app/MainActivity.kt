@@ -22,6 +22,8 @@ class MainActivity : ComponentActivity() {
     private var latestIntent by mutableStateOf<Intent?>(null)
     private var callOverlaySignal by mutableStateOf<CallOverlaySignal?>(null)
     private var telephonyManager: TelephonyManager? = null
+    // This compatibility listener remains available on the supported pre-API31 devices.
+    @Suppress("DEPRECATION")
     private var phoneStateListener: PhoneStateListener? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,6 +65,8 @@ class MainActivity : ComponentActivity() {
         if (!hasAnyCallPermission()) return
         if (phoneStateListener != null) return
         telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+        // Keep the same callback lifecycle and permission checks across older Android devices.
+        @Suppress("DEPRECATION")
         val listener = object : PhoneStateListener() {
             @Deprecated("Deprecated by Android; retained for broad device compatibility.")
             override fun onCallStateChanged(state: Int, phoneNumber: String?) {

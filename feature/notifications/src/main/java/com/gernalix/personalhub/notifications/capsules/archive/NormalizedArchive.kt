@@ -75,7 +75,7 @@ internal object NormalizedArchive {
         val conversation = if(strong.isNotBlank()) stableKey(appScope,"thread",strong)
             else if(kind!="OBSERVED" && prior!=null && prior.second==0) prior.first else stableKey(appScope,"observed-key",key,event.toString())
         val title = s.value("conversationTitle").ifBlank { s.value("title").ifBlank { s.getString("package") } }
-        db.execSQL("INSERT OR IGNORE INTO conversations VALUES(?,?,?,?,?)",arrayOf(conversation,s.getString("package"),title,if(strong.isBlank()) 1 else 0,if(s.optBoolean("isGroup")) 1 else 0))
+        db.execSQL("INSERT OR IGNORE INTO conversations VALUES(?,?,?,?,?)",arrayOf<Any>(conversation,s.getString("package"),title,if(strong.isBlank()) 1 else 0,if(s.optBoolean("isGroup")) 1 else 0))
         db.execSQL("INSERT OR REPLACE INTO notification_threads VALUES(?,?,0)",arrayOf(key,conversation))
         // A repeated tuple in one observed snapshot has multiplicity; identical text is not a global key.
         val counts = mutableMapOf<String,Int>()

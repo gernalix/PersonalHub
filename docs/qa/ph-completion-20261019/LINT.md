@@ -1,6 +1,7 @@
 # Debug lint inventory
 
-Current full unfiltered matrix check:14 module XML reports,0 errors and0 warnings after the reviewed source/dependency repairs. All393 original diagnostics are absent. No blanket lint disabling or baseline was introduced. Historical snapshots and failures remain below.
+Last verified full lint snapshot on the uncommitted modernization:14 complete module reports,0 issues, architecture PASS (SQLite413). The full host run has375 PASS/1 existing AndroidKeyStore SKIP, and subsequent focused host fixtures36 PASS. Actual nonincremental compilation and NDK strip/package validation now have0 Kotlin/native-strip warnings. One Gradle deprecation is emitted by26 internal calls in the official AGP9.4.1 artifact; its source provenance is retained privately and no warning filter was added. The later Places search-draft correction also passes app compile, QA build, Luoghi lint0 and architecture. Native delayed-state regression, four search repetitions and full app16 cases PASS433–438.
+
 
 
 The full `lintDebug checkArchitectureBoundaries` run on19 October completed successfully (no lint errors, architecture PASS). It exposed393 distinct warnings/hints across the whole project; this is the original historical baseline, not the current residual count. Raw source-backed findings are retained privately in `~/.local/share/personalhub-qa/lint-20261019.json` (0600). This snapshot is taken before the following fixes are rechecked.
@@ -126,3 +127,7 @@ The detached full command completed with exit1 after15m54s. All79 JUnit reports/
 The last lint warning came from the new Lifecycle contract marking the empty ViewModel `super.onCleared` implementation. Removed only that call, keeping the existing PVT job cancellation. Highest app compile passes after this and the two widget inset fixes. Targeted widget host suites, the Android test compilation and full unfiltered lint are in progress.
 
 Post-repair gates PASS: Android instrumentation source compilation, targeted widget suites7/7 cases (SQLite285–286), architecture and full unfiltered lint14 reports/0 errors/0 warnings. SQLite287 records three actual Gradle task gates, explicitly not individual unit cases. The previous298-case full unit run remains separate. Private complete XML/hash manifest: evidence/post-matrix-leaf-lint/manifest.json.
+
+## Compiler warnings are a separate acceptance gate
+
+The fa9b4eb3 CI log is preserved privately and reconciled into compiler-warnings-fa9b4eb3.json (75 unique locations/messages, including3 Gradle-script deprecations). A quiet compile can pass while hiding these messages. The next warning acceptance uses visible warnings and a comprehensive necessary compilation; no global suppression or weaker test/data guard is introduced. Library Timer's actual nullable-array error is repaired explicitly; all three requested library Android-test compilation tasks pass before the later source modernizations.

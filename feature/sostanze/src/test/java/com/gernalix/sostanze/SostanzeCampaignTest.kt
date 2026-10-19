@@ -21,11 +21,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.SQLiteMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
-@SQLiteMode(SQLiteMode.Mode.NATIVE)
+
 class SostanzeCampaignTest {
     @Test fun successRecordedMessageUsesCurrentTappedTitle() {
         assertEquals("Pregabalin added", successRecordedMessage("%1\$s added", "Pregabalin"))

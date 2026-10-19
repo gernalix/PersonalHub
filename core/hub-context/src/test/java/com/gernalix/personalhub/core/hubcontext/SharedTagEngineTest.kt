@@ -89,7 +89,7 @@ class SharedTagEngineTest {
     @Test fun timerNamespacesRemainIndependentForRenameArchiveDeleteAndMerge() = runBlocking {
         val now = engine.createStable("timer.now:7", HubTagNamespaces.TIMER_NOW, "Focus")
         val events = engine.createStable("timer.events:7", HubTagNamespaces.TIMER_EVENTS, "Focus")
-        val since = engine.createStable("timer.since_when:7", HubTagNamespaces.TIMER_SINCE_WHEN, "Focus")
+        val since = engine.createStable("timer.since_when:7", HubTagNamespaces.SINCE_WHEN, "Focus")
         engine.assign(canonicalFixture(database, "timer", "session", "1"), listOf(now.id))
         engine.assign(canonicalFixture(database, "timer", "quick_event_entry", "2"), listOf(events.id))
         engine.assign(canonicalFixture(database, "timer", "life_period", "3"), listOf(since.id))

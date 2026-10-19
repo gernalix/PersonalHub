@@ -208,7 +208,7 @@ private fun logAppVersionIfNeeded(context: Context) {
             bridge.observe(HubTagNamespaces.TIMER_EVENTS).collect { timerEventTags.value = it }
         }
         viewModelScope.launch {
-            bridge.observe(HubTagNamespaces.TIMER_SINCE_WHEN).collect { timerSinceWhenTags.value = it }
+            bridge.observe(HubTagNamespaces.SINCE_WHEN).collect { timerSinceWhenTags.value = it }
         }
     }
 
