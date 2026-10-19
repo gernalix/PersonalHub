@@ -568,3 +568,11 @@ QA history context repair: copied controller labels incorrectly described three7
 
 - Focused lint exposed one UseKtx warning in Directions. Zero-diagnostic gate564 FAIL retained, despite Gradle exit0. Replaced Uri.parse(uri) with the existing Android KTX toUri extension; no URI/action/provider behavior changes. Highest app compile and corrected Places lint0 PASS566; the three Directions cases PASS565 preserve full address/civico/reserved characters, coordinate fallback and invalid-location behavior.
 - Focused pre-final UI review for this repair: existing English labels and tag hint retained; four shared buffered fields preserve multiline mode and use the existing Clear affordance. No raw IDs, timestamps, cursors or backend values added. The previously frozen72 remains held; next final72 must be built from the corrected committed inputs and revalidated before Pixel installation.
+
+
+## Corrected final72 candidate
+
+- Frozen new final72 from reviewed clean source1c90c437, SHA25620dc9a84653389c194a0cd7fdb4435934ccbd7741c1a2c97daa433f9ad490b5a,195071590 bytes, canonical signer, actual non-debuggable/R8 full mode,10981 obfuscated and238 preserved OsmAnd wire classes. Build/freezer568 records4 command gates. Previous517 artifact remains held; no historical outcome renamed.
+- New exact bytes replace the existing517 bytes on the canonical emulator, using fresh supported exports before/after.569 PASS6 checks:162 identical tables, schema/integrity valid, exactly one real72 update fact, no invented repeated prompt. Generic private replacement runner now takes an explicit previous-artifact identity instead of assuming the first72.
+- New exact-final feature controller takes an explicit artifact directory and checks the complete nickname. Real Android rapid input PHQANoMatch72 now remains exactly PHQANoMatch72 on the optimized APK, closing the557 reproduction.570 contains2 actual checks: Places Home controls and rapid nickname. Cancelled the editor without saving any place; canonical facade stop verified. These2 checks do not claim all Places features or all4 fields on this optimized artifact; all4 have native isolatedQA563 coverage. Broader exact-final acceptance remains pending.
+- Source1c90c437 pushed to the existing draft PR104 for fresh CI. No primary-device operation, Pixel still71; no72 delivery/publication.
