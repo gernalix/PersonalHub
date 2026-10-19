@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import subprocess
@@ -70,12 +71,28 @@ def launched_activity(output: str, package: str) -> str | None:
     return None
 
 
+def require_installed_artifact(adb: str, serial: str, package: str, apk: Path) -> str:
+    paths = run(adb, "-s", serial, "shell", "pm", "path", package).stdout.splitlines()
+    if len(paths) != 1 or not paths[0].startswith("package:"):
+        raise SmokeError("Expected one installed APK; refusing to test another artifact")
+    installed = run(adb, "-s", serial, "shell", "sha256sum", paths[0][8:]).stdout.split()[0]
+    with apk.open("rb") as source:
+        expected = hashlib.file_digest(source, "sha256").hexdigest()
+    if installed != expected:
+        raise SmokeError("Installed APK differs from the supplied immutable artifact")
+    return expected
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial", required=True)
     parser.add_argument("--apk", required=True, type=Path)
     parser.add_argument("--package", default="com.gernalix.personalhub")
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--already-installed", action="store_true",
+                        help="Verify installed bytes instead of reinstalling or granting permissions")
+    parser.add_argument("--evidence-dir", type=Path,
+                        help="New directory for launch output and automatic SQLite startup history")
     args = parser.parse_args()
 
     if not args.apk.is_file():
@@ -90,9 +107,24 @@ def main() -> int:
     if state != "device":
         raise SmokeError(f"ADB target is not ready: {args.serial} -> {state!r}")
 
-    # Install the exact tested artifact and pre-grant runtime permissions so permission
-    # dialogs cannot invalidate the shortcut-routing smoke.
-    run(adb, "-s", args.serial, "install", "-r", "-g", str(args.apk))
+    if args.evidence_dir:
+        args.evidence_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
+    if args.already_installed:
+        require_installed_artifact(adb, args.serial, args.package, args.apk)
+    else:
+        # Disposable QA mode; primary-device QA should preserve permission state.
+        run(adb, "-s", args.serial, "install", "-r", "-g", str(args.apk))
+
+    if args.evidence_dir:
+        from android_test_history import DEFAULT_DB, digest, record
+        model = run(adb, "-s", args.serial, "shell", "getprop", "ro.product.model").stdout.strip()
+        api = run(adb, "-s", args.serial, "shell", "getprop", "ro.build.version.sdk").stdout.strip()
+        emulator = run(adb, "-s", args.serial, "shell", "getprop", "ro.kernel.qemu").stdout.strip() == "1"
+        package_dump = run(adb, "-s", args.serial, "shell", "dumpsys", "package", args.package).stdout
+        version = re.search(r"(?m)^\s*versionName=(\S+)", package_dump)
+        context = {"app_version": version[1] if version else None, "device_kind": "emulator" if emulator else "pixel" if "Pixel" in model else "tcl" if "TCL" in model else "physical",
+                   "device_model": model, "android_api": api, "app_id": args.package,
+                   "apk_sha256": digest(args.apk), "variant": "installed-exact-artifact"}
 
     for alias, expected_target in aliases:
         run(adb, "-s", args.serial, "shell", "am", "force-stop", args.package)
@@ -108,7 +140,14 @@ def main() -> int:
             f"{args.package}/{alias}",
             check=False,
         )
-        if proc.returncode or "Error:" in proc.stdout or "Activity class" in proc.stdout:
+        if args.evidence_dir:
+            evidence = args.evidence_dir / (alias.rsplit(".", 1)[-1] + ".log")
+            evidence.touch(mode=0o600, exist_ok=False)
+            evidence.write_text(proc.stdout)
+            record(DEFAULT_DB, evidence, "am-start", dict(context, process_exit_code=proc.returncode),
+                   module=alias.removeprefix(ALIAS_PREFIX).lower())
+        if (proc.returncode or "Status: ok" not in proc.stdout or "Complete" not in proc.stdout
+                or "Error:" in proc.stdout or "Activity class" in proc.stdout):
             raise SmokeError(f"launch failed for {alias}:\n{proc.stdout.strip()}")
         actual = launched_activity(proc.stdout, args.package)
         if actual != expected_target:
@@ -118,7 +157,7 @@ def main() -> int:
             )
         print(f"ALIAS_PASS {alias} -> {actual}")
 
-    print("ALIASES_AVD=PASS")
+    print("ALIASES_TARGET=PASS")
     return 0
 
 
@@ -126,5 +165,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except SmokeError as exc:
-        print(f"ALIASES_AVD=FAIL: {exc}", file=sys.stderr)
+        print(f"ALIASES_TARGET=FAIL: {exc}", file=sys.stderr)
         raise SystemExit(1)

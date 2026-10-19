@@ -32,6 +32,8 @@ Status: implementation and QA in progress. This is not a final release or purifi
 
 ## Data, tooling and safety
 
+- Public-shortcut QA supports `--already-installed`: read-only exact SHA256 matching, no reinstall or added permissions, a fresh private evidence directory and automatic per-module startup history with actual installed version/device/hash. Android timeout no longer passes from an Activity line alone; physical/emulated results use the neutral `ALIASES_TARGET` marker. Six host guard tests PASS (SQLite73); actual final-APK shortcut runtime acceptance remains pending.
+
 - Fixed widget loss in the external paired update procedure: package disable pruned Android widget providers and launcher bindings. Freeze now suspends and force-stops PH while retaining its original enabled state; cleanup removes only an owned suspension, validates readback and refuses pre-disabled or foreign-suspended states. Nineteen paired safety tests, seven installer tests and two migration tests pass (SQLite68–70). No APK change/rebuild is required for this host-tool fix. Native widget restoration/binding preservation remains pending; both attempted Pixel windows closed with verified pre/post notices, with no intake activation.
 
 - Room schema 25 adds a defaulted counter mode; mutation capture and readable History/Git presentation distinguish Countdown, including deleted counters.
@@ -99,7 +101,6 @@ Passive archive metadata readback found actual Telegram/WhatsApp events and no S
 ## Changed project files
 
 Complete source diff against original canonical base `e031f296d0ac8535c9248b262f777b792ab99548`, refreshed at each checkpoint. Exact removed app-string inventory: `~/.local/share/personalhub-qa/removed-unused-resources-20261019.json`.
-
 
 - `.codex/CODE_MAP.tsv`
 - `.github/workflows/android-consumer-preflight.yml`
@@ -295,11 +296,13 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `tools/android_connected_test_gate.py`
 - `tools/android_paired_cutover_v24.py`
 - `tools/android_pixel_apk.py`
+- `tools/android_shortcut_alias_smoke.py`
 - `tools/android_test_history.py`
 - `tools/migrate_personalhub_v24_to_v25.py`
 - `tools/run_ci_instrumentation.sh`
 - `tools/test_android_connected_test_gate.py`
 - `tools/test_android_paired_cutover_v24.py`
 - `tools/test_android_pixel_apk.py`
+- `tools/test_android_shortcut_alias_smoke.py`
 - `tools/test_android_test_history.py`
 - `tools/test_migrate_personalhub_v24_to_v25.py`

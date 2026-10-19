@@ -62,3 +62,13 @@ Lo storico salva hash e percorso dell'evidenza, nomi/esiti dei test e durate
 misurate. Non contiene log completi, notifiche, messaggi privati, credenziali o
 valori estratti dalle asserzioni fallite. Non modifica gli esiti precedenti:
 una correzione genera una nuova esecuzione.
+
+For the six public module shortcuts on the already installed final APK, run
+`tools/android_shortcut_alias_smoke.py --serial <verified-serial> --apk <frozen-apk> --already-installed --evidence-dir <new-private-directory>`
+inside the required physical-device notification window. The installed SHA256 must match
+before launches; no install or runtime-permission grant is performed. Raw launch
+evidence and automatic per-module SQLite measurements retain the actual device,
+Android API, installed version and APK hash. A measured start does not certify the
+module's full functional behavior. A timeout cannot pass solely because Android
+printed an Activity name. The output uses `ALIASES_TARGET` for either physical or
+emulated targets.
