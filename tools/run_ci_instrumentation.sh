@@ -19,7 +19,8 @@ adb -s "$serial" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidT
 
 run_app_test() {
   local test_name=$1 result
-  if ! result=$(timeout --signal=TERM --kill-after=15s 3m \
+  if ! result=$(python3 tools/android_connected_test_gate.py -- \
+    timeout --signal=TERM --kill-after=15s 3m \
     adb -s "$serial" shell am instrument -w -r \
     -e class "com.gernalix.personalhub.$test_name" "$runner" 2>&1); then
     printf 'Instrumentation command failed: %s\n%s\n' "$test_name" "$result" >&2

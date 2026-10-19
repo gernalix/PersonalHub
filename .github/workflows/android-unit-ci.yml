@@ -73,6 +73,8 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_pixel_apk.py
           PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_test_history.py
           PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_connected_test_gate.py
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/test_run_ci_instrumentation.py
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/test_android_shortcut_alias_smoke.py
       - name: Run all debug unit tests and lint
         run: |
           chmod +x ./gradlew

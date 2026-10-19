@@ -32,6 +32,8 @@ Status: implementation and QA in progress. This is not a final release or purifi
 
 ## Data, tooling and safety
 
+- The CI app instrumentation function now uses the same fail-closed connected-test gate as library tests. A cleanup/runner failure after an apparent OK cannot produce PASS. Three host regressions execute the actual shell function against a fake adb; existing gate17 checks also PASS. Unit CI includes these regressions and the six shortcut-safety cases. No app source, permission, database or final APK change.
+
 - Public-shortcut QA supports `--already-installed`: read-only exact SHA256 matching, no reinstall or added permissions, a fresh private evidence directory and automatic per-module startup history with actual installed version/device/hash. Android timeout no longer passes from an Activity line alone; physical/emulated results use the neutral `ALIASES_TARGET` marker. Six host guard tests PASS (SQLite73); actual final-APK shortcut runtime acceptance remains pending.
 
 - Fixed widget loss in the external paired update procedure: package disable pruned Android widget providers and launcher bindings. Freeze now suspends and force-stops PH while retaining its original enabled state; cleanup removes only an owned suspension, validates readback and refuses pre-disabled or foreign-suspended states. Nineteen paired safety tests, seven installer tests and two migration tests pass (SQLite68–70). No APK change/rebuild is required for this host-tool fix. Native widget restoration/binding preservation remains pending; both attempted Pixel windows closed with verified pre/post notices, with no intake activation.
@@ -306,3 +308,4 @@ Complete source diff against original canonical base `e031f296d0ac8535c9248b262f
 - `tools/test_android_shortcut_alias_smoke.py`
 - `tools/test_android_test_history.py`
 - `tools/test_migrate_personalhub_v24_to_v25.py`
+- `tools/test_run_ci_instrumentation.py`
