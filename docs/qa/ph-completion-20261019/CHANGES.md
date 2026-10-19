@@ -353,3 +353,5 @@ All changed project paths against the initial integrated base, including the cur
 - Expanded Project Capsule freshness watches to the real wrapper scripts, NV, tools and scoped Git whitespace policy. Its old review ref correctly fails while source is uncommitted; refresh and canonical validation remain required.
 
 Latest source validation: highest app compile, Android instrumentation source compilation, targeted widget7/7, architecture and all14 full lint reports PASS with0 errors/0 warnings; prior full unit298/298 retained separately. No final replacement APK has been built or installed for these dependency/UI changes.
+
+- Advanced source NV70→71 for the next real primary Pixel replacement, after live version70 and canonical main69 readback. The user explicitly requires a new NV for every actual update; old70 artifacts and acceptance remain historical. No QA-only compilation or test increments NV. Version71 still requires minified signing, real update-prompt/event/binding/feature acceptance and exact-byte publication.
