@@ -12,6 +12,8 @@ serial=${devices[0]}
 # Device identity is diagnostic only; native emulator-only guards remain required.
 adb -s "$serial" shell getprop ro.product.model
 adb -s "$serial" shell getprop ro.hardware
+adb -s "$serial" shell wm size
+adb -s "$serial" shell wm density
 runner=com.gernalix.personalhub.qa.test/androidx.test.runner.AndroidJUnitRunner
 
 capture_failure() {
@@ -47,7 +49,20 @@ wait_for_broadcast_idle() {
     return 1
   fi
 }
+assert_clean_boot() {
+  local result
+  if ! result=$(adb -s "$serial" shell dumpsys activity lastanr); then
+    capture_failure emulator_boot_anr_readback
+    return 1
+  fi
+  if [[ "$result" != *'<no ANR has occurred since boot>'* ]]; then
+    echo 'Emulator boot did not provide an ANR-free baseline; app tests were not started' >&2
+    capture_failure emulator_first_boot_system_anr
+    return 1
+  fi
+}
 wait_for_broadcast_idle emulator_first_boot
+assert_clean_boot
 adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
 adb -s "$serial" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk >/dev/null
 wait_for_broadcast_idle instrumentation_package_installation
@@ -76,6 +91,7 @@ prepare_qa_compilation() {
 }
 prepare_qa_compilation
 wait_for_broadcast_idle instrumentation_package_compilation
+assert_clean_boot
 
 run_app_test() {
   local test_name=$1 result
