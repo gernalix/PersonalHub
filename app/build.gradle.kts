@@ -235,5 +235,5 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.uiautomator)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation("androidx.test.espresso:espresso-intents:3.7.0")
+    androidTestImplementation(libs.androidx.espresso.intents)
 }

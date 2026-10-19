@@ -11,7 +11,7 @@ import android.provider.Settings
 
 object CallOverlayPermission {
     fun canDrawOverlays(context: Context): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
+        Settings.canDrawOverlays(context)
 
     fun requiresRestrictedSettingsPrimer(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false

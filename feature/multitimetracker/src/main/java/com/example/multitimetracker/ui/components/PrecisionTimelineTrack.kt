@@ -37,10 +37,10 @@ fun PrecisionTimelineTrack(
     overlapsPrev: Boolean,
     overlapsNext: Boolean,
     isRunning: Boolean,
+    modifier: Modifier = Modifier,
     laneIndex: Int = 0,
     laneCount: Int = 1,
     laneOverflow: Boolean = false,
-    modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
 

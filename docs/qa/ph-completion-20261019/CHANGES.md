@@ -71,6 +71,15 @@ Official action metadata: https://github.com/actions/checkout/blob/v5/action.yml
 - The database-startup blocker now uses English non-translatable resources for title, schema/readiness details and Close. The data-preserving gate and recovery instructions remain intact.
 - Reviewed conservative lint false positives: DatabaseGate retains only applicationContext; the process-owned call overlay is created from applicationContext and removed/cleared on dismissal. Narrow class-level StaticFieldLeak annotations document those intentional lifetimes. The pure SDK policy's inlined integer package-source constants receive a method-level InlinedApi explanation; the existing API36 guard remains.
 
+- People external URL and explicit Maps opening now attempts the launch directly, with the existing failure fallback, instead of relying on package-visibility preflight queries. No queries/permissions added. Guidance: https://developer.android.com/training/package-visibility/use-cases#open-urls .
+- Reordered Modifier to the first optional argument in six composable signatures after the exact consumer scan/readback; all affected consumers use named arguments. Highest app compilation passes.
+- Widget target-cell dimensions now use API31 XML variants while older versions keep the same fallback geometry. Removed duplicate full-screen manifest attributes already set by the existing guarded Activity code. Quick-session widget uses its existing accessible name and an English non-translatable symbol resource.
+- Removed eight SDK compatibility branches below the declared supported module minima; exact-alarm authorization/recovery and notification authorization retain their existing gates. Eleven core alert/link/notification tests pass (SQLite51–54); four call-overlay cancellation/restricted-settings policy tests pass (55).
+- Espresso Intents now uses the existing version catalog and espresso3.7.0 version reference, preserving the coordinate/version. People loading labels use ellipses.
+- Corrected37 count-wording diagnostics: neutral category/count labels retain every format argument; People age and elapsed-time units reuse shared core/ui plurals for natural singular/plural output. Removed five obsolete localized format entries, with zero translated additions.
+- Removed ten unused pre26 fallback launcher bitmap variants from Timer and the redundant v26 resource directory qualifier. Both adaptive XML resources and all five foreground densities remain defined; foreground bytes were hash-checked unchanged.
+- Closed stale GitHub issues91 and69 as completed after integration/evidence readback;71 as not planned because its C2/C3 orchestration was retired. Issue68 remains open pending Capsule validation on the actually integrated canonical checkout.
+
 ## Evidence and remaining delivery work
 
 Native QA history includes passing live search/tag-filter lifecycle, all eight overlapping candidates with cancel/explicit eighth selection/current visit/checkout, Where was I, all compact actions, twelve History scopes, real notification capture into shared History, Countdown, permission guidance, real external OsmAnd and Explore detail return. Failed attempts remain historical; later PASS is linked by scenario/artifact provenance rather than rewriting old records.
@@ -81,7 +90,7 @@ Passive archive metadata readback found actual Telegram/WhatsApp events and no S
 
 ## Changed project files
 
-Complete current source diff against the original canonical base `e031f296d0ac8535c9248b262f777b792ab99548`. Final delivery and report updates will refresh this list using this fixed base.
+Complete source diff against original canonical base `e031f296d0ac8535c9248b262f777b792ab99548`, refreshed at each checkpoint. Exact removed app-string inventory: `~/.local/share/personalhub-qa/removed-unused-resources-20261019.json`.
 
 - `.codex/CODE_MAP.tsv`
 - `.github/workflows/android-consumer-preflight.yml`
@@ -91,6 +100,7 @@ Complete current source diff against the original canonical base `e031f296d0ac85
 - `.github/workflows/play-store-preflight.yml`
 - `AGENTS.md`
 - `NV.txt`
+- `app/build.gradle.kts`
 - `app/src/androidTest/java/com/gernalix/personalhub/CountdownQaDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HistoryAndPatchReviewDeviceTest.kt`
 - `app/src/androidTest/java/com/gernalix/personalhub/HubHistorySearchQaDeviceTest.kt`
@@ -123,6 +133,7 @@ Complete current source diff against the original canonical base `e031f296d0ac85
 - `contracts/database/src/main/java/com/gernalix/personalhub/contracts/database/SinceWhenCounterEntity.kt`
 - `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/AlertLinkPolicy.kt`
 - `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/AlertNotificationDispatcher.kt`
+- `core/alerts/src/main/java/com/gernalix/personalhub/core/alerts/HubAndroidPlatform.kt`
 - `core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/25.json`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseGate.kt`
 - `core/database/src/main/java/com/gernalix/personalhub/core/database/DatabaseStartupGate.kt`
@@ -186,6 +197,7 @@ Complete current source diff against the original canonical base `e031f296d0ac85
 - `feature/luoghi/src/test/java/com/gernalix/luoghi/PlacesHistoryMapGeofencingTest.kt`
 - `feature/luoghi/src/test/java/com/gernalix/luoghi/PlacesProximityTest.kt`
 - `feature/luoghi/src/test/java/com/gernalix/luoghi/VisitTimestampTest.kt`
+- `feature/multitimetracker/src/main/AndroidManifest.xml`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/MainActivity.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/TimeFenceNotifier.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/TimeFenceTimerScheduler.kt`
@@ -197,9 +209,32 @@ Complete current source diff against the original canonical base `e031f296d0ac85
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/hub/TimerSessionHubAdapter.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/AppRoot.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/AlertPopupHost.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/PrecisionTimelineTrack.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SectionHeader.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SessionEditDialog.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/ui/components/SingleSubmitButtons.kt`
 - `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickEventWidgetConfigureActivity.kt`
+- `feature/multitimetracker/src/main/java/com/example/multitimetracker/widget/QuickTaskWidgetClickActivity.kt`
+- `feature/multitimetracker/src/main/res/layout/widget_quick_task.xml`
+- `feature/multitimetracker/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
+- `feature/multitimetracker/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
+- `feature/multitimetracker/src/main/res/mipmap-anydpi/ic_launcher.xml`
+- `feature/multitimetracker/src/main/res/mipmap-anydpi/ic_launcher_round.xml`
+- `feature/multitimetracker/src/main/res/mipmap-hdpi/ic_launcher.png`
+- `feature/multitimetracker/src/main/res/mipmap-hdpi/ic_launcher_round.png`
+- `feature/multitimetracker/src/main/res/mipmap-mdpi/ic_launcher.png`
+- `feature/multitimetracker/src/main/res/mipmap-mdpi/ic_launcher_round.png`
+- `feature/multitimetracker/src/main/res/mipmap-xhdpi/ic_launcher.png`
+- `feature/multitimetracker/src/main/res/mipmap-xhdpi/ic_launcher_round.png`
+- `feature/multitimetracker/src/main/res/mipmap-xxhdpi/ic_launcher.png`
+- `feature/multitimetracker/src/main/res/mipmap-xxhdpi/ic_launcher_round.png`
+- `feature/multitimetracker/src/main/res/mipmap-xxxhdpi/ic_launcher.png`
+- `feature/multitimetracker/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png`
 - `feature/multitimetracker/src/main/res/values/strings.xml`
+- `feature/multitimetracker/src/main/res/xml-v31/quick_event_widget_info.xml`
+- `feature/multitimetracker/src/main/res/xml-v31/quick_task_widget_info.xml`
+- `feature/multitimetracker/src/main/res/xml/quick_event_widget_info.xml`
+- `feature/multitimetracker/src/main/res/xml/quick_task_widget_info.xml`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/api/NotificationsHistory.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/api/NotificationsRoute.kt`
 - `feature/notifications/src/main/java/com/gernalix/personalhub/notifications/capsules/archive/ArchiveStore.kt`
@@ -209,15 +244,22 @@ Complete current source diff against the original canonical base `e031f296d0ac85
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/FinancePhotoSemanticEngine.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiActivity.kt`
 - `feature/soldi/src/main/java/com/gernalix/personalhub/soldi/SoldiEditorsUi.kt`
+- `feature/soldi/src/main/res/values-it/banking_strings.xml`
+- `feature/soldi/src/main/res/values/banking_strings.xml`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/MainActivity.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/notifications/SostanzeNotificationScheduler.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/ui/SostanzeApp.kt`
 - `feature/sostanze/src/main/java/com/gernalix/sostanze/widget/SubstancesWidgetConfigureActivity.kt`
+- `feature/sostanze/src/main/res/values-it/strings.xml`
+- `feature/sostanze/src/main/res/values/strings.xml`
+- `feature/sostanze/src/main/res/xml-v31/substances_widget_info.xml`
+- `feature/sostanze/src/main/res/xml/substances_widget_info.xml`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/CallOverlayPermission.kt`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/CallSystemOverlayController.kt`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/MainActivity.kt`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/data/repository/ContactModels.kt`
 - `feature/supercontacts/src/main/java/com/supercontacts/app/ui/app/SuperContactsApp.kt`
+- `feature/supercontacts/src/main/res/values/strings.xml`
 - `feature/wordpulse/src/main/java/com/wordpulse/app/MainActivity.kt`
 - `gradle/libs.versions.toml`
 - `project-capsule.yaml`

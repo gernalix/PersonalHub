@@ -118,7 +118,7 @@
     <string name="activity_invalid_range">From must be before To.</string>
     <string name="activity_invalid_date">Use a valid date and time.</string>
     <string name="activity_open">Open</string>
-    <string name="activity_related_changes">%1$d related changes</string>
+    <string name="activity_related_changes" translatable="false">Related changes: %1$d</string>
     <string name="activity_empty">No recorded changes match these filters.</string>
     <string name="activity_status_reverted">Reverted</string>
     <string name="activity_status_conflict">Conflict</string>

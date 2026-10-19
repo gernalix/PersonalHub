@@ -29,6 +29,7 @@ uiautomator = "2.3.0"
 startup = "1.2.0"
 
 [libraries]
+androidx-espresso-intents = { module = "androidx.test.espresso:espresso-intents", version.ref = "espresso" }
 androidx-arch-core-runtime = { module = "androidx.arch.core:core-runtime", version.ref = "archCore" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-benchmark-macro-junit4 = { module = "androidx.benchmark:benchmark-macro-junit4", version.ref = "benchmark" }

@@ -36,9 +36,8 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:noHistory="true"
-            android:showWhenLocked="true"
             android:theme="@style/Theme.MultiTimeTracker"
-            android:turnScreenOn="true" />
+            />
 
         <activity
             android:name=".widget.QuickSessionWidgetClickActivity"

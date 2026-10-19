@@ -20,7 +20,7 @@
     <string name="banking_status">Status</string>
     <string name="banking_period">Days</string>
     <string name="banking_all">All</string>
-    <string name="banking_results">%1$d results</string>
+    <string name="banking_results" translatable="false">Results: %1$d</string>
     <string name="banking_description_missing">Description unavailable</string>
     <string name="banking_date_missing">Date unavailable</string>
     <string name="banking_no_transactions">No movements match these filters.</string>
@@ -76,9 +76,9 @@
     <string name="banking_cause_pending">Cause not confirmed. Pending bank movements are shown separately and do not explain the booked difference.</string>
     <string name="banking_cause_future">Cause not confirmed. Future PersonalHub entries are excluded and shown separately.</string>
     <string name="banking_cause_unconfirmed">No reliable cause found. Review the two ledgers without importing automatically.</string>
-    <string name="banking_pending_separate">%1$d pending bank movements kept separate</string>
-    <string name="banking_future_separate">%1$d future PersonalHub entries kept separate</string>
-    <string name="banking_ambiguous_matches">%1$d bank movements have ambiguous PersonalHub matches</string>
+    <string name="banking_pending_separate" translatable="false">Pending bank movements kept separate: %1$d</string>
+    <string name="banking_future_separate" translatable="false">Future PersonalHub entries kept separate: %1$d</string>
+    <string name="banking_ambiguous_matches" translatable="false">Bank movements with ambiguous PersonalHub matches: %1$d</string>
     <string name="banking_review_suggestion">Review</string>
     <string name="banking_suggestion_expired">The bank suggestion changed, was already saved, or no longer matches the account balance. Reopen Banks before saving.</string>
     <string name="banking_alert_settings">Balance alerts</string>

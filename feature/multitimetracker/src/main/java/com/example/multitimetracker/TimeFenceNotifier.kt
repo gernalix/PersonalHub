@@ -195,7 +195,6 @@ object TimeFenceNotifier {
     }
 
     private fun hasActiveTimedSessionNotification(nm: NotificationManager, notificationId: Int): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
         return runCatching {
             nm.activeNotifications.any { sbn ->
                 if (sbn.id != notificationId) return@any false

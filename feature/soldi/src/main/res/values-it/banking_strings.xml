@@ -20,7 +20,6 @@
     <string name="banking_status">Stato</string>
     <string name="banking_period">Giorni</string>
     <string name="banking_all">Tutti</string>
-    <string name="banking_results">%1$d risultati</string>
     <string name="banking_description_missing">Descrizione non disponibile</string>
     <string name="banking_date_missing">Data non disponibile</string>
     <string name="banking_no_transactions">Nessun movimento corrisponde ai filtri.</string>
@@ -76,9 +75,6 @@
     <string name="banking_cause_pending">Causa non confermata. I movimenti bancari in attesa restano separati e non spiegano la differenza contabilizzata.</string>
     <string name="banking_cause_future">Causa non confermata. Le voci PersonalHub future sono escluse e mostrate separatamente.</string>
     <string name="banking_cause_unconfirmed">Nessuna causa affidabile trovata. Controlla i due registri senza importazioni automatiche.</string>
-    <string name="banking_pending_separate">%1$d movimenti bancari in attesa mantenuti separati</string>
-    <string name="banking_future_separate">%1$d voci PersonalHub future mantenute separate</string>
-    <string name="banking_ambiguous_matches">%1$d movimenti bancari hanno corrispondenze PersonalHub ambigue</string>
     <string name="banking_review_suggestion">Controlla</string>
     <string name="banking_suggestion_expired">Il suggerimento bancario è cambiato, è già stato salvato o non coincide più con conto e saldo. Riapri Banche prima di salvare.</string>
     <string name="banking_alert_settings">Avvisi saldo</string>

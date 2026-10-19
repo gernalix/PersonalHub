@@ -89,7 +89,7 @@
     <string name="alert_tags_prefix">Tags: </string>
     <string name="alert_notification_delivery_hint">Timer alerts appear immediately inside the app.</string>
     <string name="alert_popup_dismiss">Dismiss alert</string>
-    <string name="alert_popup_more_count">%1$d more alerts queued</string>
+    <string name="alert_popup_more_count" translatable="false">Additional queued alerts: %1$d</string>
     <string name="alert_link_open_failed">No app can open this link.</string>
     <string name="alert_trigger_end">End</string>
     <string name="alert_trigger_start">Start</string>
@@ -142,7 +142,7 @@
     <string name="chain_running_step">Step %1$d/%2$d: %3$s%4$s</string>
     <string name="chain_running_title">Chain running title</string>
     <string name="chain_step_line">%1$d) %2$s</string>
-    <string name="chain_steps_count">%1$d steps</string>
+    <string name="chain_steps_count" translatable="false">Steps: %1$d</string>
     <string name="chiudi">Close</string>
     <string name="chronology">Timeline</string>
     <string name="history_search">History/Search</string>
@@ -436,9 +436,9 @@
     <string name="session_only_mode_title">Session-only mode</string>
     <string name="session_only_mode_subtitle">Use sessions table as single source of truth (debug kill-switch)</string>
     <string name="restart_app_to_apply">Restart the app to apply</string>
-    <string name="reward_toast_today_count">%1$d sessions today</string>
-    <string name="reward_toast_hour_count">%1$d sessions this hour</string>
-    <string name="reward_toast_generic_good">Nice: %1$d today</string>
+    <string name="reward_toast_today_count" translatable="false">Sessions today: %1$d</string>
+    <string name="reward_toast_hour_count" translatable="false">Sessions this hour: %1$d</string>
+    <string name="reward_toast_generic_good" translatable="false">Nice · Today: %1$d</string>
     <string name="paused_sessions_header">Paused sessions</string>
     <string name="show_paused_sessions">Show paused sessions (%1$d)</string>
     <string name="hide_paused_sessions">Hide paused sessions (%1$d)</string>
@@ -487,7 +487,7 @@
     <string name="import_legacy_csv_disabled">Legacy CSV auto-import is disabled. Use database import instead.</string>
     <string name="tracking_active">Tracking active</string>
     <string name="tracking_active_one_session">Tracking active: 1 session</string>
-    <string name="tracking_active_n_sessions">Tracking active: %1$d sessions</string>
+    <string name="tracking_active_n_sessions" translatable="false">Tracking active · Sessions: %1$d</string>
     <string name="timezone_utc_z">UTC/Z</string>
     <string name="cleanup_failed_fmt">Cleanup failed: %1$s</string>
     <string name="tag_hierarchy_cycle_not_allowed">Cycle not allowed in tag hierarchy</string>
@@ -562,9 +562,9 @@
     <string name="audit_alert_trashed">Alert moved to trash: %1$s</string>
     <string name="audit_alert_restored">Alert restored: %1$s</string>
     <string name="audit_alert_purged">Alert purged: %1$s</string>
-    <string name="audit_alert_purge_all">Purged %1$d alerts from trash</string>
+    <string name="audit_alert_purge_all" translatable="false">Alerts purged from trash: %1$d</string>
     <string name="audit_chain_purged">Chain purged: %1$s</string>
-    <string name="audit_chain_purge_all">Purged %1$d chains from trash</string>
+    <string name="audit_chain_purge_all" translatable="false">Chains purged from trash: %1$d</string>
     <string name="show_seconds">Show seconds</string>
     <string name="hide_hours_if_zero">Hide hours if zero</string>
     <string name="summary">Summary</string>
@@ -654,7 +654,7 @@
     <string name="life_period_unit_seconds">Seconds</string>
     <string name="now_intro_title">Track what is active right now</string>
     <string name="now_intro_body">Use the play button to create a session quickly. Tap a running row to stop it, or swipe and long-press to edit it.</string>
-    <string name="now_intro_counts">%1$d running sessions • %2$d active tags</string>
+    <string name="now_intro_counts" translatable="false">Running sessions: %1$d · Active tags: %2$d</string>
     <string name="now_first_run_intro_title">Sessions start here</string>
     <string name="now_first_run_intro_body">A session is one tracked block of time. Start it with play, stop it when you are done, and add tags for context. If you use a timed tag, the session can end automatically.</string>
     <string name="now_running_title">Normal sessions</string>
@@ -668,7 +668,7 @@
     <string name="now_active_tags_empty_title">No active tags yet</string>
     <string name="now_active_tags_empty_body">Add tags to a running session to keep your active contexts visible here.</string>
     <string name="now_active_tag_single_session">Running in 1 session</string>
-    <string name="now_active_tag_sessions">Running in %1$d sessions</string>
+    <string name="now_active_tag_sessions" translatable="false">Running sessions: %1$d</string>
     <string name="session_dialog_time_summary_label">Current time range</string>
     <string name="session_dialog_title_section">Title</string>
     <string name="session_dialog_timing_section">Timing</string>
@@ -679,7 +679,7 @@
     <string name="quick_start_hide_all">Hide</string>
     <string name="tags_intro_title">Keep tags tidy and easy to scan</string>
     <string name="tags_intro_body">Tap a tag to open one central panel for edit, timed settings, timeline visibility, archive, delete, and linked session review.</string>
-    <string name="tags_intro_counts">%1$d visible • %2$d archived • %3$d in trash</string>
+    <string name="tags_intro_counts" translatable="false">Visible: %1$d · Archived: %2$d · In trash: %3$d</string>
     <string name="tags_first_run_intro_title">Tags organize your sessions</string>
     <string name="tags_first_run_intro_body">Create tags for projects, places, or contexts. Make one timed if sessions with that tag should end automatically after its duration.</string>
     <string name="tags_empty_title">No tags to show</string>
@@ -691,29 +691,29 @@
     <string name="tag_running_now">Currently active</string>
     <string name="timeline_intro_title">Read the day faster</string>
     <string name="timeline_intro_body">Sorting, totals and range context are grouped together so it is easier to understand what the list is showing.</string>
-    <string name="timeline_intro_counts">%1$d sessions • %2$d selected tags • %3$s</string>
+    <string name="timeline_intro_counts" translatable="false">Sessions: %1$d · Selected tags: %2$d · %3$s</string>
     <string name="timeline_first_run_intro_title">Your session history lives here</string>
     <string name="timeline_first_run_intro_body">Running sessions stay in Now. As soon as you stop one, it appears here with its duration and tags.</string>
     <string name="timeline_empty_title">No sessions in this range</string>
     <string name="timeline_empty_body">Try a different range or filter. Finished sessions appear here.</string>
     <string name="life_period_intro_title">Track broader life periods</string>
     <string name="life_period_intro_body">Keep long-running periods easy to review with one list, one add button, clearer cards, and familiar edit gestures.</string>
-    <string name="life_period_intro_count">%1$d periods</string>
+    <string name="life_period_intro_count" translatable="false">Periods: %1$d</string>
     <string name="alerts_intro_title">Keep alert rules understandable</string>
     <string name="alerts_intro_body">This screen now highlights how many rules are active and keeps each rule easier to read at a glance.</string>
-    <string name="alerts_intro_counts">%1$d enabled of %2$d rules</string>
+    <string name="alerts_intro_counts" translatable="false">Enabled rules: %1$d/%2$d</string>
     <string name="alerts_empty_title">No alert rules yet</string>
     <string name="alerts_empty_body">Tap + to add your first alert rule.</string>
     <string name="alert_status_enabled">Enabled</string>
     <string name="alert_status_disabled">Disabled</string>
     <string name="chains_intro_title">Launch repeated sequences with less friction</string>
     <string name="chains_intro_body">Chains keep the same structure, but the main actions are clearer and the trash area is easier to spot.</string>
-    <string name="chains_intro_counts">%1$d active chains • %2$d deleted</string>
+    <string name="chains_intro_counts" translatable="false">Active chains: %1$d · Deleted: %2$d</string>
     <string name="chains_empty_title">No chains yet</string>
     <string name="chains_empty_body">Tap + to create a reusable sequence.</string>
     <string name="audit_intro_title">Review changes at a glance</string>
     <string name="audit_intro_body">Filters stay in the top bar while undo and list context remain easy to spot here.</string>
-    <string name="audit_intro_counts">%1$d active filters • %2$d events</string>
+    <string name="audit_intro_counts" translatable="false">Active filters: %1$d · Events: %2$d</string>
     <string name="audit_undo_help">Undo affects compatible actions only and stays disabled in read-only mode.</string>
     <string name="audit_empty_title">No audit events yet</string>
     <string name="audit_empty_body">Your next change shows up here.</string>
@@ -772,7 +772,7 @@
     <string name="quick_event_no_macros">No event groups yet</string>
     <string name="quick_event_no_macros_body">Create an event group to record several quick buttons with one timestamp.</string>
     <string name="quick_event_macro_actions">Group actions</string>
-    <string name="quick_event_macro_action_count">%1$d actions</string>
+    <string name="quick_event_macro_action_count" translatable="false">Actions: %1$d</string>
     <string name="quick_event_run_macro">Run %1$s</string>
     <string name="quick_event_custom_fields">Custom fields</string>
     <string name="quick_event_add_field">Add field</string>
@@ -781,7 +781,7 @@
     <string name="quick_event_field_required">Required</string>
     <string name="quick_event_field_default">Default value</string>
     <string name="quick_event_field_choices">Choices, comma separated</string>
-    <string name="quick_event_fields_count">%1$d fields</string>
+    <string name="quick_event_fields_count" translatable="false">Fields: %1$d</string>
     <string name="quick_event_create_reusable_template">Create a reusable button too</string>
     <string name="audit_quick_event_template_created">Quick event button created: %1$s</string>
     <string name="audit_quick_event_template_updated">Quick event button updated: %1$s</string>
@@ -799,4 +799,5 @@
     <string name="hub_context_new_place">+ New place</string>
     <string name="hub_context_place_radius_hint">New places use a 75 m radius.</string>
     <string name="hub_context_save_failed">Context could not be saved.</string>
+    <string name="widget_quick_task_symbol" translatable="false">⚡</string>
 </resources>

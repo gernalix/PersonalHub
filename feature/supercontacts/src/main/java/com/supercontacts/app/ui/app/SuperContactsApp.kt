@@ -109,6 +109,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
@@ -4033,8 +4034,8 @@ private fun ContactTextField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    singleLine: Boolean = true,
     modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
     trailingIcon: (@Composable (() -> Unit))? = null,
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -4806,7 +4807,7 @@ private fun AgeFieldSection(
             onMoreClick = {},
         )
         Text(
-            text = stringResource(R.string.age_value_years, age.years),
+            text = pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_years, age.years, age.years),
             modifier = Modifier.clickable { onOpen() },
             style = MaterialTheme.typography.bodyLarge,
         )
@@ -5622,15 +5623,18 @@ private fun formatKnownDuration(sinceUtc: Long): String {
     val today = LocalDate.now(zone)
     val days = ChronoUnit.DAYS.between(start, today).coerceAtLeast(0)
     return when {
-        days < 7 -> stringResource(R.string.stats_days, days)
-        days < 30 -> stringResource(R.string.stats_weeks, days / 7)
-        days < 365 -> stringResource(R.string.stats_months, (days / 30).coerceAtLeast(1))
+        days < 7 -> pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_days, days.toInt(), days)
+        days < 30 -> pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_weeks, (days / 7).toInt(), days / 7)
+        days < 365 -> pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_months, (days / 30).coerceAtLeast(1).toInt(), (days / 30).coerceAtLeast(1))
         else -> {
             val totalMonths = ChronoUnit.MONTHS.between(start.withDayOfMonth(1), today.withDayOfMonth(1))
                 .coerceAtLeast(12)
             val years = totalMonths / 12
             val months = totalMonths % 12
-            stringResource(R.string.stats_years_months, years, months)
+            listOf(
+                pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_years, years.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), years),
+                pluralStringResource(com.gernalix.personalhub.core.ui.R.plurals.counter_months, months.toInt(), months),
+            ).joinToString(", ")
         }
     }
 }
@@ -5931,12 +5935,9 @@ private fun openTelegram(context: Context, storedValue: String) {
 
 private fun openUriIfResolvable(context: Context, uri: Uri): Boolean {
     val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    val canResolve = intent.resolveActivity(context.packageManager) != null
-    if (canResolve) {
-        runCatching { context.startActivity(intent) }
-            .onSuccess { return true }
-    }
-    return false
+    // Launchability does not require package visibility; a preflight query can
+    // hide installed handlers on Android11+. Keep fallback tied to actual launch.
+    return runCatching { context.startActivity(intent) }.isSuccess
 }
 
 private fun telegramLinkForPhone(phone: String): String? {
@@ -6008,9 +6009,7 @@ private fun openMaps(context: Context, detail: ContactDetail, linkedPlace: Resol
     val mapsIntent = Intent(Intent.ACTION_VIEW, uris.first())
         .setPackage("com.google.android.apps.maps")
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (mapsIntent.resolveActivity(context.packageManager) != null &&
-        runCatching { context.startActivity(mapsIntent) }.isSuccess
-    ) {
+    if (runCatching { context.startActivity(mapsIntent) }.isSuccess) {
         return
     }
     uris.drop(1).firstOrNull { openUriIfResolvable(context, it) }?.let { return }
