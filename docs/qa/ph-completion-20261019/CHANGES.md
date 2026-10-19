@@ -453,3 +453,5 @@ Host validation:7 cases PASS441–443, including4 buffer tests for late/conflate
 Cursor native update: actual People/Substances/WordPulse group3/3 PASS446 and Places draft/scroll/restore PASS447 on the unchanged production QA APK. The5 newly shared fields also gain its existing clear button, with original labels, pagination callbacks and multiline mode preserved. No new string translation or physical-device interaction. App16 regression is running.
 
 Cross-module cursor native closure: app16/16 PASS448; combined final groups444/446/447/448 are23 native cases PASS. All use the same production QA APK. Canonical emulator stop PASS. Native baseline440 is resolved by the unchanged regression assertion passing444. The module startup445 failure is resolved by446. This is source/isolated QA acceptance, not final minified72 acceptance or Pixel installation.
+
+Source checkpoint2462c321 contains the cross-module cursor correction and all stated validation. Capsule reviewed_commit refreshed: FAST13/FULL14 PASS; SQLite449 records2 command gates, not27 unit tests. Remote CI and exact final72 acceptance remain pending.
