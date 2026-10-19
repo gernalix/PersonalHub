@@ -49,6 +49,14 @@ class OsmAndBridge(context: Context) {
         runCatching { app.packageManager.getApplicationInfo(name, 0).enabled }.getOrDefault(false)
     }
 
+    /** OsmAnd's content-intent handler closes UI panels, retaining its data/navigation state. */
+    fun mapLaunchIntent(): Intent? = installedPackage()?.let { target ->
+        app.packageManager.getLaunchIntentForPackage(target)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra("close_all_fragments", true)
+        }
+    }
+
     suspend fun connect() = withContext(Dispatchers.Main.immediate) {
         if (api != null) return@withContext
         val target = installedPackage() ?: error("OsmAnd is not installed")
@@ -110,6 +118,11 @@ class OsmAndBridge(context: Context) {
 
     /** Upstream stores the target before opening its map, so cold starts keep center and zoom. */
     suspend fun showReference(reference: OsmAndReference) = withContext(Dispatchers.IO) {
+        // showMapPoint alone overlays the selected-point sheet on an already open Plugins/Search
+        // screen. Deliver the normal launcher intent first so OsmAnd displays its map surface.
+        withContext(Dispatchers.Main.immediate) {
+            app.startActivity(checkNotNull(mapLaunchIntent()) { "OsmAnd map entry is unavailable" })
+        }
         check(checkNotNull(api).showMapPoint(ShowMapPointParams(LAYER_ID,
             AMapPoint("ph-reference", reference.label, reference.label, "PersonalHub reference", LAYER_ID,
                 0xFFFF6D00.toInt(), ALatLon(reference.latitude, reference.longitude), emptyList(), emptyMap())))) {

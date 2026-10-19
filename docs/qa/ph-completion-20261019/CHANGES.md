@@ -534,3 +534,10 @@ QA history context repair: copied controller labels incorrectly described three7
 - The bounded controller window expired while idle (FAIL543) and its finally block verified the canonical emulator stop. Temporary default-map selection must be cleared back to its original unset state in the next AVD window. No physical device was used; final72 stays held.
 
 - Corrected guidance app/test APK build and architecture gate pass (command gates544). Official QA dependency provenance: [OsmAnd release directory](https://download.osmand.net/releases/); exact download hash/certificate/ABI report is kept privately, outside Git. This cached dependency is not the PH distributable.
+
+
+## OsmAnd warm-panel regression resolved
+
+- The official OsmAnd source shows that showMapPoint foregrounds the existing Activity without closing Plugins/Search panels. Reused its normal package launcher with the official close_all_fragments content-intent extra, retaining CATEGORY_LAUNCHER and app/navigation data. The same entrypoint powers Open OsmAnd help and precedes reference selection. No app-data reset, private permission action or product UI automation.
+- Highest app compile, QA app/test assembly and architecture gate PASS (private osmand-map-surface compile/build logs). Actual isolated QA7219 native run546 PASS from an already open Plugins panel; retained screenshot osmand-reference.png visually shows PH QA West and East in teal, and PH QA Reference in orange, over the real Copenhagen street map. This closes the nearby-marker proof gap; historical542 remains unchanged.
+- Android app-info Clear default preferences restored the AVD's original map default to No defaults set, with screenshot proof. Canonical facade stop returned stopped; controller28217 terminal0. Pixel remains71, no72 installation/publication. Full-address default-app geocoding remains to be rechecked; this marker test is not that acceptance.

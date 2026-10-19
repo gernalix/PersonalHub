@@ -42,10 +42,7 @@ class MapViewerActivity : ComponentActivity() {
                     startActivity(Intent(Intent.ACTION_VIEW, "https://osmand.net/docs/versions/free-versions/".toUri()))
                 }) { Text(getString(R.string.places_osmand_install)) }
                 if (mapAccessRequired) Button(onClick = {
-                    val target = bridge.installedPackage() ?: return@Button
-                    packageManager.getLaunchIntentForPackage(target)?.apply {
-                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    }?.let(::startActivity)
+                    bridge.mapLaunchIntent()?.let(::startActivity)
                 }) { Text(getString(R.string.places_osmand_allow_map_access)) }
                 TextButton(onClick = ::openMap) { Text(getString(R.string.places_action_retry)) }
                 TextButton(onClick = { finish() }) { Text(getString(R.string.places_action_back)) }
