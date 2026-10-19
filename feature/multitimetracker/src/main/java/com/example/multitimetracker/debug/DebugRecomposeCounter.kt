@@ -1,6 +1,7 @@
 // v323
 package com.example.multitimetracker.debug
 
+import androidx.compose.runtime.mutableIntStateOf
 import com.example.multitimetracker.BuildConfig
 
 import androidx.compose.runtime.*
@@ -11,9 +12,9 @@ fun DebugRecomposeCounter(tag: String) {
     if (!BuildConfig.DEBUG) return
     if (LocalInspectionMode.current) return
 
-    val counter = remember { mutableStateOf(0) }
+    val counter = remember { mutableIntStateOf(0) }
     SideEffect {
-        counter.value++
-        android.util.Log.d("RECOMPOSE", "$tag -> ${counter.value}")
+        counter.intValue++
+        android.util.Log.d("RECOMPOSE", "$tag -> ${counter.intValue}")
     }
 }

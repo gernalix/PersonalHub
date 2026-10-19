@@ -7,6 +7,7 @@ package com.example.multitimetracker.ui
 import com.gernalix.personalhub.core.ui.HubFeedback
 import android.content.Intent
 import android.os.Trace
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import com.example.multitimetracker.ui.util.formatDuration
@@ -259,6 +260,15 @@ private fun VarTabScaffold(
     }
     val isCloneBenchmark = remember { BuildConfig.APPLICATION_ID.endsWith(".devicetest") }
     val pendingTrace = remember { mutableStateOf<String?>(null) }
+    val traceCookie = remember { System.identityHashCode(pendingTrace) }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (Build.VERSION.SDK_INT >= 29) {
+                pendingTrace.value?.let { Trace.endAsyncSection(it, traceCookie) }
+                pendingTrace.value = null
+            }
+        }
+    }
     val stateHolder = rememberSaveableStateHolder()
     var drawerChromeEnabled by remember { mutableStateOf(false) }
     var drawerContentMounted by remember { mutableStateOf(false) }
@@ -297,28 +307,26 @@ private fun VarTabScaffold(
     val diagnosticsLoading = stringResource(R.string.diagnostics_loading)
 
     fun beginTabTrace(target: Tab) {
-        if (!isCloneBenchmark) return
+        if (!isCloneBenchmark || Build.VERSION.SDK_INT < 29) return
         val name = when (target) {
             Tab.QUICK_EVENTS -> TRACE_TAB_QUICK_EVENTS
             Tab.TAGS -> TRACE_TAB_TAGS
             else -> null
         } ?: return
-        if (pendingTrace.value != null) {
-            Trace.endSection()
-        }
-        Trace.beginSection(name)
+        pendingTrace.value?.let { Trace.endAsyncSection(it, traceCookie) }
+        Trace.beginAsyncSection(name, traceCookie)
         pendingTrace.value = name
     }
 
     LaunchedEffect(tab) {
-        if (!isCloneBenchmark) return@LaunchedEffect
+        if (!isCloneBenchmark || Build.VERSION.SDK_INT < 29) return@LaunchedEffect
         val expected = when (tab) {
             Tab.QUICK_EVENTS -> TRACE_TAB_QUICK_EVENTS
             Tab.TAGS -> TRACE_TAB_TAGS
             else -> null
         }
         if (expected != null && pendingTrace.value == expected) {
-            Trace.endSection()
+            Trace.endAsyncSection(expected, traceCookie)
             pendingTrace.value = null
         }
     }

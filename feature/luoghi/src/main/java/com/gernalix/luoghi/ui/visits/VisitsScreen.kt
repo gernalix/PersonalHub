@@ -157,7 +157,7 @@ fun VisitsScreen(
                     }
                     if (activeVisits.isNotEmpty()) {
                         stickyHeader(key = "active-header") {
-                            DayHeader(stringResource(R.string.in_progress))
+                            DayHeader(stringResource(R.string.places_in_progress))
                         }
                         items(activeVisits, key = { it.stableId }) { visit ->
                             VisitTimelineItem(visit = visit, onClick = { selectedVisitId = visit.stableId })

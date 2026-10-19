@@ -1,5 +1,7 @@
 package com.gernalix.personalhub
 
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.core.net.toUri
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -60,7 +63,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null,
     val dao = remember { PersonalHubDatabase.get(context).sinceWhenCounterDao() }
     val allCounters by dao.observeAll().collectAsState(initial = emptyList())
     val counters = remember(allCounters, mode) { allCounters.filter { it.mode == mode } }
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(mode, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -155,7 +158,7 @@ internal fun SinceWhenScreen(onBack: () -> Unit, initialCounterId: Long? = null,
                                 Text(
                                     "↳ ${stringResource(sourceTypeRes(counter.sourceEntityType))}: $label",
                                     modifier = Modifier.clickable {
-                                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target.uri))
+                                        val intent = Intent(Intent.ACTION_VIEW, (target.uri).toUri())
                                         target.activityClassName?.let { intent.setClassName(context.packageName, it) }
                                         context.startActivity(intent)
                                     },
@@ -199,7 +202,7 @@ private fun counterDurationText(counter: SinceWhenCounterEntity, now: Long): Str
     }
     val reference = counter.endTimestamp?.let { minOf(now, it) } ?: now
     val duration = CounterElapsed.between(counter.initialTimestamp, reference, selected, ZoneId.systemDefault())
-    val resources = LocalContext.current.resources
+    val resources = LocalResources.current
     val text = duration.parts.joinToString(" ") { (unit, amount) ->
         val plural = when (unit) {
             ChronoUnit.YEARS -> com.gernalix.personalhub.core.ui.R.plurals.counter_years

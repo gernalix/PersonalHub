@@ -1,5 +1,7 @@
 package com.supercontacts.app
 
+import android.annotation.SuppressLint
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
@@ -24,6 +26,9 @@ object CallOverlayPermission {
         )
     }
 
+    // These package-source constants are inlined integers. The pure policy below
+    // accepts a supplied SDK for tests and requires API36 before using the values.
+    @SuppressLint("InlinedApi")
     internal fun requiresRestrictedSettingsPrimer(
         sdkInt: Int,
         packageSource: Int?,
@@ -37,12 +42,12 @@ object CallOverlayPermission {
     fun appInfoIntent(context: Context): Intent =
         Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.parse("package:${context.packageName}"),
+            ("package:${context.packageName}").toUri(),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     fun settingsIntent(context: Context): Intent =
         Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:${context.packageName}"),
+            ("package:${context.packageName}").toUri(),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }

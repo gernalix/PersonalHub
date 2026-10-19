@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -149,7 +150,7 @@ object WorkflowyLinkPolicy {
 
     fun normalize(raw: String): String? {
         val normalized = raw.trim().trimEnd('.', ',', ';', ')', ']', '}')
-        val uri = runCatching { Uri.parse(normalized) }.getOrNull() ?: return null
+        val uri = runCatching { (normalized).toUri() }.getOrNull() ?: return null
         if (uri.scheme?.lowercase() !in setOf("http", "https")) return null
         val host = uri.host?.lowercase() ?: return null
         if (host != "workflowy.com" && !host.endsWith(".workflowy.com")) return null
@@ -170,7 +171,7 @@ object WorkflowyLinkPolicy {
 
     fun shortId(rawUrl: String): String? {
         val normalized = normalize(rawUrl) ?: return null
-        val uri = Uri.parse(normalized)
+        val uri = (normalized).toUri()
         if (uri.path != "/" || uri.query != null) return null
         val fragment = uri.fragment ?: return null
         val shortId = fragment.removePrefix("/")
@@ -427,7 +428,7 @@ object WorkflowyHubBridge {
     fun open(context: Context, rawUrl: String): Boolean {
         if (!WorkflowyIntegrationSettings.isEnabled(context)) return false
         val normalized = WorkflowyLinkPolicy.normalize(rawUrl) ?: return false
-        val uri = Uri.parse(normalized)
+        val uri = (normalized).toUri()
         val explicit = Intent(Intent.ACTION_VIEW, uri)
             .setPackage("com.workflowy.android")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)

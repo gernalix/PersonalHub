@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.core.net.toUri
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -397,7 +398,7 @@ internal class FinancePhotoSemanticEngine(
     }
 
     private suspend fun readBytes(reference: String): ByteArray = withContext(Dispatchers.IO) {
-        val uri = Uri.parse(reference)
+        val uri = (reference).toUri()
         val stream = when (uri.scheme?.lowercase()) {
             "http", "https" -> {
                 val connection = URL(reference).openConnection()

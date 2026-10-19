@@ -1,5 +1,7 @@
 package com.supercontacts.app
 
+import android.annotation.SuppressLint
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -38,6 +40,8 @@ internal class CallOverlayRequestGate {
     fun isCurrent(token: Long): Boolean = token == generation
 }
 
+// Process-owned window uses only applicationContext and is removed and cleared by dismissCurrent.
+@SuppressLint("StaticFieldLeak")
 object CallSystemOverlayController {
     private const val TAG = "SC_CallOverlay"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -189,7 +193,7 @@ object CallSystemOverlayController {
     }
 
     private fun openContact(context: Context, publicId: String) {
-        val uri = Uri.parse(ContactDeepLink.create(publicId))
+        val uri = (ContactDeepLink.create(publicId)).toUri()
         val intent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = uri

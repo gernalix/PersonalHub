@@ -1,6 +1,7 @@
 package com.gernalix.sostanze.widget
 
 import android.app.Activity
+import android.content.Intent
 import android.appwidget.AppWidgetManager
 import android.os.Bundle
 import android.view.ViewGroup
@@ -67,7 +68,7 @@ class SubstancesWidgetConfigureActivity : Activity() {
                 val substanceId = selected ?: return@setOnClickListener
                 SubstancesWidgetPrefs.save(applicationContext, appWidgetId, substanceId)
                 SubstancesWidgetProvider.updateOne(applicationContext, appWidgetId)
-                setResult(RESULT_OK, intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+                setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
                 finish()
             }
         }

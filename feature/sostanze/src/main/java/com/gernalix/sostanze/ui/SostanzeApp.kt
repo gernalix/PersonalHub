@@ -5,6 +5,8 @@
 
 package com.gernalix.sostanze.ui
 
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableDoubleStateOf
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -1034,7 +1036,7 @@ private fun SubstanceDialog(
 
 @Composable
 private fun StockAdjustDialog(substance: SubstanceEntity, onDismiss: () -> Unit, onSave: (Double, String?) -> Unit) {
-    var sign by remember { mutableStateOf(-1.0) }
+    var sign by remember { mutableDoubleStateOf(-1.0) }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     AlertDialog(
@@ -1073,8 +1075,8 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
     var costId by remember { mutableStateOf<Long?>(null) }
     var costChoices by remember { mutableStateOf<List<CostChoice>>(emptyList()) }
     val today = LocalDate.now().toEpochDay()
-    var orderEpochDay by rememberSaveable { mutableStateOf(today) }
-    var prescriptionEpochDay by rememberSaveable { mutableStateOf(today) }
+    var orderEpochDay by rememberSaveable { mutableLongStateOf(today) }
+    var prescriptionEpochDay by rememberSaveable { mutableLongStateOf(today) }
     LaunchedEffect(doctorQuery) {
         if (doctorQuery.length >= 2) viewModel.doctorChoices(doctorQuery) { doctorChoices = it }
         else doctorChoices = emptyList()
@@ -1155,8 +1157,8 @@ private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, o
     var dose by remember(initial.id) { mutableStateOf(initial.doseMg.clean()) }
     var frequency by remember(initial.id) { mutableStateOf(initial.frequencyCount.toString()) }
     var weekly by remember(initial.id) { mutableStateOf(initial.frequencyPeriod == "WEEK") }
-    var orderEpochDay by rememberSaveable(initial.id) { mutableStateOf(initial.orderEpochDay) }
-    var prescriptionEpochDay by rememberSaveable(initial.id) { mutableStateOf(initial.prescriptionEpochDay) }
+    var orderEpochDay by rememberSaveable(initial.id) { mutableLongStateOf(initial.orderEpochDay) }
+    var prescriptionEpochDay by rememberSaveable(initial.id) { mutableLongStateOf(initial.prescriptionEpochDay) }
     var doctorId by remember(initial.id) { mutableStateOf(initial.doctorContactId?.toString().orEmpty()) }
     var costId by remember(initial.id) { mutableStateOf(initial.financeTransactionId?.toString().orEmpty()) }
     val depletion = SostanzeEngine.depletionDate(

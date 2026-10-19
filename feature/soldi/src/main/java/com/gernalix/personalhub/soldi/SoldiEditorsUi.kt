@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -57,7 +58,7 @@ internal fun TransactionEditorV2(
     var linkText by remember(draftKey) { mutableStateOf("") }
     var recurring by remember(draftKey) { mutableStateOf(false) }
     var lastBusinessDay by remember(draftKey) { mutableStateOf(false) }
-    var recurrenceDay by remember(draftKey) { mutableStateOf(localDate(state.draft.occurredAt).dayOfMonth) }
+    var recurrenceDay by remember(draftKey) { mutableIntStateOf(localDate(state.draft.occurredAt).dayOfMonth) }
     var recurrenceReminderDays by remember(draftKey) { mutableStateOf<Int?>(null) }
     var facetPickerOpen by remember(draftKey) { mutableStateOf(false) }
     var selectedFacets by remember(draftKey) { mutableStateOf<List<HubEntitySummary>>(emptyList()) }
@@ -336,7 +337,7 @@ internal fun TransferEditorV2(
     var linkText by remember(stateKey) { mutableStateOf("") }
     var recurring by remember(stateKey) { mutableStateOf(false) }
     var lastBusinessDay by remember(stateKey) { mutableStateOf(false) }
-    var recurrenceDay by remember(stateKey) { mutableStateOf(localDate(state.occurredAt).dayOfMonth) }
+    var recurrenceDay by remember(stateKey) { mutableIntStateOf(localDate(state.occurredAt).dayOfMonth) }
     var recurrenceReminderDays by remember(stateKey) { mutableStateOf<Int?>(null) }
     var facetPickerOpen by remember { mutableStateOf(false) }
     var selectedFacets by remember(stateKey) { mutableStateOf<List<HubEntitySummary>>(emptyList()) }

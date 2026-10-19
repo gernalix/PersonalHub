@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.workflowydays
 
+import androidx.core.net.toUri
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -164,7 +165,7 @@ object WorkflowyDaysSync {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private fun isUnsupportedArrayFeedUrl(url: String): Boolean =
-        Uri.parse(url).getQueryParameter("_shape")?.equals("array", ignoreCase = true) == true
+        (url).toUri().getQueryParameter("_shape")?.equals("array", ignoreCase = true) == true
 
     private fun retireLegacyFeed(context: Context, url: String?): Boolean {
         if (url == null || !isUnsupportedArrayFeedUrl(url)) return false
@@ -219,7 +220,7 @@ object WorkflowyDaysSync {
 
     fun open(context: Context, date: LocalDate): Boolean {
         val link = deepLinkFor(context, date) ?: return false
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent = Intent(Intent.ACTION_VIEW, (link).toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(intent); true }.getOrDefault(false)
     }
 

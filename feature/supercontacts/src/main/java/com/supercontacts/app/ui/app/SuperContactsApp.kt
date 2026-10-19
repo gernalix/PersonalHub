@@ -2,6 +2,7 @@
 
 package com.supercontacts.app.ui.app
 
+import androidx.core.net.toUri
 import com.gernalix.personalhub.core.ui.HubFeedback
 
 import com.gernalix.personalhub.core.ui.HubFeedbackHost
@@ -337,7 +338,7 @@ fun SuperContactsApp(
 
     val pickDetailPhoto = rememberHubPhotoPicker { selected ->
         val contactId = selectedContactId ?: return@rememberHubPhotoPicker
-        viewModel.saveContactPhotoForContact(contactId, Uri.parse(selected.reference)) { path ->
+        viewModel.saveContactPhotoForContact(contactId, (selected.reference).toUri()) { path ->
             viewModel.updateContactPhoto(contactId, path)
         }
     }
@@ -3228,7 +3229,7 @@ private fun ContactEditScreen(
         photoPath = photoPath,
     )
     val pickPhoto = rememberHubPhotoPicker { selected ->
-        onSavePhoto(Uri.parse(selected.reference)) { path ->
+        onSavePhoto((selected.reference).toUri()) { path ->
             if (photoPath.isNotBlank() && photoPath != initialInput.photoPath) {
                 onDeleteUnusedPhoto(photoPath)
             }
@@ -4889,7 +4890,7 @@ private fun PhoneFieldSection(
                         link = link,
                         onClick = {
                             onOpen()
-                            openUri(context, Uri.parse(link.deepLink))
+                            openUri(context, (link.deepLink).toUri())
                         },
                     )
                 }
@@ -5274,7 +5275,7 @@ private fun SocialLinksSection(
                 label = stringResource(R.string.open_instagram),
                 icon = InstagramIcon,
                 fieldType = ContactFieldType.InstagramUsername,
-                uri = Uri.parse("https://www.instagram.com/${Uri.encode(username)}"),
+                uri = ("https://www.instagram.com/${Uri.encode(username)}").toUri(),
             )
         },
         detail.facebookUserId.trim().takeIf { it.isNotBlank() }?.let { facebookUserId ->
@@ -5282,7 +5283,7 @@ private fun SocialLinksSection(
                 label = stringResource(R.string.open_facebook),
                 icon = FacebookIcon,
                 fieldType = ContactFieldType.FacebookUserId,
-                uri = Uri.parse("https://facebook.com/${Uri.encode(facebookUserId)}"),
+                uri = ("https://facebook.com/${Uri.encode(facebookUserId)}").toUri(),
             )
         },
         detail.facebookUserId.trim().takeIf { it.isNotBlank() }?.let { facebookUserId ->
@@ -5290,7 +5291,7 @@ private fun SocialLinksSection(
                 label = stringResource(R.string.open_messenger),
                 icon = MessengerIcon,
                 fieldType = ContactFieldType.FacebookUserId,
-                uri = Uri.parse("fb-messenger://user/${Uri.encode(facebookUserId)}"),
+                uri = ("fb-messenger://user/${Uri.encode(facebookUserId)}").toUri(),
             )
         },
     )
@@ -5412,7 +5413,7 @@ private fun MessagingLinksSection(
         undecidedLinks.forEach { link ->
             MessagingActionRequiredCard(
                 link = link,
-                onOpen = { openUri(context, Uri.parse(link.deepLink)) },
+                onOpen = { openUri(context, (link.deepLink).toUri()) },
                 onConfirm = onConfirm,
                 onReject = onReject,
                 onReset = onReset,
@@ -5852,9 +5853,8 @@ private fun String.initials(): String {
 private fun openLink(context: Context, value: String) {
     val trimmed = value.trim()
     if (trimmed.isBlank()) return
-    val uri = Uri.parse(
-        if (trimmed.contains("://")) trimmed else "https://$trimmed",
-    )
+    val uri = (
+        if (trimmed.contains("://")) trimmed else "https://$trimmed").toUri()
     openUri(context, uri)
 }
 
@@ -5919,11 +5919,11 @@ private fun openTelegram(context: Context, storedValue: String) {
     val username = telegramUsernameFromStoredValue(trimmed)
     val phoneDigits = telegramPhoneDigitsFromStoredValue(trimmed)
     val preferredUri = when {
-        username != null -> Uri.parse("tg://resolve?domain=${Uri.encode(username)}")
-        phoneDigits != null -> Uri.parse("tg://resolve?phone=${Uri.encode(phoneDigits)}")
-        else -> Uri.parse(trimmed)
+        username != null -> ("tg://resolve?domain=${Uri.encode(username)}").toUri()
+        phoneDigits != null -> ("tg://resolve?phone=${Uri.encode(phoneDigits)}").toUri()
+        else -> (trimmed).toUri()
     }
-    val fallbackUri = username?.let { Uri.parse("https://t.me/${Uri.encode(it)}") }
+    val fallbackUri = username?.let { ("https://t.me/${Uri.encode(it)}").toUri() }
     if (!openUriIfResolvable(context, preferredUri) && fallbackUri != null) {
         openUri(context, fallbackUri)
     }
@@ -6029,15 +6029,13 @@ internal fun buildMapsUris(
     val result = mutableListOf<Uri>()
     if (latitude != null && longitude != null) {
         val coordinateLabel = trimmedLabel.ifBlank { trimmedAddress }
-        result += Uri.parse(
-            "geo:$latitude,$longitude?q=" + Uri.encode("$latitude,$longitude($coordinateLabel)"),
-        )
+        result += (
+            "geo:$latitude,$longitude?q=" + Uri.encode("$latitude,$longitude($coordinateLabel)")).toUri()
     }
     if (trimmedAddress.isNotBlank()) {
-        result += Uri.parse("geo:0,0?q=${Uri.encode(trimmedAddress)}")
-        result += Uri.parse(
-            "https://www.google.com/maps/search/?api=1&query=${Uri.encode(trimmedAddress)}",
-        )
+        result += ("geo:0,0?q=${Uri.encode(trimmedAddress)}").toUri()
+        result += (
+            "https://www.google.com/maps/search/?api=1&query=${Uri.encode(trimmedAddress)}").toUri()
     }
     return result.distinct()
 }

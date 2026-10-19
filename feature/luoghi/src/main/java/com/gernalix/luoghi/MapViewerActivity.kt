@@ -1,7 +1,7 @@
 package com.gernalix.luoghi
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -42,7 +42,7 @@ class MapViewerActivity : ComponentActivity() {
                 Text(getString(R.string.places_osmand_title), style = MaterialTheme.typography.headlineMedium)
                 Text(status)
                 if (unavailable) Button(onClick = {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://osmand.net/docs/versions/free-versions/")))
+                    startActivity(Intent(Intent.ACTION_VIEW, "https://osmand.net/docs/versions/free-versions/".toUri()))
                 }) { Text(getString(R.string.places_osmand_install)) }
                 if (mapAccessRequired) Button(onClick = {
                     val target = bridge.installedPackage() ?: return@Button

@@ -1,5 +1,6 @@
 package com.gernalix.personalhub
 
+import androidx.compose.runtime.mutableIntStateOf
 import com.gernalix.personalhub.notifications.api.NotificationsRoute
 import android.content.Intent
 import android.os.Bundle
@@ -61,7 +62,7 @@ import com.gernalix.personalhub.core.alerts.AlertText
 private val LocalCompactHome = staticCompositionLocalOf { false }
 
 class MainActivity : ComponentActivity() {
-    private var launcherGeneration by mutableStateOf(0)
+    private var launcherGeneration by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -1,5 +1,6 @@
 package com.supercontacts.app.data.repository
 
+import androidx.core.net.toUri
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -300,14 +301,14 @@ object ContactDeepLink {
         "$Scheme://$SearchHost/${UriEncoder.encode(publicId)}"
 
     fun parse(value: String?): String? {
-        val uri = value?.trim()?.takeIf { it.isNotBlank() }?.let { android.net.Uri.parse(it) } ?: return null
+        val uri = value?.trim()?.takeIf { it.isNotBlank() }?.let { (it).toUri() } ?: return null
         if (!uri.scheme.equals(Scheme, ignoreCase = true)) return null
         if (!uri.host.equals(Host, ignoreCase = true)) return null
         return uri.pathSegments.firstOrNull()?.takeIf { it.isNotBlank() }
     }
 
     fun parseSavedSearch(value: String?): String? {
-        val uri = value?.trim()?.takeIf { it.isNotBlank() }?.let { android.net.Uri.parse(it) } ?: return null
+        val uri = value?.trim()?.takeIf { it.isNotBlank() }?.let { (it).toUri() } ?: return null
         if (!uri.scheme.equals(Scheme, ignoreCase = true)) return null
         if (!uri.host.equals(SearchHost, ignoreCase = true)) return null
         return uri.pathSegments.firstOrNull()?.takeIf { it.isNotBlank() }

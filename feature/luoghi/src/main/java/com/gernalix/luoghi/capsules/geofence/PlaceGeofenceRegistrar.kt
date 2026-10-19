@@ -6,7 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.gernalix.luoghi.capsules.checkin.CheckInPolicy
@@ -71,10 +71,10 @@ class PlaceGeofenceRegistrar(
 
     private fun pendingIntent(): PendingIntent {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_MUTABLE else 0)
+            PendingIntent.FLAG_MUTABLE
         val intent = Intent(appContext, PlaceGeofenceReceiver::class.java).apply {
             action = PlaceGeofenceReceiver.ACTION_GEOFENCE_TRANSITION
-            data = Uri.parse("places://geofence/${DatabaseProfiles.activeProfileId(appContext)}/transitions")
+            data = "places://geofence/${DatabaseProfiles.activeProfileId(appContext)}/transitions".toUri()
             putExtra(PROFILE_ID, DatabaseProfiles.activeProfileId(appContext))
         }
         return PendingIntent.getBroadcast(appContext, 0, intent, flags)

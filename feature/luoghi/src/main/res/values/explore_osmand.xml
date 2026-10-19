@@ -1,26 +1,26 @@
 <resources>
-    <string name="places_explore_action">Explore</string>
-    <string name="places_explore_title">Explore places</string>
-    <string name="places_action_back">Back</string>
-    <string name="places_action_retry">Try again</string>
-    <string name="places_explore_reference_hint">Choose a saved place or search an address</string>
-    <string name="places_explore_lookup_failed">Address lookup failed. Try another address or choose a saved place.</string>
-    <string name="places_explore_reference_help">Choose the reference above. Distances use that point, not your GPS location. Temporary addresses are not saved.</string>
-    <string name="places_explore_distance_help">Straight-line distances from this reference; moving the map does not change them.</string>
-    <string name="places_explore_open_map">Show in OsmAnd</string>
-    <string name="places_explore_missing_heading">Places without coordinates</string>
-    <string name="places_explore_missing_value">No coordinates</string>
-    <string name="places_osmand_title">OsmAnd</string>
-    <string name="places_osmand_opening">Opening OsmAnd…</string>
-    <string name="places_osmand_install">Install OsmAnd</string>
-    <string name="places_osmand_allow_map_access">Allow map access in OsmAnd</string>
-    <string name="places_osmand_optional">OsmAnd is optional. Install it to view the map; your places and search remain available in PersonalHub.</string>
-    <string name="places_osmand_preparing">Preparing places in OsmAnd…</string>
-    <string name="places_map_reference">Reference</string>
-    <string name="places_map_no_coordinates">No saved places have valid coordinates.</string>
-    <string name="places_osmand_return_hint">Return to PersonalHub to close this temporary map.</string>
-    <string name="places_osmand_permission_help">In OsmAnd, open Menu → Plugins → PersonalHub and enable it. Then return here and choose Try again. PersonalHub uses only temporary map points.</string>
-    <string name="places_osmand_unable">Unable to open the map. Check that OsmAnd allows PersonalHub to access maps, then try again.</string>
-    <string name="places_sort_about">About sorting</string>
-    <string name="places_sort_explanation">Distance: straight-line distance from your current location. Total time: recorded time at each place. Last visit: most recent check-in. Visits: number of check-ins.\n\nThe current place stays first. Missing distances and places never visited stay last. Equal values keep a stable name order, so sorting equal or missing values may look unchanged. Tap the selected criterion again to reverse the order.</string>
+    <string name="places_explore_action" translatable="false">Explore</string>
+    <string name="places_explore_title" translatable="false">Explore places</string>
+    <string name="places_action_back" translatable="false">Back</string>
+    <string name="places_action_retry" translatable="false">Try again</string>
+    <string name="places_explore_reference_hint" translatable="false">Choose a saved place or search an address</string>
+    <string name="places_explore_lookup_failed" translatable="false">Address lookup failed. Try another address or choose a saved place.</string>
+    <string name="places_explore_reference_help" translatable="false">Choose the reference above. Distances use that point, not your GPS location. Temporary addresses are not saved.</string>
+    <string name="places_explore_distance_help" translatable="false">Straight-line distances from this reference; moving the map does not change them.</string>
+    <string name="places_explore_open_map" translatable="false">Show in OsmAnd</string>
+    <string name="places_explore_missing_heading" translatable="false">Places without coordinates</string>
+    <string name="places_explore_missing_value" translatable="false">No coordinates</string>
+    <string name="places_osmand_title" translatable="false">OsmAnd</string>
+    <string name="places_osmand_opening" translatable="false">Opening OsmAnd…</string>
+    <string name="places_osmand_install" translatable="false">Install OsmAnd</string>
+    <string name="places_osmand_allow_map_access" translatable="false">Allow map access in OsmAnd</string>
+    <string name="places_osmand_optional" translatable="false">OsmAnd is optional. Install it to view the map; your places and search remain available in PersonalHub.</string>
+    <string name="places_osmand_preparing" translatable="false">Preparing places in OsmAnd…</string>
+    <string name="places_map_reference" translatable="false">Reference</string>
+    <string name="places_map_no_coordinates" translatable="false">No saved places have valid coordinates.</string>
+    <string name="places_osmand_return_hint" translatable="false">Return to PersonalHub to close this temporary map.</string>
+    <string name="places_osmand_permission_help" translatable="false">In OsmAnd, open Menu → Plugins → PersonalHub and enable it. Then return here and choose Try again. PersonalHub uses only temporary map points.</string>
+    <string name="places_osmand_unable" translatable="false">Unable to open the map. Check that OsmAnd allows PersonalHub to access maps, then try again.</string>
+    <string name="places_sort_about" translatable="false">About sorting</string>
+    <string name="places_sort_explanation" translatable="false">Distance: straight-line distance from your current location. Total time: recorded time at each place. Last visit: most recent check-in. Visits: number of check-ins.\n\nThe current place stays first. Missing distances and places never visited stay last. Equal values keep a stable name order, so sorting equal or missing values may look unchanged. Tap the selected criterion again to reverse the order.</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.sincewhen
 
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -59,7 +60,7 @@ internal fun SinceWhenEditorDialog(initial: SinceWhenCounterEntity?, onDismiss: 
     val scope = rememberCoroutineScope()
     var value by remember(initial) { mutableStateOf(initial ?: SinceWhenCounterEntity(title = "", initialTimestamp = if (mode == CounterModes.COUNTDOWN) ZonedDateTime.now().plusDays(1).toInstant().toEpochMilli() else System.currentTimeMillis(), createdAt = System.currentTimeMillis(), mode = mode, displayUnitsJson = if (mode == CounterModes.COUNTDOWN) "[\"DAYS\",\"HOURS\",\"MINUTES\",\"SECONDS\"]" else "[\"DAYS\"]")) }
     var hasEnd by remember(initial) { mutableStateOf(initial?.endTimestamp != null) }
-    var end by remember(initial) { mutableStateOf(initial?.endTimestamp ?: System.currentTimeMillis()) }
+    var end by remember(initial) { mutableLongStateOf(initial?.endTimestamp ?: System.currentTimeMillis()) }
     var selectedTags by remember(initial) { mutableStateOf(emptySet<String>()) }
     var tagsReady by remember(initial) { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }

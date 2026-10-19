@@ -1,4 +1,4 @@
 <resources>
-    <string name="home_layout_compact">Compact</string>
-    <string name="home_layout_extended">Extended</string>
+    <string name="home_layout_compact" translatable="false">Compact</string>
+    <string name="home_layout_extended" translatable="false">Extended</string>
 </resources>

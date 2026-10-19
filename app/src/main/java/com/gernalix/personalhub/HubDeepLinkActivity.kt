@@ -2,6 +2,7 @@
 
 package com.gernalix.personalhub
 
+import androidx.core.net.toUri
 import com.gernalix.personalhub.core.ui.HubFeedback
 
 import android.content.ClipData
@@ -231,7 +232,7 @@ private suspend fun resolveEntityIntent(
     val target = runCatching { adapter.openTarget(ref.canonicalId) }.getOrNull() ?: return@withContext null
     Intent(
         if (action == HubDeepLinkContract.ACTION_EDIT) Intent.ACTION_EDIT else Intent.ACTION_VIEW,
-        Uri.parse(target.uri),
+        (target.uri).toUri(),
     ).apply {
         putExtra(HubDeepLinkContract.EXTRA_ACTION, action)
         target.activityClassName?.let { setClassName(context.packageName, it) }

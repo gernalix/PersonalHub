@@ -32,6 +32,7 @@ import kotlin.math.roundToLong
 @Composable
 fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPlace: (PlaceEntity) -> Unit) {
     val context = LocalContext.current
+    val unnamedPlace = stringResource(R.string.unnamed_place)
     val source = remember { AddressAutocompleteRepository(context) }
     val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
@@ -79,9 +80,9 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
         }
         items(saved, key = { "saved:${it.uuid}" }) { place ->
             TextButton(enabled = !resolving && validCoordinates(place.lat, place.lon), onClick = {
-                latitude = place.lat; longitude = place.lon; label = place.nickname.ifBlank { context.getString(R.string.unnamed_place) }; referenceId = place.uuid
+                latitude = place.lat; longitude = place.lon; label = place.nickname.ifBlank { unnamedPlace }; referenceId = place.uuid
                 query = label; suggestions = emptyList()
-            }, modifier = Modifier.fillMaxWidth()) { Text(place.nickname.ifBlank { stringResource(R.string.unnamed_place) } + (place.address?.let { " · $it" } ?: "")) }
+            }, modifier = Modifier.fillMaxWidth()) { Text(place.nickname.ifBlank { unnamedPlace } + (place.address?.let { " · $it" } ?: "")) }
         }
         items(suggestions, key = { "address:${it.placeId}" }) { suggestion ->
             TextButton(enabled = !resolving, onClick = {
@@ -121,7 +122,7 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
                 }
                 OutlinedCard(onClick = { onOpenPlace(nearby.place) }, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(nearby.place.nickname.ifBlank { stringResource(R.string.unnamed_place) }, modifier = Modifier.weight(1f))
+                        Text(nearby.place.nickname.ifBlank { unnamedPlace }, modifier = Modifier.weight(1f))
                         Text(nearby.distanceMeters?.roundToLong()?.let { localizedDistance(it) } ?: stringResource(R.string.places_explore_missing_value))
                     }
                 }

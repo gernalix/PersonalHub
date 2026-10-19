@@ -2,6 +2,8 @@
 
 package com.gernalix.personalhub
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -154,14 +156,14 @@ fun HubHistorySearchScreen(
         mutableStateOf(initialToMs?.let(::formatHubDateTime).orEmpty())
     }
     var showRecords by rememberSaveable { mutableStateOf(false) }
-    var requestRevision by remember { mutableStateOf(0) }
+    var requestRevision by remember { mutableIntStateOf(0) }
     var entries by remember { mutableStateOf<List<ActivityUiItem>>(emptyList()) }
     var nextPage by remember { mutableStateOf<HistoryQueryCapsule.Cursor?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var reviewingPatch by remember { mutableStateOf<Pair<String,String>?>(null) }
     var eventMissing by remember(initialEventId) { mutableStateOf(false) }
-    var undoRevision by remember { mutableStateOf(0) }
+    var undoRevision by remember { mutableIntStateOf(0) }
 
     val selectedSet = remember(selectedModuleIds) { selectedModuleIds.toSet() }
     // Preserve the archive's existing screenshot protection when its contents are shown here.
@@ -723,7 +725,7 @@ private fun ActivityCard(
                 item.git?.let { git ->
                     TextButton(onClick = {
                         val repository = GitDataSettings.configuration(context).repositoryUrl.removeSuffix(".git").trimEnd('/')
-                        context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("$repository/commit/${git.commitSha}")))
+                        context.startActivity(Intent(Intent.ACTION_VIEW,("$repository/commit/${git.commitSha}").toUri()))
                     }) { Text(stringResource(UiR.string.history_view_git)) }
                 }
                 if (canOpen) {
@@ -834,7 +836,7 @@ private suspend fun openActivityTarget(context: Context, item: ActivityUiItem): 
         }.getOrNull()
     }
     if (target != null) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri))
+        val intent = Intent(Intent.ACTION_VIEW, (target.uri).toUri())
         target.activityClassName?.let { intent.setClassName(context.packageName, it) }
         return runCatching { context.startActivity(intent); true }.getOrDefault(false)
     }

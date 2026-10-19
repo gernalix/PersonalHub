@@ -6,6 +6,7 @@
 
 package com.example.multitimetracker.ui.components
 
+import androidx.compose.runtime.mutableLongStateOf
 import com.gernalix.personalhub.core.ui.HubFeedback
 
 import android.widget.Toast
@@ -494,8 +495,8 @@ fun SessionEditDialog(
 
     if (showTimesDialog) {
         val nowMs = referenceNowMs
-        var startMs by remember { mutableStateOf(session.startMs) }
-        var endMs by remember { mutableStateOf(session.endMs ?: session.startMs) }
+        var startMs by remember { mutableLongStateOf(session.startMs) }
+        var endMs by remember { mutableLongStateOf(session.endMs ?: session.startMs) }
         var timePickTarget by remember { mutableStateOf<SessionTimePickTarget?>(null) }
 
         AlertDialog(

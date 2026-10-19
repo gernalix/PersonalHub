@@ -521,7 +521,6 @@
     <string name="import_db_missing_tables_fmt">Not a MultiTimer database (missing tables: %1$s).</string>
     <string name="import_db_schema_check_failed_fmt">Schema check failed: %1$s</string>
     <string name="audit_import_db">Imported DB: %1$s</string>
-    <string name="m3c_time_picker_hour_suffix">%1$d o’clock</string>
     <string name="import_verify_title">Import verification</string>
     <string name="import_verify_header">Import completed, but integrity verification found mismatches:</string>
     <string name="import_verify_problem_header">Import blocked because verification found a problem:</string>

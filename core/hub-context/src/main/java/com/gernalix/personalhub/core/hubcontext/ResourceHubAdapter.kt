@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.hubcontext
 
+import androidx.core.net.toUri
 import android.content.Context
 import android.net.Uri
 import com.gernalix.personalhub.contracts.database.*
@@ -41,7 +42,7 @@ class ResourceHubAdapter(private val context: Context) : HubEntityAdapter {
                 HubResourceKinds.SAF_DOCUMENT,
             )
         ) return null
-        val uri = if (kind == HubResourceKinds.NOTE) null else runCatching { Uri.parse(value) }.getOrNull()
+        val uri = if (kind == HubResourceKinds.NOTE) null else runCatching { (value).toUri() }.getOrNull()
         if (kind == HubResourceKinds.WEB_URL && uri?.scheme !in setOf("http", "https")) return null
         if (kind == HubResourceKinds.ANDROID_URI && uri?.scheme.isNullOrBlank()) return null
         if (kind == HubResourceKinds.SAF_DOCUMENT && uri?.scheme != "content") return null

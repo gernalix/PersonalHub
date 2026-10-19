@@ -1,5 +1,6 @@
 package com.example.multitimetracker.ui.components
 
+import androidx.core.net.toUri
 import com.gernalix.personalhub.core.ui.HubFeedback
 
 import android.app.Activity
@@ -173,7 +174,7 @@ private fun openAlertLink(context: Context, url: String) {
         HubFeedback.makeText(context, context.getString(R.string.alert_link_open_failed), Toast.LENGTH_SHORT).show()
         return
     }
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+    val intent = Intent(Intent.ACTION_VIEW, (url).toUri()).apply {
         addCategory(Intent.CATEGORY_BROWSABLE)
         if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }

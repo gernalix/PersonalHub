@@ -9,7 +9,7 @@
     <string name="history_patch_applied">Applied Git patch</string>
     <string name="history_view_git">View Git revision</string>
     <string name="history_intake_detail">Intake of %1$s</string>
-    <string name="history_loaded_count">%1$d loaded</string>
+    <string name="history_loaded_count">Loaded: %1$d</string>
     <string name="history_record_person">Person</string>
     <string name="history_record_typing_session">Typing session</string>
     <string name="history_record_generic">Record</string>

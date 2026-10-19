@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- Host tests exercise initialization explicitly. Remove the startup
+             provider here rather than leaving an unmatched production removal
+             marker in the reduced Robolectric manifest. -->
+        <provider android:name="androidx.startup.InitializationProvider"
+            tools:node="remove" />
+    </application>
+</manifest>

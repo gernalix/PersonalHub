@@ -5,6 +5,7 @@
 
 package com.example.multitimetracker.capsules.sincewhen.ui
 
+import androidx.compose.runtime.mutableLongStateOf
 import android.content.res.Resources
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +59,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -292,7 +294,7 @@ private fun LifePeriodCard(
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
-    val resources = context.resources
+    val resources = LocalResources.current
     val locale = remember { Locale.getDefault() }
     val zoneId = remember { ZoneId.systemDefault() }
     val dateFormatter = remember(locale) { DateTimeFormatter.ofPattern("d MMM uuuu HH:mm:ss", locale) }
@@ -503,10 +505,10 @@ internal fun SinceWhenLifePeriodEditorDialog(
 
     var periodTitle by remember(initialValues) { mutableStateOf(initialValues?.title ?: "") }
     var description by remember(initialValues) { mutableStateOf(initialValues?.description ?: "") }
-    var startMs by remember(initialValues) { mutableStateOf(initialValues?.startMs ?: initialNowMs) }
+    var startMs by remember(initialValues) { mutableLongStateOf(initialValues?.startMs ?: initialNowMs) }
     var hasEnd by remember(initialValues) { mutableStateOf(initialValues?.endMs != null) }
-    var endMs by remember(initialValues) { mutableStateOf(initialValues?.endMs ?: initialNowMs) }
-    var selectedColor by remember(initialValues) { mutableStateOf(initialValues?.colorArgb ?: DEFAULT_LIFE_PERIOD_COLOR_ARGB) }
+    var endMs by remember(initialValues) { mutableLongStateOf(initialValues?.endMs ?: initialNowMs) }
+    var selectedColor by remember(initialValues) { mutableLongStateOf(initialValues?.colorArgb ?: DEFAULT_LIFE_PERIOD_COLOR_ARGB) }
     var selectedTagIds by remember(initialValues) { mutableStateOf(initialValues?.tagIds ?: emptySet()) }
     var selectedUnits by remember(initialValues) {
         mutableStateOf(initialValues?.displayUnits?.ifEmpty { setOf(LifePeriodDisplayUnit.DAYS) } ?: setOf(LifePeriodDisplayUnit.DAYS))

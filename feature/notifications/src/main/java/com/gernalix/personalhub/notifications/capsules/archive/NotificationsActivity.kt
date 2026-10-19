@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import androidx.compose.runtime.mutableIntStateOf
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Intent
@@ -29,7 +30,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class NotificationsActivity : ComponentActivity() {
-    private var generation by mutableStateOf(0)
+    private var generation by mutableIntStateOf(0)
     private var exportResult by mutableStateOf<Int?>(null)
     private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.sqlite3")) { uri ->
         if (uri != null) {
@@ -69,7 +70,7 @@ internal fun ArchiveScreen(generation: Int, exportResult: Int?, onExport: () -> 
     var from by remember { mutableStateOf("") }; var until by remember { mutableStateOf("") }
     var rows by remember { mutableStateOf(emptyList<ArchiveEvent>()) }; var apps by remember { mutableStateOf(emptyList<String>()) }
     var selected by remember { mutableStateOf<ArchiveEvent?>(null) }
-    var error by remember { mutableStateOf(false) }; var more by remember(search,app,from,until,changed) { mutableStateOf(0) }
+    var error by remember { mutableStateOf(false) }; var more by remember(search,app,from,until,changed) { mutableIntStateOf(0) }
     LaunchedEffect(initialEventId) {
         initialEventId?.let { id ->
             try { selected = withContext(Dispatchers.IO) { store.event(id) } }

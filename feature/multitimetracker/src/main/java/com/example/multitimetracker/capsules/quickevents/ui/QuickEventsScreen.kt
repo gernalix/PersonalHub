@@ -6,6 +6,7 @@
 
 package com.example.multitimetracker.capsules.quickevents.ui
 
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -989,7 +990,7 @@ private fun QuickEventEntryDialog(
     onDelete: (() -> Unit)?
 ) {
     var entryTitle by remember(initialEntry, template) { mutableStateOf(initialEntry?.title ?: template?.title.orEmpty()) }
-    var timestampMs by remember(initialEntry, initialTimestampMs) { mutableStateOf(initialEntry?.timestampMs ?: initialTimestampMs) }
+    var timestampMs by remember(initialEntry, initialTimestampMs) { mutableLongStateOf(initialEntry?.timestampMs ?: initialTimestampMs) }
     var tagIds by remember(initialEntry, template) { mutableStateOf(initialEntry?.tagIds ?: template?.tagIds ?: emptySet()) }
     val fieldValueText = remember(initialEntry, initialValues, fields) {
         mutableStateMapOf<Long, String>().apply {
@@ -1254,7 +1255,7 @@ private fun QuickEventMacroRunDialog(
     onDismiss: () -> Unit,
     onConfirm: (Long, List<MacroEntrySave>) -> Unit
 ) {
-    var timestampMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    var timestampMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showTimestampPicker by remember { mutableStateOf(false) }
     val valueText = remember(macro, actions, fieldsByTemplate) {
         mutableStateMapOf<String, String>().apply {

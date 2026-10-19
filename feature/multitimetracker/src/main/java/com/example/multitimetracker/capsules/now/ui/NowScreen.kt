@@ -6,6 +6,7 @@
 
 package com.example.multitimetracker.capsules.now.ui
 
+import androidx.compose.runtime.mutableIntStateOf
 import com.gernalix.personalhub.core.ui.HubFeedbackHost
 
 import androidx.compose.foundation.layout.Arrangement
@@ -118,7 +119,7 @@ fun NowScreen(
     var editingSessionIsNew by remember { mutableStateOf(false) }
     var elapsedModeSessionIds by remember { mutableStateOf(setOf<Long>()) }
     var randomMaxMinutes by rememberSaveable { mutableStateOf("60") }
-    var randomResultRevision by rememberSaveable { mutableStateOf(0) }
+    var randomResultRevision by rememberSaveable { mutableIntStateOf(0) }
 
     fun openNewSessionDraft() {
         editingSession = newSessionDraft(effectiveTime.nowMs)

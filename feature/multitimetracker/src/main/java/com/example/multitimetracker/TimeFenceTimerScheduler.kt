@@ -1,5 +1,6 @@
 package com.example.multitimetracker
 
+import androidx.core.net.toUri
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -18,7 +19,7 @@ object TimeFenceTimerScheduler {
 
     fun openExactAlarmSettings(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-        val packageUri = Uri.parse("package:${context.packageName}")
+        val packageUri = ("package:${context.packageName}").toUri()
         val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
             data = packageUri
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -51,7 +52,7 @@ object TimeFenceTimerScheduler {
         val showPi = alarmClockShowIntent(
             context = context,
             requestCode = sessionId.toInt(),
-            data = Uri.parse("mtt://timed-session/$sessionId/show"),
+            data = ("mtt://timed-session/$sessionId/show").toUri(),
         )
         scheduleExact(context, fireAtMs, pi, showPi, alarmStyle)
     }
@@ -74,7 +75,7 @@ object TimeFenceTimerScheduler {
         val showPi = alarmClockShowIntent(
             context = context,
             requestCode = (identity.hashCode() xor fireAtMs.hashCode()),
-            data = Uri.parse("mtt://random-alert/$identity/$fireAtMs/show"),
+            data = ("mtt://random-alert/$identity/$fireAtMs/show").toUri(),
         )
         scheduleExact(context, fireAtMs, pi, showPi, alarmStyle = false)
     }
@@ -148,7 +149,7 @@ object TimeFenceTimerScheduler {
             putExtra(TimeFenceTimerReceiver.EXTRA_SESSION_ID, sessionId)
             if (!legacyIdentity) {
                 putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, profileId)
-                data = Uri.parse("mtt://timed-session/$profileId/$sessionId")
+                data = ("mtt://timed-session/$profileId/$sessionId").toUri()
             }
         }
         return PendingIntent.getBroadcast(
@@ -171,7 +172,7 @@ object TimeFenceTimerScheduler {
             action = LEGACY_ACTION_FIRE_TIMER
             if (!legacyIdentity) {
                 putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, profileId)
-                data = Uri.parse("mtt://time-fence/$profileId/$ruleId/$sessionId/$expectedSessionStartAtMs")
+                data = ("mtt://time-fence/$profileId/$ruleId/$sessionId/$expectedSessionStartAtMs").toUri()
             }
         }
 
@@ -196,7 +197,7 @@ object TimeFenceTimerScheduler {
         val profileId = DatabaseProfiles.activeProfileId(context)
         val intent = Intent(context, TimeFenceTimerReceiver::class.java).apply {
             action = TimeFenceTimerReceiver.ACTION_RANDOM_ALERT
-            data = Uri.parse("mtt://random-alert/$profileId/$identity/$fireAtMs")
+            data = ("mtt://random-alert/$profileId/$identity/$fireAtMs").toUri()
             putExtra(TimeFenceTimerReceiver.EXTRA_PROFILE_ID, profileId)
             putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TITLE, title)
             putExtra(TimeFenceTimerReceiver.EXTRA_RANDOM_ALERT_TEXT, message)

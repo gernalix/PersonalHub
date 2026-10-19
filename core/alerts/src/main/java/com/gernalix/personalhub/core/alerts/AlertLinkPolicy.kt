@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.alerts
 
+import androidx.core.net.toUri
 import android.net.Uri
 import java.net.URI
 
@@ -12,7 +13,7 @@ object AlertLinkPolicy {
 
     fun linkOnlyUriOrNull(message: String): Uri? {
         if (!isLinkOnlyUri(message)) return null
-        return Uri.parse(message.trim())
+        return (message.trim()).toUri()
     }
 
     fun isLinkOnlyUri(message: String): Boolean {

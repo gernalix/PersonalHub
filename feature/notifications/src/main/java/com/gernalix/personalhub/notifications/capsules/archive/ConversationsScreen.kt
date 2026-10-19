@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.notifications.capsules.archive
 
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,13 +30,13 @@ import java.time.Instant
     var selected by remember { mutableStateOf<ConversationRow?>(null) }
     var person by remember { mutableStateOf<PersonChoice?>(null) }
     var search by remember { mutableStateOf("") };var app by remember { mutableStateOf("") }
-    var from by remember { mutableStateOf("") };var until by remember { mutableStateOf("") };var page by remember(search,app,from,until,selected,person,changes,profile) { mutableStateOf(0) }
-    var conversationPage by remember(app,changes) { mutableStateOf(0) }
+    var from by remember { mutableStateOf("") };var until by remember { mutableStateOf("") };var page by remember(search,app,from,until,selected,person,changes,profile) { mutableIntStateOf(0) }
+    var conversationPage by remember(app,changes) { mutableIntStateOf(0) }
     var failure by remember { mutableStateOf(false) };var pickPerson by remember { mutableStateOf(false) }
     var mapping by remember { mutableStateOf<Pair<String,String>?>(null) }
     var sources by remember { mutableStateOf<List<ArchiveEvent>?>(null) }
     var senderChoices by remember { mutableStateOf<List<IdentityRow>?>(null) }
-    var normalized by remember { mutableStateOf(0L) }
+    var normalized by remember { mutableLongStateOf(0L) }
     LaunchedEffect(changes) {
         try { withContext(Dispatchers.IO) { while(archive.normalizePending()==100) yield() };normalized++;failure=false }
         catch(_:Exception){failure=true}
@@ -128,7 +130,7 @@ import java.time.Instant
 
 @Composable private fun MappingDialog(people: PeopleBridge,store: ConversationsStore,profile: String,target: Pair<String,String>,onDismiss: () -> Unit,onFailure: () -> Unit) {
     val scope=rememberCoroutineScope()
-    var linked by remember { mutableStateOf(emptyList<String>()) };var resolved by remember { mutableStateOf(emptyList<PersonChoice>()) };var pick by remember { mutableStateOf(false) };var reload by remember { mutableStateOf(0) }
+    var linked by remember { mutableStateOf(emptyList<String>()) };var resolved by remember { mutableStateOf(emptyList<PersonChoice>()) };var pick by remember { mutableStateOf(false) };var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { try { linked=withContext(Dispatchers.IO){store.linked(profile,target.first,target.second)};resolved=withContext(Dispatchers.IO){people.resolve(linked)} }catch(_:Exception){onFailure()} }
     AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.people_links))},text={Column {
         Text(stringResource(R.string.manual_link_help))

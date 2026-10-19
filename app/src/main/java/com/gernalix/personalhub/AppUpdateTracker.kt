@@ -6,12 +6,13 @@ import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.room.withTransaction
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventDraft
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -42,25 +43,22 @@ internal suspend fun recordAppUpdate(db: PersonalHubDatabase, version: Long, pre
 
 internal object AppUpdateTracker : Application.ActivityLifecycleCallbacks {
     private var dialog: AlertDialog? = null
-    private var checking = false
     private const val PREFS = "app-update-acknowledgement"
+    private lateinit var coordinator: ResumedUpdateCheck
 
-    fun install(app: Application) { app.registerActivityLifecycleCallbacks(this) }
-
-    override fun onActivityResumed(activity: Activity) {
-        if (activity !is ComponentActivity || checking || dialog != null) return
-        checking = true
-        activity.lifecycleScope.launch {
-            try {
-                val pending = withContext(Dispatchers.IO) {
-                    val info = activity.packageManager.getPackageInfo(activity.packageName, 0)
+    fun install(app: Application) {
+        coordinator = ResumedUpdateCheck(
+            CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+            pendingVersion = {
+                withContext(Dispatchers.IO) {
+                    val info = app.packageManager.getPackageInfo(app.packageName, 0)
                     val version = info.longVersionCode
-                    val prefs = activity.getSharedPreferences(PREFS, 0)
+                    val prefs = app.getSharedPreferences(PREFS, 0)
                     val previous = prefs.getLong("observed-version", 0L)
                     if (previous != version) {
                         val wasUpdate = previous > 0 || info.lastUpdateTime != info.firstInstallTime
                         if (wasUpdate) {
-                            recordAppUpdate(PersonalHubDatabase.get(activity), version, previous.takeIf { it > 0 })
+                            recordAppUpdate(PersonalHubDatabase.get(app), version, previous.takeIf { it > 0 })
                         }
                         check(prefs.edit().putLong("observed-version", version).apply {
                             // A fresh installation is the baseline, not an invented update.
@@ -69,24 +67,68 @@ internal object AppUpdateTracker : Application.ActivityLifecycleCallbacks {
                     }
                     version.takeIf { prefs.getLong("acknowledged-version", 0L) != it }
                 }
-                if (pending != null && !activity.isFinishing &&
-                    activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            },
+            showPrompt = { activity, pending ->
+                if (dialog == null) {
                     dialog = AlertDialog.Builder(activity)
                         .setMessage("app aggiornata alla v$pending")
                         .setCancelable(false)
                         .setPositiveButton("OK") { _, _ ->
-                            activity.getSharedPreferences(PREFS, 0).edit()
+                            app.getSharedPreferences(PREFS, 0).edit()
                                 .putLong("acknowledged-version", pending).apply()
                         }
                         .create().also { shown ->
+                            shown.setOwnerActivity(activity)
                             shown.setOnDismissListener { if (dialog === shown) dialog = null }
                             shown.show()
                         }
                 }
+            },
+        )
+        app.registerActivityLifecycleCallbacks(this)
+    }
+
+    override fun onActivityResumed(activity: Activity) {
+        if (activity is ComponentActivity) coordinator.onResume(activity)
+    }
+
+    override fun onActivityPaused(activity: Activity) {
+        if (activity is ComponentActivity) coordinator.onPause(activity)
+        if (dialog?.ownerActivity === activity) { dialog?.dismiss(); dialog = null }
+    }
+    override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
+    override fun onActivityStarted(activity: Activity) = Unit
+    override fun onActivityStopped(activity: Activity) = Unit
+    override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+    override fun onActivityDestroyed(activity: Activity) = Unit
+}
+
+/** The database gate recreates the first Activity: finish the check in the process,
+ * then present on the currently resumed Activity rather than the discarded one. */
+internal class ResumedUpdateCheck(
+    private val scope: CoroutineScope,
+    private val pendingVersion: suspend () -> Long?,
+    private val showPrompt: (ComponentActivity, Long) -> Unit,
+) {
+    private var resumed: ComponentActivity? = null
+    private var checking = false
+
+    fun onResume(activity: ComponentActivity) {
+        resumed = activity
+        if (checking) return
+        checking = true
+        scope.launch {
+            try {
+                val pending = pendingVersion()
+                val target = resumed
+                if (pending != null && target != null && !target.isFinishing && !target.isDestroyed &&
+                    target.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                    showPrompt(target, pending)
+                }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                // Preserve the unacknowledged update for retry; never crash or claim a saved event.
+                // No acknowledgement on failure: the next foreground entry retries.
                 android.util.Log.w("PersonalHubUpdate", "Installed-version recording will be retried")
             } finally {
                 checking = false
@@ -94,10 +136,7 @@ internal object AppUpdateTracker : Application.ActivityLifecycleCallbacks {
         }
     }
 
-    override fun onActivityPaused(activity: Activity) { dialog?.dismiss(); dialog = null }
-    override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
-    override fun onActivityStarted(activity: Activity) = Unit
-    override fun onActivityStopped(activity: Activity) = Unit
-    override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
-    override fun onActivityDestroyed(activity: Activity) = Unit
+    fun onPause(activity: ComponentActivity) {
+        if (resumed === activity) resumed = null
+    }
 }

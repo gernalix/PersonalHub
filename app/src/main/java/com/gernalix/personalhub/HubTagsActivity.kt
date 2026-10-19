@@ -1,5 +1,6 @@
 package com.gernalix.personalhub
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -205,7 +206,7 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
                             val target = withContext(Dispatchers.IO) {
                                 HubContextRuntime.adapter(summary.ref.moduleId, summary.ref.entityKind).openTarget(summary.ref.canonicalId)
                             } ?: return@launch
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target.uri)).apply {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, (target.uri).toUri()).apply {
                                 target.activityClassName?.let { setClassName(context.packageName, it) }
                             })
                         }

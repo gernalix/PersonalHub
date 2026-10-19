@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.capsules.settings
 
+import androidx.core.net.toUri
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -112,7 +113,7 @@ fun HubSettings(onBack: () -> Unit) {
                         context.startActivity(
                             Intent(
                                 Intent.ACTION_VIEW,
-                                Uri.parse(privacyPolicyUrl),
+                                (privacyPolicyUrl).toUri(),
                             ),
                         )
                     },

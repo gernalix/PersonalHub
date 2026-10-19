@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.capsules.settings
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.material3.*
@@ -60,7 +61,7 @@ internal fun GitHistoryTools(busy: Boolean, runOperation: (() -> Unit) -> Unit) 
     }
     OutlinedButton(enabled = !busy && proposal.isNotBlank(), onClick = { runOperation {
         val url = GitHistory.createProposalPullRequest(context,proposal,"PersonalHub data proposal", "Explicit data proposal for review; patches require sandbox preview and confirmation in PersonalHub.")
-        scope.launch { context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url))) }
+        scope.launch { context.startActivity(Intent(Intent.ACTION_VIEW,(url).toUri())) }
     } }) { Text(stringResource(UiR.string.git_review_pr)) }
     OutlinedButton(enabled = !busy && proposal.isNotBlank(), onClick = { discard = true }) { Text(stringResource(UiR.string.git_review_discard)) }
     if (discard) AlertDialog(

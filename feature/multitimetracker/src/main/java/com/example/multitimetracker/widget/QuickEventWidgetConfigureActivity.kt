@@ -1,6 +1,7 @@
 package com.example.multitimetracker.widget
 
 import android.app.Activity
+import android.content.Intent
 import android.appwidget.AppWidgetManager
 import android.os.Bundle
 import android.view.ViewGroup
@@ -73,7 +74,7 @@ class QuickEventWidgetConfigureActivity : Activity() {
                 val target = selected ?: return@setOnClickListener
                 QuickEventWidgetPrefs.save(applicationContext, appWidgetId, target)
                 QuickEventWidgetProvider.updateOne(applicationContext, appWidgetId)
-                setResult(RESULT_OK, intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
+                setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
                 finish()
             }
         }

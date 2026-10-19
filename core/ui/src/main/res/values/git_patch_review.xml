@@ -7,7 +7,7 @@
     <string name="git_review_author">Author: %1$s</string>
     <string name="git_review_schema_pass">Schema %1$d: compatible</string>
     <string name="git_review_schema_fail">Schema %1$d: incompatible</string>
-    <string name="git_review_operations">%1$d changes</string>
+    <string name="git_review_operations">Changes: %1$d</string>
     <string name="git_review_tables">Tables: %1$s</string>
     <string name="git_review_isolated">Preview uses a separate database copy. Your current records stay unchanged.</string>
     <string name="git_review_preview">Preview in sandbox</string>
@@ -22,7 +22,7 @@
     <string name="git_review_before">Before revision</string>
     <string name="git_review_after">After revision</string>
     <string name="git_review_compare">Compare revisions</string>
-    <string name="git_review_diff_table">%1$s: %2$d inserts · %3$d updates · %4$d deletes</string>
+    <string name="git_review_diff_table">%1$s · Insert: %2$d · Update: %3$d · Delete: %4$d</string>
     <string name="git_review_no_changes">No changes</string>
     <string name="git_review_truncated">Showing a bounded comparison; more changes exist.</string>
     <string name="git_review_milestone_name">Milestone / tag name</string>

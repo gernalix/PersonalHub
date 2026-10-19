@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
@@ -10,6 +11,8 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /** Serializes writers, including legacy timer writes, and quiesces them during file replacement. */
+// Only the process Application context is retained; configureAutoExport strips Activity contexts.
+@SuppressLint("StaticFieldLeak")
 object DatabaseGate {
     private val lock = ReentrantLock(true)
     private val resumed = lock.newCondition()

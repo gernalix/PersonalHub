@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.core.database
 
+import androidx.core.net.toUri
 import com.gernalix.personalhub.core.database.capsules.sync.*
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
@@ -929,7 +930,7 @@ object DatabaseVault {
             return requireNotNull(queryDocument(uri)) { "Provider returned an unreadable URI for $name" }
         }
 
-        override fun open(identity: String): ExportFile? = queryDocument(Uri.parse(identity))
+        override fun open(identity: String): ExportFile? = queryDocument((identity).toUri())
 
         override fun find(name: String): ExportFile? {
             if (treeUri.authority == "com.android.externalstorage.documents") {
