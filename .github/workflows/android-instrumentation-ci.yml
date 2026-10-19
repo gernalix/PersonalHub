@@ -55,6 +55,16 @@ jobs:
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$ANDROID_NDK_VERSION"
           test -x "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+      - name: Build instrumentation APKs before starting the emulator
+        run: |
+          timeout --signal=TERM --kill-after=2m 18m ./gradlew --no-daemon --console=plain --warning-mode=all --max-workers=1 \
+            :app:assembleQa :app:assembleQaAndroidTest \
+            -Ppersonalhub.testBuildType=qa -Ppersonalhub.allowCiEmulatorDebug=true
+          timeout --signal=TERM --kill-after=2m 18m ./gradlew --no-daemon --console=plain --warning-mode=all --max-workers=1 \
+            :feature:luoghi:assembleDebugAndroidTest \
+            :feature:multitimetracker:assembleDebugAndroidTest \
+            :core:database:assembleDebugAndroidTest \
+            -Ppersonalhub.allowCiEmulatorDebug=true
       - name: Prepare KVM and emulator libraries
         run: |
           sudo apt-get update -qq
