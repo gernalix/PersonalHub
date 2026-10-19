@@ -43,13 +43,19 @@ val unsignedPlayBundlePreflight = allowUnsignedPlayBundle.get() &&
 val allowCiEmulatorDebug = providers.gradleProperty("personalhub.allowCiEmulatorDebug")
     .map { it.equals("true", ignoreCase = true) }
     .orElse(false)
+val ciLibraryTestPreparation = gradle.startParameter.taskNames.isNotEmpty() &&
+    gradle.startParameter.taskNames.all { it in setOf(
+        ":feature:luoghi:assembleDebugAndroidTest",
+        ":feature:multitimetracker:assembleDebugAndroidTest",
+        ":core:database:assembleDebugAndroidTest",
+    ) }
 val ciDebugInstrumentation = allowCiEmulatorDebug.get() &&
     System.getenv("CI")?.equals("true", ignoreCase = true) == true &&
     requestedTaskNames.isNotEmpty() &&
-    requestedTaskNames.all {
+    (ciLibraryTestPreparation || requestedTaskNames.all {
         it == "connecteddebugandroidtest" || it == "connectedqaandroidtest" ||
             it == "assembleqa" || it == "assembleqaandroidtest"
-    }
+    })
 if (signingArtifactRequested && !unsignedPlayBundlePreflight && !ciDebugInstrumentation) {
     require(hasCanonicalSigning) {
         "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
