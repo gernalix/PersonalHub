@@ -66,3 +66,11 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: timeout --signal=TERM --kill-after=2m 50m bash tools/run_ci_instrumentation.sh
+      - name: Preserve failed app instrumentation diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: app-instrumentation-diagnostics
+          path: build/ci-instrumentation-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 7

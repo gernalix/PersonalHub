@@ -1,5 +1,7 @@
 # Debug lint inventory
 
+Final72 optimized configuration app debug lint0 and architecture PASS456. AGP debug+minify warnings from the rejected first candidate are addressed by disabling debug mode only for the final optimization opt-in; QA explicitly remains debuggable/unminified. Full replacement APK proof is pending. Original Configuration.setVisible upstream deprecation remains.
+
 Additional cross-module cursor repair: app compile/QA build and architecture PASS; fresh core/ui, Notifications, Soldi debug lint and app QA lint each0 findings. Seven core/ui host cases and23 native cases PASS441–448 (445 startup test failure retained, resolved446). The official AGP deprecation remains separate and unchanged.
 
 Last verified full lint snapshot on the uncommitted modernization:14 complete module reports,0 issues, architecture PASS (SQLite413). The full host run has375 PASS/1 existing AndroidKeyStore SKIP, and subsequent focused host fixtures36 PASS. Actual nonincremental compilation and NDK strip/package validation now have0 Kotlin/native-strip warnings. One Gradle deprecation is emitted by26 internal calls in the official AGP9.4.1 artifact; its source provenance is retained privately and no warning filter was added. The later Places search-draft correction also passes app compile, QA build, Luoghi lint0 and architecture. Native delayed-state regression, four search repetitions and full app16 cases PASS433–438.

@@ -111,6 +111,9 @@ android {
             if (hasCanonicalSigning) signingConfig = signingConfigs.getByName("canonicalShared")
             // Final Pixel delivery uses the existing R8/signing pipeline; worker/test builds stay unchanged.
             if (providers.gradleProperty("personalhub.minifiedDebug").getOrElse("false").toBoolean()) {
+                // AGP disables optimization/obfuscation when debuggable remains true.
+                // Only the final opt-in is optimized; ordinary debug stays debuggable.
+                isDebuggable = false
                 isMinifyEnabled = true
                 isShrinkResources = true
                 proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -135,8 +138,11 @@ android {
             require(qaSuffix.matches(Regex("\\.qa[0-9]*"))) { "QA suffix must remain an isolated .qa package" }
             applicationIdSuffix = qaSuffix
             // QA supports 32-bit devices, the physical Pixel arm64, and the x86_64 emulator.
-            // Default QA retains instrumentation hooks. The minifiedDebug opt-in also permits
-            // manual clone checks with R8; instrumentation must use the unminified default.
+            // QA remains independently debuggable/unminified, even while the final
+            // debug opt-in is enabled in the same Gradle invocation.
+            isDebuggable = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64") }
         }
         create("benchmark") {

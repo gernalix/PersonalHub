@@ -17,6 +17,16 @@ timeout --signal=TERM --kill-after=2m 18m ./gradlew --no-daemon --console=plain 
 adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
 adb -s "$serial" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk >/dev/null
 
+capture_failure() {
+  local test_name=$1
+  local diagnostics=build/ci-instrumentation-diagnostics
+  mkdir -p "$diagnostics"
+  printf '%s\n' "$test_name" > "$diagnostics/test-case.txt"
+  python3 -c 'import sys; from pathlib import Path; sys.path.insert(0,"tools"); from android_ui_summary import _dump_xml; Path(sys.argv[2]).write_text(_dump_xml(sys.argv[1]))' "$serial" "$diagnostics/window.xml" || true
+  adb -s "$serial" exec-out screencap -p > "$diagnostics/screen.png" || true
+  adb -s "$serial" logcat -d -b crash > "$diagnostics/crash.log" || true
+}
+
 run_app_test() {
   local test_name=$1 result
   if ! result=$(python3 tools/android_connected_test_gate.py -- \
@@ -24,10 +34,12 @@ run_app_test() {
     adb -s "$serial" shell am instrument -w -r \
     -e class "com.gernalix.personalhub.$test_name" "$runner" 2>&1); then
     printf 'Instrumentation command failed: %s\n%s\n' "$test_name" "$result" >&2
+    capture_failure "$test_name"
     return 1
   fi
   if [[ "$result" != *'OK (1 test)'* || "$result" == *'INSTRUMENTATION_STATUS_CODE: -2'* ]]; then
     printf 'Instrumentation failed: %s\n%s\n' "$test_name" "$result" >&2
+    capture_failure "$test_name"
     return 1
   fi
   printf 'PASS %s\n' "$test_name"
