@@ -11,12 +11,6 @@ fi
 serial=${devices[0]}
 runner=com.gernalix.personalhub.qa.test/androidx.test.runner.AndroidJUnitRunner
 
-timeout --signal=TERM --kill-after=2m 18m ./gradlew --no-daemon --console=plain --warning-mode=all --max-workers=1 \
-  :app:assembleQa :app:assembleQaAndroidTest \
-  -Ppersonalhub.testBuildType=qa -Ppersonalhub.allowCiEmulatorDebug=true
-adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
-adb -s "$serial" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk >/dev/null
-
 capture_failure() {
   local test_name=$1
   local diagnostics=build/ci-instrumentation-diagnostics
@@ -26,6 +20,7 @@ capture_failure() {
   adb -s "$serial" exec-out screencap -p > "$diagnostics/screen.png" || true
   adb -s "$serial" logcat -d -b crash > "$diagnostics/crash.log" || true
   adb -s "$serial" shell dumpsys activity lastanr > "$diagnostics/last-anr.txt" || true
+  adb -s "$serial" shell dumpsys dropbox --print data_app_anr > "$diagnostics/app-anr-dropbox.txt" || true
   adb -s "$serial" logcat -d -b system -v threadtime > "$diagnostics/system.log" || true
   adb -s "$serial" shell dumpsys meminfo > "$diagnostics/meminfo.txt" || true
   for module in PEOPLE SUBSTANCES WORDPULSE; do
@@ -37,6 +32,21 @@ capture_failure() {
     done
   done
 }
+
+# These exact APKs were prepared before emulator boot by the workflow. Never
+# start a redundant Gradle JVM while the device is finishing its first boot.
+test -s app/build/outputs/apk/qa/app-qa.apk
+test -s app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk
+wait_for_broadcast_idle() {
+  if ! timeout --signal=TERM --kill-after=5s 90s adb -s "$serial" shell cmd activity wait-for-broadcast-idle; then
+    capture_failure "$1"
+    return 1
+  fi
+}
+wait_for_broadcast_idle emulator_first_boot
+adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
+adb -s "$serial" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk >/dev/null
+wait_for_broadcast_idle instrumentation_package_installation
 
 run_app_test() {
   local test_name=$1 result
