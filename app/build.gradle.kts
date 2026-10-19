@@ -172,6 +172,13 @@ android {
     }
 }
 
+composeCompiler {
+    // Places6 includes pre-obfuscated Compose methods that the optional group-key
+    // mapping collector cannot tokenize. Keep standard R8 class/line mappings and
+    // optimization; disable only this incompatible diagnostic mapping add-on.
+    includeComposeMappingFile.set(false)
+}
+
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.outputs.forEach { output -> output.outputFileName.set("$appVersion.apk") }
