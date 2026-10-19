@@ -43,6 +43,7 @@ jobs:
     env:
       GOOGLE_MAPS_API_KEY: CI_NOT_A_REAL_KEY
       GOOGLE_ROUTES_API_KEY: CI_NOT_A_REAL_KEY
+      ANDROID_NDK_VERSION: 28.2.13676358
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -50,6 +51,10 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
+      - name: Prepare native-library stripping
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$ANDROID_NDK_VERSION"
+          test -x "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
       - name: Prepare KVM and emulator libraries
         run: |
           sudo apt-get update -qq

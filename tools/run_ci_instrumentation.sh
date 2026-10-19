@@ -11,7 +11,7 @@ fi
 serial=${devices[0]}
 runner=com.gernalix.personalhub.qa.test/androidx.test.runner.AndroidJUnitRunner
 
-timeout --signal=TERM --kill-after=2m 18m ./gradlew --no-daemon --console=plain --max-workers=1 \
+timeout --signal=TERM --kill-after=2m 18m ./gradlew --no-daemon --console=plain --warning-mode=all --max-workers=1 \
   :app:assembleQa :app:assembleQaAndroidTest \
   -Ppersonalhub.testBuildType=qa -Ppersonalhub.allowCiEmulatorDebug=true
 adb -s "$serial" install -r app/build/outputs/apk/qa/app-qa.apk >/dev/null
@@ -96,14 +96,14 @@ done
 
 # Library instrumentation uses the same emulator, never concurrently.
 python3 tools/android_connected_test_gate.py -- \
-  timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --max-workers=1 \
+  timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --warning-mode=all --max-workers=1 \
   :feature:luoghi:connectedDebugAndroidTest \
   :feature:multitimetracker:connectedDebugAndroidTest \
   -Ppersonalhub.allowCiEmulatorDebug=true
 
 # Canonical export/restore and patch safety use an isolated library-test package.
 python3 tools/android_connected_test_gate.py -- \
-  timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --max-workers=1 \
+  timeout --signal=TERM --kill-after=2m 22m ./gradlew --no-daemon --console=plain --warning-mode=all --max-workers=1 \
   :core:database:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.gernalix.personalhub.core.database.capsules.gitdata.GitDataRestoreDeviceTest \
   -Ppersonalhub.allowCiEmulatorDebug=true
