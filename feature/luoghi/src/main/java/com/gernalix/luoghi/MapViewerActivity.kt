@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 class MapViewerActivity : ComponentActivity() {
     private lateinit var bridge: OsmAndBridge
     private var opening: Job? = null
-    private var status by mutableStateOf("Opening OsmAnd…")
+    private var status by mutableStateOf("")
     private var unavailable by mutableStateOf(false)
     private var mapAccessRequired by mutableStateOf(false)
     private val requestMapAccess = registerForActivityResult(
@@ -36,22 +36,23 @@ class MapViewerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (DatabaseStartupGate.blockIfNotReady(this)) return
         bridge = OsmAndBridge(this)
+        status = getString(R.string.places_osmand_opening)
         setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("OsmAnd", style = MaterialTheme.typography.headlineMedium)
+                Text(getString(R.string.places_osmand_title), style = MaterialTheme.typography.headlineMedium)
                 Text(status)
                 if (unavailable) Button(onClick = {
                     startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://osmand.net/docs/versions/free-versions/")))
-                }) { Text("Install OsmAnd") }
+                }) { Text(getString(R.string.places_osmand_install)) }
                 if (mapAccessRequired) Button(onClick = {
                     val target = bridge.installedPackage() ?: return@Button
                     val request = Intent("net.osmand.aidl.REQUEST_PERMISSIONS").setPackage(target)
                         .putExtra("groups", arrayOf("map"))
                     if (request.resolveActivity(packageManager) != null) requestMapAccess.launch(request)
                     else packageManager.getLaunchIntentForPackage(target)?.let(::startActivity)
-                }) { Text("Allow map access in OsmAnd") }
-                TextButton(onClick = ::openMap) { Text("Try again") }
-                TextButton(onClick = { finish() }) { Text("Back") }
+                }) { Text(getString(R.string.places_osmand_allow_map_access)) }
+                TextButton(onClick = ::openMap) { Text(getString(R.string.places_action_retry)) }
+                TextButton(onClick = { finish() }) { Text(getString(R.string.places_action_back)) }
             }
         } } }
         openMap()
@@ -61,16 +62,16 @@ class MapViewerActivity : ComponentActivity() {
         if (opening?.isActive == true) return
         if (bridge.installedPackage() == null) {
             unavailable = true
-            status = "OsmAnd is optional. Install it to view the map; your places and search remain available in PersonalHub."
+            status = getString(R.string.places_osmand_optional)
             return
         }
         unavailable = false
         mapAccessRequired = false
         opening = lifecycleScope.launch {
             try {
-                status = "Preparing places in OsmAnd…"
+                status = getString(R.string.places_osmand_preparing)
                 val model = withContext(Dispatchers.IO) {
-                    MapViewerRepository(PersonalHubDatabase.get(applicationContext).placeDao()).load(
+                    MapViewerRepository(PersonalHubDatabase.get(applicationContext).placeDao(), getString(R.string.unnamed_place)).load(
                         intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.map_default_title),
                         MapCallerMode.parse(intent.getStringExtra(EXTRA_CALLER_MODE)),
                         MapMarkerMode.parse(intent.getStringExtra(EXTRA_MARKER_MODE)),
@@ -81,7 +82,7 @@ class MapViewerActivity : ComponentActivity() {
                 val reference = if (intent.hasExtra(EXTRA_REFERENCE_LAT) && intent.hasExtra(EXTRA_REFERENCE_LON)) {
                     OsmAndReference(intent.getDoubleExtra(EXTRA_REFERENCE_LAT, Double.NaN),
                         intent.getDoubleExtra(EXTRA_REFERENCE_LON, Double.NaN),
-                        intent.getStringExtra(EXTRA_REFERENCE_LABEL) ?: "Reference", intent.getStringExtra(EXTRA_REFERENCE_ID))
+                        intent.getStringExtra(EXTRA_REFERENCE_LABEL)?.takeUnless(String::isBlank) ?: getString(R.string.places_map_reference), intent.getStringExtra(EXTRA_REFERENCE_ID))
                 } else {
                     val first = model.markers.firstOrNull() ?: error("No saved places have valid coordinates")
                     OsmAndReference(first.latitude, first.longitude, first.title, first.uuid)
@@ -90,15 +91,19 @@ class MapViewerActivity : ComponentActivity() {
                 bridge.publish(model.markers, reference)
                 launched = true
                 bridge.showReference(reference)
-                status = "Return to PersonalHub to close this temporary map."
+                status = getString(R.string.places_osmand_return_hint)
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (error: Exception) {
                 launched = false
                 leftForMap = false
                 withContext(kotlinx.coroutines.NonCancellable) { runCatching { bridge.clear() } }
                 mapAccessRequired = error.message == "Allow PersonalHub map access in OsmAnd external app settings"
-                status = if (mapAccessRequired) "In OsmAnd, open Menu → Plugins → PersonalHub and enable it. Then return here and choose Try again. PersonalHub uses only temporary map points."
-                    else error.message?.takeIf { it in SAFE_ERRORS } ?: "Unable to open the map. Check that OsmAnd allows PersonalHub to access maps, then try again."
+                status = if (mapAccessRequired) getString(R.string.places_osmand_permission_help)
+                    else when (error.message) {
+                        "No saved places have valid coordinates" -> getString(R.string.places_map_no_coordinates)
+                        "OsmAnd is not installed" -> getString(R.string.places_osmand_optional)
+                        else -> getString(R.string.places_osmand_unable)
+                    }
                 bridge.close()
             }
         }
@@ -132,6 +137,5 @@ class MapViewerActivity : ComponentActivity() {
         const val EXTRA_REFERENCE_LON = "com.gernalix.luoghi.extra.REFERENCE_LON"
         const val EXTRA_REFERENCE_LABEL = "com.gernalix.luoghi.extra.REFERENCE_LABEL"
         const val EXTRA_REFERENCE_ID = "com.gernalix.luoghi.extra.REFERENCE_ID"
-        private val SAFE_ERRORS = setOf("No saved places have valid coordinates", "OsmAnd is not installed")
     }
 }

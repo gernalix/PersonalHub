@@ -97,7 +97,9 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
     var topDestination by rememberSaveable(launcherGeneration) { mutableStateOf<String?>(null) }
     BackHandler(enabled = topDestination != null) { topDestination = null }
     if (topDestination == "composer") {
-        HubContextComposerScreen(onBack = { topDestination = null })
+        com.gernalix.personalhub.core.ui.ModuleHistoryHost("hub") {
+            HubContextComposerScreen(onBack = { topDestination = null })
+        }
         return
     }
     if (topDestination == "since_when" || topDestination == "countdown") {
@@ -116,7 +118,9 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         return
     }
     if (showSettings) {
-        HubSettings(onBack = { showSettings = false })
+        com.gernalix.personalhub.core.ui.ModuleHistoryHost("settings") {
+            HubSettings(onBack = { showSettings = false })
+        }
         return
     }
     CompositionLocalProvider(LocalCompactHome provides compact) {

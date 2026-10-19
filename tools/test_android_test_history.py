@@ -19,6 +19,12 @@ INSTRUMENTATION_CODE: -1
 
 
 class TestHistoryTests(unittest.TestCase):
+    def test_instrumentation_duration_is_retained_even_when_the_suite_fails(self):
+        source = SUCCESS + "Time: 6.302\nFAILURES!!!\n"
+        status, _, measurements = history.instrumentation(source)
+        self.assertEqual("FAIL", status)
+        self.assertEqual([("@suite", "test_suite_duration", 6302., "ms", "INSTRUMENTATION")], measurements)
+
     def test_python_suite_uses_its_terminal_summary_not_expected_failure_output(self):
         log = "FAIL-CLOSED: expected negative test\nRan 17 tests in 0.090s\n\nOK\n"
         status, rows, _ = history.unittest_result(log)

@@ -24,6 +24,6 @@ object MapViewerCapsule {
             )
             .putStringArrayListExtra(
                 MapViewerActivity.EXTRA_LABELS,
-                ArrayList(places.map { it.nickname.ifBlank { "Unnamed place" } }),
+                ArrayList(places.map { it.nickname.ifBlank { context.getString(R.string.unnamed_place) } }),
             )
 }

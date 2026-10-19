@@ -3,7 +3,7 @@ package com.gernalix.luoghi.capsules.mapviewer
 import com.gernalix.luoghi.data.PlaceDao
 import com.gernalix.luoghi.data.PlaceEntity
 
-class MapViewerRepository(private val dao: PlaceDao) {
+class MapViewerRepository(private val dao: PlaceDao, private val unnamedLabel: String = "Unnamed place") {
     fun load(
         title: String,
         callerMode: MapCallerMode,
@@ -21,7 +21,7 @@ class MapViewerRepository(private val dao: PlaceDao) {
         val labelsByUuid = uuids.mapIndexedNotNull { index, uuid ->
             labels.getOrNull(index)?.let { uuid to it }
         }.toMap()
-        val markers = places.mapNotNull { place -> MapMarkerModel.from(place, labelsByUuid[place.uuid]) }
+        val markers = places.mapNotNull { place -> MapMarkerModel.from(place, labelsByUuid[place.uuid], unnamedLabel) }
         val missing = places.count { it.lat == null || it.lon == null }
         return MapViewerModel(
             title = title,

@@ -123,6 +123,7 @@ fun HomeScreen(
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
+                .testTag("places-home-list")
                 .fillMaxSize()
                 .padding(innerPadding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -158,7 +159,7 @@ fun HomeScreen(
             item(key = "where-was-i") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onExplore, modifier = Modifier.weight(1f).testTag("places-explore")) {
-                    Text("Explore")
+                    Text(stringResource(R.string.places_explore_action))
                 }
                 OutlinedButton(
                     onClick = { whereWasIOpen = true },
@@ -178,6 +179,7 @@ fun HomeScreen(
                 SectionHeader(
                     title = stringResource(R.string.places),
                     action = stringResource(R.string.places_count_format, state.placeItems.size),
+                    actionTestTag = "places-count",
                 )
             }
             item(key = "places-sort") {
@@ -381,8 +383,10 @@ private fun PlacesSortBar(
     onSortPlaces: (PlaceSortCriterion, PlaceSortDirection) -> Unit,
     onRefreshLocation: () -> Unit,
 ) {
+    var helpOpen by rememberSaveable { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(R.string.places_sort_help), style = MaterialTheme.typography.bodySmall)
+        TextButton(onClick = { helpOpen = true }) { Text(stringResource(R.string.places_sort_about)) }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             SortChip(R.string.sort_distance, sort, PlaceSortCriterion.DISTANCE, onSortPlaces, Modifier.weight(1f))
             SortChip(R.string.sort_last_visit, sort, PlaceSortCriterion.LAST_VISIT, onSortPlaces, Modifier.weight(1f))
@@ -413,6 +417,12 @@ private fun PlacesSortBar(
             )
         }
     }
+    if (helpOpen) AlertDialog(
+        onDismissRequest = { helpOpen = false },
+        title = { Text(stringResource(R.string.places_sort_about)) },
+        text = { Text(stringResource(R.string.places_sort_explanation)) },
+        confirmButton = { TextButton(onClick = { helpOpen = false }) { Text(stringResource(android.R.string.ok)) } },
+    )
 }
 
 @Composable
@@ -442,7 +452,7 @@ private fun defaultDirection(criterion: PlaceSortCriterion): PlaceSortDirection 
     if (criterion == PlaceSortCriterion.DISTANCE) PlaceSortDirection.ASC else PlaceSortDirection.DESC
 
 @Composable
-private fun SectionHeader(title: String, action: String?) {
+private fun SectionHeader(title: String, action: String?, actionTestTag: String? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -456,7 +466,8 @@ private fun SectionHeader(title: String, action: String?) {
             fontWeight = FontWeight.SemiBold,
         )
         action?.let {
-            Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(it, modifier = actionTestTag?.let { tag -> Modifier.testTag(tag) } ?: Modifier,
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

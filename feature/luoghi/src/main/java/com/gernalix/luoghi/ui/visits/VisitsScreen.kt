@@ -248,12 +248,13 @@ fun WhereWasIDialog(
     places: List<PlaceEntity>,
     onDismiss: () -> Unit,
 ) {
+    val initialTimestamp = rememberSaveable { System.currentTimeMillis() }
     var timestampText by rememberSaveable {
-        mutableStateOf(formatVisitTimestampForInput(System.currentTimeMillis()))
+        mutableStateOf(formatVisitTimestampForInput(initialTimestamp))
     }
     var parseFailed by rememberSaveable { mutableStateOf(false) }
-    val instant = parseVisitTimestampInput(timestampText)
-    val result = instant?.let { WhereWasIQuery.at(visits, places, it) }
+    val instant = parseVisitTimestampInput(timestampText, initialTimestamp)
+    val result = instant?.let { WhereWasIQuery.at(visits, places, it, observedAtMs = System.currentTimeMillis()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.where_was_i)) },

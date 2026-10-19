@@ -75,7 +75,13 @@ def instrumentation(text: str) -> tuple[str, list[tuple], list[tuple]]:
     count = re.search(r"\bOK \((\d+) tests?\)", text)
     complete = bool(count and re.search(r"^INSTRUMENTATION_CODE: -1$", text, re.M)
                     and len(cases) == int(count[1]) and any(row[1] == "PASS" for row in cases.values()))
-    return ("FAIL" if failed else "PASS" if complete else "INCOMPLETE", list(cases.values()), [])
+    samples = []
+    durations = re.findall(r"^Time: ([0-9]+(?:\.[0-9]+)?)$", text, re.M)
+    if durations:
+        elapsed_ms = float(durations[-1]) * 1000
+        if math.isfinite(elapsed_ms):
+            samples.append(("@suite", "test_suite_duration", elapsed_ms, "ms", "INSTRUMENTATION"))
+    return ("FAIL" if failed else "PASS" if complete else "INCOMPLETE", list(cases.values()), samples)
 
 
 def startup(text: str, module: str, app_id: str | None) -> tuple[str, list[tuple], list[tuple]]:
@@ -141,7 +147,8 @@ def record(db_path: Path, source: Path, category: str, context: dict, *, module:
         cases = [(context.get("suite", source.stem), row[1], row[2]) for row in cases]
     if context.get("process_exit_code", 0) != 0:
         status = "FAIL"
-        samples = []
+        if category == "am-start":
+            samples = []
     # File timestamp is evidence time, not an invented execution start time.
     observed = utc(source.stat().st_mtime)
     source_hash = digest(source)

@@ -112,6 +112,8 @@ class PlacesHistoryMapGeofencingTest {
         val current = WhereWasIQuery.at(visits, places, 4_000L) as WhereWasIResult.Inside
         assertEquals("office", current.place.uuid)
         assertTrue(WhereWasIQuery.at(visits, places, 6_000L) !is WhereWasIResult.Inside)
+        assertTrue(WhereWasIQuery.at(visits, places, 6_000L, observedAtMs = 6_500L) is WhereWasIResult.Inside)
+        assertTrue(WhereWasIQuery.at(visits, places, 7_000L, observedAtMs = 6_500L) !is WhereWasIResult.Inside)
     }
 
     @Test
@@ -159,6 +161,34 @@ class PlacesHistoryMapGeofencingTest {
             sort = PlaceSortState(PlaceSortCriterion.LAST_VISIT, PlaceSortDirection.ASC),
         )
         assertEquals(listOf("near", "far", "unknown"), byLastVisitAsc.map { it.place.uuid })
+    }
+
+    @Test
+    fun allFourSortCriteriaChangeOrderAndReverseKnownValues() {
+        val a = place("a", "Alpha", 0.0, 0.0)
+        val b = place("b", "Beta", 0.0, 0.01)
+        val c = place("c", "Gamma", null, null)
+        val places = listOf(c, b, a)
+        val visits = VisitMapper.map(listOf(
+            event("a", PlaceEventTypes.CHECK_IN, 1_000L, "a1"), event("a", PlaceEventTypes.CHECK_OUT, 2_000L, "a1"),
+            event("a", PlaceEventTypes.CHECK_IN, 4_000L, "a2"), event("a", PlaceEventTypes.CHECK_OUT, 5_000L, "a2"),
+            event("b", PlaceEventTypes.CHECK_IN, 6_000L, "b1"), event("b", PlaceEventTypes.CHECK_OUT, 9_000L, "b1"),
+        ), places, 10_000L)
+        val stats = listOf(a to 2_000L, b to 3_000L, c to 0L).map { (place, time) ->
+            com.gernalix.luoghi.capsules.stats.PlaceStatsUi(place, time, null, null)
+        }
+        val expected = mapOf(
+            PlaceSortCriterion.DISTANCE to (listOf("a", "b", "c") to listOf("b", "a", "c")),
+            PlaceSortCriterion.LAST_VISIT to (listOf("a", "b", "c") to listOf("b", "a", "c")),
+            PlaceSortCriterion.TOTAL_TIME to (listOf("c", "a", "b") to listOf("b", "a", "c")),
+            PlaceSortCriterion.VISIT_COUNT to (listOf("c", "b", "a") to listOf("a", "b", "c")),
+        )
+        expected.forEach { (criterion, orders) ->
+            listOf(PlaceSortDirection.ASC to orders.first, PlaceSortDirection.DESC to orders.second).forEach { (direction, order) ->
+                assertEquals("$criterion $direction", order, PlaceListUiMapper.map(places, stats, visits,
+                    PlaceSortState(criterion, direction), PlaceListLocation(0.0, 0.0)).map { it.place.uuid })
+            }
+        }
     }
 
     @Test

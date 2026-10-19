@@ -99,9 +99,9 @@
     <string name="history_delete_session_confirm">Delete the whole session? Audit and undo will keep a recoverable trace.</string>
     <string name="history_delete_session">Delete session</string>
     <string name="history_edit_event_title">Edit history event</string>
-    <string name="history_timestamp">Timestamp</string>
-    <string name="history_timestamp_hint">Format: d/M/yy HH:mm</string>
-    <string name="history_timestamp_invalid">Use d/M/yy HH:mm, for example 6/7/26 14:30.</string>
+    <string name="history_timestamp">Date and time</string>
+    <string name="history_timestamp_hint">For example 19/10/2026 14:30:15. Seconds are optional.</string>
+    <string name="history_timestamp_invalid">Enter a valid local date and time, for example 19/10/2026 14:30:15.</string>
     <string name="history_anomaly_open">open check-in</string>
     <string name="history_anomaly_missing_check_in">missing check-in</string>
     <string name="history_anomaly_negative_duration">negative duration</string>

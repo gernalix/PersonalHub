@@ -9,6 +9,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.gernalix.luoghi.R
 import androidx.compose.ui.unit.dp
 import com.gernalix.luoghi.capsules.addressautocomplete.*
 import com.gernalix.luoghi.capsules.explore.PlacesProximity
@@ -63,8 +65,8 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onBack) { Text("Back") }
-                Text("Explore places", style = MaterialTheme.typography.headlineSmall)
+                TextButton(onClick = onBack) { Text(stringResource(R.string.places_action_back)) }
+                Text(stringResource(R.string.places_explore_title), style = MaterialTheme.typography.headlineSmall)
             }
         }
         item {
@@ -73,13 +75,13 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
                 latitude = null
                 longitude = null
                 referenceId = null
-            }, label = "Choose a saved place or search an address", modifier = Modifier.fillMaxWidth().testTag("explore-reference-search"))
+            }, label = stringResource(R.string.places_explore_reference_hint), modifier = Modifier.fillMaxWidth().testTag("explore-reference-search"))
         }
         items(saved, key = { "saved:${it.uuid}" }) { place ->
             TextButton(enabled = !resolving && validCoordinates(place.lat, place.lon), onClick = {
-                latitude = place.lat; longitude = place.lon; label = place.nickname; referenceId = place.uuid
-                query = place.nickname; suggestions = emptyList()
-            }, modifier = Modifier.fillMaxWidth()) { Text(place.nickname + (place.address?.let { " · $it" } ?: "")) }
+                latitude = place.lat; longitude = place.lon; label = place.nickname.ifBlank { context.getString(R.string.unnamed_place) }; referenceId = place.uuid
+                query = label; suggestions = emptyList()
+            }, modifier = Modifier.fillMaxWidth()) { Text(place.nickname.ifBlank { stringResource(R.string.unnamed_place) } + (place.address?.let { " · $it" } ?: "")) }
         }
         items(suggestions, key = { "address:${it.placeId}" }) { suggestion ->
             TextButton(enabled = !resolving, onClick = {
@@ -102,25 +104,25 @@ fun ExplorePlacesScreen(places: List<PlaceEntity>, onBack: () -> Unit, onOpenPla
             }, modifier = Modifier.fillMaxWidth()) { Text(suggestion.primaryText + " · " + suggestion.secondaryText) }
         }
         if (resolving) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-        if (error) item { Text("Address lookup failed. Try another address or choose a saved place.", color = MaterialTheme.colorScheme.error) }
+        if (error) item { Text(stringResource(R.string.places_explore_lookup_failed), color = MaterialTheme.colorScheme.error) }
         if (reference == null) item {
-            Text("Choose the reference above. Distances use that point, not your GPS location. Temporary addresses are not saved.")
+            Text(stringResource(R.string.places_explore_reference_help))
         } else {
             item {
                 Text(label, style = MaterialTheme.typography.titleMedium)
-                Text("Straight-line distances from this reference; moving the map does not change them.")
+                Text(stringResource(R.string.places_explore_distance_help))
                 Button(onClick = { context.startActivity(MapViewerCapsule.exploreMapIntent(context, reference)) }, modifier = Modifier.testTag("explore-open-osmand")) {
-                    Text("Show in OsmAnd")
+                    Text(stringResource(R.string.places_explore_open_map))
                 }
             }
             items(ordered, key = { "nearby:${it.place.uuid}" }) { nearby ->
                 if (nearby.distanceMeters == null && firstMissingId == nearby.place.uuid) {
-                    Text("Places without coordinates", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.places_explore_missing_heading), style = MaterialTheme.typography.titleMedium)
                 }
                 OutlinedCard(onClick = { onOpenPlace(nearby.place) }, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(nearby.place.nickname, modifier = Modifier.weight(1f))
-                        Text(nearby.distanceMeters?.roundToLong()?.let { localizedDistance(it) } ?: "No coordinates")
+                        Text(nearby.place.nickname.ifBlank { stringResource(R.string.unnamed_place) }, modifier = Modifier.weight(1f))
+                        Text(nearby.distanceMeters?.roundToLong()?.let { localizedDistance(it) } ?: stringResource(R.string.places_explore_missing_value))
                     }
                 }
             }

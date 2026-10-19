@@ -46,6 +46,11 @@ FROM startup_history
 GROUP BY module, app_version, variant, apk_sha256, device_model, phase, metric;
 ```
 
+Le suite instrumentation conservano anche il tempo complessivo dichiarato dal
+runner (`test_suite_duration`, ambito `@suite`), inclusi i tentativi falliti se
+il runner ha prodotto una durata. Questo tempo comprende l’esecuzione dei test
+e delle loro attese; non è un tempo di avvio del modulo.
+
 `am start -W` produce `activity_total_time` e `activity_wait_time` in millisecondi,
 con fase COLD/WARM/HOT riportata da Android. Lo stato `MEASURED` certifica la
 lettura dei tempi, non il corretto funzionamento o la piena disponibilità del

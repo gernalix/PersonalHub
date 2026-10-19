@@ -1,5 +1,0 @@
-<resources>
-    <string name="module_content_tab">Modulo</string>
-    <string name="module_history_tab">Cronologia</string>
-    <string name="module_history_unavailable">Cronologia non disponibile.</string>
-</resources>

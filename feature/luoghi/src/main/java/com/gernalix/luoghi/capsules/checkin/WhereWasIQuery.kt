@@ -13,7 +13,7 @@ sealed interface WhereWasIResult {
 }
 
 object WhereWasIQuery {
-    fun at(visits: List<VisitUiModel>, places: List<PlaceEntity>, instantMs: Long): WhereWasIResult {
+    fun at(visits: List<VisitUiModel>, places: List<PlaceEntity>, instantMs: Long, observedAtMs: Long? = null): WhereWasIResult {
         val placesById = places.associateBy { it.uuid }
         val ordered = visits
             .filter { it.startedAt != null && it.placeId in placesById }
@@ -22,7 +22,7 @@ object WhereWasIQuery {
         // duration. An old check-in without checkout is not proof of staying forever.
         val inside = ordered.filter { visit ->
             val start = visit.startedAt ?: return@filter false
-            val end = visit.endedAt ?: if (visit.isActive) start + visit.durationMs else return@filter false
+            val end = visit.endedAt ?: if (visit.isActive) observedAtMs ?: (start + visit.durationMs) else return@filter false
             instantMs in start..end
         }.let { matches ->
             if (matches.any { it.startedAt == instantMs }) matches.filterNot { it.endedAt == instantMs && it.startedAt != instantMs }

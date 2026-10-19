@@ -36,13 +36,13 @@ data class MapMarkerModel(
     val longitude: Double,
 ) {
     companion object {
-        fun from(place: PlaceEntity, label: String?): MapMarkerModel? {
+        fun from(place: PlaceEntity, label: String?, unnamedLabel: String = "Unnamed place"): MapMarkerModel? {
             val lat = place.lat ?: return null
             val lon = place.lon ?: return null
             if (!OsmAndMapPlan.valid(lat, lon)) return null
             return MapMarkerModel(
                 uuid = place.uuid,
-                title = label?.takeIf { it.isNotBlank() } ?: place.nickname.ifBlank { "Unnamed place" },
+                title = label?.takeIf { it.isNotBlank() } ?: place.nickname.ifBlank { unnamedLabel },
                 address = place.address,
                 notes = place.notes,
                 latitude = lat,

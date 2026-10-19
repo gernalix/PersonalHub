@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -142,6 +143,9 @@ class HubHistorySearchQaDeviceTest {
                 R.string.since_when_title, com.gernalix.personalhub.core.ui.R.string.countdown_title, R.string.settings_title).forEach {
                 composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed()
             }
+            listOf(R.string.home_alerts to R.string.home_alerts_it, R.string.home_notifications to R.string.home_notifications_it).forEach { (english, italian) ->
+                composeRule.onNodeWithContentDescription(com.gernalix.personalhub.core.alerts.AlertText.get(context, english, italian)).assertIsDisplayed()
+            }
             composeRule.onNodeWithText(context.getString(com.gernalix.personalhub.core.ui.R.string.home_layout_extended)).assertIsDisplayed()
             composeRule.onNodeWithTag("home-layout-switch").performClick()
             composeRule.runOnIdle { assertTrue(!preferences.getBoolean("compact", true)) }
@@ -196,6 +200,67 @@ class HubHistorySearchQaDeviceTest {
             "${context.getString(R.string.activity_title)} · " +
                 context.getString(R.string.module_timer),
         ).assertIsDisplayed()
+    }
+
+    @Test
+    fun hubAndSettingsEntryPointsExposeTheirScopedHistoryTabs() {
+        val context = qaContext()
+        val preferences = context.getSharedPreferences("home_layout", Context.MODE_PRIVATE)
+        val previous = preferences.getBoolean("compact", false)
+        preferences.edit().putBoolean("compact", false).commit()
+        val generation = mutableStateOf(0)
+        try {
+            composeRule.setContent { PersonalHubTheme { Surface { PersonalHubApp(generation.value) } } }
+            listOf(R.string.home_context to R.string.app_name, R.string.settings_title to R.string.settings_title,
+                R.string.since_when_title to R.string.since_when_title,
+                com.gernalix.personalhub.core.ui.R.string.countdown_title to com.gernalix.personalhub.core.ui.R.string.countdown_title).forEach { (entry, scopeTitle) ->
+                composeRule.onNodeWithTag("home-grid").performScrollToNode(hasText(context.getString(entry)))
+                composeRule.onNodeWithText(context.getString(entry)).performClick()
+                composeRule.onNodeWithTag("module-history-tab").assertIsDisplayed().performClick()
+                composeRule.onNodeWithText("${context.getString(R.string.activity_title)} · ${context.getString(scopeTitle)}").assertIsDisplayed()
+                composeRule.onNodeWithTag("history-module-filter").assertDoesNotExist()
+                composeRule.runOnIdle { generation.value += 1 }
+            }
+        } finally { preferences.edit().putBoolean("compact", previous).commit() }
+    }
+
+    @Test
+    fun zz_allOwnerActivitiesExposeTheirSharedHistoryTabWithTheCorrectScope() {
+        val context = qaContext()
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        val entries = HubModule.entries.map { module ->
+            LauncherShortcutsCapsule.moduleIntent(context, module) to context.getString(module.titleRes)
+        } + listOf(
+            com.gernalix.personalhub.notifications.api.NotificationsRoute.intent(context) to
+                com.gernalix.personalhub.core.alerts.AlertText.get(context, R.string.home_notifications, R.string.home_notifications_it),
+            Intent(context, HubTagsActivity::class.java) to "Tags",
+        )
+        entries.forEachIndexed { index, (intent, name) ->
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            // Deny an optional QA-only runtime permission instead of importing user data.
+            device.wait(Until.findObject(By.res(java.util.regex.Pattern.compile(".*:id/permission_deny_button"))
+                .pkg(java.util.regex.Pattern.compile("com\\.(google\\.android|android)\\.permissioncontroller"))), 500)?.click()
+            device.findObject(By.pkg(context.packageName).text(context.getString(com.example.multitimetracker.R.string.notification_permission_not_now)))?.click()
+            device.waitForIdle()
+            try {
+                composeRule.waitUntil(10_000) {
+                    composeRule.onAllNodesWithTag("module-history-tab").fetchSemanticsNodes().isNotEmpty()
+                }
+                assertEquals("The QA app must own the foreground before input", context.packageName, device.currentPackageName)
+                composeRule.onNodeWithTag("module-history-tab").assertIsDisplayed().performClick()
+                val expected = "${context.getString(R.string.activity_title)} · $name"
+                composeRule.waitUntil(10_000) { composeRule.onAllNodesWithText(expected).fetchSemanticsNodes().isNotEmpty() }
+                composeRule.onNodeWithText(expected).assertIsDisplayed()
+                composeRule.onNodeWithTag("history-module-filter").assertDoesNotExist()
+            } catch (failure: Throwable) {
+                if (device.currentPackageName == context.packageName) {
+                    runCatching { device.takeScreenshot(java.io.File(context.cacheDir, "module-history-failure-$index.png")) }
+                }
+                throw failure
+            }
+            device.pressBack()
+            device.pressHome()
+        }
     }
 
     @Test
