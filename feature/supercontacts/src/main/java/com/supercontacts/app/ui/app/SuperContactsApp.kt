@@ -190,12 +190,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-data class CallOverlaySignal(
-    val sequence: Long,
-    val phoneNumber: String?,
-    val isManualTest: Boolean = false,
-)
-
 @Composable
 fun SuperContactsApp(
     launchIntent: Intent? = null,
@@ -1994,73 +1988,6 @@ private fun EmptyContactsState(
             Text(stringResource(R.string.create_first_contact))
             Button(onClick = onNewContact) {
                 Text(stringResource(R.string.new_contact))
-            }
-        }
-    }
-}
-
-@Composable
-private fun CallOverlay(
-    signal: CallOverlaySignal,
-    matchedContactId: Long?,
-    onDismiss: () -> Unit,
-    onOpenContact: (Long) -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .testTag("call-overlay"),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (signal.isManualTest) {
-                                R.string.call_overlay_manual_title
-                            } else {
-                                R.string.call_overlay_title
-                            },
-                        ),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.testTag("call-overlay-close"),
-                    ) {
-                        Text("X")
-                    }
-                }
-                Text(
-                    text = signal.phoneNumber
-                        ?.takeIf { it.isNotBlank() }
-                        ?: stringResource(R.string.call_overlay_number_unknown),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                if (matchedContactId == null) {
-                    Text(
-                        text = stringResource(R.string.call_overlay_contact_not_found),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Button(
-                        onClick = { onOpenContact(matchedContactId) },
-                        modifier = Modifier.testTag("call-overlay-open-contact"),
-                    ) {
-                        Text(stringResource(R.string.call_overlay_open_contact))
-                    }
-                }
             }
         }
     }
