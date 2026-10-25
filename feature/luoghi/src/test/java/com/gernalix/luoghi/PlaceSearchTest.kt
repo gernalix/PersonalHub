@@ -15,5 +15,8 @@ class PlaceSearchTest {
         assertTrue(PlaceSearch.matches(place, emptyList(), " "))
         assertFalse(PlaceSearch.matches(place, emptyList(), "cafe missing"))
         assertFalse(PlaceSearch.matches(place, emptyList(), "internal-id"))
+        assertTrue(PlaceSearch.matches(place, emptyList(), "Amager", "Amagerbro Amager Copenhagen Denmark"))
+        assertTrue(PlaceSearch.matches(place, emptyList(), "amager denmark", "Amager Copenhagen Denmark"))
+        assertFalse(PlaceSearch.matches(place, emptyList(), "Amager", ""))
     }
 }
