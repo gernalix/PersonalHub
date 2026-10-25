@@ -186,6 +186,13 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth().testTag("places-live-search"),
                 )
             }
+            item(key = "places-geo-attribution") {
+                Text(
+                    text = stringResource(R.string.places_geodata_attribution),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             item(key = "places-title") {
                 SectionHeader(
                     title = stringResource(R.string.places),

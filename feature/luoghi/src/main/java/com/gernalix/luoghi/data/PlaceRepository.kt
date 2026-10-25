@@ -10,6 +10,7 @@ import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 import android.content.Context
 import androidx.room.withTransaction
 import com.gernalix.personalhub.contracts.database.PlaceReferenceReader
+import com.gernalix.luoghi.capsules.geometadata.PlaceGeoMetadataWorker
 import com.gernalix.luoghi.capsules.checkin.HistoryMutationResult
 import com.gernalix.luoghi.capsules.checkin.HistorySessionAnomaly
 import com.gernalix.luoghi.capsules.checkin.HistorySessionCalculator
@@ -39,6 +40,22 @@ class PlaceRepository(
     private val placeReferences: PlaceReferenceReader = database,
 ) {
     val places: Flow<List<PlaceEntity>> = dao.observePlaces()
+    val geoMetadata: Flow<List<PlaceGeoMetadataEntity>> = dao.observeGeoMetadata()
+
+    suspend fun placesNeedingGeoMetadata(limit: Int): List<PlaceEntity> =
+        dao.placesNeedingGeoMetadata(limit)
+
+    /** A delayed response must never attach the old coordinates to an edited/deleted place. */
+    suspend fun saveGeoMetadataIfUnchanged(metadata: PlaceGeoMetadataEntity) {
+        val saved = DatabaseMutationCoordinator.mutex.withLock {
+            val current = dao.getPlace(metadata.placeUuid)
+            if (current?.lat == metadata.latitudeSnapshot && current.lon == metadata.longitudeSnapshot) {
+                dao.upsertGeoMetadata(metadata)
+                true
+            } else false
+        }
+        if (saved) HubAutoExport.request(context)
+    }
     private val sharedTags = SharedTagEngine(database)
     val placeTags: Flow<List<HubTagEntity>> = sharedTags.observe(HubTagNamespaces.PLACES)
     val placeTagAssignments = sharedTags.observeAssignments(HubTagNamespaces.PLACES)
@@ -128,6 +145,9 @@ class PlaceRepository(
             }
         }
         HubAutoExport.request(context)
+        if (lat != null && lon != null && lat in -90.0..90.0 && lon in -180.0..180.0) {
+            PlaceGeoMetadataWorker.enqueue(context)
+        }
         return resolvedUuid
     }
 

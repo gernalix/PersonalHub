@@ -25,6 +25,7 @@ import com.gernalix.luoghi.capsules.visits.VisitMapper
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.luoghi.capsules.visits.VisitUiModel
 import com.gernalix.luoghi.data.PlaceEntity
+import com.gernalix.luoghi.data.PlaceGeoMetadataEntity
 import com.gernalix.luoghi.data.PlaceDeleteResult
 import com.gernalix.luoghi.data.CheckInAttemptCandidateEntity
 import com.gernalix.luoghi.data.CheckInAttemptDiagnostic
@@ -226,7 +227,9 @@ class LuoghiHomeViewModel(
     }
 
     val state: StateFlow<HomeUiState> = combine(
-        combine(container.places.places, container.places.tagAssignments, container.places.tags) { places, assignments, tags -> Triple(places, assignments, tags) },
+        combine(container.places.places, container.places.tagAssignments, container.places.tags, container.places.geoMetadata) { places, assignments, tags, geo ->
+            Triple(places, assignments, tags) to geo
+        },
         combine(container.checkIns.events, container.geofences.configs, container.checkIns.recentAttempts) { events, geofenceConfigs, attempts ->
             Triple(events, geofenceConfigs, attempts)
         },
@@ -234,7 +237,9 @@ class LuoghiHomeViewModel(
         mutableState,
         HubContextRuntime.contextChanges(),
     ) { placeData, eventAndGeofenceConfigs, globalStatsState, state, _ ->
-        val (places, tagAssignments, tags) = placeData
+        val (placeTriple, geo) = placeData
+        val (places, tagAssignments, tags) = placeTriple
+        val geoByUuid = geo.associateBy { it.placeUuid }
         val (events, geofenceConfigs, attempts) = eventAndGeofenceConfigs
         val nowMs = maxOf(state.nowMs, System.currentTimeMillis())
         val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
@@ -248,6 +253,7 @@ class LuoghiHomeViewModel(
             val assigned = placeTagIds[place.uuid].orEmpty()
             assigned.containsAll(selectedTags) && com.gernalix.luoghi.capsules.places.PlaceSearch.matches(
                 place, assigned.mapNotNull(tagNames::get), state.placeQuery,
+                geoByUuid[place.uuid]?.searchText.orEmpty(),
             )
         }
         state.copy(

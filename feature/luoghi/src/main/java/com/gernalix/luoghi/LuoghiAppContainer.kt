@@ -6,6 +6,7 @@ import com.gernalix.luoghi.capsules.addressautocomplete.AddressAutocompleteSourc
 import com.gernalix.luoghi.capsules.aliases.AliasesCapsule
 import com.gernalix.luoghi.capsules.checkin.CheckInCapsule
 import com.gernalix.luoghi.capsules.geofence.PlaceGeofenceCapsule
+import com.gernalix.luoghi.capsules.geometadata.PlaceGeoMetadataWorker
 import com.gernalix.luoghi.capsules.links.LinksCapsule
 import com.gernalix.luoghi.capsules.location.FusedLocationCapsule
 import com.gernalix.luoghi.capsules.location.LocationSource
@@ -26,6 +27,8 @@ class LuoghiAppContainer(context: Context) {
     private val dao = database.placeDao()
     private val placeRepository = PlaceRepository(appContext, database, dao)
     private val placeAlertEngine = PlaceAlertEngine(appContext, database)
+
+    init { PlaceGeoMetadataWorker.enqueue(appContext) }
 
     val places = PlacesCapsule(placeRepository)
     val alerts = PlaceAlertRepository(appContext, database)
