@@ -3,6 +3,7 @@ package com.gernalix.personalhub.core.database
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
+import com.gernalix.luoghi.data.PlaceGeoMetadataEntity
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -78,6 +79,15 @@ class PlaceGeoMetadataMigrationTest {
         assertNotNull(db.placeDao().getPlace("existing-place"))
         assertEquals("Amager", db.placeDao().getPlace("existing-place")?.address)
         assertTrue(db.placeDao().placesNeedingGeoMetadata(5).any { it.uuid == "existing-place" })
+        db.placeDao().upsertGeoMetadata(
+            PlaceGeoMetadataEntity(
+                placeUuid = "existing-place", latitudeSnapshot = 55.6,
+                longitudeSnapshot = 12.6, rawJson = "{\"address\":{\"suburb\":\"Amager\"}}",
+                searchText = "Amager Copenhagen Denmark",
+            )
+        )
+        assertTrue("Cached coordinates never need another API request",
+            db.placeDao().placesNeedingGeoMetadata(5).isEmpty())
         assertEquals(26, SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version })
     }
 }

@@ -37,6 +37,8 @@ class PlaceGeoMetadataWorker(context: Context, parameters: WorkerParameters) :
                     is NominatimReverse.Response.Found -> PlaceGeoMetadataCodec.found(place, response.json)
                     NominatimReverse.Response.NoMatch -> PlaceGeoMetadataCodec.noMatch(place)
                 }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 // Transient HTTP failures/connection loss must not prevent saving the place.
                 return Result.retry()
