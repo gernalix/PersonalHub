@@ -414,6 +414,7 @@ internal val GIT_HISTORY_ENTITY_TYPES = mapOf(
     "tags" to "person tag",
     "contact_tags" to "person tag",
     "places" to "place",
+    "place_geo_metadata" to "place geographic metadata",
     "place_aliases" to "place alias",
     "place_links" to "place link",
     "place_events" to "visit",

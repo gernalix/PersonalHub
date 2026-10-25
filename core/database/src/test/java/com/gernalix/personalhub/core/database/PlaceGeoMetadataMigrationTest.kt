@@ -21,6 +21,7 @@ class PlaceGeoMetadataMigrationTest {
     private lateinit var context: Context
 
     @Before fun setUp() {
+        DatabaseVault.setDirectorySyncForTests { }
         context = ApplicationProvider.getApplicationContext()
         PersonalHubDatabase.resetForTests()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
@@ -28,6 +29,7 @@ class PlaceGeoMetadataMigrationTest {
     }
 
     @After fun tearDown() {
+        DatabaseVault.setDirectorySyncForTests(null)
         PersonalHubDatabase.resetForTests()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
         DatabaseVault.preferences(context).edit().clear().commit()
@@ -61,6 +63,11 @@ class PlaceGeoMetadataMigrationTest {
             db.execSQL("""
                 INSERT INTO places(uuid, nickname, address, lat, lon, created_at, updated_at, archived)
                 VALUES('existing-place', 'Home', 'Amager', 55.6, 12.6, 1000, 1000, 0)
+            """)
+            db.execSQL("""
+                INSERT INTO hub_entities
+                    (canonical_id, entity_kind, owning_module, local_table, local_key, lifecycle, created_at, updated_at)
+                VALUES('existing-place', 'places/place', 'places', 'places', 'existing-place', 'ACTIVE', 1000, 1000)
             """)
             db.version = 25
         }

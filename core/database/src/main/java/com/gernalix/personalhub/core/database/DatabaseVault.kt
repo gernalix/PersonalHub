@@ -306,7 +306,7 @@ object DatabaseVault {
                     throw error
                 }
             }.getOrElse {
-                fail("Automatic database migration from schema $sourceVersion failed (${it.javaClass.simpleName}); original data was preserved")
+                fail("Automatic database migration from schema $sourceVersion failed (${it.javaClass.simpleName}: ${it.message?.take(220)}); original data was preserved")
             }
         }
         if (sourceVersion != PersonalHubDatabase.SCHEMA_VERSION) {
