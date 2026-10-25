@@ -31,6 +31,27 @@ data class PlaceEntity(
     @ColumnInfo(name = "first_check_in_at_place") val firstCheckInAtPlace: Long? = null,
 )
 
+/** One-time, locally searchable, attribution-preserving reverse-geocoding snapshot. */
+@Entity(
+    tableName = "place_geo_metadata",
+    foreignKeys = [ForeignKey(
+        entity = PlaceEntity::class,
+        parentColumns = ["uuid"],
+        childColumns = ["place_uuid"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+)
+data class PlaceGeoMetadataEntity(
+    @PrimaryKey @ColumnInfo(name = "place_uuid") val placeUuid: String,
+    @ColumnInfo(name = "latitude_snapshot") val latitudeSnapshot: Double,
+    @ColumnInfo(name = "longitude_snapshot") val longitudeSnapshot: Double,
+    val source: String = "OpenStreetMap/Nominatim",
+    val status: String = "FOUND",
+    @ColumnInfo(name = "raw_json") val rawJson: String,
+    @ColumnInfo(name = "search_text") val searchText: String,
+    @ColumnInfo(name = "fetched_at") val fetchedAt: Long = System.currentTimeMillis(),
+)
+
 @Entity(
     tableName = "route_distance_cache",
     foreignKeys = [

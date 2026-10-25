@@ -135,6 +135,23 @@ interface PlaceDao {
     @Query("SELECT * FROM places WHERE archived=0 AND lat IS NOT NULL AND lon IS NOT NULL ORDER BY updated_at DESC,uuid ASC LIMIT :limit")
     suspend fun placesWithCoordinates(limit: Int): List<PlaceEntity>
 
+    @Query("SELECT * FROM place_geo_metadata ORDER BY place_uuid")
+    fun observeGeoMetadata(): Flow<List<PlaceGeoMetadataEntity>>
+
+    @Query("""
+        SELECT places.* FROM places
+        LEFT JOIN place_geo_metadata ON place_geo_metadata.place_uuid = places.uuid
+        WHERE places.archived = 0 AND places.lat BETWEEN -90 AND 90 AND places.lon BETWEEN -180 AND 180
+          AND (place_geo_metadata.place_uuid IS NULL
+            OR place_geo_metadata.latitude_snapshot != places.lat
+            OR place_geo_metadata.longitude_snapshot != places.lon)
+        ORDER BY places.created_at ASC LIMIT :limit
+    """)
+    suspend fun placesNeedingGeoMetadata(limit: Int): List<PlaceEntity>
+
+    @Upsert
+    suspend fun upsertGeoMetadata(metadata: PlaceGeoMetadataEntity)
+
     @Upsert
     suspend fun upsertPlace(place: PlaceEntity)
 

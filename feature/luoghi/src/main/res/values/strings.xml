@@ -259,7 +259,8 @@
     <string name="place_alert_edit">Edit</string>
     <string name="place_alert_existing">Existing Places alerts</string>
     <string name="place_alert_specific_place">Specific place</string>
-    <string name="places_search_hint" translatable="false">Search places, addresses, notes and tags</string>
+    <string name="places_search_hint" translatable="false">Search places, addresses, notes and geographic metadata</string>
+    <string name="places_geodata_attribution" translatable="false">Geographic metadata: © OpenStreetMap contributors (ODbL)</string>
     <string name="places_sort_help" translatable="false">Sort the places below. Tap the selected criterion again to reverse the order.</string>
     <string name="where_was_i_overlapping_format" translatable="false">Overlapping visits were recorded at: %1$s</string>
     <string name="place_directions" translatable="false">Directions</string>

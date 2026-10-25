@@ -20,6 +20,7 @@ data class PlaceMutation(
 
 class PlacesCapsule(private val repository: PlaceRepository) {
     val places: Flow<List<PlaceEntity>> = repository.places
+    val geoMetadata = repository.geoMetadata
     val tags = repository.placeTags
     val tagAssignments = repository.placeTagAssignments
 

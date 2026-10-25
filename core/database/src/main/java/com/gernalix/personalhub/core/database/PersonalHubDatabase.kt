@@ -10,6 +10,7 @@ import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataTracking
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitHistoryStore
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventStore
 import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationEventCapture
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -44,6 +45,7 @@ import java.security.MessageDigest
     com.supercontacts.app.data.local.TagEntity::class,
     com.supercontacts.app.data.local.ContactTagCrossRef::class,
     com.gernalix.luoghi.data.PlaceEntity::class,
+    com.gernalix.luoghi.data.PlaceGeoMetadataEntity::class,
     com.gernalix.luoghi.data.PlaceAliasEntity::class,
     com.gernalix.luoghi.data.PlaceLinkEntity::class,
     com.gernalix.luoghi.data.PlaceEventEntity::class,
@@ -102,7 +104,7 @@ import java.security.MessageDigest
     SinceWhenMigrationState::class,
 
     HubCanonicalEntity::class, HubExternalIdentity::class, HubEntityAlias::class,
-], version = 25, exportSchema = true)
+], version = 26, autoMigrations = [AutoMigration(from = 25, to = 26)], exportSchema = true)
 abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     abstract fun contactsDao(): com.supercontacts.app.data.local.ContactsDao
     abstract fun placeDao(): com.gernalix.luoghi.data.PlaceDao
@@ -123,7 +125,7 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
     companion object {
         const val DATABASE_NAME = "personalhub.db"
         const val DB_NAME = DATABASE_NAME
-        const val SCHEMA_VERSION = 25
+        const val SCHEMA_VERSION = 26
         const val APP_ID = "com.gernalix.personalhub"
         const val BACKUP_FORMAT_VERSION = 1
         @Volatile private var instance: PersonalHubDatabase? = null

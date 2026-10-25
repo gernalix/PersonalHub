@@ -216,10 +216,25 @@ object DatabaseVault {
         sidecars(target)
         atomicMove(recovery, target)
         DatabaseProfiles.rollbackPendingSwitch(context)
+        preferences(context).edit().remove("startup_gate_schema").remove("startup_gate_app_version").commit()
         check(marker.delete())
         syncDirectory(context.filesDir)
         preferences(context).edit().putString("error", "Interrupted import was rolled back").commit()
         cleanupOrphanedPreImportBackups(context)
+    }
+
+    /** Only explicitly registered and tested Room migrations may bypass the strict version gate. */
+    fun supportsStartupUpgrade(version: Int?): Boolean =
+        version == 25 && PersonalHubDatabase.SCHEMA_VERSION == 26
+
+    private fun migrateStagedDatabaseIfSupported(context: Context, stage: File) {
+        val version = SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READONLY)
+            .use { it.version }
+        if (version == PersonalHubDatabase.SCHEMA_VERSION) return
+        require(supportsStartupUpgrade(version)) { "Unsupported database schema $version" }
+        PersonalHubDatabase.openStaging(context, stage.absolutePath).let { staging ->
+            try { staging.openHelper.writableDatabase } finally { staging.close() }
+        }
     }
 
     /** Validates the canonical database before feature code can write to it. */
@@ -261,6 +276,39 @@ object DatabaseVault {
         val sourceVersion = runCatching {
             SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY).use { it.version }
         }.getOrElse { return@withLock fail("Database is unreadable; existing data was preserved") }
+        if (supportsStartupUpgrade(sourceVersion)) {
+            return@withLock runCatching {
+                // Preserve the complete original database before Room touches the schema.
+                // Its WAL must be checkpointed before a byte-for-byte recovery snapshot.
+                require(!marker(context).exists()) { "Pending database replacement must be recovered first" }
+                SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READWRITE).use { source ->
+                    source.rawQuery("PRAGMA wal_checkpoint(FULL)", null).use { cursor ->
+                        require(cursor.moveToFirst() && cursor.getInt(0) == 0 &&
+                            cursor.getInt(1) == cursor.getInt(2)) { "Cannot checkpoint database safely" }
+                    }
+                }
+                val backup = File(target.parentFile,
+                    "$STARTUP_ROLLBACK_PREFIX$sourceVersion-${UUID.randomUUID()}.db")
+                syncCopy(target, backup)
+                try {
+                    writeImportMarker(context, backup)
+                    // AutoMigration(25 -> 26) is transactional and Room validates its schema.
+                    PersonalHubDatabase.get(context).openHelper.writableDatabase
+                    validate(context, target)
+                    check(pass()) { "Cannot persist successful schema migration" }
+                    check(marker(context).delete()) { "Cannot finish schema migration safely" }
+                    syncDirectory(context.filesDir)
+                    cleanupCompletedStartupRollbacks(context)
+                    true
+                } catch (error: Throwable) {
+                    PersonalHubDatabase.closeInstance()
+                    if (marker(context).exists()) recoverInterruptedImport(context)
+                    throw error
+                }
+            }.getOrElse {
+                fail("Automatic database migration from schema $sourceVersion failed (${it.javaClass.simpleName}); original data was preserved")
+            }
+        }
         if (sourceVersion != PersonalHubDatabase.SCHEMA_VERSION) {
             return@withLock fail("Database schema $sourceVersion is unsupported; schema ${PersonalHubDatabase.SCHEMA_VERSION} is required. Existing data was preserved")
         }
@@ -695,6 +743,7 @@ object DatabaseVault {
         val stage = File(target.parentFile, "personalhub-import-${UUID.randomUUID()}.db")
         try {
             context.contentResolver.openInputStream(uri).use { input -> FileOutputStream(stage).use { out -> requireNotNull(input).copyTo(out); out.fd.sync() } }
+            migrateStagedDatabaseIfSupported(context, stage)
             validate(context, stage)
             val gitHistoryEnabled = runCatching {
                 GitDataSettings.configuration(context).enabled
@@ -816,6 +865,7 @@ object DatabaseVault {
                 val stage = File(target.parentFile, "personalhub-profile-${UUID.randomUUID()}.db")
                 try {
                     syncCopy(targetProfileFile, stage)
+                    migrateStagedDatabaseIfSupported(context, stage)
                     validate(context, stage)
                     DatabaseGate.replace {
                         val backup = File(
