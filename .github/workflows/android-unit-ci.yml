@@ -58,12 +58,12 @@ jobs:
       GOOGLE_MAPS_API_KEY: CI_NOT_A_REAL_KEY
       GOOGLE_ROUTES_API_KEY: CI_NOT_A_REAL_KEY
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v5.1.0
+      - uses: actions/setup-java@v5.7.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v5.0.2
       - name: Validate external database migrations
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 tools/test_migrate_personalhub_v20_to_v21.py
