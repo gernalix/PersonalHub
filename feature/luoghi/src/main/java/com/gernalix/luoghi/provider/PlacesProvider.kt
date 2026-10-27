@@ -242,7 +242,8 @@ class PlacesProvider : ContentProvider() {
         val lat = uri.getQueryParameter(PlacesContract.Nearby.LAT)?.toDoubleOrNull()
         val lon = uri.getQueryParameter(PlacesContract.Nearby.LON)?.toDoubleOrNull()
         val radius = uri.getQueryParameter(PlacesContract.Nearby.RADIUS_M)?.toDoubleOrNull()
-        if (lat == null || lon == null || radius == null) return emptyList()
+        if (lat == null || lon == null || radius == null || !GeoSearch.validCoordinates(lat, lon) ||
+            !radius.isFinite() || radius < 0.0) return emptyList()
         val limit = uri.getQueryParameter(PlacesContract.Nearby.LIMIT)?.toIntOrNull()
             ?.coerceIn(1, MAX_GEO_CANDIDATES)
             ?: DEFAULT_NEARBY_LIMIT
@@ -262,7 +263,7 @@ class PlacesProvider : ContentProvider() {
     private fun nearestPlaces(dao: PlaceDao, uri: Uri): List<PlaceEntity> {
         val lat = uri.getQueryParameter(PlacesContract.Nearest.LAT)?.toDoubleOrNull()
         val lon = uri.getQueryParameter(PlacesContract.Nearest.LON)?.toDoubleOrNull()
-        if (lat == null || lon == null) return emptyList()
+        if (lat == null || lon == null || !GeoSearch.validCoordinates(lat, lon)) return emptyList()
         val limit = uri.getQueryParameter(PlacesContract.Nearest.LIMIT)?.toIntOrNull()
             ?.coerceIn(1, MAX_NEAREST_RESULTS)
             ?: DEFAULT_NEAREST_RESULTS

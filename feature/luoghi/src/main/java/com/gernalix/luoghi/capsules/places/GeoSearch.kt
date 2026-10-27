@@ -14,7 +14,11 @@ data class GeoBoundingBox(
     val maxLat: Double,
     val minLon: Double,
     val maxLon: Double,
-)
+) {
+    /** A reversed longitude range spans the antimeridian rather than being empty. */
+    fun containsLongitude(value: Double): Boolean =
+        if (minLon <= maxLon) value in minLon..maxLon else value >= minLon || value <= maxLon
+}
 
 data class PlaceDistance(
     val place: PlaceEntity,
@@ -42,11 +46,13 @@ object GeoSearch {
         val latDelta = safeRadius / METERS_PER_LATITUDE_DEGREE
         val lonMeters = METERS_PER_LATITUDE_DEGREE * cos(Math.toRadians(lat)).coerceAtLeast(0.01)
         val lonDelta = safeRadius / lonMeters
+        val allLongitudes = lonDelta >= 180.0
+        fun wrap(value: Double) = ((value + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
         return GeoBoundingBox(
             minLat = max(-90.0, lat - latDelta),
             maxLat = min(90.0, lat + latDelta),
-            minLon = max(-180.0, lon - lonDelta),
-            maxLon = min(180.0, lon + lonDelta),
+            minLon = if (allLongitudes) -180.0 else wrap(lon - lonDelta),
+            maxLon = if (allLongitudes) 180.0 else wrap(lon + lonDelta),
         )
     }
 

@@ -108,7 +108,10 @@ interface PlaceDao {
         WHERE archived = 0
           AND lat IS NOT NULL AND lon IS NOT NULL
           AND lat BETWEEN :minLat AND :maxLat
-          AND lon BETWEEN :minLon AND :maxLon
+          AND (
+              (:minLon <= :maxLon AND lon BETWEEN :minLon AND :maxLon)
+              OR (:minLon > :maxLon AND (lon >= :minLon OR lon <= :maxLon))
+          )
         ORDER BY nickname COLLATE NOCASE ASC, updated_at DESC
         LIMIT :limit
         """,
