@@ -201,15 +201,14 @@ private class TinyClipRuntime(files: FinanceSemanticFiles) : AutoCloseable {
 
         fun preprocess(source: Bitmap): FloatArray {
             require(source.width > 0 && source.height > 0)
-            val scale = 224f / minOf(source.width, source.height)
-            val width = (source.width * scale).roundToInt().coerceAtLeast(224)
-            val height = (source.height * scale).roundToInt().coerceAtLeast(224)
-            val resized = source.scale(width, height)
-            val left = ((width - 224) / 2).coerceAtLeast(0)
-            val top = ((height - 224) / 2).coerceAtLeast(0)
-            val crop = Bitmap.createBitmap(resized, left, top, 224, 224)
+            // Crop to the center square BEFORE scaling: extreme panoramas must not
+            // allocate huge intermediate bitmaps just to cover a 224 x 224 input.
+            val side = minOf(source.width, source.height)
+            val square = Bitmap.createBitmap(source, (source.width - side) / 2, (source.height - side) / 2, side, side)
+            val resized = square.scale(224, 224)
+            if (square !== source) square.recycle()
             val pixels = IntArray(224 * 224)
-            crop.getPixels(pixels, 0, 224, 0, 0, 224, 224)
+            resized.getPixels(pixels, 0, 224, 0, 0, 224, 224)
             val output = FloatArray(3 * 224 * 224)
             pixels.indices.forEach { index ->
                 val pixel = pixels[index]
@@ -220,10 +219,26 @@ private class TinyClipRuntime(files: FinanceSemanticFiles) : AutoCloseable {
                 output[224 * 224 + index] = (green - mean[1]) / std[1]
                 output[2 * 224 * 224 + index] = (blue - mean[2]) / std[2]
             }
-            if (crop !== resized) crop.recycle()
             if (resized !== source) resized.recycle()
             return output
         }
+    }
+}
+
+
+/** Caps decoded bitmap memory even for tiny highly-compressed source images. */
+internal object FinanceBitmapSampling {
+    const val MAX_PIXELS = 4_194_304L
+    const val MAX_SIDE = 4096
+
+    fun sampleSize(width: Int, height: Int): Int {
+        require(width > 0 && height > 0) { "Foto non decodificabile." }
+        var sample = 1
+        while ((width.toLong() / sample) * (height.toLong() / sample) > MAX_PIXELS ||
+            maxOf(width / sample, height / sample) > MAX_SIDE) {
+            sample *= 2
+        }
+        return sample
     }
 }
 
@@ -242,10 +257,11 @@ internal class FinancePhotoSemanticEngine(
     private val indexMutex = Mutex()
     @Volatile private var runtime: TinyClipRuntime? = null
 
-    suspend fun backfill(attachments: List<FinanceAttachment>) = indexMutex.withLock {
-        val photos = attachments.filter(FinanceAttachment::isDisplayPhoto)
-        if (photos.isEmpty()) return@withLock
-        for (attachment in photos) {
+    suspend fun backfill(attachments: List<FinanceAttachment>) = withContext(Dispatchers.Default) {
+        indexMutex.withLock {
+            val photos = attachments.filter(FinanceAttachment::isDisplayPhoto)
+            if (photos.isEmpty()) return@withLock
+            for (attachment in photos) {
             val current = capsule.photoIndex(attachment.id)
             if (
                 current?.status == STATUS_READY &&
@@ -256,7 +272,8 @@ internal class FinancePhotoSemanticEngine(
             ) {
                 continue
             }
-            indexAttachment(attachment, current)
+                indexAttachment(attachment, current)
+            }
         }
     }
 
@@ -264,20 +281,20 @@ internal class FinancePhotoSemanticEngine(
         query: String,
         indexes: List<FinancePhotoIndex>,
         limit: Int = 40,
-    ): List<FinanceSemanticMatch> {
+    ): List<FinanceSemanticMatch> = withContext(Dispatchers.Default) {
         val cleaned = query.trim()
-        if (cleaned.isEmpty()) return emptyList()
+        if (cleaned.isEmpty()) return@withContext emptyList()
         val vector = inferenceMutex.withLock { model().textEmbedding(cleaned) }
-        return rank(vector, indexes, TEXT_MIN_SCORE, limit)
+        rank(vector, indexes, TEXT_MIN_SCORE, limit)
     }
 
     suspend fun findSimilar(
         uri: Uri,
         indexes: List<FinancePhotoIndex>,
         limit: Int = 10,
-    ): List<FinanceSemanticMatch> {
+    ): List<FinanceSemanticMatch> = withContext(Dispatchers.Default) {
         val bitmap = decode(readBytes(uri.toString()))
-        return try {
+        try {
             findSimilar(bitmap, indexes, limit)
         } finally {
             bitmap.recycle()
@@ -288,9 +305,9 @@ internal class FinancePhotoSemanticEngine(
         bitmap: Bitmap,
         indexes: List<FinancePhotoIndex>,
         limit: Int = 10,
-    ): List<FinanceSemanticMatch> {
+    ): List<FinanceSemanticMatch> = withContext(Dispatchers.Default) {
         val vector = inferenceMutex.withLock { model().imageEmbedding(bitmap) }
-        return rank(vector, indexes, IMAGE_MIN_SCORE, limit)
+        rank(vector, indexes, IMAGE_MIN_SCORE, limit)
     }
 
     private suspend fun indexAttachment(
@@ -425,8 +442,20 @@ internal class FinancePhotoSemanticEngine(
         }
     }
 
-    private fun decode(bytes: ByteArray): Bitmap =
-        requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) { "Foto non decodificabile." }
+    private fun decode(bytes: ByteArray): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val sample = FinanceBitmapSampling.sampleSize(bounds.outWidth, bounds.outHeight)
+        val decoded = requireNotNull(
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+        ) { "Foto non decodificabile." }
+        if (decoded.width.toLong() * decoded.height > FinanceBitmapSampling.MAX_PIXELS ||
+            maxOf(decoded.width, decoded.height) > FinanceBitmapSampling.MAX_SIDE) {
+            decoded.recycle()
+            error("Foto troppo grande per l'indicizzazione.")
+        }
+        return decoded
+    }
 
     private suspend fun recognizeText(bitmap: Bitmap): String {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
