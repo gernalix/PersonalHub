@@ -1,30 +1,34 @@
-# PersonalHub audit remediation — operational state (2026-10-27)
+# PersonalHub audit remediation — checkpoint 2026-10-27
 
-## Objective
-Fix reproducible functional defects and concrete performance/safety risks identified in audit/20261027/REPORT.md at source main c9aaa634dbe33fb1cb80609d137fd45c7ff01795. Minimal modifications; preserve personal database/schema and final-distribution version.
+## Goal
+Fix all confirmed defects and safely address actionable risks in audit/20261027/REPORT.md, based on main c9aaa634dbe33fb1cb80609d137fd45c7ff01795. No schema migrations, no NV bump or final APK without physical-device QA.
 
-## Constraints
-- No access to user's Fedora/Pixel via Remote Desktop Commander: monthly tool quota exhausted. GitHub connector + GitHub Actions are available.
-- Strict isolation: branch `fix/20261027-ph-audit-remediation`; no direct changes to production SQLite, no unverified Pixel install, no NV increment unless final signed APK delivered.
-- Current MetaInfrastructure verified MegaVault master d187c0950d9e86473caa1dd7264d4bde7780d016; PH AGENTS.md and ai/personalhubdoc.md read. Existing repository helper repo_single_writer.py and mv-git-finalize unavailable on Fedora; use compare+expected_sha Git leases and state exact limitations.
-- Do not treat static risks as confirmed runtime defects. Test each change on CI before merging.
+## Verified
+MegaVault master d187c0950d9e86473caa1dd7264d4bde7780d016; PH operating rules; CODE_MAP relevant paths. GitHub API is usable. Remote Desktop Commander monthly quota exhausted; cannot access local Fedora or Pixel, so developer-specific single-writer wrapper and mv-git-finalize are BLOCKED.
 
 ## Checklist
-- [x] Reverify PH/MV remote source and code map; create isolated branch
-- [ ] P1: ensure Timer first-frame timeout never skips profile/backup/Git/Workflowy boot tasks; targeted test
-- [ ] P1: preserve alias/link creation timestamps in Luoghi; targeted tests
-- [ ] P2: antimeridian bounding-box and nearest completeness; preserve failing fuzz regression
-- [ ] P2: image inference CPU dispatcher, safe decoded pixel limit; tests
-- [ ] P2: geometadata error handling that never permanently blocks subsequent places; tests
-- [ ] P2: temporal UI state, banking page progress guards; tests
-- [ ] Evaluate performance-only risks (autoexport, Luoghi recomputation) against evidence; change only when validated safe
-- [ ] Consumer preflight before CI Gradle on changed APIs; architecture gate if boundaries affected
-- [ ] Compile + targeted unit tests + CI emulator isolated; preserve output as evidence
-- [ ] Review diff, merge only after required gates; do not bump NV/deliver APK without complete final device QA
-- [ ] Recheck branch/main remote, request Git finalize only if Fedora access available; report exactly
+- [x] Create independent Git branch and persist state
+- [x] Startup service initialization continues after Timer 15s first usable frame timeout
+- [x] Preserve existing createdAt on Luoghi alias/link update
+- [x] Wrap longitude bounding boxes across antimeridian; Room SQL and regression
+- [x] Page all nearest/nearby candidates to avoid 20k alphabetic cutoff
+- [x] Allow failed individual reverse-geocode calls to be skipped within run; retry systemic failures
+- [x] Reject repeated/decreasing/>100 bank pagination cursor
+- [x] Bound bitmap dimensions/pixels, crop square before image resize
+- [x] Move ONNX text/image embedding, gallery search and indexing off UI dispatcher
+- [x] Limit temporal result snapshot state; re-query on recreation; semaphore bounds linked-people reads
+- [ ] Consumer preflight before first Gradle run
+- [ ] Compile + targeted JVM tests + architecture gate on isolated GitHub runner
+- [ ] Fix only errors evidenced by compiler/test, then run isolated Android QA as needed
+- [ ] Review performance-only risks (frequent autoexport and global Luoghi recomputation) without changing durability/unmeasured behavior
+- [ ] Decide integration/merge into main after tests and final source inspection
+- [ ] Git finalization on Fedora if available; otherwise report blocker
 
-## Current
-Created dedicated remediation branch from c9aaa634. No product code changed yet.
+## Safety
+Production database and Pixel untouched; all edits confined to fix/20261027-ph-audit-remediation. No release signing or APK delivery. No PR created yet. Main remains c9aaa634 until explicit integration.
+
+## Current action
+Run preflight, compile and unit tests with a dedicated one-off workflow (GitHub Actions), then inspect logs. Patch compiler/test findings only.
 
 ## Next action
-Inspect minimal code of the above components with GitHub connector, apply verified patches preserving public interfaces, push checkpoint, then run isolated CI via needed PR.
+Inspect initial `PersonalHub audit remediation validation` Actions run. Verify preflight listed both new PlaceDao methods and top consumers; inspect any failed `:feature:luoghi`, `:feature:soldi`, `:app` test. If PASS, run CI instrumentation on isolated emulator and consider one PR for merge, not for documentation checkpoints.
