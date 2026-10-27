@@ -39,6 +39,11 @@ class GeoDatelineRegressionTest {
         assertTrue(box.containsLongitude(-179.9995))
         val found = dao.placesInBoundingBoxBlocking(box.minLat, box.maxLat, box.minLon, box.maxLon, 100)
         assertEquals(setOf("west", "east"), found.map { it.uuid }.toSet())
+        val page1 = dao.placesInBoundingBoxPageBlocking(box.minLat, box.maxLat, box.minLon, box.maxLon, 1, 0)
+        val page2 = dao.placesInBoundingBoxPageBlocking(box.minLat, box.maxLat, box.minLon, box.maxLon, 1, 1)
+        assertEquals(setOf("west", "east"), (page1 + page2).map { it.uuid }.toSet())
+        assertEquals(2, dao.placesWithCoordinatesPageBlocking(1, 0).size +
+            dao.placesWithCoordinatesPageBlocking(1, 1).size)
     }
 
     @Test fun largeRadiusNearPoleSearchesEveryLongitude() {
