@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.luoghi.data.PlaceRepository
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -30,7 +31,7 @@ class PlaceAliasLinkCreatedAtTest {
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
     }
 
-    @Test fun editingAliasAndLinkRetainsOriginalCreationDate() = runBlocking {
+    @Test fun editingAliasAndLinkRetainsOriginalCreationDate() = runBlocking(Dispatchers.IO) {
         val dao = PersonalHubDatabase.get(context).placeDao()
         dao.upsertPlaceBlocking(PlaceEntity(uuid = "p", nickname = "Test"))
         val repo = PlaceRepository(context)

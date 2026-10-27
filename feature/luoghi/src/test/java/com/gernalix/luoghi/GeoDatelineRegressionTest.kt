@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.gernalix.luoghi.capsules.places.GeoSearch
 import com.gernalix.luoghi.data.PlaceEntity
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,7 +31,7 @@ class GeoDatelineRegressionTest {
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
     }
 
-    @Test fun datelineCandidateSearchIncludesBothSidesOfMeridian() {
+    @Test fun datelineCandidateSearchIncludesBothSidesOfMeridian() = runBlocking(Dispatchers.IO) {
         val db = PersonalHubDatabase.get(context)
         val dao = db.placeDao()
         dao.upsertPlaceBlocking(PlaceEntity(uuid = "west", nickname = "West", lat = 0.0, lon = 179.9995))
