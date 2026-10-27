@@ -21,6 +21,7 @@ import com.gernalix.luoghi.capsules.location.LocationSample
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
@@ -933,13 +934,14 @@ class PlaceRepository(
     suspend fun updateAlias(id: Long, placeUuid: String, alias: String, appScope: String?): Long {
         val now = System.currentTimeMillis()
         val rowId = DatabaseMutationCoordinator.mutex.withLock {
+            val createdAt = withContext(Dispatchers.IO) { dao.getAliasBlocking(id)?.createdAt } ?: now
             dao.insertAlias(
                 PlaceAliasEntity(
                     id = id,
                     placeUuid = placeUuid,
                     alias = alias.trim(),
                     appScope = appScope.cleanNullable(),
-                    createdAt = now,
+                    createdAt = createdAt,
                     updatedAt = now,
                 )
             )
@@ -977,6 +979,7 @@ class PlaceRepository(
     suspend fun updateLink(id: Long, placeUuid: String, ownerApp: String, ownerType: String, ownerId: String): Long {
         val now = System.currentTimeMillis()
         val rowId = DatabaseMutationCoordinator.mutex.withLock {
+            val createdAt = withContext(Dispatchers.IO) { dao.getLinkBlocking(id)?.createdAt } ?: now
             dao.insertLink(
                 PlaceLinkEntity(
                     id = id,
@@ -984,7 +987,7 @@ class PlaceRepository(
                     ownerApp = ownerApp,
                     ownerType = ownerType,
                     ownerId = ownerId,
-                    createdAt = now,
+                    createdAt = createdAt,
                     updatedAt = now,
                 )
             )

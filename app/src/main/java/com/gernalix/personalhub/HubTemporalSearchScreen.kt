@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +29,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
@@ -124,54 +125,6 @@ private fun decodeRef(value: String): HubEntityRef? {
     return if (parts.size == 3) HubEntityRef(parts[0], parts[1], parts[2]) else null
 }
 
-private fun saveTemporalRecords(records: List<HubTemporalRecord>): List<Any?> = records.map { record ->
-    listOf(
-        record.moduleId, record.source, record.stableId, record.kind.name, record.startMs, record.endMs,
-        record.title, record.subtitle, record.entityRef?.let(::encodeRef), record.attributes,
-    )
-}
-
-private fun restoreTemporalRecords(saved: List<Any?>): List<HubTemporalRecord> {
-    @Suppress("UNCHECKED_CAST")
-    return (saved as List<List<Any?>>).map { row ->
-        HubTemporalRecord(
-            moduleId = row[0] as String,
-            source = row[1] as String,
-            stableId = row[2] as String,
-            kind = HubTemporalKind.valueOf(row[3] as String),
-            startMs = row[4] as Long,
-            endMs = row[5] as Long?,
-            title = row[6] as String,
-            subtitle = row[7] as String?,
-            entityRef = (row[8] as String?)?.let(::decodeRef),
-            attributes = row[9] as Map<String, String>,
-        )
-    }
-}
-
-private val TemporalRecordStateSaver = Saver<MutableState<List<HubTemporalRecord>>, List<Any?>>(
-    save = { state -> saveTemporalRecords(state.value) },
-    restore = { saved -> mutableStateOf(restoreTemporalRecords(saved)) },
-)
-
-private fun saveHubSummaries(people: List<HubEntitySummary>): List<Any?> = people.map { summary ->
-    listOf(encodeRef(summary.ref), summary.label, summary.description, summary.lifecycle, summary.attributes)
-}
-
-private fun restoreHubSummaries(saved: List<Any?>): List<HubEntitySummary> {
-    @Suppress("UNCHECKED_CAST")
-    return (saved as List<List<Any?>>).mapNotNull { row ->
-        (row[0] as String).let(::decodeRef)?.let { ref ->
-            HubEntitySummary(ref, row[1] as String, row[2] as String?, row[3] as String, row[4] as Map<String, String>)
-        }
-    }
-}
-
-private val HubSummaryStateSaver = Saver<MutableState<List<HubEntitySummary>>, List<Any?>>(
-    save = { state -> saveHubSummaries(state.value) },
-    restore = { saved -> mutableStateOf(restoreHubSummaries(saved)) },
-)
-
 @Composable
 fun HubTemporalSearchScreen(
     onBack: () -> Unit,
@@ -194,13 +147,16 @@ fun HubTemporalSearchScreen(
     var toText by rememberSaveable(initialToMs) {
         mutableStateOf(formatTemporalInput(initialToMs ?: (System.currentTimeMillis() + 60_000L)))
     }
-    var records by rememberSaveable(saver = TemporalRecordStateSaver) { mutableStateOf(emptyList<HubTemporalRecord>()) }
-    var boundedPeople by rememberSaveable(saver = HubSummaryStateSaver) { mutableStateOf(emptyList<HubEntitySummary>()) }
+    // Results can exceed Android's saved-instance-state Binder limit. Re-query after
+    // recreation using only the small persisted search parameters.
+    var records by remember { mutableStateOf(emptyList<HubTemporalRecord>()) }
+    var boundedPeople by remember { mutableStateOf(emptyList<HubEntitySummary>()) }
+    var searchedOnce by rememberSaveable { mutableStateOf(false) }
     var cursors by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
     var error by remember { mutableStateOf<String?>(null) }
-    var saving by rememberSaveable { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
     var episodeTitle by rememberSaveable { mutableStateOf("") }
-    var selectedRefs by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var selectedRefs by remember { mutableStateOf<List<String>>(emptyList()) }
     var collapsedSections by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var savedEpisodes by remember { mutableStateOf<List<SavedEpisodeEntry>>(emptyList()) }
     var editingEpisodeContextId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -249,6 +205,7 @@ fun HubTemporalSearchScreen(
     }
 
     fun invalidateTemporalResults() {
+        searchedOnce = false
         records = emptyList()
         boundedPeople = emptyList()
         cursors = emptyMap()
@@ -294,9 +251,12 @@ fun HubTemporalSearchScreen(
         records = nextRecords
         val recordsNeedingPeopleLookup = if (append) incoming else nextRecords
         val linkedPeople = coroutineScope {
+            val permits = Semaphore(4)
             recordsNeedingPeopleLookup.mapNotNull { record -> record.entityRef }.distinct().map { ref ->
                 async(Dispatchers.IO) {
-                    HubContextRuntime.linked(ref).filter { it.ref.moduleId == "people" && it.ref.entityKind == "person" }
+                    permits.withPermit {
+                        HubContextRuntime.linked(ref).filter { it.ref.moduleId == "people" && it.ref.entityKind == "person" }
+                    }
                 }
             }.awaitAll().flatten()
         }.distinctBy { it.ref }
@@ -309,11 +269,12 @@ fun HubTemporalSearchScreen(
             saving = false
             selectedRefs = emptyList()
         }
+        searchedOnce = true
         error = null
     }
 
     LaunchedEffect(initialFromMs, initialToMs, initialModules, autoSearch) {
-        if (autoSearch) runCatching { search(false) }.onFailure { error = it.message }
+        if (autoSearch || searchedOnce) runCatching { search(false) }.onFailure { error = it.message }
     }
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

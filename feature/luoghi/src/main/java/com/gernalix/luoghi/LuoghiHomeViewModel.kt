@@ -38,6 +38,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -226,7 +229,9 @@ class LuoghiHomeViewModel(
         (undoable != null) to (redoable != null)
     }
 
-    val state: StateFlow<HomeUiState> = combine(
+    // Aggregate visit history independently of UI-only state (search text, dialogs,
+    // selection). Room emissions still recompute it, but typing does not.
+    private val placeAggregate = combine(
         combine(container.places.places, container.places.tagAssignments, container.places.tags, container.places.geoMetadata) { places, assignments, tags, geo ->
             Triple(places, assignments, tags) to geo
         },
@@ -234,16 +239,25 @@ class LuoghiHomeViewModel(
             Triple(events, geofenceConfigs, attempts)
         },
         container.stats.globalStatsState,
-        mutableState,
+        mutableState.map { it.nowMs }.distinctUntilChanged(),
         HubContextRuntime.contextChanges(),
-    ) { placeData, eventAndGeofenceConfigs, globalStatsState, state, _ ->
+    ) { placeData, eventAndGeofenceConfigs, globalStatsState, requestedNowMs, _ ->
+        val (placeTriple, _) = placeData
+        val (places, _, _) = placeTriple
+        val (events, _, _) = eventAndGeofenceConfigs
+        val nowMs = maxOf(requestedNowMs, System.currentTimeMillis())
+        val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
+        val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
+        Triple(placeData, eventAndGeofenceConfigs, Triple(nowMs, visits, stats))
+    }.flowOn(Dispatchers.Default)
+
+    val state: StateFlow<HomeUiState> = combine(placeAggregate, mutableState) { aggregate, state ->
+        val (placeData, eventAndGeofenceConfigs, computed) = aggregate
+        val (nowMs, visits, stats) = computed
         val (placeTriple, geo) = placeData
         val (places, tagAssignments, tags) = placeTriple
         val geoByUuid = geo.associateBy { it.placeUuid }
         val (events, geofenceConfigs, attempts) = eventAndGeofenceConfigs
-        val nowMs = maxOf(state.nowMs, System.currentTimeMillis())
-        val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
-        val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
         val placeTagIds = tagAssignments.filter { it.moduleId == "places" && it.entityKind == "place" }
             .groupBy({ it.canonicalId }, { it.tagId }).mapValues { it.value.toSet() }
         val activeTagIds = tags.filterNot { it.archived }.map { it.id }.toSet()
@@ -276,7 +290,7 @@ class LuoghiHomeViewModel(
             placeTags = tags,
             selectedPlaceTagIds = selectedTags,
         )
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = mutableState.value,

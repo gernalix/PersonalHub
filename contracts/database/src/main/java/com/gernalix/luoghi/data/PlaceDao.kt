@@ -108,7 +108,10 @@ interface PlaceDao {
         WHERE archived = 0
           AND lat IS NOT NULL AND lon IS NOT NULL
           AND lat BETWEEN :minLat AND :maxLat
-          AND lon BETWEEN :minLon AND :maxLon
+          AND (
+              (:minLon <= :maxLon AND lon BETWEEN :minLon AND :maxLon)
+              OR (:minLon > :maxLon AND (lon >= :minLon OR lon <= :maxLon))
+          )
         ORDER BY nickname COLLATE NOCASE ASC, updated_at DESC
         LIMIT :limit
         """,
@@ -131,6 +134,35 @@ interface PlaceDao {
         """,
     )
     fun placesWithCoordinatesBlocking(limit: Int): List<PlaceEntity>
+
+    /** Stable, bounded pages; avoids dropping near matches when an archive exceeds 20k places. */
+    @Query(
+        """
+        SELECT * FROM places
+        WHERE archived = 0
+          AND lat BETWEEN :minLat AND :maxLat
+          AND (
+              (:minLon <= :maxLon AND lon BETWEEN :minLon AND :maxLon)
+              OR (:minLon > :maxLon AND (lon >= :minLon OR lon <= :maxLon))
+          )
+        ORDER BY nickname COLLATE NOCASE ASC, updated_at DESC, uuid ASC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    fun placesInBoundingBoxPageBlocking(
+        minLat: Double, maxLat: Double, minLon: Double, maxLon: Double,
+        limit: Int, offset: Int,
+    ): List<PlaceEntity>
+
+    @Query(
+        """
+        SELECT * FROM places
+        WHERE archived = 0 AND lat BETWEEN -90 AND 90 AND lon BETWEEN -180 AND 180
+        ORDER BY nickname COLLATE NOCASE ASC, updated_at DESC, uuid ASC
+        LIMIT :limit OFFSET :offset
+        """,
+    )
+    fun placesWithCoordinatesPageBlocking(limit: Int, offset: Int): List<PlaceEntity>
 
     @Query("SELECT * FROM places WHERE archived=0 AND lat IS NOT NULL AND lon IS NOT NULL ORDER BY updated_at DESC,uuid ASC LIMIT :limit")
     suspend fun placesWithCoordinates(limit: Int): List<PlaceEntity>

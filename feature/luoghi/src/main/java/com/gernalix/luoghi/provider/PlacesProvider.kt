@@ -242,32 +242,45 @@ class PlacesProvider : ContentProvider() {
         val lat = uri.getQueryParameter(PlacesContract.Nearby.LAT)?.toDoubleOrNull()
         val lon = uri.getQueryParameter(PlacesContract.Nearby.LON)?.toDoubleOrNull()
         val radius = uri.getQueryParameter(PlacesContract.Nearby.RADIUS_M)?.toDoubleOrNull()
-        if (lat == null || lon == null || radius == null) return emptyList()
+        if (lat == null || lon == null || radius == null || !GeoSearch.validCoordinates(lat, lon) ||
+            !radius.isFinite() || radius < 0.0) return emptyList()
         val limit = uri.getQueryParameter(PlacesContract.Nearby.LIMIT)?.toIntOrNull()
             ?.coerceIn(1, MAX_GEO_CANDIDATES)
             ?: DEFAULT_NEARBY_LIMIT
         val box = GeoSearch.boundingBox(lat, lon, radius)
-        val candidates = dao.placesInBoundingBoxBlocking(
-            minLat = box.minLat,
-            maxLat = box.maxLat,
-            minLon = box.minLon,
-            maxLon = box.maxLon,
-            limit = MAX_GEO_CANDIDATES,
-        )
-        return GeoSearch.withinRadius(candidates, lat, lon, radius)
-            .take(limit)
-            .map { it.place }
+        var offset = 0
+        var nearest = emptyList<com.gernalix.luoghi.capsules.places.PlaceDistance>()
+        do {
+            val page = dao.placesInBoundingBoxPageBlocking(
+                box.minLat, box.maxLat, box.minLon, box.maxLon, GEO_PAGE_SIZE, offset,
+            )
+            nearest = (nearest + GeoSearch.withinRadius(page, lat, lon, radius))
+                .sortedWith(compareBy<com.gernalix.luoghi.capsules.places.PlaceDistance> { it.distanceM }
+                    .thenBy { it.place.nickname.lowercase() })
+                .take(limit)
+            offset += page.size
+        } while (page.size == GEO_PAGE_SIZE)
+        return nearest.map { it.place }
     }
 
     private fun nearestPlaces(dao: PlaceDao, uri: Uri): List<PlaceEntity> {
         val lat = uri.getQueryParameter(PlacesContract.Nearest.LAT)?.toDoubleOrNull()
         val lon = uri.getQueryParameter(PlacesContract.Nearest.LON)?.toDoubleOrNull()
-        if (lat == null || lon == null) return emptyList()
+        if (lat == null || lon == null || !GeoSearch.validCoordinates(lat, lon)) return emptyList()
         val limit = uri.getQueryParameter(PlacesContract.Nearest.LIMIT)?.toIntOrNull()
             ?.coerceIn(1, MAX_NEAREST_RESULTS)
             ?: DEFAULT_NEAREST_RESULTS
-        return GeoSearch.nearest(dao.placesWithCoordinatesBlocking(MAX_NEAREST_CANDIDATES), lat, lon, limit)
-            .map { it.place }
+        var offset = 0
+        var nearest = emptyList<com.gernalix.luoghi.capsules.places.PlaceDistance>()
+        do {
+            val page = dao.placesWithCoordinatesPageBlocking(GEO_PAGE_SIZE, offset)
+            nearest = (nearest + GeoSearch.nearest(page, lat, lon, limit))
+                .sortedWith(compareBy<com.gernalix.luoghi.capsules.places.PlaceDistance> { it.distanceM }
+                    .thenBy { it.place.nickname.lowercase() })
+                .take(limit)
+            offset += page.size
+        } while (page.size == GEO_PAGE_SIZE)
+        return nearest.map { it.place }
     }
 
     private fun ContentValues.toPlace(uuid: String, now: Long): PlaceEntity {
@@ -425,7 +438,7 @@ class PlacesProvider : ContentProvider() {
         private const val DEFAULT_NEAREST_RESULTS = 5
         private const val MAX_NEAREST_RESULTS = 100
         private const val MAX_GEO_CANDIDATES = 20_000
-        private const val MAX_NEAREST_CANDIDATES = 20_000
+        private const val GEO_PAGE_SIZE = 500
         private val PLACE_COLUMNS = arrayOf(
             PlacesContract.Places.PLACE_ID,
             PlacesContract.Places.DISPLAY_NAME,

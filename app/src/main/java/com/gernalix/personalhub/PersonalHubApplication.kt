@@ -122,7 +122,10 @@ private object PostFirstFrameStartup {
                             runStep("legacy Since When compatibility", "PH.bg.sinceWhenLegacy") {
                                 runBlocking { com.example.multitimetracker.api.LegacySinceWhenMigrationApi.ensureMigrated(app) }
                             }
-                            if (timerOpening && !TimerStartupApi.awaitFirstUsableScreen()) return@execute
+                            if (timerOpening && !TimerStartupApi.awaitFirstUsableScreen()) {
+                                // A slow Timer first frame must never cancel backup and sync startup.
+                                Log.w(TAG, "Timer first screen timed out; continuing required startup maintenance")
+                            }
                             runStep("profile runtime restore", "PH.bg.profileRuntime") {
                                 runBlocking { ProfileRuntimeCoordinator.restoreActiveProfile(app) }
                             }
