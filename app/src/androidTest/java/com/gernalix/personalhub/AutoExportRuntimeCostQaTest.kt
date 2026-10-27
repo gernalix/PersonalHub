@@ -101,7 +101,7 @@ class AutoExportRuntimeCostQaTest {
         val rootPrefs = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
         val profilePrefs = context.getSharedPreferences("personalhub_transfer", Context.MODE_PRIVATE)
         val previousTree = rootPrefs.getString("tree_uri", null)
-        val previousIdentity = profilePrefs.getString(DatabaseVault.CANONICAL_DOCUMENT_URI, null)
+        val previousIdentity = profilePrefs.getString("canonical_document_uri", null)
         val previousGeneration = profilePrefs.getLong("exported_generation", -1L)
         val directory = File(context.cacheDir, "runtime-export-only").apply {
             if (exists()) deleteRecursively()
@@ -116,23 +116,23 @@ class AutoExportRuntimeCostQaTest {
             DatabaseVault.setExportPublisherFactoryForTests { _, _ -> publisher }
             check(rootPrefs.edit().putString("tree_uri", "content://qa-runtime-only/synthetic")
                 .commit())
-            check(profilePrefs.edit().remove(DatabaseVault.CANONICAL_DOCUMENT_URI)
+            check(profilePrefs.edit().remove("canonical_document_uri")
                 .putLong("exported_generation", -1L).commit())
 
             val db = PersonalHubDatabase.get(context).openHelper.writableDatabase
             db.execSQL(
                 "INSERT INTO contacts(id,public_id,created_at,updated_at) VALUES(?, ?, 1, 1)",
-                arrayOf(fixture, "audit-synthetic-contact"),
+                arrayOf<Any>(fixture, "audit-synthetic-contact"),
             )
             db.execSQL(
                 "INSERT INTO contact_fields(id,contact_id,field_type,value,added_at,position,is_primary) " +
                     "VALUES(?,?, 'photo','synthetic',1,0,0)",
-                arrayOf(fixture, fixture),
+                arrayOf<Any>(fixture, fixture),
             )
             db.execSQL(
                 "INSERT INTO people_photos(field_id,contact_id,reference,mime_type,bytes,sha256,created_at) " +
                     "VALUES(?,?, 'audit-fixture','application/octet-stream',zeroblob(?),'synthetic',1)",
-                arrayOf(fixture, fixture, 2 * mebibyte),
+                arrayOf<Any>(fixture, fixture, 2 * mebibyte),
             )
 
             // Importantly, this calls actual DatabaseVault.exportNow including SQLite snapshot,
@@ -140,7 +140,7 @@ class AutoExportRuntimeCostQaTest {
             for (payload in listOf(2, 16, 48)) {
                 db.execSQL(
                     "UPDATE people_photos SET bytes=zeroblob(?) WHERE field_id=?",
-                    arrayOf(payload * mebibyte, fixture),
+                    arrayOf<Any>(payload * mebibyte, fixture),
                 )
                 val started = SystemClock.elapsedRealtimeNanos()
                 assertTrue(DatabaseVault.exportNow(context))
@@ -160,13 +160,13 @@ class AutoExportRuntimeCostQaTest {
             val mutationStarted = SystemClock.elapsedRealtimeNanos()
             repeat(25) { index ->
                 db.execSQL("UPDATE contacts SET updated_at=? WHERE id=?",
-                    arrayOf(index + 10L, fixture))
+                    arrayOf<Any>(index + 10L, fixture))
             }
             val mutationMs = (SystemClock.elapsedRealtimeNanos() - mutationStarted) / 1_000_000.0
             val deltaRequests = scheduler.enqueues.get() - queuedBefore
             assertTrue("committed writes did not schedule export", deltaRequests >= 25)
             val exportStarted = SystemClock.elapsedRealtimeNanos()
-            assertTrue(HubAutoExport.exportUntilClean(context) { false })
+            assertTrue(DatabaseVault.exportNow(context))
             val exportMs = (SystemClock.elapsedRealtimeNanos() - exportStarted) / 1_000_000.0
             assertEquals(DatabaseVault.currentGeneration(context), DatabaseVault.exportedGeneration(context))
             metric(JSONObject().put("case", "burst")
@@ -183,8 +183,8 @@ class AutoExportRuntimeCostQaTest {
                 if (previousTree == null) remove("tree_uri") else putString("tree_uri", previousTree)
             }.commit()
             profilePrefs.edit().apply {
-                if (previousIdentity == null) remove(DatabaseVault.CANONICAL_DOCUMENT_URI)
-                else putString(DatabaseVault.CANONICAL_DOCUMENT_URI, previousIdentity)
+                if (previousIdentity == null) remove("canonical_document_uri")
+                else putString("canonical_document_uri", previousIdentity)
                 putLong("exported_generation", previousGeneration)
             }.commit()
             directory.deleteRecursively()

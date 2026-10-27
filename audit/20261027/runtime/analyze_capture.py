@@ -47,7 +47,13 @@ if trace.is_file() and trace.stat().st_size > 1000:
         }
         with TraceProcessor(trace=str(trace)) as tp:
             for key, sql in queries.items():
-                result[key] = [dict(row) for row in tp.query(sql)]
+                fields = {
+                    "app_sections": ("name", "calls", "total_ms", "max_ms"),
+                    "main_frame_slices": ("name", "duration_ms"),
+                    "app_cpu_threads": ("thread", "cpu_ms"),
+                }[key]
+                result[key] = [{field: getattr(row, field, None) for field in fields}
+                               for row in tp.query(sql)]
         result["trace_bytes"] = trace.stat().st_size
     except Exception as exc:
         result["perfetto_analysis_error"] = str(exc)
