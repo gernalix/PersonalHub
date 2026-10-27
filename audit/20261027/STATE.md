@@ -1,21 +1,32 @@
-# PersonalHub deep audit — checkpoint 2026-10-27
+# PersonalHub deep audit — completed 2026-10-27
 
-Source: main c9aaa634dbe33fb1cb80609d137fd45c7ff01795.
-Master protocol: MegaVault d187c0950d9e86473caa1dd7264d4bde7780d016.
-Remote Desktop Commander usage exhausted: user Fedora/Pixel unreachable. Synthetic CI only.
+## Goal
+Read-only all-repository static sweep, seeded real Kotlin fuzz, synthetic Room SQLite stress, ephemeral Android security and performance trace. Produce findings without modifying production code/data or merging.
 
-- [x] Audit 998 Git files / 200332 textual lines (automated heuristics, **not** complete human reading).
-- [x] SQLite schema v26: 100 tables, 240 indices, 2681 synthetic mutation attempts, integrity PASS.
-- [x] Kotlin geo/search fuzz: 30000 distance + 10000 unicode; one confirmed antimeridian regression FAILED.
-- [x] Deep-link fuzz: 4000 mutation samples, no failures.
-- [x] Ephemeral Android 35 QA installation (package ending .qa) on CI only.
-- [x] Android permissions: internal DatabaseActivity and PlacesProvider DENIED to shell UID.
-- [x] 8 malformed external deep links; 0 attributable AndroidRuntime fatal messages.
-- [x] Profile snapshots Home/Places/Timer/Soldi + 7.3 MB Perfetto trace saved in Actions artifact.
-- [ ] Analyze Perfetto with official trace processor using pre-existing artifact (new lightweight workflow only).
-- [ ] Deliver synthesized findings with scope limits, priority and links.
+## Verified revisions
+- PersonalHub main: c9aaa634dbe33fb1cb80609d137fd45c7ff01795 (unchanged by audit)
+- MegaVault master: d187c0950d9e86473caa1dd7264d4bde7780d016
 
-Initial run: https://github.com/gernalix/PersonalHub/actions/runs/40535233287
-Original source unchanged, user DB untouched, main unchanged.
+## Execution checklist
+- [x] Verified remote refs and protocol resolution
+- [x] Scanned 998 tracked files / 200332 UTF-8 text lines (automated sweep, not exhaustive human review)
+- [x] Synthetic schema v26: 100 tables, 240 indexes, 2681 mutations, integrity PASS
+- [x] Real Kotlin geospatial fuzz: 30000 haversine and 10000 unicode, one antimeridian JUnit regression FAIL
+- [x] Real Kotlin deep link fuzz: 4000 inputs and dangerous-action cases PASS
+- [x] Android 35 ephemeral .qa: 4 launches, PSS, gfxinfo, Perfetto 12s
+- [x] Internal provider and activity external access denied; 8 malformed external deep links, zero attributable fatal logs
+- [x] Perfetto SQL: 3092ms background SinceWhen legacy and 3072ms *background* lock wait; main frames 354ms and 227ms
+- [x] Published findings in audit/20261027/REPORT.md
+- [ ] Pixel Android17 / real data traces (BLOCKED: monthly Desktop Commander quota exhausted; not required to claim emulator findings)
 
-Next action: wait for **PersonalHub existing Perfetto trace analysis** workflow and read its log/artifact. Record measured PH startup durations and CPU section hotspots. Do not rerun whole Android audit or open additional PRs.
+## Evidence
+https://github.com/gernalix/PersonalHub/actions/runs/40535233287
+https://github.com/gernalix/PersonalHub/actions/runs/40537363332
+Audit branch: audit/20261027-deep-diagnostics
+
+## Safety and delivery
+No source code change on main, no deployment/APK on Pixel, no user DB access. Single isolated branch; no PR necessary.
+No Fedora purify/finalize: remote access quota blocked; do not claim PASS.
+
+## Next action
+Stop. Report contains reproducible evidence, priorities and limitations. Further fixes and Pixel benchmarking require separate authorized coding task and restored Fedora access. Do not rerun existing PASS checks.
