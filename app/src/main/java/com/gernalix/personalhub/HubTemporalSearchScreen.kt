@@ -118,6 +118,13 @@ internal fun buildTemporalEntries(
 internal fun groupedTemporalEntries(entries: List<TemporalEntry>): List<Pair<String, List<TemporalEntry>>> =
     entries.groupBy { it.sectionTitle }.toSortedMap().map { it.key to it.value }
 
+private fun encodeRef(ref: HubEntityRef) = "${ref.moduleId}\\u001F${ref.entityKind}\\u001F${ref.canonicalId}"
+
+private fun decodeRef(value: String): HubEntityRef? {
+    val parts = value.split('\\u001F', limit = 3)
+    return if (parts.size == 3) HubEntityRef(parts[0], parts[1], parts[2]) else null
+}
+
 @Composable
 fun HubTemporalSearchScreen(
     onBack: () -> Unit,
