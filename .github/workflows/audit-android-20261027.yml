@@ -3,6 +3,8 @@ name: PersonalHub isolated Android deep audit
 on:
   push:
     branches: [audit/20261027-deep-diagnostics]
+    paths:
+      - audit/20261027/trigger-full-suite.txt
 
 permissions:
   contents: read

@@ -1,22 +1,21 @@
-# PersonalHub isolated deep audit, 2026-10-27
+# PersonalHub deep audit — checkpoint 2026-10-27
 
-Goal: systematic inspection of all tracked source lines, deterministic JVM fuzz of real Kotlin code, synthetic SQLite integrity fuzz, and isolated dynamic Android security/performance checks. No production code fixes or edits to main.
+Source: main c9aaa634dbe33fb1cb80609d137fd45c7ff01795.
+Master protocol: MegaVault d187c0950d9e86473caa1dd7264d4bde7780d016.
+Remote Desktop Commander usage exhausted: user Fedora/Pixel unreachable. Synthetic CI only.
 
-Source revisions:
-- PersonalHub main: c9aaa634dbe33fb1cb80609d137fd45c7ff01795
-- MegaVault master: d187c0950d9e86473caa1dd7264d4bde7780d016
+- [x] Audit 998 Git files / 200332 textual lines (automated heuristics, **not** complete human reading).
+- [x] SQLite schema v26: 100 tables, 240 indices, 2681 synthetic mutation attempts, integrity PASS.
+- [x] Kotlin geo/search fuzz: 30000 distance + 10000 unicode; one confirmed antimeridian regression FAILED.
+- [x] Deep-link fuzz: 4000 mutation samples, no failures.
+- [x] Ephemeral Android 35 QA installation (package ending .qa) on CI only.
+- [x] Android permissions: internal DatabaseActivity and PlacesProvider DENIED to shell UID.
+- [x] 8 malformed external deep links; 0 attributable AndroidRuntime fatal messages.
+- [x] Profile snapshots Home/Places/Timer/Soldi + 7.3 MB Perfetto trace saved in Actions artifact.
+- [ ] Analyze Perfetto with official trace processor using pre-existing artifact (new lightweight workflow only).
+- [ ] Deliver synthesized findings with scope limits, priority and links.
 
-User Fedora unavailable via Desktop Commander: monthly RDC quota exhausted. No live Pixel access. Ephemeral CI emulator only, QA application ID and synthetic data. No production credentials.
+Initial run: https://github.com/gernalix/PersonalHub/actions/runs/40535233287
+Original source unchanged, user DB untouched, main unchanged.
 
-Checklist:
-- [x] Verified remote refs and current policies
-- [x] Reviewed build, database, URI, background services, photo inference, geospatial search, and manifests
-- [x] Isolated audit branch
-- [ ] Run tracked-file/line static sweep and synthetic SQLite stress
-- [ ] Execute deterministic geospatial/search and URI Kotlin fuzz tests
-- [ ] Profile isolated QA on ephemeral Android and test internal provider/activity access
-- [ ] Read run artifacts, classify findings, deliver report
-
-Acceptance: evidence-backed findings, exact test outcomes and limitations, zero alteration of production app/database. No claims of comprehensive human line-by-line review or physical Pixel profiling without proof.
-
-Next action: read this branch's Actions run "PersonalHub isolated Android deep audit"; inspect artifacts audit-source-sqlite, audit-jvm-fuzz and audit-android-dynamic. If a harness itself fails, repair harness on this audit branch only. Retain real counterexample test failures and report them; do not edit production source.
+Next action: wait for **PersonalHub existing Perfetto trace analysis** workflow and read its log/artifact. Record measured PH startup durations and CPU section hotspots. Do not rerun whole Android audit or open additional PRs.
