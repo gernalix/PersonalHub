@@ -11,6 +11,7 @@ import com.gernalix.personalhub.core.database.DatabaseVault
 import com.gernalix.personalhub.core.database.HubAutoExport
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -95,6 +96,15 @@ class AutoExportRuntimeCostQaTest {
         Log.i(tag, "PH_EXPORT_METRIC:" + json.toString())
     }
 
+    private fun hashZeros(size: Int): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val block = ByteArray(64 * 1024)
+        repeat(size / block.size) { digest.update(block) }
+        val left = size % block.size
+        if (left > 0) digest.update(block, 0, left)
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
     @Test
     fun profileRealDatabaseVaultExportWithSyntheticPhotoAndRapidWrites() {
         guard() // fail closed BEFORE any mutation
@@ -129,19 +139,38 @@ class AutoExportRuntimeCostQaTest {
                     "VALUES(?,?, 'photo','synthetic',1,0,0)",
                 arrayOf<Any>(fixture, fixture),
             )
+            // One original photo larger than CursorWindow plus a realistically sized
+            // collection of additional 512-KiB photos; all digest values are valid.
             db.execSQL(
                 "INSERT INTO people_photos(field_id,contact_id,reference,mime_type,bytes,sha256,created_at) " +
-                    "VALUES(?,?, 'audit-fixture','application/octet-stream',zeroblob(?),'synthetic',1)",
-                arrayOf<Any>(fixture, fixture, 2 * mebibyte),
+                    "VALUES(?,?, 'audit-fixture','application/octet-stream',zeroblob(?),?,1)",
+                arrayOf<Any>(fixture, fixture, 3 * mebibyte, hashZeros(3 * mebibyte)),
             )
+            val halfMibDigest = hashZeros(mebibyte / 2)
+            var extraPhotos = 0
 
-            // Importantly, this calls actual DatabaseVault.exportNow including SQLite snapshot,
-            // schema/integrity validation, staged write, two readback validations and hashes.
-            for (payload in listOf(2, 16, 48)) {
-                db.execSQL(
-                    "UPDATE people_photos SET bytes=zeroblob(?) WHERE field_id=?",
-                    arrayOf<Any>(payload * mebibyte, fixture),
-                )
+            // Real exportNow includes snapshot, validation, staged write, two
+            // independent readbacks + full integrity/hash checks.
+            for (payload in listOf(3, 16, 48)) {
+                val requiredExtra = (payload - 3) * 2
+                while (extraPhotos < requiredExtra) {
+                    val id = fixture - extraPhotos - 1
+                    db.execSQL(
+                        "INSERT INTO contacts(id,public_id,created_at,updated_at) VALUES(?, ?, 1, 1)",
+                        arrayOf<Any>(id, "audit-synthetic-" + extraPhotos),
+                    )
+                    db.execSQL(
+                        "INSERT INTO contact_fields(id,contact_id,field_type,value,added_at,position,is_primary) " +
+                            "VALUES(?,?, 'photo','synthetic',1,0,0)",
+                        arrayOf<Any>(id, id),
+                    )
+                    db.execSQL(
+                        "INSERT INTO people_photos(field_id,contact_id,reference,mime_type,bytes,sha256,created_at) " +
+                            "VALUES(?,?, 'audit-fixture','application/octet-stream',zeroblob(?),?,1)",
+                        arrayOf<Any>(id, id, mebibyte / 2, halfMibDigest),
+                    )
+                    extraPhotos++
+                }
                 val started = SystemClock.elapsedRealtimeNanos()
                 assertTrue(DatabaseVault.exportNow(context))
                 val elapsedMs = (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0
