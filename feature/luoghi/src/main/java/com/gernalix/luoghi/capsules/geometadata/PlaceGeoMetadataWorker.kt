@@ -27,9 +27,13 @@ class PlaceGeoMetadataWorker(context: Context, parameters: WorkerParameters) :
     override suspend fun doWork(): Result {
         val repo = PlaceRepository(applicationContext)
         val startMs = SystemClock.elapsedRealtime()
-        // WorkManager has a finite execution window. Process small batches on a single thread.
+        val failedPlaceIds = mutableSetOf<String>()
+        // Keep other places moving even if one place yields an invalid/permanent response.
+        // Global outages and rate limits should still stop requests and retry later.
         while (!isStopped && SystemClock.elapsedRealtime() - startMs < 7 * 60_000L) {
-            val place = repo.placesNeedingGeoMetadata(1).firstOrNull() ?: return Result.success()
+            val place = repo.placesNeedingGeoMetadata(failedPlaceIds.size + 1)
+                .firstOrNull { it.uuid !in failedPlaceIds }
+                ?: return if (failedPlaceIds.isEmpty()) Result.success() else Result.retry()
             val lat = place.lat ?: return Result.failure()
             val lon = place.lon ?: return Result.failure()
             val metadata = try {
@@ -39,8 +43,14 @@ class PlaceGeoMetadataWorker(context: Context, parameters: WorkerParameters) :
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
+            } catch (error: NominatimReverse.HttpError) {
+                if (error.status == 429 || error.status >= 500 || error.status == 401 || error.status == 403) {
+                    return Result.retry()
+                }
+                failedPlaceIds += place.uuid
+                continue
             } catch (_: Exception) {
-                // Transient HTTP failures/connection loss must not prevent saving the place.
+                // Network failure is usually systemic: preserve the missing entry for retry.
                 return Result.retry()
             }
             repo.saveGeoMetadataIfUnchanged(metadata)
@@ -70,6 +80,8 @@ internal object NominatimReverse {
         data object NoMatch : Response
     }
 
+    class HttpError(val status: Int) : Exception("Reverse-geocoding HTTP $status")
+
     private val requests = Mutex()
     private var lastRequestMs = 0L
 
@@ -94,7 +106,7 @@ internal object NominatimReverse {
                 when (conn.responseCode) {
                     200 -> Response.Found(conn.inputStream.bufferedReader().use { it.readText() })
                     404 -> Response.NoMatch
-                    else -> error("Reverse-geocoding HTTP ${conn.responseCode}")
+                    else -> throw HttpError(conn.responseCode)
                 }
             } finally {
                 conn.disconnect()

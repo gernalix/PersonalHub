@@ -19,6 +19,13 @@ internal fun bankingFailureForHttpStatus(code: Int): BankingFailure = when (code
     else -> BankingFailure.SERVER
 }
 
+/** Reject non-advancing or runaway pagination instead of repeatedly requesting the same page. */
+internal fun checkedBankingNextPage(current: Int, next: Int?): Int {
+    if (next == null) return 0
+    if (next <= current || next > 100) throw BankingException(BankingFailure.INVALID_RESPONSE)
+    return next
+}
+
 internal class BankingRepository(context: Context) {
     private val app = context.applicationContext
     private val store = BankingSecureStore(app)
@@ -125,7 +132,7 @@ internal class BankingRepository(context: Context) {
                             get(config.baseUrl + "/accounts/${account.id}/transactions?days=90&page=$page&page_size=100", token))
                         transactions += rows
                         cache = strictest(cache, transactionCache)
-                        page = next ?: 0
+                        page = checkedBankingNextPage(page, next)
                     } while (page > 0)
                 } catch (error: BankingException) {
                     if (error.kind == BankingFailure.AUTHORIZATION || error.kind == BankingFailure.RATE_LIMIT) throw error
