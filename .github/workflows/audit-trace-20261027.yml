@@ -3,7 +3,7 @@ name: PersonalHub existing Perfetto trace analysis
 on:
   push:
     branches: [audit/20261027-deep-diagnostics]
-    paths: ['.github/workflows/audit-trace-20261027.yml']
+    paths: ['.github/workflows/audit-trace-20261027.yml', 'audit/20261027/analyze_trace.py']
 
 permissions:
   contents: read
