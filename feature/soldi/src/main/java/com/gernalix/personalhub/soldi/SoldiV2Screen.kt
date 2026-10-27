@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -37,18 +38,18 @@ internal fun SoldiV2Screen(
     finish: () -> Unit,
     hubTransactionUuid: String? = null,
 ) {
-    val accounts by capsule.accounts.collectAsState(emptyList())
-    val transactions by capsule.transactions.collectAsState(emptyList())
-    val allAttachments by capsule.allAttachments.collectAsState(emptyList())
-    val photoIndexes by capsule.photoIndexes.collectAsState(emptyList())
-    val ownedItems by capsule.ownedItems.collectAsState(emptyList())
-    val transfers by capsule.transfers.collectAsState(emptyList())
-    val macros by capsule.macros.collectAsState(emptyList())
-    val recurrences by capsule.recurrences.collectAsState(emptyList())
-    val people by capsule.people.collectAsState(emptyList())
-    val places by capsule.places.collectAsState(emptyList())
-    val tags by capsule.tagNames.collectAsState(emptyList())
-    val products by capsule.products.collectAsState(emptyList())
+    val accounts by capsule.accounts.collectAsStateWithLifecycle(emptyList())
+    val transactions by capsule.transactions.collectAsStateWithLifecycle(emptyList())
+    val allAttachments by capsule.allAttachments.collectAsStateWithLifecycle(emptyList())
+    val photoIndexes by capsule.photoIndexes.collectAsStateWithLifecycle(emptyList())
+    val ownedItems by capsule.ownedItems.collectAsStateWithLifecycle(emptyList())
+    val transfers by capsule.transfers.collectAsStateWithLifecycle(emptyList())
+    val macros by capsule.macros.collectAsStateWithLifecycle(emptyList())
+    val recurrences by capsule.recurrences.collectAsStateWithLifecycle(emptyList())
+    val people by capsule.people.collectAsStateWithLifecycle(emptyList())
+    val places by capsule.places.collectAsStateWithLifecycle(emptyList())
+    val tags by capsule.tagNames.collectAsStateWithLifecycle(emptyList())
+    val products by capsule.products.collectAsStateWithLifecycle(emptyList())
 
     val context = LocalContext.current
     val bankingSuggestionExpiredMessage = stringResource(R.string.banking_suggestion_expired)

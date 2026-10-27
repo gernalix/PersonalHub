@@ -26,7 +26,7 @@ import java.nio.LongBuffer
 import java.security.MessageDigest
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -360,6 +360,8 @@ internal class FinancePhotoSemanticEngine(
                     updatedAt = System.currentTimeMillis(),
                 ),
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             capsule.putPhotoIndex(
                 FinancePhotoIndex(
