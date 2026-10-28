@@ -37,3 +37,17 @@ Working branch `fix/20261027-ph-audit-remediation` remote HEAD `42252ae8744e8d1c
 
 ## Next action
 Check `https://github.com/gernalix/PersonalHub/actions/runs/40543594046`. On PASS, create review PR to main for integrated CI; read unit, instrumentation, architecture and Play preflight outcomes; merge only if gates pass. No unnecessary reruns or unrelated changes.
+
+
+## Combined source integration (2026-10-28)
+The four remaining audit/remediation branches are combined in the guarded
+`task/integrate-reviewed-audit-work-20261028` worktree. Preserve the newer
+contracts/database ownership and unchanged NV/schema. The old antimeridian
+fuzz assertion now uses the wrapped-longitude predicate introduced by the fix.
+Consumer preflight passed for the added DAO/page and sampling APIs.
+Local combined-source validation: app Kotlin compile, Android test Kotlin
+compile and architecture boundary gate PASS; 76 Luoghi, 38 Soldi and 69 app
+JUnit tests PASS (183 total). No physical device, application data, final APK,
+service, notification or installation changed. Prior photo-fix PR #111 has
+provider PASS for unit, instrumentation, architecture and Play preflight;
+the new combined revision still requires its own provider integration gates.

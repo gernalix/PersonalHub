@@ -28,7 +28,7 @@ class GeoSearchMutationFuzzTest {
         assertTrue(GeoSearch.distanceMeters(lat,lon,lat,otherLon)<radius)
         val box=GeoSearch.boundingBox(lat,lon,radius)
         assertTrue("Antimeridian crossing near 180 degrees is lost before distance filter",
-            otherLon>=box.minLon && otherLon<=box.maxLon)
+            box.containsLongitude(otherLon))
     }
     @Test fun unicodeSearchTenThousandSeededInputsNeverThrows() {
         val r=Random(20261027)
