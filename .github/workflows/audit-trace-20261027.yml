@@ -1,0 +1,36 @@
+name: PersonalHub existing Perfetto trace analysis
+
+on:
+  push:
+    branches: [audit/20261027-deep-diagnostics]
+    paths: ['.github/workflows/audit-trace-20261027.yml', 'audit/20261027/analyze_trace.py']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  trace-analysis:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5.1.0
+      - name: Download exact previous-run Perfetto artifact without an emulator
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: audit-android-dynamic
+          run-id: 40535233287
+          github-token: ${{ github.token }}
+          path: trace-input
+      - name: Install official Perfetto trace processing Python package
+        run: python3 -m pip install --disable-pip-version-check perfetto
+      - name: Analyze startup sections, main thread and CPU scheduling
+        run: python3 audit/20261027/analyze_trace.py
+      - name: Retain parsed Perfetto SQL results
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: audit-perfetto-analysis
+          path: audit/20261027/trace-results/
+          if-no-files-found: warn
+          retention-days: 7
