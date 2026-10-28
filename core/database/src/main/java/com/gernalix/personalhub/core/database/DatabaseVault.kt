@@ -456,14 +456,47 @@ object DatabaseVault {
                     require(sql == expected) { "Incompatible database trigger: $name" }
                 }
             }
-            db.rawQuery("SELECT bytes, sha256 FROM people_photos", null).use { c -> while (c.moveToNext()) require(sha256(c.getBlob(0)) == c.getString(1)) { "Photo integrity check failed" } }
+            validatePeoplePhotoHashes(db)
             return db.rawQuery("SELECT generation FROM hub_generation WHERE id=1", null).use { c -> require(c.moveToFirst()) { "Missing database generation" }; c.getLong(0) }
             } finally { db.endTransaction() }
         }
     }
 
-    private fun sha256(bytes: ByteArray) =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    private const val PHOTO_HASH_CHUNK_BYTES = 256 * 1024
+
+    /**
+     * Original People photos can be larger than Android's CursorWindow.
+     * Hash each BLOB in bounded 256 KiB pieces, preserving the original SHA-256
+     * integrity requirement for export and import without loading it into a cursor.
+     * SQLite substr offsets are one-based; the third argument is a byte COUNT.
+     */
+    private fun validatePeoplePhotoHashes(db: SQLiteDatabase) {
+        db.rawQuery("SELECT field_id, length(bytes), sha256 FROM people_photos", null).use { photos ->
+            while (photos.moveToNext()) {
+                val photoId = photos.getLong(0)
+                val totalBytes = photos.getLong(1)
+                val expectedHash = photos.getString(2)
+                require(totalBytes >= 0L) { "Photo integrity check failed" }
+                val digest = MessageDigest.getInstance("SHA-256")
+                var offset = 1L
+                while (offset <= totalBytes) {
+                    val count = minOf(PHOTO_HASH_CHUNK_BYTES.toLong(), totalBytes - offset + 1).toInt()
+                    db.rawQuery(
+                        "SELECT substr(bytes, ?, ?) FROM people_photos WHERE field_id=?",
+                        arrayOf(offset.toString(), count.toString(), photoId.toString()),
+                    ).use { chunk ->
+                        require(chunk.moveToFirst()) { "Photo integrity check failed" }
+                        val bytes = chunk.getBlob(0)
+                        require(bytes != null && bytes.size == count) { "Photo integrity check failed" }
+                        digest.update(bytes)
+                    }
+                    offset += count
+                }
+                val actual = digest.digest().joinToString("") { "%02x".format(it) }
+                require(actual == expectedHash) { "Photo integrity check failed" }
+            }
+        }
+    }
 
     fun configureFolder(context: Context, uri: Uri) {
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)

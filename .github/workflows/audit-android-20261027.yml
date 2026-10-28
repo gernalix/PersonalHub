@@ -1,0 +1,113 @@
+name: PersonalHub isolated Android deep audit
+
+on:
+  push:
+    branches: [audit/20261027-deep-diagnostics]
+    paths:
+      - audit/20261027/trigger-full-suite.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-ph-audit-20261027
+  cancel-in-progress: false
+
+jobs:
+  source-sqlite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5.1.0
+      - name: Scan all tracked text lines and fuzz synthetic Room schema
+        run: python3 audit/20261027/source_sqlite_audit.py
+      - name: Parse all Python sources
+        run: python3 -m compileall -q -b tools audit/20261027
+      - name: Preserve structural and SQLite evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: audit-source-sqlite
+          path: |
+            audit/20261027/source-audit.json
+            audit/20261027/sqlite-fuzz.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  kotlin-fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GOOGLE_MAPS_API_KEY: CI_NOT_A_REAL_KEY
+      GOOGLE_ROUTES_API_KEY: CI_NOT_A_REAL_KEY
+    steps:
+      - uses: actions/checkout@v5.1.0
+      - uses: actions/setup-java@v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5.0.2
+      - name: Seeded geospatial and search Kotlin fuzz
+        continue-on-error: true
+        run: ./gradlew --no-daemon --console=plain --max-workers=2 :feature:luoghi:testDebugUnitTest --tests 'com.gernalix.luoghi.GeoSearchMutationFuzzTest'
+      - name: Seeded external deep-link Kotlin fuzz
+        continue-on-error: true
+        run: ./gradlew --no-daemon --console=plain --max-workers=2 :app:testDebugUnitTest --tests 'com.gernalix.personalhub.HubDeepLinkMutationFuzzTest'
+      - name: Preserve exact JUnit assertions
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: audit-jvm-fuzz
+          path: |
+            feature/luoghi/build/test-results/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 7
+
+  android-dynamic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GOOGLE_MAPS_API_KEY: CI_NOT_A_REAL_KEY
+      GOOGLE_ROUTES_API_KEY: CI_NOT_A_REAL_KEY
+      ANDROID_NDK_VERSION: 28.2.13676358
+    steps:
+      - uses: actions/checkout@v5.1.0
+      - uses: actions/setup-java@v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5.0.2
+      - name: Prepare native dependencies
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$ANDROID_NDK_VERSION"
+          test -x "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+      - name: Build only isolated QA APK, never production APK
+        run: ./gradlew --no-daemon --console=plain --max-workers=1 :app:assembleQa -Ppersonalhub.testBuildType=qa -Ppersonalhub.allowCiEmulatorDebug=true
+      - name: Prepare KVM
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libx11-dev libx11-xcb-dev
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run dynamic security and focused Android performance probes
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          pre-emulator-launch-script: python3 tools/configure_ci_emulator.py
+          disable-animations: true
+          script: bash audit/20261027/dynamic_android.sh
+      - name: Preserve synthetic Android measurements
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: audit-android-dynamic
+          path: audit/20261027/dynamic-results/
+          if-no-files-found: warn
+          retention-days: 7
