@@ -30,7 +30,7 @@ class PlacesSearchDraftDeviceTest {
                     onPlaceQueryChange = { submitted += it },
                     onRefreshLocation = {}, onToggleTagFilter = {},
                     onExplore = {}, onGlobalMap = {}, onGlobalStats = {},
-                    onHistorySearch = {}, onOpenVisits = {}, onNewPlace = {},
+                    onHistorySearch = {}, onOpenVisits = {}, onNewPlace = {}, onManualCheckIn = {},
                 )
             }
         }

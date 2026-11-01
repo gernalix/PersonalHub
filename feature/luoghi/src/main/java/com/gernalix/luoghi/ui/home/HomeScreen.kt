@@ -93,6 +93,7 @@ fun HomeScreen(
     onHistorySearch: () -> Unit,
     onOpenVisits: (String?) -> Unit,
     onNewPlace: () -> Unit,
+    onManualCheckIn: () -> Unit,
 ) {
     val context = LocalContext.current
     val recentVisits = state.visits.take(3)
@@ -144,6 +145,13 @@ fun HomeScreen(
                     onAmbiguousCheckIn = onAmbiguousCheckIn,
                     onCancelAmbiguousCheckIn = onCancelAmbiguousCheckIn,
                 )
+            }
+            item(key = "manual-check-in") {
+                OutlinedButton(
+                    onClick = onManualCheckIn,
+                    enabled = state.dataLoaded && state.places.any { !it.archived },
+                    modifier = Modifier.fillMaxWidth().testTag("places-manual-check-in"),
+                ) { Text(stringResource(R.string.manual_check_in)) }
             }
             item(key = "global-actions") {
                 Row(

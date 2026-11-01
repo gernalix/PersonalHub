@@ -29,6 +29,8 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -67,22 +69,31 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var hubPlaceId by mutableStateOf<String?>(null)
+    private var manualRequest by androidx.compose.runtime.mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (DatabaseStartupGate.blockIfNotReady(this)) return
         hubPlaceId = intent.hubPlaceId()
+        manualRequest = savedInstanceState?.getInt("manual_request") ?: 0
+        if (savedInstanceState == null && intent.action == com.gernalix.luoghi.hub.PlacesManualCheckInRoute.ACTION) manualRequest += 1
         setContent {
             LuoghiTheme {
-                Surface(modifier = Modifier.fillMaxSize()) { com.gernalix.personalhub.core.ui.ModuleHistoryHost("places", hubPlaceId) { LuoghiHome(hubPlaceId) } }
+                Surface(modifier = Modifier.fillMaxSize()) { com.gernalix.personalhub.core.ui.ModuleHistoryHost("places", hubPlaceId) { LuoghiHome(hubPlaceId, manualRequest) } }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("manual_request", manualRequest)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         hubPlaceId = intent.hubPlaceId()
+        if (intent.action == com.gernalix.luoghi.hub.PlacesManualCheckInRoute.ACTION) manualRequest += 1
     }
 }
 
@@ -93,7 +104,7 @@ private fun Intent?.hubPlaceId(): String? = this?.data
 private enum class AppDestination { HOME, PLACE_DETAIL, VISITS, EXPLORE }
 
 @Composable
-fun LuoghiHome(initialPlaceId: String? = null) {
+fun LuoghiHome(initialPlaceId: String? = null, manualRequest: Int = 0) {
     val context = LocalContext.current
     val vm: LuoghiHomeViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -125,6 +136,7 @@ fun LuoghiHome(initialPlaceId: String? = null) {
         vm = vm,
         initialPlaceId = initialPlaceId,
         onCheckAction = onCheckAction,
+        manualRequest = manualRequest,
     )
 
 }
@@ -135,6 +147,7 @@ private fun LuoghiNavigation(
     vm: LuoghiHomeViewModel,
     initialPlaceId: String?,
     onCheckAction: () -> Unit,
+    manualRequest: Int,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -154,6 +167,18 @@ private fun LuoghiNavigation(
     var globalStatsOpen by rememberSaveable { mutableStateOf(value = false) }
     var pendingDeletePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var manualVisitPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var manualVisitOpen by rememberSaveable { mutableStateOf(false) }
+    var manualVisitSaving by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var manualVisitError by androidx.compose.runtime.remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(manualVisitOpen) { manualVisitError = null }
+    var handledManualRequest by rememberSaveable { mutableStateOf(0) }
+    LaunchedEffect(manualRequest) {
+        if (manualRequest > handledManualRequest) {
+            handledManualRequest = manualRequest
+            manualVisitPlaceId = null
+            manualVisitOpen = true
+        }
+    }
     var geofencePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     val visitsListState: LazyListState = rememberLazyListState()
     val destinationState = rememberSaveableStateHolder()
@@ -223,6 +248,7 @@ private fun LuoghiNavigation(
     when (destination) {
         AppDestination.HOME -> HomeScreen(
             state = state,
+            onManualCheckIn = { manualVisitPlaceId = null; manualVisitOpen = true },
             onCheckAction = onCheckAction,
             onAmbiguousCheckIn = vm::selectAmbiguousCheckIn,
             onCancelAmbiguousCheckIn = vm::newPlace,
@@ -269,7 +295,7 @@ private fun LuoghiNavigation(
                     openVisits(item.place.uuid)
                 },
                 onCheckInNow = { vm.manualCheckIn(item.place.uuid) },
-                onAddManualVisit = { manualVisitPlaceId = item.place.uuid },
+                onAddManualVisit = { manualVisitPlaceId = item.place.uuid; manualVisitOpen = true },
                 onAlerts = {
                     context.startActivity(
                         UnifiedAlertsRoute.intent(context, UnifiedAlertsRoute.Filter.PLACES, item.place.uuid)
@@ -377,12 +403,28 @@ private fun LuoghiNavigation(
             },
         )
     }
-    manualVisitPlaceId?.let { placeId ->
+    if (manualVisitOpen && state.dataLoaded) {
         ManualVisitDialog(
-            onDismiss = { manualVisitPlaceId = null },
-            onSave = { checkInAt, checkOutAt, notes ->
-                vm.addManualVisit(placeId, checkInAt, checkOutAt, notes)
-                manualVisitPlaceId = null
+            places = state.places.filterNot { it.archived },
+            initialPlaceId = manualVisitPlaceId,
+            saving = manualVisitSaving,
+            errorMessage = manualVisitError?.let { stringResource(it) },
+            onDismiss = { if (!manualVisitSaving) manualVisitOpen = false },
+            onSave = { placeId, checkInAt, checkOutAt, notes ->
+                manualVisitSaving = true
+                manualVisitError = null
+                vm.addManualVisit(placeId, checkInAt, checkOutAt, notes) { result ->
+                    manualVisitSaving = false
+                    if (result is com.gernalix.luoghi.capsules.checkin.HistoryMutationResult.Success) {
+                        manualVisitOpen = false
+                    } else {
+                        manualVisitError = when ((result as? com.gernalix.luoghi.capsules.checkin.HistoryMutationResult.Failure)?.error) {
+                            com.gernalix.luoghi.capsules.checkin.HistoryValidationError.OVERLAP -> R.string.history_error_overlap
+                            com.gernalix.luoghi.capsules.checkin.HistoryValidationError.DUPLICATE -> R.string.history_error_duplicate
+                            else -> R.string.manual_visit_save_failed
+                        }
+                    }
+                }
             },
         )
     }
@@ -423,9 +465,18 @@ private fun LuoghiNavigation(
 
 @Composable
 private fun ManualVisitDialog(
+    places: List<com.gernalix.luoghi.data.PlaceEntity>,
+    initialPlaceId: String?,
+    saving: Boolean,
+    errorMessage: String?,
     onDismiss: () -> Unit,
-    onSave: (Long, Long?, String?) -> Unit,
+    onSave: (String, Long, Long?, String?) -> Unit,
 ) {
+    var selectedPlaceId by rememberSaveable { mutableStateOf(initialPlaceId) }
+    var placeQuery by rememberSaveable { mutableStateOf("") }
+    var choosingPlace by rememberSaveable { mutableStateOf(initialPlaceId == null) }
+    var intervalFailed by rememberSaveable { mutableStateOf(false) }
+    val selectedPlace = places.firstOrNull { it.uuid == selectedPlaceId }
     var checkInText by rememberSaveable {
         mutableStateOf(formatVisitTimestampForInput(System.currentTimeMillis()))
     }
@@ -436,14 +487,37 @@ private fun ManualVisitDialog(
     var parseFailed by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.place_add_past_visit)) },
+        title = { Text(stringResource(R.string.manual_check_in)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { choosingPlace = !choosingPlace }) {
+                    Text(selectedPlace?.nickname ?: stringResource(R.string.manual_visit_choose_place))
+                }
+                if (choosingPlace) {
+                    com.gernalix.personalhub.core.ui.HubSearchField(
+                        value = placeQuery, onValueChange = { placeQuery = it },
+                        label = stringResource(R.string.manual_visit_place),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    LazyColumn(Modifier.heightIn(max = 160.dp)) {
+                        items(places.filter { it.nickname.contains(placeQuery, true) || it.address.orEmpty().contains(placeQuery, true) }
+                            .sortedBy { it.nickname.lowercase(java.util.Locale.ROOT) }, key = { it.uuid }) { place ->
+                                TextButton(onClick = { selectedPlaceId = place.uuid; choosingPlace = false }) {
+                                    Text(listOfNotNull(place.nickname, place.address?.takeIf { it.isNotBlank() }).joinToString(" · "))
+                                }
+                            }
+                    }
+                }
+                if (places.isEmpty()) Text(stringResource(R.string.manual_visit_no_places))
+                errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (parseFailed) Text(stringResource(R.string.history_timestamp_invalid), color = MaterialTheme.colorScheme.error)
+                if (intervalFailed) Text(stringResource(R.string.manual_visit_invalid_interval), color = MaterialTheme.colorScheme.error)
                 androidx.compose.material3.OutlinedTextField(
                     value = checkInText,
                     onValueChange = {
                         checkInText = it
                         parseFailed = false
+                        intervalFailed = false
                     },
                     label = { Text(stringResource(R.string.manual_visit_check_in)) },
                     supportingText = { Text(stringResource(R.string.history_timestamp_hint)) },
@@ -455,6 +529,7 @@ private fun ManualVisitDialog(
                     onValueChange = {
                         checkOutText = it
                         parseFailed = false
+                        intervalFailed = false
                     },
                     label = { Text(stringResource(R.string.manual_visit_check_out)) },
                     supportingText = { Text(stringResource(R.string.manual_visit_open_hint)) },
@@ -470,13 +545,15 @@ private fun ManualVisitDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(enabled = selectedPlace != null && !saving, onClick = {
                 val checkIn = parseVisitTimestampInput(checkInText)
                 val checkOut = checkOutText.trim().takeIf { it.isNotEmpty() }?.let { parseVisitTimestampInput(it) }
                 if (checkIn == null || (checkOutText.isNotBlank() && checkOut == null)) {
                     parseFailed = true
+                } else if (checkOut != null && checkOut <= checkIn) {
+                    intervalFailed = true
                 } else {
-                    onSave(checkIn, checkOut, notesText)
+                    onSave(requireNotNull(selectedPlace).uuid, checkIn, checkOut, notesText)
                 }
             }) { Text(stringResource(R.string.save)) }
         },

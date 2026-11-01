@@ -71,6 +71,48 @@ abstract class PlacesQaScenario {
         }
     }
 
+    @Test fun homeManualCheckInChoosesPlaceAndPersistsBothTimestampsWithoutGps() {
+        val context = context()
+        val repository = PlaceRepository(context)
+        val dao = PersonalHubDatabase.get(context).placeDao()
+        val name = "QA Manual ${System.currentTimeMillis()}"
+        val id = runBlocking { repository.savePlace(null, name, null, null, null, null, null, "QA") }
+        val start = System.currentTimeMillis() - 86_400_000L
+        val inText = formatVisitTimestampForInput(start)
+        val outText = formatVisitTimestampForInput(start + 3_600_000L)
+        try {
+            compose.onNodeWithTag("places-home-list").performScrollToNode(hasTestTag("places-manual-check-in"))
+            compose.onNodeWithTag("places-manual-check-in").performClick()
+            compose.onNode(hasSetTextAction() and hasText(context.getString(PlacesR.string.manual_visit_place)))
+                .performTextReplacement(name)
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNode(hasText(name) and hasClickAction() and !hasSetTextAction()).assertIsDisplayed().performClick()
+            compose.onNode(hasSetTextAction() and hasText(context.getString(PlacesR.string.manual_visit_check_in)))
+                .performTextReplacement(inText)
+            compose.onNode(hasSetTextAction() and hasText(context.getString(PlacesR.string.manual_visit_check_out)))
+                .performTextReplacement(outText)
+            compose.onNode(hasSetTextAction() and hasText(context.getString(PlacesR.string.manual_visit_check_in))).assertTextContains(inText)
+            compose.onNode(hasSetTextAction() and hasText(context.getString(PlacesR.string.manual_visit_check_out))).assertTextContains(outText)
+            compose.onNodeWithText(context.getString(PlacesR.string.save)).performClick()
+            try {
+                compose.waitUntil(10_000) { runBlocking { dao.listEvents().count { it.placeId == id } == 2 } }
+            } catch (failure: ComposeTimeoutException) {
+                throw AssertionError(compose.onAllNodes(hasText("", substring = true), useUnmergedTree = true).printToString(), failure)
+            }
+            val events = runBlocking { dao.listEvents().filter { it.placeId == id }.sortedBy { it.timestamp } }
+            assertEquals(listOf(PlaceEventTypes.CHECK_IN, PlaceEventTypes.CHECK_OUT), events.map { it.eventType })
+            assertEquals(com.gernalix.luoghi.ui.visits.parseVisitTimestampInput(inText), events[0].timestamp)
+            assertEquals(com.gernalix.luoghi.ui.visits.parseVisitTimestampInput(outText), events[1].timestamp)
+            assertEquals(events[0].sessionUuid, events[1].sessionUuid)
+            assertTrue(events.all { it.lat == null && it.lon == null })
+        } finally {
+            runBlocking {
+                dao.listEvents().filter { it.placeId == id }.forEach { dao.deleteEventByUuid(it.eventUuid) }
+                repository.deletePlace(id)
+            }
+        }
+    }
+
     @Test fun liveSearchCombinesNameAddressNotesTagsAndTheSelectedTagFilter() {
         val context = context()
         val repository = PlaceRepository(context)

@@ -181,6 +181,11 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
                     },
                 )
             }
+            item(key = "home-manual-check-in") {
+                HomeActionTile("📍", R.string.home_manual_check_in, R.string.home_manual_check_in_help) {
+                    context.startActivity(com.gernalix.luoghi.hub.PlacesManualCheckInRoute.intent(context))
+                }
+            }
             item(key = "home-context") {
                 HomeActionTile("🔗", R.string.home_context, R.string.home_context_help) { topDestination = "composer" }
             }
