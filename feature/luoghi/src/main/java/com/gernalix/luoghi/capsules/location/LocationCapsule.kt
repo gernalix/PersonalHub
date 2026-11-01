@@ -34,12 +34,7 @@ class FusedLocationCapsule(
 
     override suspend fun currentLocation(): LocationSample? = withContext(Dispatchers.IO) {
         if (!hasLocationPermission(appContext)) return@withContext null
-        withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
-            val nowMs = System.currentTimeMillis()
-            currentFusedLocation()
-                ?.takeIf { it.isUsable(nowMs) }
-                ?: lastKnownLocation()?.takeIf { it.isUsable(nowMs) }
-        }
+        resolveLocationWithFallback(::currentFusedLocation, ::lastKnownLocation)
     }
 
     @SuppressLint("MissingPermission")
@@ -68,20 +63,28 @@ class FusedLocationCapsule(
             capturedAt = time.takeIf { it > 0L } ?: System.currentTimeMillis(),
         )
 
-    private fun LocationSample.isUsable(nowMs: Long): Boolean {
-        val ageMs = (nowMs - capturedAt).coerceAtLeast(0L)
-        val accurateEnough = accuracyM == null ||
-            (accuracyM.isFinite() && accuracyM > 0.0 && accuracyM <= MAX_LOCATION_ACCURACY_M)
-        return ageMs <= MAX_LOCATION_AGE_MS && accurateEnough
-    }
-
     companion object {
-        private const val LOCATION_TIMEOUT_MS = 6_000L
-        private const val MAX_LOCATION_AGE_MS = 2 * 60_000L
-        private const val MAX_LOCATION_ACCURACY_M = 50.0
-
         fun hasLocationPermission(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 }
+
+/** A slow fresh fix must not consume the separate cached-fix fallback budget. */
+internal suspend fun resolveLocationWithFallback(
+    current: suspend () -> LocationSample?,
+    lastKnown: suspend () -> LocationSample?,
+    currentTimeoutMs: Long = 6_000L,
+    fallbackTimeoutMs: Long = 1_000L,
+    now: () -> Long = System::currentTimeMillis,
+): LocationSample? {
+    val fresh = withTimeoutOrNull(currentTimeoutMs) { current() }
+    if (fresh != null && fresh.isUsable(now())) return fresh
+    return withTimeoutOrNull(fallbackTimeoutMs) { lastKnown() }?.takeIf { it.isUsable(now()) }
+}
+
+private fun LocationSample.isUsable(nowMs: Long): Boolean =
+    latitude.isFinite() && latitude in -90.0..90.0 &&
+        longitude.isFinite() && longitude in -180.0..180.0 &&
+        capturedAt > 0L && (nowMs - capturedAt) in 0L..120_000L &&
+        (accuracyM == null || (accuracyM.isFinite() && accuracyM > 0.0 && accuracyM <= 50.0))

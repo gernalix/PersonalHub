@@ -230,34 +230,33 @@ class LuoghiHomeViewModel(
     }
 
     // Aggregate visit history independently of UI-only state (search text, dialogs,
-    // selection). Room emissions still recompute it, but typing does not.
+    // selection) and check-in diagnostics. Journal stage updates must not rescan
+    // the complete visit history while the user is waiting for a GPS fix.
     private val placeAggregate = combine(
         combine(container.places.places, container.places.tagAssignments, container.places.tags, container.places.geoMetadata) { places, assignments, tags, geo ->
             Triple(places, assignments, tags) to geo
         },
-        combine(container.checkIns.events, container.geofences.configs, container.checkIns.recentAttempts) { events, geofenceConfigs, attempts ->
-            Triple(events, geofenceConfigs, attempts)
-        },
+        container.checkIns.events,
         container.stats.globalStatsState,
         mutableState.map { it.nowMs }.distinctUntilChanged(),
         HubContextRuntime.contextChanges(),
-    ) { placeData, eventAndGeofenceConfigs, globalStatsState, requestedNowMs, _ ->
+    ) { placeData, events, globalStatsState, requestedNowMs, _ ->
         val (placeTriple, _) = placeData
         val (places, _, _) = placeTriple
-        val (events, _, _) = eventAndGeofenceConfigs
         val nowMs = maxOf(requestedNowMs, System.currentTimeMillis())
         val visits = VisitMapper.map(events, places, nowMs, HubContextRuntime.temporalFacts())
         val stats = container.stats.snapshot(places, events, globalStatsState, nowMs, visits)
-        Triple(placeData, eventAndGeofenceConfigs, Triple(nowMs, visits, stats))
+        Triple(placeData, events, Triple(nowMs, visits, stats))
     }.flowOn(Dispatchers.Default)
 
-    val state: StateFlow<HomeUiState> = combine(placeAggregate, mutableState) { aggregate, state ->
-        val (placeData, eventAndGeofenceConfigs, computed) = aggregate
+    val state: StateFlow<HomeUiState> = combine(
+        placeAggregate, mutableState, container.geofences.configs, container.checkIns.recentAttempts,
+    ) { aggregate, state, geofenceConfigs, attempts ->
+        val (placeData, events, computed) = aggregate
         val (nowMs, visits, stats) = computed
         val (placeTriple, geo) = placeData
         val (places, tagAssignments, tags) = placeTriple
         val geoByUuid = geo.associateBy { it.placeUuid }
-        val (events, geofenceConfigs, attempts) = eventAndGeofenceConfigs
         val placeTagIds = tagAssignments.filter { it.moduleId == "places" && it.entityKind == "place" }
             .groupBy({ it.canonicalId }, { it.tagId }).mapValues { it.value.toSet() }
         val activeTagIds = tags.filterNot { it.archived }.map { it.id }.toSet()
@@ -866,10 +865,20 @@ class LuoghiHomeViewModel(
         }
     }
 
-    fun addManualVisit(placeUuid: String, checkInAt: Long, checkOutAt: Long?, notes: String?) {
+    fun addManualVisit(
+        placeUuid: String, checkInAt: Long, checkOutAt: Long?, notes: String?,
+        onResult: (HistoryMutationResult?) -> Unit = {},
+    ) {
         viewModelScope.launch {
-            val result = container.checkIns.manualVisit(placeUuid, checkInAt, checkOutAt, notes)
-            applyHistoryResult(result, HistoryMessage.VISIT_CREATED)
+            val result = try {
+                container.checkIns.manualVisit(placeUuid, checkInAt, checkOutAt, notes)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (result != null) applyHistoryResult(result, HistoryMessage.VISIT_CREATED)
+            onResult(result)
         }
     }
 

@@ -288,4 +288,10 @@
     <string name="geofence_manual_alerts_help" translatable="false">Check-in/out alerts are separate: they run when you use the check-in/out buttons, even with background detection off. Manage them in Alerts.</string>
     <string name="geofence_registration_failed" translatable="false">Settings saved, but Android could not update background detection. Check location services and try again.</string>
     <string name="place_distance_unavailable" translatable="false">Distance unavailable</string>
+    <string name="manual_check_in">Check-in manuale</string>
+    <string name="manual_visit_place">Luogo</string>
+    <string name="manual_visit_choose_place">Scegli un luogo salvato</string>
+    <string name="manual_visit_no_places">Aggiungi prima un luogo in Luoghi.</string>
+    <string name="manual_visit_invalid_interval">Il check-out deve essere successivo al check-in.</string>
+    <string name="manual_visit_save_failed">Impossibile salvare la visita. I dati inseriti sono ancora disponibili: riprova.</string>
 </resources>

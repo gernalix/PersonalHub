@@ -181,4 +181,6 @@
 <string name="home_notifications_help">Local notification archive</string>
 <string name="home_notifications_it">Notifiche</string>
 <string name="home_notifications_help_it">Archivio locale delle notifiche</string>
+    <string name="home_manual_check_in">Check-in manuale</string>
+    <string name="home_manual_check_in_help">Scegli luogo, entrata e uscita</string>
 </resources>
