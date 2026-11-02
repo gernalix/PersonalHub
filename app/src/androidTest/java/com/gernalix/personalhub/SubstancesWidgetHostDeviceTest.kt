@@ -101,11 +101,17 @@ class SubstancesWidgetHostDeviceTest {
         val id = bindWidget(manager, ComponentName(context, SubstancesWidgetProvider::class.java))
         SubstancesWidgetPrefs.save(context, id, target)
         launchHost(manager, listOf(id)).use {
-            // Reproduce a host placeholder whose label and action have not been restored.
-            manager.updateAppWidget(id, RemoteViews(context.packageName, SubstancesR.layout.widget_substances_action).apply {
-                setTextViewText(SubstancesR.id.widgetSubstancesLabel, "")
-            })
-            awaitLabel(id, "")
+            // Install the blank host fixture synchronously. A manager update is
+            // asynchronous and can race the intentional foreground recovery,
+            // restoring the label before the test can observe its blank setup.
+            instrumentation.runOnMainSync {
+                views.getValue(id).updateAppWidget(
+                    RemoteViews(context.packageName, SubstancesR.layout.widget_substances_action).apply {
+                        setTextViewText(SubstancesR.id.widgetSubstancesLabel, "")
+                    },
+                )
+                assertEquals("", views.getValue(id).findViewById<TextView>(SubstancesR.id.widgetSubstancesLabel).text.toString())
+            }
             val before = db.dao().recentIntakes().count { it.substanceId == target }
             SubstancesWidgetsRuntime.restoreActiveProfile(context)
             awaitLabel(id, title)
