@@ -1,7 +1,6 @@
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.test)
@@ -15,20 +14,9 @@ val realPackageDestructiveOptIn = providers.gradleProperty("personalhub.allowRea
     .map { it.equals("true", ignoreCase = true) }
     .orElse(false)
 
-val canonicalSigningEnvFile = File("/home/daniele/.config/codex/secrets/android_signing.env")
-val canonicalSigningProperties = Properties().apply {
-    if (canonicalSigningEnvFile.exists()) canonicalSigningEnvFile.inputStream().use(::load)
-}
-val canonicalSigningNames = listOf(
-    "ANDROID_SHARED_STORE_FILE",
-    "ANDROID_SHARED_STORE_PASSWORD",
-    "ANDROID_SHARED_KEY_ALIAS",
-    "ANDROID_SHARED_KEY_PASSWORD",
-)
-val canonicalSigningValues = canonicalSigningNames.associateWith { name ->
-    canonicalSigningProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
-}
-val hasCanonicalSigning = canonicalSigningValues.values.all { !it.isNullOrBlank() }
+@Suppress("UNCHECKED_CAST")
+val canonicalSigningValues = rootProject.extra["canonicalSigningValues"] as Map<String, String>
+val hasCanonicalSigning = canonicalSigningValues.size == 4 && canonicalSigningValues.values.all { it.isNotBlank() }
 if (hasCanonicalSigning) {
     val store = File(canonicalSigningValues.getValue("ANDROID_SHARED_STORE_FILE")!!)
     require(store.isFile && store.canRead()) { "Canonical Android signing keystore is missing or unreadable." }

@@ -16,7 +16,7 @@ Expected bundle output:
 app/build/outputs/bundle/play/app-play.aab
 ```
 
-The `play` variant inherits the optimized/minified `release` configuration and uses the same application ID, `com.gernalix.personalhub`. Signed artifact tasks require the canonical local signing configuration in `/home/daniele/.config/codex/secrets/android_signing.env`; signing credentials and the keystore must never be committed.
+The `play` variant inherits the optimized/minified `release` configuration and uses the same application ID, `com.gernalix.personalhub`. Signed artifact tasks require `FEDORA_ANDROID_SIGNING_ENV` from the Fedora Bitwarden runtime; signing credentials and the keystore must never be committed.
 
 GitHub-hosted CI is allowed one deliberately narrow exception: it may run **only** `bundlePlay` with `-Ppersonalhub.allowUnsignedPlayBundle=true`. This produces the same minified/shrunk Play package for deterministic packaging checks without exposing private signing material. The opt-in is rejected for APK, install, connected-test, generic build/assemble, or any other signing-sensitive task.
 
@@ -107,3 +107,14 @@ Play Console administration is separate from repository readiness. Before publis
 - any permission declarations Play Console requests for the uploaded bundle.
 
 Do not claim a policy declaration is complete until Play Console itself accepts it.
+
+Signing passwords are fetched once per signed Gradle invocation, for app and
+benchmark together, without a legacy-file fallback. The existing encrypted
+keystore stays in its specialist 0600 custody; its path and alias come from
+the vault. Use `--no-configuration-cache` for signed tasks. Vault edits take
+effect on the next build; they do not change the keystore passwords by themselves.
+Unsigned CI preflight and ephemeral CI instrumentation retain their narrow gates.
+
+The delivery helper retrieves `FEDORA_GITHUB_ENV/GITHUB_TOKEN` for each GitHub
+CLI child. Telegram uses the shared vault-backed notifier. Running delivery is
+still a separate explicit operation; credential checks do not upload or notify.
