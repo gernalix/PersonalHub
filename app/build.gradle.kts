@@ -3,7 +3,6 @@ import javax.inject.Inject
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -12,20 +11,9 @@ plugins {
 
 abstract class SigningBuildFeatureAccess @Inject constructor(val features: BuildFeatures)
 
-val canonicalSigningEnvFile = File("/home/daniele/.config/codex/secrets/android_signing.env")
-val canonicalSigningProperties = Properties().apply {
-    if (canonicalSigningEnvFile.exists()) canonicalSigningEnvFile.inputStream().use(::load)
-}
-val canonicalSigningNames = listOf(
-    "ANDROID_SHARED_STORE_FILE",
-    "ANDROID_SHARED_STORE_PASSWORD",
-    "ANDROID_SHARED_KEY_ALIAS",
-    "ANDROID_SHARED_KEY_PASSWORD",
-)
-val canonicalSigningValues = canonicalSigningNames.associateWith { name ->
-    canonicalSigningProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
-}
-val hasCanonicalSigning = canonicalSigningValues.values.all { !it.isNullOrBlank() }
+@Suppress("UNCHECKED_CAST")
+val canonicalSigningValues = rootProject.extra["canonicalSigningValues"] as Map<String, String>
+val hasCanonicalSigning = canonicalSigningValues.size == 4 && canonicalSigningValues.values.all { it.isNotBlank() }
 val requestedTaskNames = gradle.startParameter.taskNames
     .map { it.substringAfterLast(":").lowercase() }
 val signingArtifactRequested = requestedTaskNames.any { name ->
@@ -58,7 +46,7 @@ val ciDebugInstrumentation = allowCiEmulatorDebug.get() &&
     })
 if (signingArtifactRequested && !unsignedPlayBundlePreflight && !ciDebugInstrumentation) {
     require(hasCanonicalSigning) {
-        "APK/AAB/device tasks require /home/daniele/.config/codex/secrets/android_signing.env and all ANDROID_SHARED_* fields. " +
+        "APK/AAB/device tasks require FEDORA_ANDROID_SIGNING_ENV through Bitwarden and all ANDROID_SHARED_* fields. " +
             "Only the CI Play preflight or ephemeral CI emulator instrumentation may opt out of canonical signing."
     }
     require(!objects.newInstance<SigningBuildFeatureAccess>().features.configurationCache.active.get()) {

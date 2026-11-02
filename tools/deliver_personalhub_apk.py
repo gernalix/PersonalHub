@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -21,8 +22,20 @@ REPO = "gernalix/PersonalHub"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _command(args: list[str]) -> tuple[list[str], dict[str, str]]:
+    environment = dict(os.environ)
+    if args[0] == "gh":
+        for name in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN",
+                     "BWS_ACCESS_TOKEN", "GH_DEBUG", "DEBUG"):
+            environment.pop(name, None)
+        args = [str(Path.home() / ".local/bin/bws-credential"), "--ref", "FEDORA_GITHUB_ENV",
+                "--var", "GH_TOKEN=GITHUB_TOKEN", "--", "/usr/bin/gh", *args[1:]]
+    return args, environment
+
+
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, check=True, text=True, capture_output=True)
+    command, environment = _command(args)
+    return subprocess.run(command, env=environment, check=True, text=True, capture_output=True)
 
 
 def _repo_visibility() -> tuple[bool, str]:
@@ -47,8 +60,10 @@ def _existing_assets(release_tag: str = DEV_RELEASE_TAG) -> list[str]:
 
 
 def _release_exists(release_tag: str = DEV_RELEASE_TAG) -> bool:
+    command, environment = _command(["gh", "release", "view", release_tag, "--repo", REPO])
     result = subprocess.run(
-        ["gh", "release", "view", release_tag, "--repo", REPO],
+        command,
+        env=environment,
         text=True,
         capture_output=True,
     )
