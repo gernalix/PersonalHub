@@ -21,6 +21,21 @@ data class DatabaseStartupStatus(
 object DatabaseStartupGate {
     @Volatile private var preparedInProcess = false
 
+    /**
+     * Application already validates the database before launching an Activity. Reuse that
+     * preflight instead of displaying a second loading screen on every process restart.
+     * Check the actual file version as well: a stale cached startup stamp must not
+     * bypass the gate if the on-disk database has unexpectedly changed.
+     */
+    fun onApplicationStartupChecked(context: Context, ready: Boolean) {
+        val file = context.applicationContext.getDatabasePath(PersonalHubDatabase.DB_NAME)
+        preparedInProcess = ready && file.isFile && runCatching {
+            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use {
+                it.version == PersonalHubDatabase.SCHEMA_VERSION
+            }
+        }.getOrDefault(false)
+    }
+
     fun status(context: Context): DatabaseStartupStatus {
         val app = context.applicationContext
         val file = app.getDatabasePath(PersonalHubDatabase.DB_NAME)

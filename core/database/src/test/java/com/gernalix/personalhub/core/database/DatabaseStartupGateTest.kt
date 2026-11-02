@@ -1,8 +1,10 @@
 package com.gernalix.personalhub.core.database
 
+import android.app.Activity
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
+import org.robolectric.Robolectric
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,12 +25,32 @@ class DatabaseStartupGateTest {
         PersonalHubDatabase.resetForTests()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
         DatabaseVault.preferences(context).edit().clear().commit()
+        DatabaseStartupGate.onApplicationStartupChecked(context, ready = false)
     }
 
     @After fun tearDown() {
         PersonalHubDatabase.resetForTests()
         context.deleteDatabase(PersonalHubDatabase.DB_NAME)
         DatabaseVault.preferences(context).edit().clear().commit()
+        DatabaseStartupGate.onApplicationStartupChecked(context, ready = false)
+    }
+
+    @Test fun validatedDatabaseOpensModuleWithoutPreparingScreen() {
+        val file = context.getDatabasePath(PersonalHubDatabase.DB_NAME).also { it.parentFile!!.mkdirs() }
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { it.version = PersonalHubDatabase.SCHEMA_VERSION }
+        DatabaseStartupGate.onApplicationStartupChecked(context, ready = true)
+
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        assertFalse(DatabaseStartupGate.blockIfNotReady(activity))
+    }
+
+    @Test fun anUnexpectedSchemaChangeCannotReuseApplicationPreflight() {
+        val file = context.getDatabasePath(PersonalHubDatabase.DB_NAME).also { it.parentFile!!.mkdirs() }
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { it.version = 20 }
+        DatabaseStartupGate.onApplicationStartupChecked(context, ready = true)
+
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        assertTrue(DatabaseStartupGate.blockIfNotReady(activity))
     }
 
     @Test fun schema20IsBlockedBeforeRoomCanAttemptAnUpgrade() {
