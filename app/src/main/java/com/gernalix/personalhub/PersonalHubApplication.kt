@@ -12,6 +12,7 @@ import com.example.multitimetracker.api.TimerStartupApi
 import com.example.multitimetracker.hub.TimerSessionHubAdapter
 import com.example.multitimetracker.hub.TimerQuickEventEntryHubAdapter
 import com.gernalix.luoghi.hub.PlacesHubAdapter
+import com.gernalix.personalhub.core.database.DatabaseStartupGate
 import com.gernalix.personalhub.core.database.DatabaseVault
 import com.gernalix.personalhub.core.database.HubAutoExport
 import com.gernalix.personalhub.core.database.capsules.gitdata.GitDataSync
@@ -48,6 +49,7 @@ class PersonalHubApplication : Application(), Configuration.Provider {
         val startupReady = traceStartup("PH.ensureStartupReady") {
             DatabaseVault.ensureStartupReady(this)
         }
+        DatabaseStartupGate.onApplicationStartupChecked(this, startupReady)
         if (!startupReady) return
 
         traceStartup("PH.timerStartupHook") {
