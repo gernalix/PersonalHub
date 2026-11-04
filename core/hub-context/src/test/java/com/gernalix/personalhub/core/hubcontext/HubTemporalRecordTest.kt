@@ -66,6 +66,18 @@ class HubTemporalRecordTest {
         assertEquals(1_789_167_600_000L, parseHubDateTime(text, zone))
     }
 
+    @Test fun editableTimestampsPreserveMidnightNoonAndAfternoonInDifferentZones() {
+        for (zone in listOf(ZoneId.of("UTC"), ZoneId.of("Europe/Copenhagen"))) {
+            for (hour in listOf("00", "12", "18", "23")) {
+                val text = "2026-11-04 $hour:30"
+                val instant = java.time.LocalDateTime.parse(text, java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm"))
+                    .atZone(zone).toInstant().toEpochMilli()
+                assertEquals(text, formatHubDateTimeInput(instant, zone))
+                assertEquals(instant, parseHubDateTime(formatHubDateTimeInput(instant, zone), zone))
+            }
+        }
+    }
+
     private fun point(
         id: String,
         start: Long,

@@ -288,8 +288,8 @@ fun HubContextComposerScreen(
     }
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
-    var fromText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() - 60 * 60 * 1000L)) }
-    var toText by rememberSaveable { mutableStateOf(formatHubDateTime(System.currentTimeMillis() + 60_000L)) }
+    var fromText by rememberSaveable { mutableStateOf(formatHubDateTimeInput(System.currentTimeMillis() - 60 * 60 * 1000L)) }
+    var toText by rememberSaveable { mutableStateOf(formatHubDateTimeInput(System.currentTimeMillis() + 60_000L)) }
     LaunchedEffect(state) { runCatching { state.initialize(); state.detect(parseHubDateTime(fromText), parseHubDateTime(toText)) }.onFailure { state.error = it.message } }
     LaunchedEffect(Unit) {
         val location = if (androidContext.hasLocationPermission()) androidContext.latestKnownLocation() else null

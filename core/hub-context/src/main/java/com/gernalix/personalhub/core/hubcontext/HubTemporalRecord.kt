@@ -3,6 +3,7 @@ package com.gernalix.personalhub.core.hubcontext
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubTimestamp
 import java.time.LocalDateTime
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
@@ -76,6 +77,10 @@ private fun hubDateTimeDisplayFormatter(locale: Locale = Locale.getDefault()): D
 
 fun formatHubDateTime(epochMs: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
     HubTimestamp.format(epochMs, zoneId)
+
+/** Editable values need a 24-hour clock; the display-only pattern omits AM/PM. */
+fun formatHubDateTimeInput(epochMs: Long, zoneId: ZoneId = ZoneId.systemDefault()): String =
+    legacyHubDateTimeInputFormatter.withZone(zoneId).format(Instant.ofEpochMilli(epochMs))
 
 fun parseHubDateTime(value: String, zoneId: ZoneId = ZoneId.systemDefault()): Long {
     val normalized = value.trim()

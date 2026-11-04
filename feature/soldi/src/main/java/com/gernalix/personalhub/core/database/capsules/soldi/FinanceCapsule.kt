@@ -8,6 +8,7 @@ import com.gernalix.personalhub.contracts.database.HubTagNamespaces
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
 import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.DayOfWeek
@@ -32,6 +33,16 @@ class FinanceCapsule(private val db: PersonalHubDatabase) {
     val places = dao.places()
     val people = dao.people()
     val tagNames = sharedTags.observe(HubTagNamespaces.SOLDI).map { values -> values.filterNot { it.archived }.map { it.name } }
+    val transactionTagNames = combine(
+        sharedTags.observe(HubTagNamespaces.SOLDI),
+        sharedTags.observeAssignments(HubTagNamespaces.SOLDI),
+    ) { tags, assignments ->
+        val names = tags.filter { it.namespace == HubTagNamespaces.SOLDI }.associate { it.id to it.name }
+        assignments.asSequence()
+            .filter { it.moduleId == "soldi" && it.entityKind == "transaction" && it.tagId in names }
+            .groupBy({ it.canonicalId }, { names.getValue(it.tagId) })
+            .mapValues { (_, values) -> values.sortedWith(String.CASE_INSENSITIVE_ORDER) }
+    }
     val transfers = dao.transfers()
     val macros = dao.macros()
     val recurrences = dao.recurrenceViews().map { values -> values.map { view -> view.value.apply { category = view.category } } }
