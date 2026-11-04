@@ -11,6 +11,15 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withTimeout
+import com.gernalix.personalhub.contracts.database.HubEntityRef
+import com.gernalix.personalhub.contracts.database.HubTagNamespaces
+import com.gernalix.personalhub.core.hubcontext.SharedTagEngine
 import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
@@ -25,6 +34,36 @@ class FinanceCapsuleTest {
     }
     private fun scalar(db: PersonalHubDatabase, sql: String): Long = db.openHelper.writableDatabase.query(sql).use { it.moveToFirst(); it.getLong(0) }
     private suspend fun rejects(block: suspend () -> Unit) { try { block(); fail("Expected rejection") } catch (e: Exception) { /* the enclosing assertions verify no partial writes */ } }
+
+    @Test fun transactionTagsObserveEditsRenamesAndRemovalWithoutChangingTransactionIds() = database { db, finance ->
+        val id = finance.saveTransaction(TransactionDraft(title = "Milk", amount = "-3", tags = "food"))
+        val uuid = db.financeDao().transaction(id)!!.uuid
+        val ref = HubEntityRef("soldi", "transaction", uuid)
+        val shared = SharedTagEngine(db)
+        coroutineScope {
+            val updates = Channel<Map<String, List<String>>>(Channel.UNLIMITED)
+            val observer = launch { finance.transactionTagNames.collect { updates.send(it) } }
+            suspend fun awaitTags(expected: List<String>) = withTimeout(10_000) {
+                while (updates.receive()[uuid].orEmpty() != expected) { /* await Room invalidation */ }
+            }
+            try {
+                awaitTags(listOf("food"))
+                shared.replaceByNames(ref, HubTagNamespaces.SOLDI, listOf("weekly"))
+                awaitTags(listOf("weekly"))
+                val tag = shared.tags(ref).single()
+                shared.rename(tag.id, "Groceries")
+                awaitTags(listOf("Groceries"))
+                // Global tags must not leak into the transaction's local tag list.
+                shared.replaceByNames(ref, HubTagNamespaces.GLOBAL, listOf("global"))
+                shared.replaceByNames(ref, HubTagNamespaces.SOLDI, emptyList())
+                awaitTags(emptyList())
+                assertEquals(listOf(id), db.financeDao().allTransactions().map { it.id })
+            } finally {
+                observer.cancelAndJoin()
+                updates.close()
+            }
+        }
+    }
 
     @Test fun productsChainsTagsAndPlacesAreSharedWithAtomicCrudAndJournal() = database { db, finance ->
         db.openHelper.writableDatabase.execSQL("INSERT INTO places(uuid,nickname,created_at,updated_at,archived) VALUES ('qa-place','QA place',1,1,0)")

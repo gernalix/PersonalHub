@@ -49,6 +49,7 @@ internal fun SoldiV2Screen(
     val people by capsule.people.collectAsStateWithLifecycle(emptyList())
     val places by capsule.places.collectAsStateWithLifecycle(emptyList())
     val tags by capsule.tagNames.collectAsStateWithLifecycle(emptyList())
+    val transactionTagNames by capsule.transactionTagNames.collectAsStateWithLifecycle(emptyMap())
     val products by capsule.products.collectAsStateWithLifecycle(emptyList())
 
     val context = LocalContext.current
@@ -75,7 +76,9 @@ internal fun SoldiV2Screen(
     var accountEditor by remember { mutableStateOf<FinanceAccount?>(null) }
     var receiptDraft by remember { mutableStateOf<ReceiptImportDraft?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var tagsByTransaction by remember { mutableStateOf<Map<Long, List<String>>>(emptyMap()) }
+    val tagsByTransaction = remember(transactions, transactionTagNames) {
+        transactions.associate { it.value.id to transactionTagNames[it.value.uuid].orEmpty() }
+    }
     var projected by remember { mutableStateOf<List<ProjectedOccurrence>>(emptyList()) }
     var handledUuid by rememberSaveable { mutableStateOf<String?>(null) }
     var semanticMatches by remember { mutableStateOf<List<FinanceSemanticMatch>>(emptyList()) }
@@ -179,13 +182,8 @@ internal fun SoldiV2Screen(
         }
     }
 
-    LaunchedEffect(transactions.map { it.value.id }) {
-        tagsByTransaction = transactions.associate { row ->
-            row.value.id to runCatching { capsule.tags(row.value.id) }.getOrDefault(emptyList())
-        }
-    }
-
-    LaunchedEffect(month, recurrences.map { it.id to it.updatedAt }) {
+    LaunchedEffect(month, recurrences.map { it.id to it.updatedAt },
+        transactions.map { Triple(it.value.id, it.value.recurrenceId, it.value.occurrenceKey) }) {
         val from = minOf(LocalDate.now(), month.atDay(1))
         projected = runCatching { capsule.projectedOccurrences(from, month.atEndOfMonth()) }.getOrDefault(emptyList())
     }

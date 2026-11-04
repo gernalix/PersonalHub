@@ -3,6 +3,11 @@ package com.gernalix.personalhub.core.hubcontext
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.gernalix.personalhub.core.database.PersonalHubDatabase
+import com.gernalix.personalhub.core.database.DatabasePreferences
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -57,5 +62,33 @@ class HubSavedSearchStoreTest {
         assertTrue(second.delete(saved.id))
         assertFalse(second.delete(saved.id))
         assertTrue(first.list().isEmpty())
+    }
+
+    @Test fun concurrentSavesAcrossInstancesKeepEverySearch() = runBlocking {
+        // Initialize before racing, so this exercises updates rather than database startup.
+        HubSavedSearchStore(context).list()
+        val ready = CompletableDeferred<Unit>()
+        val saves = (1..24).map { index ->
+            async(Dispatchers.IO) {
+                ready.await()
+                HubSavedSearchStore(context).save(HubSavedSearch(
+                    id = "search-$index", name = "Search $index", query = HubSearchQuery(text = "$index"),
+                ))
+            }
+        }
+        ready.complete(Unit)
+        saves.awaitAll()
+        assertEquals((1..24).map { "search-$it" }.toSet(), HubSavedSearchStore(context).list().map { it.id }.toSet())
+    }
+
+    @Test fun malformedStoredSearchesCannotBeSilentlyOverwritten() = runBlocking {
+        val preferences = DatabasePreferences(context, "hub_search_v1")
+        val original = "[{broken]"
+        preferences.edit().putString("saved_queries", original).commit()
+        val failure = runCatching {
+            HubSavedSearchStore(context).save(HubSavedSearch(name = "New", query = HubSearchQuery()))
+        }.exceptionOrNull()
+        assertTrue("Invalid saved data must be reported", failure != null)
+        assertEquals(original, preferences.getString("saved_queries", null))
     }
 }

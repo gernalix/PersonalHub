@@ -79,7 +79,7 @@ import com.gernalix.personalhub.core.database.capsules.mutationevents.MutationUn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.gernalix.personalhub.core.hubcontext.HubContextRuntime
-import com.gernalix.personalhub.core.hubcontext.formatHubDateTime
+import com.gernalix.personalhub.core.hubcontext.formatHubDateTimeInput
 import com.gernalix.personalhub.core.hubcontext.parseHubDateTime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -150,10 +150,10 @@ fun HubHistorySearchScreen(
     var moduleMenuOpen by remember { mutableStateOf(false) }
     var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }
     var fromText by rememberSaveable(initialFromMs) {
-        mutableStateOf(initialFromMs?.let(::formatHubDateTime).orEmpty())
+        mutableStateOf(initialFromMs?.let(::formatHubDateTimeInput).orEmpty())
     }
     var toText by rememberSaveable(initialToMs) {
-        mutableStateOf(initialToMs?.let(::formatHubDateTime).orEmpty())
+        mutableStateOf(initialToMs?.let(::formatHubDateTimeInput).orEmpty())
     }
     var showRecords by rememberSaveable { mutableStateOf(false) }
     var requestRevision by remember { mutableIntStateOf(0) }

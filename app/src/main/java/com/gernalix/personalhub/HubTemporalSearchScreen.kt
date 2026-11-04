@@ -23,7 +23,6 @@ import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.contracts.database.HubEntityRef
 import com.gernalix.personalhub.contracts.database.HubEntitySummary
 import com.gernalix.personalhub.core.hubcontext.*
-import com.gernalix.personalhub.core.ui.HubTimeFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -48,7 +47,7 @@ internal data class TemporalEntry(
 )
 
 private fun formatTemporalInput(epochMs: Long): String =
-    HubTimeFormat.pattern(epochMs, "uuuu-MM-dd HH:mm")
+    formatHubDateTimeInput(epochMs)
 
 internal data class SavedEpisodeEntry(
     val contextId: String,

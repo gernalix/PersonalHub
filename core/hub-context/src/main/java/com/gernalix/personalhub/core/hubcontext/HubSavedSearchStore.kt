@@ -2,6 +2,7 @@ package com.gernalix.personalhub.core.hubcontext
 
 import android.content.Context
 import com.gernalix.personalhub.core.database.DatabasePreferences
+import com.gernalix.personalhub.core.database.DatabaseGate
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,18 +36,23 @@ class HubSavedSearchStore(context: Context) {
             updatedAt = System.currentTimeMillis(),
         )
         require(normalized.name.isNotBlank())
-        val current = decode(preferences.getString(KEY, null)).associateBy(HubSavedSearch::id).toMutableMap()
-        val previous = current[normalized.id]
-        current[normalized.id] = if (previous == null) normalized else normalized.copy(createdAt = previous.createdAt)
-        check(preferences.edit().putString(KEY, encode(current.values)).commit())
-        current.getValue(normalized.id)
+        // Serialize the complete read/modify/write across store instances and profile swaps.
+        DatabaseGate.access {
+            val current = decode(preferences.getString(KEY, null)).associateBy(HubSavedSearch::id).toMutableMap()
+            val previous = current[normalized.id]
+            current[normalized.id] = if (previous == null) normalized else normalized.copy(createdAt = previous.createdAt)
+            check(preferences.edit().putString(KEY, encode(current.values)).commit())
+            current.getValue(normalized.id)
+        }
     }
 
     suspend fun delete(id: String): Boolean = withContext(Dispatchers.IO) {
-        val current = decode(preferences.getString(KEY, null)).associateBy(HubSavedSearch::id).toMutableMap()
-        if (current.remove(id) == null) return@withContext false
-        check(preferences.edit().putString(KEY, encode(current.values)).commit())
-        true
+        DatabaseGate.access {
+            val current = decode(preferences.getString(KEY, null)).associateBy(HubSavedSearch::id).toMutableMap()
+            if (current.remove(id) == null) return@access false
+            check(preferences.edit().putString(KEY, encode(current.values)).commit())
+            true
+        }
     }
 
     private fun encode(values: Collection<HubSavedSearch>): String =
@@ -65,23 +71,21 @@ class HubSavedSearchStore(context: Context) {
 
     private fun decode(raw: String?): List<HubSavedSearch> {
         if (raw.isNullOrBlank()) return emptyList()
-        return runCatching {
-            val array = JSONArray(raw)
-            buildList {
-                for (index in 0 until array.length()) {
-                    val item = array.getJSONObject(index)
-                    add(
-                        HubSavedSearch(
-                            id = item.getString("id"),
-                            name = item.getString("name"),
-                            query = decodeQuery(item.getJSONObject("query")),
-                            createdAt = item.getLong("created_at"),
-                            updatedAt = item.getLong("updated_at"),
-                        )
+        val array = JSONArray(raw)
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+                add(
+                    HubSavedSearch(
+                        id = item.getString("id"),
+                        name = item.getString("name"),
+                        query = decodeQuery(item.getJSONObject("query")),
+                        createdAt = item.getLong("created_at"),
+                        updatedAt = item.getLong("updated_at"),
                     )
-                }
+                )
             }
-        }.getOrDefault(emptyList())
+        }
     }
 
     private fun encodeQuery(query: HubSearchQuery): JSONObject {

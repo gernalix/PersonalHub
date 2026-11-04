@@ -94,6 +94,7 @@ class HistoryQueryCapsuleTest {
     @Test fun externalSearchIndexTracksUpdatesDeletesAndLiteralQueries() = withDatabase { db ->
         event(db,"people","search",1,"Caffè fixture")
         assertEquals(1,HistoryQueryCapsule.page(db,HistoryQueryCapsule.Filter(query="caffe fixture")).groups.size)
+        assertEquals(1,HistoryQueryCapsule.page(db,HistoryQueryCapsule.Filter(query="caf fix")).groups.size)
         val filter=HistoryQueryCapsule.Filter(query="caffe")
         assertEquals(1,HistoryQueryCapsule.page(db,filter).groups.size)
         db.execSQL("UPDATE mutation_events SET after_json='{\"name\":\"Updated\"}' WHERE transaction_id='search'")
@@ -111,6 +112,22 @@ class HistoryQueryCapsuleTest {
         assertEquals(1,page.groups.size)
         assertEquals("canonical-transaction",page.groups.single().groupId)
         assertEquals("Rare payment",page.groups.single().label)
+    }
+
+    @Test fun productFinanceRecordsUseProductNamesAndTrackRenamesAndDeletes() = withDatabase { db ->
+        db.execSQL("INSERT INTO finance_accounts(id,name,currency,openingBalance,openedAt,included) VALUES('account','Fixture','DKK','0',1,1)")
+        db.execSQL("INSERT INTO finance_products(id,name,uuid) VALUES(1,'Caffè fixture','product-fixture')")
+        db.execSQL("INSERT INTO finance_transactions(id,uuid,accountId,productId,amount,currency,fromReceipt,notes,occurredAt,createdAt,updatedAt) VALUES(1,'product-transaction','account',1,'-3','DKK',0,'',1,1,1)")
+        val filter = HistoryQueryCapsule.Filter(modules = setOf("soldi"), query = "caffe fix")
+        val record = HistoryQueryCapsule.records(db, filter).groups.single()
+        assertEquals("product-transaction", record.groupId)
+        assertEquals("Caffè fixture", record.label)
+        db.execSQL("UPDATE finance_products SET name='Renamed product' WHERE id=1")
+        assertTrue(HistoryQueryCapsule.records(db, filter).groups.isEmpty())
+        assertEquals("Renamed product", HistoryQueryCapsule.records(db, filter.copy(query = "renamed")).groups.single().label)
+        db.execSQL("DELETE FROM finance_transactions WHERE id=1")
+        db.execSQL("DELETE FROM finance_products WHERE id=1")
+        assertTrue(HistoryQueryCapsule.records(db, filter.copy(query = "renamed")).groups.isEmpty())
     }
 
     private fun event(db: SupportSQLiteDatabase, module: String, group: String, time: Long, name: String) {

@@ -4,6 +4,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** External-content FTS indexes: original events and payloads stay in their existing journals. */
 object HistorySearchIndex {
+    private val tokens = Regex("[\\p{L}\\p{N}]+")
     private val sources = mapOf(
         "hub_git_applied_patches" to listOf("metadata_json"),
         "mutation_events" to listOf("event_type", "before_json", "after_json", "context_json"),
@@ -12,6 +13,7 @@ object HistorySearchIndex {
         "substances" to listOf("name", "canonical_name"),
         "contact_fields" to listOf("value", "description"),
         "finance_titles" to listOf("name"),
+        "finance_products" to listOf("name"),
         "finance_transactions" to listOf("notes"),
         "sessions" to listOf("title"),
         "places" to listOf("nickname", "address", "notes"),
@@ -53,6 +55,6 @@ object HistorySearchIndex {
     }
 
     /** Literal token-prefix query, never FTS operators supplied by the user. */
-    fun matchQuery(query: String): String? = Regex("[\\p{L}\\p{N}]+").findAll(query).map { "\"${it.value}\"*" }.toList()
+    fun matchQuery(query: String): String? = tokens.findAll(query).map { "\"${it.value}*\"" }.toList()
         .takeIf { it.isNotEmpty() }?.joinToString(" ")
 }
