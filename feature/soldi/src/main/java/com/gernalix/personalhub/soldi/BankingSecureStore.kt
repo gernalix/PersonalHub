@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.soldi
 
+import com.gernalix.personalhub.core.database.DatabaseGate
+import com.gernalix.personalhub.core.database.DatabasePreferences
 import androidx.core.content.edit
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
@@ -19,6 +21,7 @@ internal data class BankingConfiguration(val baseUrl: String, val configured: Bo
 
 internal class BankingSecureStore(context: Context) {
     private val app = context.applicationContext
+    private val databasePrefs = DatabasePreferences(app, "soldi.banking.v1")
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val credentialFile = AtomicFile(File(app.noBackupFilesDir, "soldi-banking-credential.enc"))
     private val cacheFile = AtomicFile(File(app.noBackupFilesDir, "soldi-banking-cache.enc"))
@@ -42,31 +45,48 @@ internal class BankingSecureStore(context: Context) {
         return decrypt(credentialFile.readFully(), CREDENTIAL_ALIAS).also(::validateToken)
     }
 
-    fun saveCache(snapshot: BankingSnapshot) = synchronized(LOCK) {
-        write(cacheFile, encrypt(BankingJson.encode(snapshot), CACHE_ALIAS))
+    fun saveCache(snapshot: BankingSnapshot) = DatabaseGate.access {
+        check(databasePrefs.edit().putString("cache", BankingJson.encode(snapshot)).commit())
     }
 
-    fun readCache(): BankingSnapshot? = synchronized(LOCK) {
-        if (!cacheFile.baseFile.exists()) null else BankingJson.decode(decrypt(cacheFile.readFully(), CACHE_ALIAS))
+    fun readCache(): BankingSnapshot? = DatabaseGate.access {
+        val saved = databasePrefs.getString("cache", null)
+        if (saved != null) return@access BankingJson.decode(saved)
+        if (!cacheFile.baseFile.exists()) return@access null
+        val legacy = BankingJson.decode(decrypt(cacheFile.readFully(), CACHE_ALIAS))
+        saveCache(legacy)
+        check(BankingJson.encode(readCache()!!) == BankingJson.encode(legacy))
+        cacheFile.delete()
+        legacy
     }
 
-    fun reconciliationState(): BankingReconciliationState = synchronized(LOCK) {
-        if (!reconciliationFile.baseFile.exists()) BankingReconciliationState()
-        else decodeReconciliation(decrypt(reconciliationFile.readFully(), RECONCILIATION_ALIAS))
+    fun reconciliationState(): BankingReconciliationState = DatabaseGate.access {
+        val saved = databasePrefs.getString("reconciliation", null)
+        if (saved != null) return@access decodeReconciliation(saved)
+        if (!reconciliationFile.baseFile.exists()) return@access BankingReconciliationState()
+        val legacy = decodeReconciliation(decrypt(reconciliationFile.readFully(), RECONCILIATION_ALIAS))
+        check(databasePrefs.edit().putString("reconciliation", encodeReconciliation(legacy)).commit())
+        check(reconciliationState() == legacy)
+        reconciliationFile.delete()
+        legacy
     }
 
     fun updateReconciliationState(
         transform: (BankingReconciliationState) -> BankingReconciliationState,
-    ): BankingReconciliationState = synchronized(LOCK) {
+    ): BankingReconciliationState = DatabaseGate.access {
         val next = transform(reconciliationState())
-        write(reconciliationFile, encrypt(encodeReconciliation(next), RECONCILIATION_ALIAS))
+        require(next.matchedTransactions.values.distinct().size == next.matchedTransactions.size)
+        check(databasePrefs.edit().putString("reconciliation", encodeReconciliation(next)).commit())
         next
     }
 
-    fun disconnect() = synchronized(LOCK) {
-        credentialFile.delete(); cacheFile.delete(); reconciliationFile.delete(); prefs.edit { remove(KEY_BASE_URL)}
-        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.run {
-            deleteEntry(CREDENTIAL_ALIAS); deleteEntry(CACHE_ALIAS); deleteEntry(RECONCILIATION_ALIAS)
+    fun disconnect() = DatabaseGate.access {
+        synchronized(LOCK) {
+            credentialFile.delete(); cacheFile.delete(); reconciliationFile.delete(); prefs.edit { remove(KEY_BASE_URL)}
+            check(databasePrefs.edit().clear().commit())
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.run {
+                deleteEntry(CREDENTIAL_ALIAS); deleteEntry(CACHE_ALIAS); deleteEntry(RECONCILIATION_ALIAS)
+            }
         }
     }
 
@@ -77,6 +97,7 @@ internal class BankingSecureStore(context: Context) {
             put("threshold", value.alertPreferences.threshold.toPlainString())
         })
         put("accepted_suggestions", JSONObject(value.acceptedSuggestions))
+        put("matched_transactions", JSONObject(value.matchedTransactions))
         put("observed_alerts", JSONObject(value.observedAlerts))
         put("notified_alerts", JSONObject(value.notifiedAlerts))
     }.toString()
@@ -95,6 +116,7 @@ internal class BankingSecureStore(context: Context) {
                     ?: BigDecimal.ZERO,
             ),
             acceptedSuggestions = stringMap("accepted_suggestions"),
+            matchedTransactions = stringMap("matched_transactions"),
             observedAlerts = stringMap("observed_alerts"),
             notifiedAlerts = stringMap("notified_alerts"),
         )

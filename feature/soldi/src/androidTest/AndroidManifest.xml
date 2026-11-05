@@ -2,5 +2,6 @@
     <application>
         <activity android:name="com.gernalix.personalhub.soldi.BankingRenderTestActivity" android:exported="false" />
         <activity android:name="com.gernalix.personalhub.soldi.PlaySubscriptionsTestActivity" android:exported="false" />
+        <activity android:name="com.gernalix.personalhub.soldi.GmailReceiptsTestActivity" android:exported="false" />
     </application>
 </manifest>

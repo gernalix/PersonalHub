@@ -254,6 +254,7 @@ internal fun SoldiV2Screen(
                             BottomDestination.ACCOUNTS -> "Conti"
                             BottomDestination.CATEGORIES -> "Categorie"
                             BottomDestination.RECURRENCES -> "Ricorrenze"
+                            BottomDestination.GMAIL -> "Gmail e riconciliazione"
                             BottomDestination.SUBSCRIPTIONS -> "Abbonamenti Google Play"
                             BottomDestination.BANKS -> stringResource(R.string.banking_title)
                             else -> "Soldi"
@@ -500,6 +501,8 @@ internal fun SoldiV2Screen(
                     } },
                 )
 
+                bottom == BottomDestination.GMAIL -> GmailReceiptsScreen(accounts, transactions)
+
                 bottom == BottomDestination.SUBSCRIPTIONS -> PlaySubscriptionsScreen(::requestNotifications)
 
                 bottom == BottomDestination.BANKS -> BankingScreen(
@@ -592,6 +595,7 @@ internal fun SoldiV2Screen(
                         supportingContent = { Text("OCR separato dalla creazione manuale della transazione") },
                         modifier = Modifier.clickable { showMore = false; receiptLauncher.launch("image/*") },
                     )
+                    ListItem(headlineContent = { Text("Gmail e riconciliazione") }, modifier = Modifier.clickable { showMore = false; bottom = BottomDestination.GMAIL })
                     ListItem(headlineContent = { Text("Abbonamenti Google Play") }, modifier = Modifier.clickable { showMore = false; bottom = BottomDestination.SUBSCRIPTIONS })
                     ListItem(headlineContent = { Text("Opzioni di visualizzazione") }, modifier = Modifier.clickable { showMore = false; showViewOptions = true })
                     ListItem(

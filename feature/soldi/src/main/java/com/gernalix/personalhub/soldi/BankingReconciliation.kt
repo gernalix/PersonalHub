@@ -28,6 +28,7 @@ internal data class BankingReconciliationState(
     val accountLinks: Map<String, String> = emptyMap(),
     val alertPreferences: BankingAlertPreferences = BankingAlertPreferences(),
     val acceptedSuggestions: Map<String, String> = emptyMap(),
+    val matchedTransactions: Map<String, String> = emptyMap(),
     val observedAlerts: Map<String, String> = emptyMap(),
     val notifiedAlerts: Map<String, String> = emptyMap(),
 )
@@ -193,42 +194,50 @@ internal fun analyzeBankingTransactions(
     }
     val suggestions = mutableListOf<BankingSuggestion>()
     val ambiguous = mutableMapOf<String, Int>()
-    snapshot.transactions
-        .asSequence()
-        .filter { it.status == "BOOK" && it.date != null && !it.description.isNullOrBlank() }
-        .distinctBy { it.accountId to it.id }
-        .forEach { bankRow ->
-            if (snapshot.partialAccounts.contains(bankRow.accountId)) return@forEach
-            val localId = state.accountLinks[bankRow.accountId] ?: return@forEach
-            val local = localAccounts[localId] ?: return@forEach
-            if (local.currency != bankRow.currency) return@forEach
-            val key = "${bankRow.accountId}:${bankRow.id}"
-            if (key in state.acceptedSuggestions) return@forEach
-            val bankDate = requireNotNull(bankRow.date)
-            val plausible = localRows.filter { localRow ->
-                val value = localRow.value
-                value.accountId == local.id && value.currency == bankRow.currency &&
-                    BigDecimal(value.amount).compareTo(bankRow.amount) == 0 &&
-                    kotlin.math.abs(ChronoUnit.DAYS.between(
-                        Instant.ofEpochMilli(value.occurredAt).atZone(ZoneId.systemDefault()).toLocalDate(),
-                        bankDate,
-                    )) <= 1
-            }
-            when {
-                plausible.size > 1 -> ambiguous[bankRow.accountId] = (ambiguous[bankRow.accountId] ?: 0) + 1
-                plausible.isEmpty() -> suggestions += BankingSuggestion(
-                    bankAccountId = bankRow.accountId,
-                    providerTransactionId = bankRow.id,
-                    localAccountId = local.id,
-                    bank = bankRow.bank,
-                    amount = bankRow.amount,
-                    currency = bankRow.currency,
-                    date = bankDate,
-                    description = requireNotNull(bankRow.description).trim(),
-                )
-            }
+    val candidates = bankingLocalCandidates(snapshot, state, localAccounts, localRows, now)
+    val reverse = candidates.values.flatten().groupingBy { it }.eachCount()
+    candidates.forEach { (key, localIds) ->
+        val bankRow = snapshot.transactions.first { "${it.accountId}:${it.id}" == key }
+        when {
+            localIds.isEmpty() -> suggestions += BankingSuggestion(
+                bankRow.accountId, bankRow.id, requireNotNull(state.accountLinks[bankRow.accountId]),
+                bankRow.bank, bankRow.amount, bankRow.currency, requireNotNull(bankRow.date),
+                requireNotNull(bankRow.description).trim(),
+            )
+            localIds.size != 1 || reverse[localIds.single()] != 1 ->
+                ambiguous[bankRow.accountId] = (ambiguous[bankRow.accountId] ?: 0) + 1
         }
+    }
     return BankingTransactionAnalysis(suggestions.sortedByDescending(BankingSuggestion::date), ambiguous)
+}
+
+/** Build both sides before choosing: a local movement cannot explain two bank movements. */
+internal fun bankingLocalCandidates(
+    snapshot: BankingSnapshot,
+    state: BankingReconciliationState,
+    localAccounts: Map<String, FinanceAccount>,
+    localRows: List<TransactionView>,
+    now: Instant = Instant.now(),
+): Map<String, List<String>> {
+    if (!snapshot.cache.complete || bankingCacheIsStale(snapshot.cache, now) || snapshot.cache.fetchedAt == null) return emptyMap()
+    val reserved = state.acceptedSuggestions.values.toSet() + state.matchedTransactions.values
+    return snapshot.transactions.filter { it.status == "BOOK" && it.date != null && !it.description.isNullOrBlank() }
+        .distinctBy { it.accountId to it.id }.mapNotNull { bank ->
+            val key = "${bank.accountId}:${bank.id}"
+            if (bank.accountId in snapshot.partialAccounts || key in state.acceptedSuggestions) return@mapNotNull null
+            val account = localAccounts[state.accountLinks[bank.accountId]] ?: return@mapNotNull null
+            if (account.currency != bank.currency) return@mapNotNull null
+            val fixed = state.matchedTransactions[key]
+            val rows = localRows.filter { row ->
+                val value = row.value
+                value.accountId == account.id && value.currency == bank.currency &&
+                    BigDecimal(value.amount).compareTo(bank.amount) == 0 &&
+                    kotlin.math.abs(ChronoUnit.DAYS.between(
+                        Instant.ofEpochMilli(value.occurredAt).atZone(ZoneId.systemDefault()).toLocalDate(), bank.date,
+                    )) <= 1 && (if (fixed != null) value.uuid == fixed else value.uuid !in reserved)
+            }.map { it.value.uuid }.distinct()
+            key to rows
+        }.toMap()
 }
 
 internal fun validateBankingSuggestion(
