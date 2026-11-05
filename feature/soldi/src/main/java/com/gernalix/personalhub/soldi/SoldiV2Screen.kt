@@ -254,6 +254,7 @@ internal fun SoldiV2Screen(
                             BottomDestination.ACCOUNTS -> "Conti"
                             BottomDestination.CATEGORIES -> "Categorie"
                             BottomDestination.RECURRENCES -> "Ricorrenze"
+                            BottomDestination.SUBSCRIPTIONS -> "Abbonamenti Google Play"
                             BottomDestination.BANKS -> stringResource(R.string.banking_title)
                             else -> "Soldi"
                         },
@@ -499,6 +500,8 @@ internal fun SoldiV2Screen(
                     } },
                 )
 
+                bottom == BottomDestination.SUBSCRIPTIONS -> PlaySubscriptionsScreen(::requestNotifications)
+
                 bottom == BottomDestination.BANKS -> BankingScreen(
                     repository = bankingRepository,
                     localAccounts = accounts,
@@ -589,6 +592,7 @@ internal fun SoldiV2Screen(
                         supportingContent = { Text("OCR separato dalla creazione manuale della transazione") },
                         modifier = Modifier.clickable { showMore = false; receiptLauncher.launch("image/*") },
                     )
+                    ListItem(headlineContent = { Text("Abbonamenti Google Play") }, modifier = Modifier.clickable { showMore = false; bottom = BottomDestination.SUBSCRIPTIONS })
                     ListItem(headlineContent = { Text("Opzioni di visualizzazione") }, modifier = Modifier.clickable { showMore = false; showViewOptions = true })
                     ListItem(
                         headlineContent = { Text("Cronologia / ricerca") },
