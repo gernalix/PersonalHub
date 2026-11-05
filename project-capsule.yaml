@@ -78,7 +78,7 @@ commands:
     - -s
     - tests
     - -p
-    - test_project_capsule.py
+    - test_project_capsule*.py
     cwd: .
   test_full:
     argv:
@@ -144,7 +144,7 @@ references:
   megavault: /home/daniele/MegaVault/megavault.sqlite
   c2: https://github.com/gernalix/codex-roadmap/blob/main/docs/project-capsule/README.md
 freshness:
-  reviewed_commit: 4ca1bdfd6da5c32c84addfa47a4aa283a949be74
+  reviewed_commit: 799ed62390042abcd472c796d2998a44b1ce603d
   watch_paths:
   - app
   - contracts
@@ -179,7 +179,7 @@ validation_hooks:
   - -s
   - tests
   - -p
-  - test_project_capsule.py
+  - test_project_capsule*.py
   cwd: .
   safe: true
 - id: isolated-source-architecture
@@ -241,7 +241,7 @@ change_verification:
   - project-capsule.yaml
   - tools/project_capsule.py
   - docs/project-capsule/**
-  - tests/test_project_capsule.py
+  - tests/test_project_capsule*.py
   commands:
   - test_targeted
 
