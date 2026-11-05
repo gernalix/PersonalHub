@@ -93,4 +93,5 @@
     <string name="banking_alert_channel_description">Private local alerts for trusted bank-to-PersonalHub discrepancies</string>
     <string name="banking_alert_title">PersonalHub Soldi</string>
     <string name="banking_alert_body">Open Banks to review a trusted discrepancy.</string>
+    <string name="banking_compare_reference_missing">Balance date not supplied by the bank. Comparison uses the booked balance from the reference reading.</string>
 </resources>

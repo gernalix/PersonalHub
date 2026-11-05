@@ -84,4 +84,30 @@ class BankingRenderDeviceTest {
         }
         assertTrue(screenshot.length() > 0)
     }
+
+    @Test fun missingOptionalBalanceDateStillShowsComparisonWithReadingProvenance() {
+        val bank = BankingAccount("synthetic-lunar", "Lunar", listOf("DKK"), listOf("ITBD"))
+        val local = FinanceAccount("synthetic-local", "Lunar PH", "DKK", openingBalance = "750.00")
+        val fetched = Instant.parse("2026-10-17T10:00:00Z")
+        val snapshot = BankingSnapshot(
+            accounts = listOf(bank),
+            balances = listOf(BankingBalance(bank.id, bank.bank, "ITBD", BigDecimal("750"), "DKK", null, null)),
+            transactions = emptyList(),
+            cache = BankingCacheInfo(fetched, 60, false, true, null, null),
+        )
+        val state = BankingReconciliationState(accountLinks = mapOf(bank.id to local.id))
+        val reconciliation = reconcileBanking(snapshot, state, listOf(local), emptyList(), fetched)
+        compose.setContent {
+            SoldiTheme {
+                BankingContent(snapshot = snapshot, filters = BankingFilters(), localAccounts = listOf(local),
+                    reconciliation = reconciliation, state = state, onFilters = {}, onMap = {},
+                    onSuggestion = {}, onAlerts = {})
+            }
+        }
+        compose.onNodeWithText(compose.activity.getString(R.string.banking_compare_reference_missing))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.banking_compare_difference))
+            .performScrollTo().assertIsDisplayed()
+    }
+
 }

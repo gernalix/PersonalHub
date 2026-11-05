@@ -68,6 +68,7 @@ internal data class BankingComparison(
     val suggestionCount: Int = 0,
     val ambiguousCount: Int = 0,
     val cause: BankingComparisonCause? = null,
+    val balanceReferenceDate: LocalDate? = null,
 )
 
 internal data class BankingSuggestion(
@@ -144,7 +145,10 @@ internal fun reconcileBanking(
             return@map BankingComparison(bankAccount.id, localId, BankingComparisonState.NO_BOOKED_BALANCE, local.currency, fetchedAt = fetchedAt)
         }
         val bankBalance = booked.single()
-        if (bankBalance.referenceDate == null || bankBalance.referenceDate != fetchedDate) {
+        // Enable Banking makes reference_date optional. A fresh, complete ITBD reading
+        // is the observed current booked balance even when that metadata is absent.
+        // An explicitly conflicting date remains an error; lastChangedAt is not an as-of date.
+        if (bankBalance.referenceDate != null && bankBalance.referenceDate != fetchedDate) {
             return@map BankingComparison(bankAccount.id, localId, BankingComparisonState.REFERENCE_DATE_MISMATCH, local.currency, fetchedAt = fetchedAt)
         }
 
@@ -177,6 +181,7 @@ internal fun reconcileBanking(
             suggestionCount = suggestions.size,
             ambiguousCount = analysis.ambiguousByAccount[bankAccount.id] ?: 0,
             cause = cause,
+            balanceReferenceDate = bankBalance.referenceDate,
         )
     }
     return BankingReconciliationResult(comparisons, analysis.suggestions)
