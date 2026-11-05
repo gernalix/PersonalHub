@@ -56,7 +56,7 @@ fun PlaceEditorDialog(
     val addedAt = remember(form.uuid) { System.currentTimeMillis() }
     var createSinceWhen by remember(form.uuid) { mutableStateOf(false) }
     var saving by remember(form.uuid) { mutableStateOf(false) }
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(if (form.uuid == null) stringResource(R.string.new_place) else stringResource(R.string.edit_place))
@@ -64,7 +64,6 @@ fun PlaceEditorDialog(
         text = {
             Column(
                 modifier = Modifier
-                    .heightIn(max = 560.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
                 if (form.uuid == null) {

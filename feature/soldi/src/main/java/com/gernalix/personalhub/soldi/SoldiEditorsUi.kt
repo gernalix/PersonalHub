@@ -3,6 +3,8 @@ package com.gernalix.personalhub.soldi
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
@@ -677,14 +679,14 @@ private fun CategoryTagPicker(value: String, onChange: (String) -> Unit) {
 internal fun AccountEditorV2(value: FinanceAccount, onChange: (FinanceAccount) -> Unit, onBack: () -> Unit, onSave: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         EditorHeader("Conto", onBack)
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(value.name, { onChange(value.copy(name = it)) }, label = { Text("Nome conto") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(value.currency, { onChange(value.copy(currency = it.uppercase())) }, label = { Text("Valuta") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(value.openingBalance, { onChange(value.copy(openingBalance = it)) }, label = { Text("Saldo iniziale") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             DateTimeButton("Aperto il", Instant.ofEpochMilli(value.openedAt).toString()) { onChange(value.copy(openedAt = Instant.parse(it).toEpochMilli())) }
             Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(value.included, { onChange(value.copy(included = it)) }); Text("Includi nel patrimonio") }
-            Button(onClick = onSave, enabled = value.name.isNotBlank() && value.currency.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Salva") }
         }
+        Button(onClick = onSave, enabled = value.name.isNotBlank() && value.currency.isNotBlank(), modifier = Modifier.fillMaxWidth().padding(12.dp)) { Text("Salva") }
     }
 }
 

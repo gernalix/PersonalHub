@@ -37,6 +37,8 @@ class DefaultSessionCore(private val context: Context) : SessionCore {
     override fun readAllSessions(): List<SessionUi> =
         repo.readAllSessions()
 
+    override fun hasSessionHistory(): Boolean = repo.hasSessionHistory()
+
     override fun searchSessions(query: String, limit: Int): List<SessionUi> =
         repo.searchSessions(query, limit)
 

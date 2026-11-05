@@ -695,8 +695,10 @@ class SessionOwnerCapsuleViewModel(
             persistedSnapshotTags = snapshot.tags,
         )
         if (initial != null) {
-            val hasAuthoritativeChronology =
-                initial.chronologySessions.isNotEmpty() || initial.runningSessions.isNotEmpty()
+            // Soft-deleting the last session must not resurrect the stale snapshot mirror
+            // or trip the legacy-bootstrap guard. Missing canonical history still fails closed.
+            val hasAuthoritativeChronology = initial.chronologySessions.isNotEmpty() ||
+                initial.runningSessions.isNotEmpty() || access.sessionCore(context).hasSessionHistory()
             if (!hasAuthoritativeChronology && hasLegacySnapshotData) {
                 val bootstrapped = bootstrapAuthoritativeSessionCacheFromSnapshot(
                     context = context,

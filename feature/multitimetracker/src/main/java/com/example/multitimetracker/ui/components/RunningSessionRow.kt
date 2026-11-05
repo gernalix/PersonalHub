@@ -29,6 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.multitimetracker.R
 import com.example.multitimetracker.ui.theme.LocalSpacing
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * ===== FEATURE CAPSULE: Now.SessionRow (UI) — START =====
@@ -65,6 +68,8 @@ fun RunningSessionRow(
     onDelete: () -> Unit,
     onDurationClick: (() -> Unit)? = null,
 ) {
+    val editAction by rememberUpdatedState(onEdit)
+    val deleteAction by rememberUpdatedState(onDelete)
     val s = LocalSpacing.current
 
     val displayTitle = title.trim().ifEmpty { stringResource(R.string.senza_titolo) }
@@ -72,7 +77,6 @@ fun RunningSessionRow(
     val hiddenTagsCount = tagNames.size - visibleTagNames.size
 
     key(sessionId) {
-        val deleteRequested = remember(sessionId) { AtomicBoolean(false) }
         val swipeScope = androidx.compose.runtime.rememberCoroutineScope()
         val swipeActionInFlight = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
         val dismissState = rememberSwipeToDismissBoxState()
@@ -80,20 +84,19 @@ fun RunningSessionRow(
         SwipeToDismissBox(
             state = dismissState,
             onDismiss = { direction ->
-                if (swipeActionInFlight.compareAndSet(false, true)) {
-                    when (direction) {
-                        SwipeToDismissBoxValue.StartToEnd -> swipeScope.launch {
-                            try { onEdit() }
-                            finally {
-                                try { dismissState.reset() }
-                                finally { swipeActionInFlight.set(false) }
+                if (direction != SwipeToDismissBoxValue.Settled && swipeActionInFlight.compareAndSet(false, true)) {
+                    swipeScope.launch {
+                        try {
+                            when (direction) {
+                                SwipeToDismissBoxValue.StartToEnd -> editAction()
+                                SwipeToDismissBoxValue.EndToStart -> deleteAction()
+                                SwipeToDismissBoxValue.Settled -> Unit
                             }
+                        } finally {
+                            // A failed/asynchronous owner operation must not permanently disarm this row.
+                            try { dismissState.reset() }
+                            finally { swipeActionInFlight.set(false) }
                         }
-                        SwipeToDismissBoxValue.EndToStart -> {
-                            // Keep the dismissed row until its owner removes it, exactly once.
-                            if (deleteRequested.compareAndSet(false, true)) onDelete()
-                        }
-                        SwipeToDismissBoxValue.Settled -> swipeActionInFlight.set(false)
                     }
                 }
             },
@@ -183,6 +186,18 @@ fun RunningSessionRow(
                                     .widthIn(min = 92.dp)
                                     .padding(start = s.s)
                             )
+                        }
+
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            IconButton(onClick = onEdit, modifier = Modifier.testTag("edit_session_$sessionId")) {
+                                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.modifica_sessione))
+                            }
+                            IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_session_$sessionId")) {
+                                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.elimina_sessione))
+                            }
+                            IconButton(onClick = onStop, modifier = Modifier.testTag("stop_session_$sessionId")) {
+                                Icon(Icons.Filled.Stop, contentDescription = stringResource(R.string.stop_action))
+                            }
                         }
 
                         if (visibleTagNames.isNotEmpty()) {

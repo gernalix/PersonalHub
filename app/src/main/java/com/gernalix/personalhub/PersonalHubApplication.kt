@@ -58,6 +58,12 @@ class PersonalHubApplication : Application(), Configuration.Provider {
         traceStartup("PH.hubRuntimeInit") { initializeHubContextRuntime(this) }
         AppUpdateTracker.install(this)
         com.gernalix.sostanze.hub.SubstancesWidgetsRuntime.install(this)
+        com.gernalix.personalhub.core.ui.ModuleNavigationUi.destinations =
+            com.gernalix.personalhub.capsules.shortcuts.HubModule.entries.map { module ->
+                com.gernalix.personalhub.core.ui.HubModuleDestination(module.shortcutPath, module.titleRes) { context ->
+                    com.gernalix.personalhub.capsules.shortcuts.LauncherShortcutsCapsule.moduleIntent(context, module)
+                }
+            }
         com.gernalix.personalhub.core.ui.ModuleHistoryUi.screen = { moduleId, onBack ->
             HubHistorySearchScreen(onBack = onBack, scopeModuleId = moduleId)
         }

@@ -12,6 +12,9 @@ import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import com.example.multitimetracker.ui.util.formatDuration
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -193,20 +196,20 @@ fun AppRoot(
         value = hubSessionId?.let { id -> withContext(Dispatchers.IO) { DefaultSessionCore(context).readSessionById(id) } }
     }
     hubSession?.let { session ->
-        AlertDialog(
-            modifier = Modifier.semantics { contentDescription = "hub-detail-timer/session/${session.id}" },
-            onDismissRequest = onHubSessionDismiss,
-            title = { Text(stringResource(R.string.modifica_sessione)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(session.title, style = MaterialTheme.typography.titleMedium)
-                    Text("#${session.id}")
-                    com.gernalix.personalhub.core.hubcontext.HubContextLinks(
-                        com.gernalix.personalhub.contracts.database.HubEntityRef("timer", "session", session.id.toString()),
-                    )
-                }
+        com.example.multitimetracker.ui.components.SessionEditDialog(
+            session = session, isNewSession = false, tags = tagsState.tags,
+            tagLastUsedMsByTagId = tagsState.tagLastUsedMsByTagId,
+            tagParentsByChild = tagsState.tagParentsByChild,
+            showSeconds = showSeconds.value, referenceNowMs = tagsState.nowMs,
+            readOnly = state.isReadOnly,
+            onAddTag = vm.nowCapsule::addTag,
+            onSaveMeta = vm.nowCapsule::updateSession,
+            onSaveTimes = { id, start, end ->
+                vm.nowCapsule.updateSessionTimes(id, start, end)
+                onHubSessionDismiss()
             },
-            confirmButton = { TextButton(onClick = onHubSessionDismiss) { Text(stringResource(R.string.annulla)) } },
+            onDelete = { id -> vm.nowCapsule.deleteSession(id); onHubSessionDismiss() },
+            onDismiss = onHubSessionDismiss,
         )
     }
 }
@@ -660,14 +663,7 @@ if (developerSurfaceEnabled && showDevReport) {
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
                 bottomBar = {
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                        }
+                    if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) Column {
                         NavigationBar(
                             containerColor = MaterialTheme.colorScheme.surfaceContainer,
                             tonalElevation = 2.dp

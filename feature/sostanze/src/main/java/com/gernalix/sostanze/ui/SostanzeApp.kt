@@ -951,7 +951,7 @@ private fun SubstanceDialog(
     val addedAt = remember(initial.id) { System.currentTimeMillis() }
     var createSinceWhen by remember(initial.id) { mutableStateOf(false) }
     var saving by remember(initial.id) { mutableStateOf(false) }
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         modifier = Modifier.semantics { if (initial.id != 0L) contentDescription = "hub-detail-substances/substance/${initial.id}" },
         onDismissRequest = onDismiss,
         title = { Text(if (initial.id == 0L) stringResource(R.string.new_substance) else stringResource(R.string.edit_substance)) },
@@ -962,7 +962,7 @@ private fun SubstanceDialog(
                         com.gernalix.personalhub.contracts.database.HubEntityRef("substances", "substance", initial.id.toString()),
                     )
                 }
-                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = type == SubstanceTypes.FARMACO, onClick = { type = SubstanceTypes.FARMACO }, label = { Text(stringResource(R.string.drug)) })
                     FilterChip(selected = type == SubstanceTypes.INTEGRATORE, onClick = { type = SubstanceTypes.INTEGRATORE }, label = { Text(stringResource(R.string.supplement)) })
@@ -975,8 +975,8 @@ private fun SubstanceDialog(
                     OutlinedTextField(dose, { dose = it.numberText() }, modifier = Modifier.weight(1f), label = { Text(stringResource(R.string.dose_mg)) }, singleLine = true)
                     OutlinedTextField("mg", {}, modifier = Modifier.weight(1f), label = { Text(stringResource(R.string.dose_unit)) }, singleLine = true, enabled = false)
                 }
-                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.daily_frequency)) }, singleLine = true)
-                OutlinedTextField(tags, { tags = it }, label = { Text(stringResource(R.string.context_tags)) }, singleLine = true)
+                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.daily_frequency)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(tags, { tags = it }, label = { Text(stringResource(R.string.context_tags)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.as_needed))
                     Switch(prn, { prn = it })
@@ -1040,18 +1040,18 @@ private fun StockAdjustDialog(substance: SubstanceEntity, onDismiss: () -> Unit,
     var sign by remember { mutableDoubleStateOf(-1.0) }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.edit_stock_for, substance.name)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.current_stock, substance.stockCurrent.clean(), substance.stockUnit))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = sign > 0, onClick = { sign = 1.0 }, label = { Text(stringResource(R.string.refill_plus)) })
                     FilterChip(selected = sign < 0, onClick = { sign = -1.0 }, label = { Text(stringResource(R.string.consumption_minus)) })
                 }
-                OutlinedTextField(amount, { amount = it.numberText() }, label = { Text(stringResource(R.string.quantity_unit, substance.stockUnit)) }, singleLine = true)
-                OutlinedTextField(note, { note = it }, label = { Text(stringResource(R.string.optional_note)) })
+                OutlinedTextField(amount, { amount = it.numberText() }, label = { Text(stringResource(R.string.quantity_unit, substance.stockUnit)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(note, { note = it }, label = { Text(stringResource(R.string.optional_note)) }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -1085,12 +1085,12 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
     LaunchedEffect(name) {
         if (name.isNotBlank()) viewModel.costChoices(name) { costChoices = it } else costChoices = emptyList()
     }
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.new_prescription)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) })
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) }, modifier = Modifier.fillMaxWidth())
                 suggestions.filter { it.contains(name, true) && !it.equals(name, true) }.take(4).forEach { suggestion ->
                     TextButton(onClick = {
                         name = suggestion
@@ -1106,9 +1106,9 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
                         }
                     }) { Text(suggestion) }
                 }
-                OutlinedTextField(packages, { packages = it.filter(Char::isDigit) }, label = { Text("Package doses / remaining") })
-                OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) })
-                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") })
+                OutlinedTextField(packages, { packages = it.filter(Char::isDigit) }, label = { Text("Package doses / remaining") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") }, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) { Text(if (weekly) "X per week" else "X per day"); Switch(weekly, { weekly = it }) }
                 EpochDayPickerField(
                     label = stringResource(R.string.order_date),
@@ -1122,7 +1122,7 @@ private fun PrescriptionCreateDialog(initialName: String, suggestions: List<Stri
                 )
                 val projected = SostanzeEngine.depletionDate(packages.toIntOrNull() ?: -1, frequency.toIntOrNull() ?: 0, if (weekly) "WEEK" else "DAY", LocalDate.now())
                 Text("Estimated depletion: ${projected?.let(::formatDateOnly) ?: "-"}")
-                OutlinedTextField(doctorQuery, { doctorQuery = it; doctorId = null }, label = { Text("Doctor") })
+                OutlinedTextField(doctorQuery, { doctorQuery = it; doctorId = null }, label = { Text("Doctor") }, modifier = Modifier.fillMaxWidth())
                 doctorChoices.take(5).forEach { choice ->
                     FilterChip(selected = doctorId == choice.id, onClick = { doctorId = choice.id; doctorQuery = choice.name }, label = { Text(choice.name) })
                 }
@@ -1168,15 +1168,15 @@ private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, o
         if (weekly) "WEEK" else "DAY",
         LocalDate.now(),
     )
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(row.substanceName) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(packages, { packages = it.filter(Char::isDigit) }, label = { Text("Package doses") })
-                OutlinedTextField(remaining, { remaining = it.filter(Char::isDigit) }, label = { Text("Remaining doses") })
-                OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) })
-                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") })
+                OutlinedTextField(packages, { packages = it.filter(Char::isDigit) }, label = { Text("Package doses") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(remaining, { remaining = it.filter(Char::isDigit) }, label = { Text("Remaining doses") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(dose, { dose = it.numberText() }, label = { Text(stringResource(R.string.dose_mg)) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(frequency, { frequency = it.filter(Char::isDigit) }, label = { Text("Frequency X") }, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) { Text("Weekly"); Switch(weekly, { weekly = it }) }
                 EpochDayPickerField(
                     label = stringResource(R.string.order_date),
@@ -1189,8 +1189,8 @@ private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, o
                     onEpochDayChange = { prescriptionEpochDay = it },
                 )
                 Text("Estimated depletion: ${depletion?.let(::formatDateOnly) ?: "-"}")
-                OutlinedTextField(doctorId, { doctorId = it.filter(Char::isDigit) }, label = { Text("People contact ID") })
-                OutlinedTextField(costId, { costId = it.filter(Char::isDigit) }, label = { Text("Soldi transaction ID") })
+                OutlinedTextField(doctorId, { doctorId = it.filter(Char::isDigit) }, label = { Text("People contact ID") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(costId, { costId = it.filter(Char::isDigit) }, label = { Text("Soldi transaction ID") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -1217,13 +1217,13 @@ private fun PrescriptionEditDialog(row: PrescriptionUi, onDismiss: () -> Unit, o
 private fun IntakeEditDialog(row: HistoryUi, onDismiss: () -> Unit, onSave: (Long, Double) -> Unit) {
     var timestamp by remember(row.id) { mutableStateOf(row.timestampMs.toString()) }
     var quantity by remember(row.id) { mutableStateOf("1") }
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.edit)) },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(row.substanceName)
-            OutlinedTextField(timestamp, { timestamp = it.filter(Char::isDigit) }, label = { Text("Timestamp ms") })
-            OutlinedTextField(quantity, { quantity = it.numberText() }, label = { Text("Quantity") })
+            OutlinedTextField(timestamp, { timestamp = it.filter(Char::isDigit) }, label = { Text("Timestamp ms") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(quantity, { quantity = it.numberText() }, label = { Text("Quantity") }, modifier = Modifier.fillMaxWidth())
         } },
         confirmButton = { Button(onClick = { onSave(timestamp.toLongOrNull() ?: row.timestampMs, quantity.toDoubleOrNull() ?: 1.0) }) { Text(stringResource(R.string.save)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
@@ -1234,14 +1234,14 @@ private fun IntakeEditDialog(row: HistoryUi, onDismiss: () -> Unit, onSave: (Lon
 private fun InteractionRuleDialog(source: SubstanceEntity, initial: InteractionRuleEntity?, onDismiss: () -> Unit, onSave: (Double, Double) -> Unit) {
     var before by remember(initial?.id) { mutableStateOf(initial?.avoidBeforeHours?.clean() ?: "2") }
     var after by remember(initial?.id) { mutableStateOf(initial?.avoidAfterHours?.clean() ?: "2") }
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.interaction_for, source.name)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.target_all_future))
-                OutlinedTextField(before, { before = it.numberText() }, label = { Text(stringResource(R.string.avoid_before_hours)) }, singleLine = true)
-                OutlinedTextField(after, { after = it.numberText() }, label = { Text(stringResource(R.string.avoid_after_hours)) }, singleLine = true)
+                OutlinedTextField(before, { before = it.numberText() }, label = { Text(stringResource(R.string.avoid_before_hours)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(after, { after = it.numberText() }, label = { Text(stringResource(R.string.avoid_after_hours)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
@@ -1254,6 +1254,7 @@ private fun InteractionRuleDialog(source: SubstanceEntity, initial: InteractionR
 }
 
 @Composable
+
 private fun ConfirmDeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,

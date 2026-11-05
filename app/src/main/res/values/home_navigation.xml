@@ -1,0 +1,4 @@
+<resources>
+    <string name="home_find_action" translatable="false">Find a module or action</string>
+    <string name="home_find_action_it" translatable="false">Cerca un modulo o un’azione</string>
+</resources>
