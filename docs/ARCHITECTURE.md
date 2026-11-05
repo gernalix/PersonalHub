@@ -155,3 +155,14 @@ Salute remains an active, independent project in `gernalix/salute`, with its own
 The current PersonalHub runtime has no Salute/Health feature, downloaded Salute database or health projection in its Git Data/Obsidian export. People, Places, Substances and Soldi retain their existing PersonalHub responsibilities without an implicit connection to Salute.
 
 The historical schema-20 health domain was removed in schema 21. See [DATABASE_SCHEMA_UPGRADES.md](DATABASE_SCHEMA_UPGRADES.md) for the external migration and rollback-backup requirements, and [OBSIDIAN_ARCHIVE.md](OBSIDIAN_ARCHIVE.md) for the current export boundary. This separation does not archive the Salute project.
+
+## Google Play subscriptions capsule
+
+Soldi owns subscription parsing, the SQLite catalog, OAuth/archive transport and UI in
+`capsules.playsubscriptions`. `PlaySubscriptionsCapsule` is the internal entrypoint for
+the Soldi screen, reminder schedule and background execution. The existing finance
+scheduler retains alarm/notification plumbing. `PlaySubscriptionWorker` keeps its
+original fully qualified class name as a thin adapter so persisted WorkManager jobs
+continue to resolve. Database namespace, subscription keys and work names stay stable.
+The Chrome loopback exporter remains an independent host CLI in `tools`; it shares
+no tokens or credentials with the Android runtime.

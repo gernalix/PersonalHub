@@ -29,6 +29,8 @@ architecture:
   - feature
   - docs/ARCHITECTURE.md
   - .codex/CODE_MAP.tsv
+  - feature/soldi/src/main/java/com/gernalix/personalhub/soldi/capsules/playsubscriptions
+  - tools/play_subscriptions_browser.py
 data:
   schema: Room owns canonical personalhub.db at schema26, exported to core/database/schemas/com.gernalix.personalhub.core.database.PersonalHubDatabase/26.json.
     Notifications owns its private notifications.sqlite archive; shared History reads
@@ -142,7 +144,7 @@ references:
   megavault: /home/daniele/MegaVault/megavault.sqlite
   c2: https://github.com/gernalix/codex-roadmap/blob/main/docs/project-capsule/README.md
 freshness:
-  reviewed_commit: d5b8562f6d2b5d73f498d90086de0fe879b2d8d9
+  reviewed_commit: 005709e5a7b5b3b3591ed0ba908495f476a737f5
   watch_paths:
   - app
   - contracts
@@ -242,3 +244,17 @@ change_verification:
   - tests/test_project_capsule.py
   commands:
   - test_targeted
+
+- paths:
+  - feature/soldi/**
+  - tools/play_subscriptions_browser.py
+  - tools/test_play_subscriptions_browser.py
+  - tools/check_architecture_boundaries.py
+  - docs/PLAY_SUBSCRIPTIONS.md
+  - docs/ARCHITECTURE.md
+  - .codex/CODE_MAP.tsv
+  - NV.txt
+  commands:
+  - build
+  - test_full
+  - lint

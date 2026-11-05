@@ -1,5 +1,8 @@
-package com.gernalix.personalhub.soldi
+package com.gernalix.personalhub.soldi.capsules.playsubscriptions
 
+import com.gernalix.personalhub.soldi.BankingSnapshot
+import com.gernalix.personalhub.soldi.bankingCacheIsStale
+import com.gernalix.personalhub.soldi.deduplicateBankingTransactions
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener

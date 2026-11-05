@@ -1,4 +1,4 @@
-package com.gernalix.personalhub.soldi
+package com.gernalix.personalhub.soldi.capsules.playsubscriptions
 
 import android.content.Context
 import com.gernalix.personalhub.core.database.DatabaseGate

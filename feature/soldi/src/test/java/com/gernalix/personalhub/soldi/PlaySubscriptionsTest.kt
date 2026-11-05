@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import com.gernalix.personalhub.soldi.capsules.playsubscriptions.*
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith

@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import com.gernalix.personalhub.soldi.capsules.playsubscriptions.PlaySubscriptionsCapsule
 import androidx.core.content.edit
 import android.app.Notification
 import android.app.NotificationManager
@@ -59,16 +60,9 @@ internal object FinanceReminderScheduler {
                 }
             }
         }
-        val play = PlaySubscriptionStore(context).read()
-        if (play.reminders) play.forecastSubscriptions.forEach { subscription ->
-            subscription.renewalDates(today, horizon).forEach { occurrence ->
-                val remindAt = occurrence.minusDays(play.reminderDays.toLong()).atTime(9, 0).atZone(ZoneId.systemDefault()).toInstant()
-                if (remindAt.isAfter(now)) {
-                    val key = "play:${subscription.key}:$occurrence"
-                    schedule(context, key, subscription.title, remindAt)
-                    scheduled += key
-                }
-            }
+        PlaySubscriptionsCapsule.reminders(context).forEach { reminder ->
+            schedule(context, reminder.key, reminder.title, reminder.at)
+            scheduled += reminder.key
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(PREF_KEYS, scheduled)}
         Unit
@@ -160,7 +154,7 @@ class FinanceBootReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 FinanceReminderScheduler.reschedule(context.applicationContext)
-                PlaySubscriptionWork.schedule(context, PlaySubscriptionStore(context).read())
+                PlaySubscriptionsCapsule.restoreBackgroundWork(context)
             } finally {
                 pending.finish()
             }

@@ -473,6 +473,17 @@ for path in source_files.get("feature:supercontacts", []):
             )
 
 
+# Soldi subscriptions expose only the capsule entrypoint to their enclosing feature.
+play_package = "com.gernalix.personalhub.soldi.capsules.playsubscriptions"
+for path in source_files.get("feature:soldi", []):
+    if kotlin_package(path) == play_package:
+        continue
+    for imported in kotlin_imports(path):
+        imported = imported.split(" as ")[0]
+        if imported.startswith(play_package + ".") and imported != play_package + ".PlaySubscriptionsCapsule":
+            errors.append(f"{path.relative_to(ROOT)} bypasses PlaySubscriptionsCapsule: {imported}")
+
+
 if errors:
     print("ARCHITECTURE_BOUNDARIES=FAIL")
     print("\n".join(sorted(set(errors))))
