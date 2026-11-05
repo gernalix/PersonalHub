@@ -58,6 +58,7 @@ class GmailReceiptsTest {
         assertEquals(Instant.parse("2026-11-05T09:00:00Z"), event.startsAt)
         assertEquals("fixture-event", event.uid); assertEquals("Clinic", event.location)
         assertEquals(2, event.sequence); assertFalse(event.cancelled)
+        assertTrue(GmailCalendarParser.parseIcs(ics.replace("20261105T100000", "20260230T100000"), "message").isEmpty())
         assertTrue(GmailCalendarParser.parseIcs(ics.replace("SEQUENCE:2", "SEQUENCE:3\r\nSTATUS:CANCELLED"), "message-2").single().cancelled)
         assertTrue(GmailCalendarParser.parseIcs(ics.replace("DTSTART;TZID=Europe/Copenhagen", "DTSTART"), "message").isEmpty())
     }

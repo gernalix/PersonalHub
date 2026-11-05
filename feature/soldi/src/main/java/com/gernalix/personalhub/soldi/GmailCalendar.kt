@@ -7,6 +7,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
 import java.util.Base64
 
 internal data class GmailAppointment(
@@ -59,10 +60,10 @@ internal object GmailCalendarParser {
             val time = runCatching {
                 when {
                     allDay -> LocalDate.parse(start.second, DateTimeFormatter.BASIC_ISO_DATE).atStartOfDay(ZoneId.systemDefault()).toInstant()
-                    start.second.endsWith("Z") -> LocalDateTime.parse(start.second.dropLast(1), DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")).toInstant(ZoneOffset.UTC)
+                    start.second.endsWith("Z") -> LocalDateTime.parse(start.second.dropLast(1), DateTimeFormatter.ofPattern("uuuuMMdd'T'HHmmss").withResolverStyle(ResolverStyle.STRICT)).toInstant(ZoneOffset.UTC)
                     start.first.contains("TZID=") -> {
                         val zone = start.first.substringAfter("TZID=").substringBefore(';').trim('"')
-                        val local = LocalDateTime.parse(start.second, DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss"))
+                        val local = LocalDateTime.parse(start.second, DateTimeFormatter.ofPattern("uuuuMMdd'T'HHmmss").withResolverStyle(ResolverStyle.STRICT))
                         val offsets = ZoneId.of(zone).rules.getValidOffsets(local)
                         require(offsets.size == 1) // DST gaps and overlaps need review, never shift the supplied time
                         local.toInstant(offsets.single())
