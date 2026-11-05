@@ -228,10 +228,24 @@ object DatabaseVault {
         version == 25 && PersonalHubDatabase.SCHEMA_VERSION == 26
 
     private fun migrateStagedDatabaseIfSupported(context: Context, stage: File) {
-        val version = SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READONLY)
-            .use { it.version }
+        val version = SQLiteDatabase.openDatabase(stage.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            val version = db.version
+            require(version == PersonalHubDatabase.SCHEMA_VERSION || supportsStartupUpgrade(version)) { "Unsupported database schema $version" }
+            if (version != PersonalHubDatabase.SCHEMA_VERSION) {
+                val asset = "com.gernalix.personalhub.core.database.PersonalHubDatabase/$version.json"
+                val entities = JSONObject(context.assets.open(asset).bufferedReader().use { it.readText() })
+                    .getJSONObject("database").getJSONArray("entities")
+                val tables = (0 until entities.length()).map { entities.getJSONObject(it).getString("tableName") }.toSet()
+                validateExecutableTriggers(context, db, tables)
+                val names = db.rawQuery("SELECT name FROM sqlite_master WHERE type='trigger'", null).use { cursor ->
+                    buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                }
+                // Derived capture SQL is regenerated for the migrated column layout.
+                HubActivityCapture.dropActivityTriggers(names) { db.execSQL(it) }
+            }
+            version
+        }
         if (version == PersonalHubDatabase.SCHEMA_VERSION) return
-        require(supportsStartupUpgrade(version)) { "Unsupported database schema $version" }
         PersonalHubDatabase.openStaging(context, stage.absolutePath).let { staging ->
             try { staging.openHelper.writableDatabase } finally { staging.close() }
         }
@@ -329,12 +343,13 @@ object DatabaseVault {
             require(db.version == PersonalHubDatabase.SCHEMA_VERSION) { "Incompatible database version" }
             val asset = "com.gernalix.personalhub.core.database.PersonalHubDatabase/${db.version}.json"
             val schema = JSONObject(context.assets.open(asset).bufferedReader().use { it.readText() }).getJSONObject("database")
+            val entities = schema.getJSONArray("entities")
+            validateExecutableTriggers(context, db, (0 until entities.length()).map { entities.getJSONObject(it).getString("tableName") }.toSet())
             db.rawQuery("PRAGMA quick_check", null).use { c ->
                 val checks = buildList { while(c.moveToNext()) add(c.getString(0)) }
                 require(checks == listOf("ok")) { "SQLite integrity check failed: ${checks.take(5).joinToString()}" }
             }
             db.rawQuery("PRAGMA foreign_key_check", null).use { require(!it.moveToFirst()) { "Invalid database relationships" } }
-            val entities = schema.getJSONArray("entities")
             val tables = mutableSetOf<String>()
             for (i in 0 until entities.length()) {
                 val entity = entities.getJSONObject(i)
@@ -388,77 +403,93 @@ object DatabaseVault {
             requireNoSaluteRows("hub_sync_pending", "table_name LIKE 'health_%'")
             requireNoSaluteRows("hub_sync_known", "table_name LIKE 'health_%'")
             requireNoSaluteRows("hub_tags", "namespace='salute'")
-            val historySearchTriggers = com.gernalix.personalhub.core.database.capsules.history.HistorySearchIndex.expectedSql()
-            val mutationTriggers = MutationEventCapture.expectedSql(databaseTables)
-            val identityTriggers = org.json.JSONArray(context.assets.open("canonical-identity-triggers.json").bufferedReader().use { it.readText() }).let { array ->
-                (0 until array.length()).associate { i -> val sql = array.getString(i); sql.substringAfter("EXISTS `").substringBefore("`") to sql }
-            }
-            val canonicalCapsule = com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
-            val extraIdentityTriggers = mapOf(canonicalCapsule.MUTATION_TRIGGER to canonicalCapsule.mutationTriggerSql)
-            canonicalCapsule.validate(context, db)
-            db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
-                while (c.moveToNext()) {
-                    val name = c.getString(0); val table = c.getString(1)
-                    val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
-                    if (name in identityTriggers || name in extraIdentityTriggers) {
-                        val expected = (identityTriggers[name] ?: extraIdentityTriggers.getValue(name)).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
-                        require(sql == expected) { "Incompatible identity trigger: $name" }
-                        continue
-                    }
-                    if (name in historySearchTriggers) {
-                        val expected = historySearchTriggers.getValue(name).replace(Regex("\\s+"), " ").trim()
-                        require(sql == expected) { "Incompatible History index trigger: $name" }
-                        continue
-                    }
-                    if (name in mutationTriggers) {
-                        val expected = mutationTriggers.getValue(name)
-                        require(sql == expected.replace(Regex("\\s+"), " ").trim()) { "Incompatible database trigger: $name" }
-                        continue
-                    }
-                    val op = name.substringAfterLast('_')
-                    if (name.startsWith("hub_activity_") && table in tables) continue
-                    require(table in databaseTables && op in listOf("INSERT", "UPDATE", "DELETE")) { "Unexpected database trigger: $name" }
-                    val expected = when (name) {
-                        "hub_dirty_${table}_$op" -> {
-                            // Older Timer sync tables can retain valid generation triggers from
-                            // before they were excluded from new trigger installation. Validate
-                            // their exact SQL here; Room removes them on the next database open.
-                            require(table !in SyncJournal.excluded || table in LEGACY_TIMER_SYNC_TABLES)
-                            "CREATE TRIGGER `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
-                        }
-                        "hub_sync_${table}_$op" -> {
-                            require(table !in SyncJournal.excluded)
-                            val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columns ->
-                                buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }
-                            }
-                            SyncJournal.trigger(table, keys, op)
-                        }
-                        "hub_git_dirty_${table}_$op" -> {
-                            require(table !in GitDataTracking.operationalTables && table !in SyncJournal.excluded)
-                            val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columnsCursor ->
-                                buildList {
-                                    while (columnsCursor.moveToNext()) add(columnsCursor.getString(1))
-                                }
-                            }
-                            val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columnsCursor ->
-                                buildList {
-                                    while (columnsCursor.moveToNext()) {
-                                        if (columnsCursor.getInt(5) > 0) {
-                                            add(columnsCursor.getInt(5) to columnsCursor.getString(1))
-                                        }
-                                    }
-                                }.sortedBy { it.first }.map { it.second }
-                            }
-                            GitDataTracking.trigger(table, columns, keys, op)
-                        }
-                        else -> error("Unexpected database trigger: $name")
-                    }
-                    require(sql == expected) { "Incompatible database trigger: $name" }
-                }
-            }
+            com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.validate(context, db)
             validatePeoplePhotoHashes(db)
             return db.rawQuery("SELECT generation FROM hub_generation WHERE id=1", null).use { c -> require(c.moveToFirst()) { "Missing database generation" }; c.getLong(0) }
             } finally { db.endTransaction() }
+        }
+    }
+
+    /** Verify executable schema before any migration or validation can write. */
+    private fun validateExecutableTriggers(context: Context, db: SQLiteDatabase, tables: Set<String>) {
+        val databaseTables = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", null).use { c ->
+            buildSet { while (c.moveToNext()) add(c.getString(0)) }
+        }
+        val tableColumns = tables.associateWith { table ->
+            db.rawQuery("PRAGMA table_info(`$table`)", null).use { c ->
+                buildList { while (c.moveToNext()) add(c.getString(1)) }
+            }
+        }
+        val activityTriggers = HubActivityCapture.expectedSql(tableColumns)
+        val historySearchTriggers = com.gernalix.personalhub.core.database.capsules.history.HistorySearchIndex.expectedSql()
+        val mutationTriggers = MutationEventCapture.expectedSql(databaseTables)
+        val identityTriggers = org.json.JSONArray(context.assets.open("canonical-identity-triggers.json").bufferedReader().use { it.readText() }).let { array ->
+            (0 until array.length()).associate { i -> val sql = array.getString(i); sql.substringAfter("EXISTS `").substringBefore("`") to sql }
+        }
+        val canonicalCapsule = com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule
+        val extraIdentityTriggers = mapOf(canonicalCapsule.MUTATION_TRIGGER to canonicalCapsule.mutationTriggerSql)
+        db.rawQuery("SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'", null).use { c ->
+            while (c.moveToNext()) {
+                val name = c.getString(0); val table = c.getString(1)
+                val sql = c.getString(2).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
+                if (name in identityTriggers || name in extraIdentityTriggers) {
+                    val expected = (identityTriggers[name] ?: extraIdentityTriggers.getValue(name)).replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
+                    require(sql == expected) { "Incompatible identity trigger: $name" }
+                    continue
+                }
+                if (name in historySearchTriggers) {
+                    val expected = historySearchTriggers.getValue(name).replace(Regex("\\s+"), " ").trim()
+                    require(sql == expected) { "Incompatible History index trigger: $name" }
+                    continue
+                }
+                if (name in mutationTriggers) {
+                    val expected = mutationTriggers.getValue(name)
+                    require(sql == expected.replace(Regex("\\s+"), " ").trim()) { "Incompatible database trigger: $name" }
+                    continue
+                }
+                val op = name.substringAfterLast('_')
+                if (name.startsWith("hub_activity_")) {
+                    require(table in tables && HubActivityCapture.acceptsTrigger(sql, activityTriggers[name])) { "Incompatible activity trigger: $name" }
+                    continue
+                }
+                require(table in databaseTables && op in listOf("INSERT", "UPDATE", "DELETE")) { "Unexpected database trigger: $name" }
+                val expected = when (name) {
+                    "hub_dirty_${table}_$op" -> {
+                        // Older Timer sync tables can retain valid generation triggers from
+                        // before they were excluded from new trigger installation. Validate
+                        // their exact SQL here; Room removes them on the next database open.
+                        require(table !in SyncJournal.excluded || table in LEGACY_TIMER_SYNC_TABLES)
+                        "CREATE TRIGGER `hub_dirty_${table}_$op` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
+                    }
+                    "hub_sync_${table}_$op" -> {
+                        require(table !in SyncJournal.excluded)
+                        val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columns ->
+                            buildList { while (columns.moveToNext()) if (columns.getInt(5) > 0) add(columns.getInt(5) to columns.getString(1)) }.sortedBy { it.first }.map { it.second }
+                        }
+                        SyncJournal.trigger(table, keys, op)
+                    }
+                    "hub_git_dirty_${table}_$op" -> {
+                        require(table !in GitDataTracking.operationalTables && table !in SyncJournal.excluded)
+                        val columns = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columnsCursor ->
+                            buildList {
+                                while (columnsCursor.moveToNext()) add(columnsCursor.getString(1))
+                            }
+                        }
+                        val keys = db.rawQuery("PRAGMA table_info(`$table`)", null).use { columnsCursor ->
+                            buildList {
+                                while (columnsCursor.moveToNext()) {
+                                    if (columnsCursor.getInt(5) > 0) {
+                                        add(columnsCursor.getInt(5) to columnsCursor.getString(1))
+                                    }
+                                }
+                            }.sortedBy { it.first }.map { it.second }
+                        }
+                        GitDataTracking.trigger(table, columns, keys, op)
+                    }
+                    else -> error("Unexpected database trigger: $name")
+                }
+                require(sql == expected) { "Incompatible database trigger: $name" }
+            }
         }
     }
 

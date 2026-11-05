@@ -90,11 +90,24 @@ private fun formatDate(timestamp: Long): String = DateTimeFormatter
     .withLocale(Locale.getDefault())
     .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
 
-fun Context.launchSinceWhenCreate(source: SinceWhenSourceDescriptor, selectedSourceId: String?) {
+fun Context.reviewSinceWhenCreate(source: SinceWhenSourceDescriptor) {
+    startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)).apply {
+        setPackage(this@reviewSinceWhenCreate.packageName)
+        if (this@reviewSinceWhenCreate !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    })
+}
+
+fun Context.launchSinceWhenCreate(
+    source: SinceWhenSourceDescriptor,
+    selectedSourceId: String? = source.timestampSources.firstOrNull { it.isDefault }?.id
+        ?: source.timestampSources.firstOrNull()?.id,
+) {
     val selectedSource = source.copy(
         timestampSources = source.timestampSources.map { it.copy(isDefault = it.id == selectedSourceId) },
     )
-    startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(selectedSource, startEnabled = true)).apply {
+    startActivity(Intent(HubDeepLinkContract.ACTION_CREATE_SINCE_WHEN_INTERNAL,
+        HubDeepLinkContract.sinceWhenCreateUri(selectedSource, startEnabled = true)).apply {
+        setPackage(this@launchSinceWhenCreate.packageName)
         if (this@launchSinceWhenCreate !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     })
 }

@@ -77,6 +77,18 @@
 
 
         <activity
+            android:name=".SinceWhenCreateActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.PersonalHub">
+            <intent-filter>
+                <action android:name="com.gernalix.personalhub.action.CREATE_SINCE_WHEN_INTERNAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="personalhub" android:host="since_when" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".WorkflowyShareActivity"
             android:enabled="false"
             android:exported="true"

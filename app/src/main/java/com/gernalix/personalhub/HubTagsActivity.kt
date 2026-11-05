@@ -1,5 +1,7 @@
 package com.gernalix.personalhub
 
+import com.gernalix.personalhub.core.ui.reviewSinceWhenCreate
+
 import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
@@ -161,7 +163,7 @@ fun HubTagsScreen(initialTagId: String? = null, onBack: () -> Unit) {
                         OutlinedButton(onClick = {
                             scope.launch {
                                 val source = HubContextRuntime.adapter("tags", "tag").sinceWhenSource(selected.id) ?: return@launch
-                                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                                context.reviewSinceWhenCreate(source)
                             }
                         }) { Text(stringResource(R.string.since_when_create_counter_action)) }
                         Button(onClick = { scope.launch { HubContextRuntime.tags().pin(selected.id, !selected.pinned); reload() } }) { Text(if (selected.pinned) "Unpin" else "Pin") }

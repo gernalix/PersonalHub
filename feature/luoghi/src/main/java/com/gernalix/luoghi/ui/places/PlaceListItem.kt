@@ -1,5 +1,7 @@
 package com.gernalix.luoghi.ui.places
 
+import com.gernalix.personalhub.core.ui.reviewSinceWhenCreate
+
 import android.content.Intent
 import android.content.ActivityNotFoundException
 import android.widget.Toast
@@ -220,7 +222,7 @@ fun PlaceListItem(
                             true,
                         )),
                     )
-                    context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                    context.reviewSinceWhenCreate(source)
                 },
             )
         }

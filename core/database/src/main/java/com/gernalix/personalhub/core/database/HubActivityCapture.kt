@@ -9,6 +9,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 object HubActivityCapture {
     const val UNDO_CONTEXT_TABLE = "hub_activity_undo_context"
+    private const val APP_VERSION_MARKER = "__HUB_ACTIVITY_APP_VERSION__"
+
+    private class TriggerEmitter(
+        val tableColumns: Map<String, List<String>>,
+        val emit: (String) -> Unit,
+    ) {
+        fun execSQL(sql: String) = emit(sql)
+    }
 
     private data class RowSpec(
         val table: String,
@@ -194,30 +202,57 @@ object HubActivityCapture {
 
     fun install(db: SupportSQLiteDatabase, appVersion: Long) {
         createInternalTables(db)
-        rowSpecs.forEach { spec -> if (tableExists(db, spec.table)) installRowSpec(db, spec, appVersion) }
-        if (tableExists(db, "contact_events")) installPeopleBridge(db, appVersion)
-        if (tableExists(db, "audit_events")) installTimerBridge(db, appVersion)
-        if (tableExists(db, "history_audit_log")) installPlacesBridge(db, appVersion)
+        val tables = rowSpecs.map { it.table } + listOf("contact_events", "audit_events", "history_audit_log")
+        val tableColumns = tables.associateWith { columns(db, it) }
+        uninstall(db)
+        expectedSql(tableColumns, appVersion).values.forEach { db.execSQL(it) }
     }
 
     fun uninstall(db: SupportSQLiteDatabase) {
-        rowSpecs.forEach { spec ->
-            val base = "hub_activity_" + spec.table
-            listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                db.execSQL("DROP TRIGGER IF EXISTS `" + base + "_" + op + "`")
-            }
+        val names = db.query("SELECT name FROM sqlite_master WHERE type='trigger'").use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
         }
-        listOf(
-            "hub_activity_bridge_people",
-            "hub_activity_people_creation_label",
-            "hub_activity_bridge_timer",
-            "hub_activity_bridge_places",
-        ).forEach { trigger ->
-            db.execSQL("DROP TRIGGER IF EXISTS `" + trigger + "`")
+        dropActivityTriggers(names) { db.execSQL(it) }
+    }
+
+    internal fun dropActivityTriggers(names: List<String>, execute: (String) -> Unit) {
+        names.filter { it.startsWith("hub_activity_") }.forEach { name ->
+            execute("DROP TRIGGER IF EXISTS ${quotedIdentifier(name)}")
         }
     }
 
-    private fun installRowSpec(db: SupportSQLiteDatabase, spec: RowSpec, appVersion: Long) {
+    /** The same generator owns installed SQL and import-validation templates.
+     * A null version denotes a marker used only for comparison, never execution.
+     */
+    internal fun expectedSql(tableColumns: Map<String, List<String>>, appVersion: Long? = null): Map<String, String> = buildMap {
+        val emitter = TriggerEmitter(tableColumns) { sql ->
+            val statement = sql.trimStart()
+            if (statement.startsWith("CREATE TRIGGER `")) {
+                put(statement.substringAfter("CREATE TRIGGER `").substringBefore('`'), sql)
+            } else {
+                check(statement.startsWith("DROP TRIGGER IF EXISTS `")) { "Unexpected activity-trigger statement" }
+            }
+        }
+        val versionSql = appVersion?.toString() ?: APP_VERSION_MARKER
+        rowSpecs.forEach { spec -> if (tableExists(emitter, spec.table)) installRowSpec(emitter, spec, versionSql) }
+        if (tableExists(emitter, "contact_events")) installPeopleBridge(emitter, versionSql)
+        if (tableExists(emitter, "audit_events")) installTimerBridge(emitter, versionSql)
+        if (tableExists(emitter, "history_audit_log")) installPlacesBridge(emitter, versionSql)
+    }
+
+    internal fun acceptsTrigger(sql: String, template: String?): Boolean {
+        if (template == null) return false
+        fun normalized(value: String) = value.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
+        val actual = normalized(sql)
+        val pieces = normalized(template).split(APP_VERSION_MARKER)
+        if (pieces.size == 1) return actual == pieces.single()
+        if (pieces.size != 2 || actual.length < pieces[0].length + pieces[1].length ||
+            !actual.startsWith(pieces[0]) || !actual.endsWith(pieces[1])) return false
+        val version = actual.substring(pieces[0].length, actual.length - pieces[1].length)
+        return version.matches(Regex("-?(0|[1-9][0-9]{0,18})")) && version.toLongOrNull() != null
+    }
+
+    private fun installRowSpec(db: TriggerEmitter, spec: RowSpec, appVersion: String) {
         val columns = columns(db, spec.table)
         if (columns.isEmpty()) return
         val columnList = columns.joinToString(",")
@@ -312,7 +347,7 @@ object HubActivityCapture {
         }
     }
 
-    private fun installPeopleBridge(db: SupportSQLiteDatabase, appVersion: Long) {
+    private fun installPeopleBridge(db: TriggerEmitter, appVersion: String) {
         val initialField = "lower(NEW.entity_type)='field' AND lower(NEW.action_type)='added' AND EXISTS (SELECT 1 FROM contact_events seed WHERE seed.contact_id=NEW.contact_id AND lower(seed.entity_type)='contact' AND lower(seed.action_type)='created' AND seed.occurred_at=NEW.occurred_at)"
         val nameSql = "(SELECT NULLIF(value,'') FROM contact_fields WHERE contact_id=NEW.contact_id AND field_type='name' ORDER BY position LIMIT 1)"
         db.execSQL("DROP TRIGGER IF EXISTS `hub_activity_bridge_people`")
@@ -367,7 +402,7 @@ object HubActivityCapture {
         )
     }
 
-    private fun installTimerBridge(db: SupportSQLiteDatabase, appVersion: Long) {
+    private fun installTimerBridge(db: TriggerEmitter, appVersion: String) {
         db.execSQL("DROP TRIGGER IF EXISTS `hub_activity_bridge_timer`")
         db.execSQL(
             """
@@ -397,7 +432,7 @@ object HubActivityCapture {
         )
     }
 
-    private fun installPlacesBridge(db: SupportSQLiteDatabase, appVersion: Long) {
+    private fun installPlacesBridge(db: TriggerEmitter, appVersion: String) {
         db.execSQL("DROP TRIGGER IF EXISTS `hub_activity_bridge_places`")
         db.execSQL(
             """
@@ -428,7 +463,7 @@ object HubActivityCapture {
     }
 
     private fun insertSql(
-        appVersion: Long,
+        appVersion: String,
         moduleId: String,
         actionSql: String,
         entityKind: String?,
@@ -473,8 +508,9 @@ object HubActivityCapture {
             buildList { while (cursor.moveToNext()) add(cursor.getString(1)) }
         }
 
-    private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
-        db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1", arrayOf(table)).use { it.moveToFirst() }
+    private fun columns(db: TriggerEmitter, table: String): List<String> = db.tableColumns[table].orEmpty()
+
+    private fun tableExists(db: TriggerEmitter, table: String): Boolean = columns(db, table).isNotEmpty()
 
     private fun randomIdSql() = "lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6)))"
     private fun nowMsSql() = "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)"
