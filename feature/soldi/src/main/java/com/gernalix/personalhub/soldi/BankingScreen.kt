@@ -344,6 +344,9 @@ private fun BankingComparisonBlock(comparison: BankingComparison) {
     comparison.fetchedAt?.let {
         Text(stringResource(R.string.banking_compare_reference, formatInstant(it)), style = MaterialTheme.typography.bodySmall)
     }
+    if (comparison.balanceReferenceDate == null) {
+        Text(stringResource(R.string.banking_compare_reference_missing), style = MaterialTheme.typography.bodySmall)
+    }
     Text(comparisonCauseLabel(requireNotNull(comparison.cause)), style = MaterialTheme.typography.bodySmall)
     if (comparison.pendingCount > 0) {
         Text(stringResource(R.string.banking_pending_separate, comparison.pendingCount), style = MaterialTheme.typography.bodySmall)

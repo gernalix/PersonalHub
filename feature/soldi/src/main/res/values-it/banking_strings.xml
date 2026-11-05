@@ -89,4 +89,5 @@
     <string name="banking_alert_channel_description">Avvisi locali privati per discrepanze attendibili tra banca e PersonalHub</string>
     <string name="banking_alert_title">PersonalHub Soldi</string>
     <string name="banking_alert_body">Apri Banche per controllare una discrepanza attendibile.</string>
+    <string name="banking_compare_reference_missing">Data del saldo non fornita dalla banca. Il confronto usa il saldo contabilizzato della lettura di riferimento.</string>
 </resources>

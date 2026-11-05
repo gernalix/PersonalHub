@@ -44,6 +44,49 @@ class BankingReconciliationTest {
         ))
     }
 
+    @Test fun optionalBalanceDateUsesTheFreshBookedReadingAndPreservesItsProvenance() {
+        val base = snapshot(bankBalance = "90.00")
+        val missingDate = base.copy(balances = base.balances.map {
+            it.copy(referenceDate = null, lastChangedAt = fetchedAt.minusSeconds(3 * 86400L))
+        })
+        val localRows = listOf(
+            localTransaction("existing", "-10", "2026-10-16T08:00:00Z"),
+            localTransaction("future", "-50", "2026-10-18T08:00:00Z"),
+        )
+        val comparison = reconcileBanking(missingDate, linked, listOf(localAccount), localRows, fetchedAt).comparisons.single()
+        assertEquals(BankingComparisonState.COMPARABLE, comparison.state)
+        assertNull(comparison.balanceReferenceDate)
+        assertEquals(fetchedAt, comparison.fetchedAt)
+        assertEquals(0, BigDecimal("90.00").compareTo(comparison.phBalance))
+        assertEquals(0, comparison.difference!!.signum())
+        assertEquals(1, comparison.futurePhCount)
+        val dated = reconcileBanking(base, linked, listOf(localAccount), emptyList(), fetchedAt).comparisons.single()
+        assertEquals(LocalDate.of(2026, 10, 17), dated.balanceReferenceDate)
+    }
+
+    @Test fun absentBalanceDateDoesNotBypassFreshnessCompletenessOrBookedType() {
+        val base = snapshot(bankBalance = "100.00").let { value ->
+            value.copy(balances = value.balances.map { it.copy(referenceDate = null, lastChangedAt = null) })
+        }
+        val cases = listOf(
+            base.copy(cache = base.cache.copy(stale = true)) to BankingComparisonState.STALE,
+            base.copy(cache = base.cache.copy(fetchedAt = null)) to BankingComparisonState.STALE,
+            base.copy(cache = base.cache.copy(complete = false)) to BankingComparisonState.INCOMPLETE,
+            base.copy(partialAccounts = setOf(bankAccount.id)) to BankingComparisonState.PARTIAL,
+            base.copy(balances = base.balances.map { it.copy(type = "ITAV") }) to BankingComparisonState.NO_BOOKED_BALANCE,
+        )
+        cases.forEach { (value, expected) ->
+            assertEquals(expected, reconcileBanking(value, linked, listOf(localAccount), emptyList(), fetchedAt).comparisons.single().state)
+        }
+        assertEquals(BankingComparisonState.COMPARABLE,
+            reconcileBanking(base, linked, listOf(localAccount), emptyList(), fetchedAt).comparisons.single().state)
+        for (date in listOf(LocalDate.of(2026, 10, 16), LocalDate.of(2026, 10, 18))) {
+            val dated = base.copy(balances = base.balances.map { it.copy(referenceDate = date) })
+            assertEquals(BankingComparisonState.REFERENCE_DATE_MISMATCH,
+                reconcileBanking(dated, linked, listOf(localAccount), emptyList(), fetchedAt).comparisons.single().state)
+        }
+    }
+
     @Test fun stalePartialReferenceCurrencyAndBalanceTypeFailClosed() {
         val base = snapshot(bankBalance = "100.00")
         assertEquals(
