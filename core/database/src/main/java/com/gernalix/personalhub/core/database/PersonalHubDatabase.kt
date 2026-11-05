@@ -162,11 +162,6 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                     // The open manifest must be durably committed and its failure checked.
                     @SuppressLint("UseKtx")
                     override fun onOpen(db: SupportSQLiteDatabase) {
-                        com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.install(context, db)
-                        MutationEventStore.install(db)
-                        GitHistoryStore.install(db)
-                        GitDataTracking.ensureAppliedPatchStore(db)
-                        com.gernalix.personalhub.core.database.capsules.history.HistorySearchIndex.install(db)
                         val appVersion = runCatching {
                             androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
                                 context.packageManager.getPackageInfo(context.packageName, 0),
@@ -175,45 +170,62 @@ abstract class PersonalHubDatabase : RoomDatabase(), PlaceReferenceReader {
                         val gitHistoryEnabled = runCatching {
                             GitDataSettings.configuration(context).enabled
                         }.getOrDefault(false)
-                        SyncJournal.retireUploadTriggers(db)
                         val manifestPrefs = context.getSharedPreferences("hub_open_manifest", Context.MODE_PRIVATE)
                         fun manifest() = "v2:$appVersion:$gitHistoryEnabled:${schemaFingerprint(db)}"
                         if (manifestPrefs.getString(name, null) == manifest()) {
+                            // Validate data invariants, but do not change an already installed
+                            // schema. Even DROP/CREATE of one unchanged trigger invalidates every
+                            // SQLite connection's schema cache during concurrent cold startup.
+                            com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.validate(context, db)
                             if (gitHistoryEnabled) GitDataTracking.resumeInstalled(db)
                             return
                         }
-                        db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
-                        LEGACY_TIMER_SYNC_TABLES.forEach { table ->
-                            listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                                db.execSQL("DROP TRIGGER IF EXISTS `hub_dirty_${table}_$op`")
-                            }
-                        }
-                        val tables = SyncJournal.tables(db)
-                        if (gitHistoryEnabled) {
-                            HubActivityCapture.uninstall(db)
+                        // Install/repair as one schema change. Opening a WAL connection between
+                        // hundreds of DDL statements otherwise reparses the growing schema repeatedly.
+                        db.beginTransaction()
+                        try {
+                            com.gernalix.personalhub.core.database.capsules.identity.CanonicalIdentityCapsule.install(context, db)
+                            MutationEventStore.install(db)
                             GitHistoryStore.install(db)
-                            // Install history triggers before feature code can perform the first
-                            // post-open write. GitDataSync.start() later handles scheduling and a
-                            // full reconciliation when the cached manifest requires it.
-                            GitDataTracking.install(db, enqueueAll = false)
-                        } else {
-                            GitDataTracking.uninstall(db)
-                            HubActivityCapture.install(db, appVersion)
-                        }
-                        MutationEventCapture.install(db)
-                        val installedDirty = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'hub_dirty_%'").use { cursor ->
-                            buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
-                        }
-                        fun normalized(sql: String) = sql.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
-                        tables.forEach { table ->
-                            listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
-                                val name = "hub_dirty_${table}_$op"
-                                val expected = "CREATE TRIGGER `$name` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
-                                if (installedDirty[name]?.let(::normalized) != expected) {
-                                    db.execSQL("DROP TRIGGER IF EXISTS `$name`")
-                                    db.execSQL(expected)
+                            GitDataTracking.ensureAppliedPatchStore(db)
+                            com.gernalix.personalhub.core.database.capsules.history.HistorySearchIndex.install(db)
+                            SyncJournal.retireUploadTriggers(db)
+                            db.execSQL("INSERT OR IGNORE INTO hub_generation(id, generation) VALUES (1, 0)")
+                            LEGACY_TIMER_SYNC_TABLES.forEach { table ->
+                                listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
+                                    db.execSQL("DROP TRIGGER IF EXISTS `hub_dirty_${table}_$op`")
                                 }
                             }
+                            val tables = SyncJournal.tables(db)
+                            if (gitHistoryEnabled) {
+                                HubActivityCapture.uninstall(db)
+                                GitHistoryStore.install(db)
+                                // Install history triggers before feature code can perform the first
+                                // post-open write. GitDataSync.start() later handles scheduling and a
+                                // full reconciliation when the cached manifest requires it.
+                                GitDataTracking.install(db, enqueueAll = false)
+                            } else {
+                                GitDataTracking.uninstall(db)
+                                HubActivityCapture.install(db, appVersion)
+                            }
+                            MutationEventCapture.install(db)
+                            val installedDirty = db.query("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'hub_dirty_%'").use { cursor ->
+                                buildMap { while (cursor.moveToNext()) put(cursor.getString(0), cursor.getString(1)) }
+                            }
+                            fun normalized(sql: String) = sql.replace("IF NOT EXISTS ", "").replace(Regex("\\s+"), " ").trim()
+                            tables.forEach { table ->
+                                listOf("INSERT", "UPDATE", "DELETE").forEach { op ->
+                                    val name = "hub_dirty_${table}_$op"
+                                    val expected = "CREATE TRIGGER `$name` AFTER $op ON `$table` BEGIN UPDATE hub_generation SET generation=generation+1 WHERE id=1; END"
+                                    if (installedDirty[name]?.let(::normalized) != expected) {
+                                        db.execSQL("DROP TRIGGER IF EXISTS `$name`")
+                                        db.execSQL(expected)
+                                    }
+                                }
+                            }
+                            db.setTransactionSuccessful()
+                        } finally {
+                            db.endTransaction()
                         }
                         check(manifestPrefs.edit().putString(name, manifest()).commit()) {
                             "Could not persist database open manifest"

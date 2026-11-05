@@ -45,8 +45,11 @@ class PersonalHubOpenManifestTest {
         assertTrue(manifest!!.startsWith("v2:"))
         assertTrue(manifest.contains(":false:"))
 
+        val installedSchemaVersion = first.query("PRAGMA schema_version").use { it.moveToFirst(); it.getInt(0) }
         PersonalHubDatabase.resetForTests()
-        PersonalHubDatabase.get(context).openHelper.writableDatabase
+        val reopened = PersonalHubDatabase.get(context).openHelper.writableDatabase
+        val reopenedSchemaVersion = reopened.query("PRAGMA schema_version").use { it.moveToFirst(); it.getInt(0) }
+        assertEquals("Cached open must not invalidate SQLite connection schemas", installedSchemaVersion, reopenedSchemaVersion)
         assertEquals(manifest, prefs.getString(PersonalHubDatabase.DB_NAME, null))
 
         PersonalHubDatabase.resetForTests()
