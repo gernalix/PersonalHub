@@ -16,6 +16,30 @@ import java.util.zip.ZipOutputStream
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class PlaySubscriptionsTest {
+    private fun exported(price: String = "DKK 123.45", state: String = "Active", renewal: String = "2027-01-31T12:00:00Z") =
+        """{"subscription":{"doc":{"documentType":"Subscription","title":"Synthetic service"},"state":"$state","renewalDate":"$renewal","pricing":[{"price":"DKK 0.00","period":{"count":7,"unit":"DAY"},"repeatedPricing":false},{"price":"$price","period":{"count":1,"unit":"MONTH"},"repeatedPricing":true}],"userChangeRecord":[{"date":"2026-01-01T12:00:00Z","type":"UpdatePaymentMethod"}]}}"""
+    @Test fun actualExportShapeUnwrapsAndUsesRecurringPriceWithoutMergingByTitle() {
+        val source = exported(price = "DKK\u00a01,234.50")
+        val sub = PlaySubscriptionJson.parse("[$source,$source]").single()
+        assertEquals(BigDecimal("1234.50"), sub.amount)
+        assertEquals("DKK", sub.currency)
+        assertEquals(java.time.Period.ofMonths(1), sub.period)
+        assertEquals(0, BigDecimal("14814.00").compareTo(sub.annualCost()))
+        assertTrue(sub.key.startsWith("snapshot:"))
+        assertTrue(playChangeDescriptions(sub.sourceJson).single().startsWith("Metodo di pagamento modificato · "))
+        assertEquals(sub, PlaySubscriptionJson.parse("[${sub.sourceJson}]").single())
+        assertEquals(2, PlaySubscriptionJson.parse("[$source,${exported(state = "Canceled")}]").size)
+        assertNull(PlaySubscriptionJson.parse("[${exported(price = "unrecognised")}]").single().amount)
+    }
+    @Test fun metadataArchiveFromPortabilityDoesNotAbortCombinedDownload() {
+        val bytes = ByteArrayOutputStream()
+        ZipOutputStream(bytes).use { zip ->
+            zip.putNextEntry(ZipEntry("Portability/archive_browser.json"))
+            zip.write("""{"creationTime":"2026-01-01T00:00:00Z","serviceStatus":[]}""".toByteArray())
+            zip.closeEntry()
+        }
+        assertTrue(PlaySubscriptionJson.read(ByteArrayInputStream(bytes.toByteArray())).isEmpty())
+    }
     private fun record(id: String = "app-one", state: String = "ACTIVE", pricing: String = """{"amount":"9.99","currencyCode":"EUR","period":"P1M"}""") =
         """{"doc":{"docid":"$id","title":"Example music","packageName":"example.music"},"state":"$state","renewalDate":"2026-01-31T12:00:00Z","pricing":$pricing,"userChangeRecord":[{"type":"REACTIVATION"}]}"""
     private fun parse(row: String = record()) = PlaySubscriptionJson.parse("[$row]").single()

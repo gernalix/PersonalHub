@@ -119,5 +119,22 @@ class PlaySubscriptionsDeviceTest {
             assertEquals(saved.subscriptions, store.read().forecastSubscriptions)
         } finally { store.update { saved } }
     }
+    @Test fun idlessSnapshotsAreIdempotentAndSupersededVersionsDoNotDoubleForecast() {
+        val store = PlaySubscriptionStore(context)
+        val saved = store.read()
+        val source = """[{"subscription":{"doc":{"documentType":"Subscription","title":"Synthetic snapshot"},"state":"Active","renewalDate":"2027-01-31T12:00:00Z","pricing":[{"price":"DKK 10.00","period":{"unit":"MONTH","count":1},"repeatedPricing":true}]}}]"""
+        val first = PlaySubscriptionJson.parse(source)
+        val updated = PlaySubscriptionJson.parse(source.replace("10.00", "12.00"))
+        try {
+            store.import(first); store.import(first)
+            assertEquals(1, store.read().subscriptions.count { it.key == first.single().key })
+            store.import(updated)
+            val current = PlaySubscriptionStore(context).read()
+            assertTrue(first.single().key in current.unconfirmedKeys)
+            assertFalse(updated.single().key in current.unconfirmedKeys)
+            assertEquals(1, current.forecastSubscriptions.count { it.title == "Synthetic snapshot" })
+            assertEquals(2, current.subscriptions.count { it.title == "Synthetic snapshot" })
+        } finally { store.update { saved } }
+    }
 
 }

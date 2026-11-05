@@ -69,30 +69,53 @@ internal object PlaySubscriptionJson {
         require(array.length() <= 10000) { "Troppe sottoscrizioni" }
         return unique((0 until array.length()).map { parseRecord(array.getJSONObject(it)) })
     }
-    private fun parseRecord(row: JSONObject): PlaySubscription {
+    private fun parseRecord(input: JSONObject): PlaySubscription {
+        val row = input.optJSONObject("subscription") ?: input
         val doc = row.getJSONObject("doc")
         val title = doc.text("title") ?: error("Nome della sottoscrizione mancante")
         val packageName = doc.text("packageName") ?: doc.optJSONObject("documentId")?.text("packageName")
         val documentId = doc.text("docid") ?: doc.text("docId") ?: doc.text("id")
         val identity = row.text("subscriptionId") ?: documentId ?: packageName
-            ?: error("Identità stabile della sottoscrizione mancante")
-        val pricing = row.optJSONObject("pricing")
+        // Actual Portability exports omit IDs. Keep content-addressed snapshots, never merge by title.
+        val source = canonical(row)
+        val key = identity?.let(::hash) ?: run {
+            require(doc.text("documentType") == "Subscription" && row.optJSONArray("pricing") != null && row.text("state") != null) {
+                "Identità della sottoscrizione mancante"
+            }
+            "snapshot:" + hash(source)
+        }
+        val pricing = row.optJSONObject("pricing") ?: row.optJSONArray("pricing")?.let { array ->
+            (0 until array.length()).map { array.getJSONObject(it) }.filter { it.optBoolean("repeatedPricing") }.singleOrNull()
+        }
+        val formatted = pricing?.text("price")?.replace('\u00a0', ' ')?.let {
+            Regex("^([A-Z]{3}) +((?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\\.[0-9]{1,2})?)$").matchEntire(it)
+        }
         val price = pricing?.optJSONObject("price")
-        val currency = (price?.text("currencyCode") ?: pricing?.text("currencyCode"))
+        val currency = (price?.text("currencyCode") ?: pricing?.text("currencyCode") ?: formatted?.groupValues?.get(1))
             ?.takeIf { Regex("[A-Z]{3}").matches(it) }
         val amount = when {
             price?.has("units") == true -> BigDecimal(price.getString("units")) + BigDecimal(price.optLong("nanos", 0)).movePointLeft(9)
             pricing?.has("priceMicros") == true -> BigDecimal(pricing.getString("priceMicros")).movePointLeft(6)
             else -> (pricing?.text("amount") ?: pricing?.text("price"))?.toBigDecimalOrNull()
+                ?: formatted?.groupValues?.get(2)?.replace(",", "")?.toBigDecimalOrNull()
         }?.also { require(it.signum() >= 0 && it.precision() <= 30 && it.scale() <= 12) { "Prezzo non valido" } }
-        val period = (pricing?.text("period") ?: pricing?.text("billingPeriod"))?.let {
+        val period = ((pricing?.text("period") ?: pricing?.text("billingPeriod"))?.let {
             runCatching { Period.parse(it) }.getOrNull()?.takeIf { p -> !p.isZero && !p.isNegative && p.years <= 20 && p.months <= 240 && p.days <= 7300 }
+        }) ?: pricing?.optJSONObject("period")?.let { p ->
+            val count = p.optInt("count", 0)
+            if (count !in 1..7300) null else when (p.text("unit")) {
+                "DAY" -> Period.ofDays(count)
+                "WEEK" -> count.takeIf { it <= 1042 }?.let { Period.ofDays(it * 7) }
+                "MONTH" -> count.takeIf { it <= 240 }?.let(Period::ofMonths)
+                "YEAR" -> count.takeIf { it <= 20 }?.let(Period::ofYears)
+                else -> null
+            }
         }
         fun date(key: String) = row.text(key)?.let { value ->
             runCatching { Instant.parse(value) }.getOrElse { error("Data Google Play non valida") }
         }
-        return PlaySubscription(hash(identity), title, packageName?.takeIf { Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+").matches(it) },
-            row.text("state") ?: "UNKNOWN", date("renewalDate"), date("expirationDate"), amount, currency, period, row.toString())
+        return PlaySubscription(key, title, packageName?.takeIf { Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+").matches(it) },
+            row.text("state") ?: "UNKNOWN", date("renewalDate"), date("expirationDate"), amount, currency, period, source)
     }
     fun read(input: InputStream): List<PlaySubscription> {
         val buffered = input.buffered()
@@ -103,6 +126,7 @@ internal object PlaySubscriptionJson {
         var entries = 0
         val records = mutableListOf<PlaySubscription>()
         var found = false
+        var metadata = false
         ZipInputStream(buffered).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
@@ -112,10 +136,13 @@ internal object PlaySubscriptionJson {
                 if (!entry.isDirectory && entry.name.substringAfterLast('/').contains("subscription", true) && entry.name.endsWith(".json", true)) {
                     found = true
                     records += parse(bytes.toString(Charsets.UTF_8))
+                } else if (entry.name.substringAfterLast('/') == "archive_browser.json") {
+                    val root = JSONObject(bytes.toString(Charsets.UTF_8))
+                    metadata = root.optJSONArray("serviceStatus") != null && root.has("creationTime")
                 }
             }
         }
-        require(found) { "Nessun file di sottoscrizioni Google Play nell'archivio" }
+        require(found || metadata) { "Nessun file di sottoscrizioni Google Play nell'archivio" }
         return unique(records)
     }
     fun unique(records: List<PlaySubscription>): List<PlaySubscription> = records.groupBy { it.key }.values.map { rows ->
@@ -133,6 +160,13 @@ internal object PlaySubscriptionJson {
         return output.toByteArray()
     }
     private fun hash(value: String) = MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
+    private fun canonical(value: Any?): String = when (value) {
+        is JSONObject -> value.keys().asSequence().toList().sorted().joinToString(",", "{", "}") { JSONObject.quote(it) + ":" + canonical(value.get(it)) }
+        is JSONArray -> (0 until value.length()).joinToString(",", "[", "]") { canonical(value.get(it)) }
+        is String -> JSONObject.quote(value)
+        null, JSONObject.NULL -> "null"
+        else -> value.toString()
+    }
 }
 
 internal fun JSONObject.text(key: String): String? = opt(key).takeUnless { it == null || it == JSONObject.NULL || it is JSONObject || it is JSONArray }?.toString()?.takeIf { it.isNotBlank() }

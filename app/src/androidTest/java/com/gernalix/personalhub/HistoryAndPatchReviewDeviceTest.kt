@@ -42,7 +42,11 @@ class HistoryAndPatchReviewDeviceTest {
             node.config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.Text) { emptyList() }.any { it.text.contains(count.toString()) }
         } } } catch(error:Exception) { compose.onRoot().printToLog("History193828");throw error }
     }
-    private fun waitFor(tag: String) { compose.waitUntil(15_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() } }
+    // Activity handoffs may briefly have no Compose root. Keep the bounded wait active
+    // until the destination appears; a missing destination still times out and fails.
+    private fun waitFor(tag: String) { compose.waitUntil(15_000) {
+        compose.onAllNodesWithTag(tag).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+    } }
 
     @Test fun scopedAndGlobalRecordsFindOldIntakeAndOpenExactCanonicalRegistration() {
         check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*")))
