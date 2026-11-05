@@ -16,10 +16,14 @@ class BankingSecureStoreDeviceTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val store = BankingSecureStore(context)
 
-    @Before fun reset() = store.disconnect()
+    @Before fun reset() {
+        check(android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("sdk") || android.os.Build.HARDWARE.contains("ranchu"))
+        check(context.packageName == "com.gernalix.personalhub.soldi.test")
+        store.disconnect()
+    }
     @After fun cleanup() = store.disconnect()
 
-    @Test fun credentialCacheAndReconciliationUseAndroidKeystoreAndDisconnectDeletesAll() {
+    @Test fun credentialUsesKeystoreAndFinanceDataUsesMainSqlite() {
         val token = "synthetic-read-only-token-000000000001"
         store.saveConfiguration(BankingSecureStore.DEFAULT_BASE_URL, token)
         assertEquals(token, store.readCredential())
@@ -41,9 +45,10 @@ class BankingSecureStoreDeviceTest {
             )
         }
         assertEquals(reconciliation, store.reconciliationState())
-        val encrypted = File(context.noBackupFilesDir, "soldi-banking-reconciliation.enc").readBytes().toString(Charsets.ISO_8859_1)
-        assertFalse(encrypted.contains("external-account-fixture"))
-        assertFalse(encrypted.contains("local-account-fixture"))
+        assertFalse(File(context.noBackupFilesDir, "soldi-banking-reconciliation.enc").exists())
+        val saved = com.gernalix.personalhub.core.database.DatabasePreferences(context, "soldi.banking.v1").getString("reconciliation", null)
+        assertTrue(requireNotNull(saved).contains("external-account-fixture"))
+        assertEquals(reconciliation, BankingSecureStore(context).reconciliationState())
 
         store.disconnect()
         assertFalse(store.configuration().configured)
@@ -51,4 +56,21 @@ class BankingSecureStoreDeviceTest {
         assertEquals(BankingReconciliationState(), store.reconciliationState())
         assertThrows(IllegalStateException::class.java) { store.readCredential() }
     }
+    @Test fun legacyEncryptedStateMovesToMainSqliteOnlyAfterVerification() {
+        val alias = "personalhub.soldi.banking.reconciliation"
+        val source = """{"account_links":{"old-bank":"local"},"accepted_suggestions":{"old-bank:charge":"transaction"},"observed_alerts":{},"notified_alerts":{}}"""
+        val encrypt = BankingSecureStore::class.java.getDeclaredMethod("encrypt", String::class.java, String::class.java).apply { isAccessible = true }
+        val file = File(context.noBackupFilesDir, "soldi-banking-reconciliation.enc")
+        file.writeBytes(encrypt.invoke(store, source, alias) as ByteArray)
+        val migrated = store.reconciliationState()
+        assertEquals("local", migrated.accountLinks["old-bank"])
+        assertEquals("transaction", migrated.acceptedSuggestions["old-bank:charge"])
+        assertFalse(file.exists())
+        assertEquals(migrated, BankingSecureStore(context).reconciliationState())
+        val database = com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context).openHelper.readableDatabase
+        database.query("SELECT json FROM hub_preferences WHERE namespace='soldi.banking.v1'").use {
+            assertTrue(it.moveToFirst()); assertTrue(it.getString(0).contains("old-bank"))
+        }
+    }
+
 }

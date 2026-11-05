@@ -116,6 +116,25 @@ class BankingReconciliationTest {
         assertTrue(advanceBankingAlerts(posted, changed).accountIdsToNotify.isEmpty())
     }
 
+    @Test fun oneLocalTransactionCannotExplainTwoBankMovements() {
+        val snapshot = snapshot("90", listOf(bankTransaction("one", "-10", "BOOK", "Fixture"), bankTransaction("two", "-10", "BOOK", "Fixture")))
+        val rows = listOf(localTransaction("local", "-10", "2026-10-17T08:00:00Z"))
+        val result = reconcileBanking(snapshot, linked, listOf(localAccount), rows, fetchedAt)
+        assertEquals(2, result.comparisons.single().ambiguousCount)
+        assertTrue(result.suggestions.isEmpty())
+        val fixed = linked.copy(matchedTransactions = mapOf("bank-1:one" to "local"))
+        val resolved = reconcileBanking(snapshot, fixed, listOf(localAccount), rows, fetchedAt)
+        assertEquals("two", resolved.suggestions.single().providerTransactionId)
+        assertEquals(0, resolved.comparisons.single().ambiguousCount)
+    }
+
+    @Test fun persistentMatchMustStillMatchTheLiveLocalTransaction() {
+        val snapshot = snapshot("90", listOf(bankTransaction("one", "-10", "BOOK", "Fixture")))
+        val fixed = linked.copy(matchedTransactions = mapOf("bank-1:one" to "local"))
+        val rows = listOf(localTransaction("local", "-11", "2026-10-17T08:00:00Z"))
+        assertEquals(1, reconcileBanking(snapshot, fixed, listOf(localAccount), rows, fetchedAt).suggestions.size)
+    }
+
     private fun snapshot(
         bankBalance: String,
         rows: List<BankingTransaction> = emptyList(),

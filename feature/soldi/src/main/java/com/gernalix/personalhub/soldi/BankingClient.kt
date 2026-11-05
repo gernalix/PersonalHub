@@ -35,7 +35,7 @@ internal class BankingRepository(context: Context) {
     fun configure(baseUrl: String, token: String) = store.saveConfiguration(baseUrl, token)
     fun disconnect() = store.disconnect()
     fun reconciliationState(): BankingReconciliationState =
-        runCatching(store::reconciliationState).getOrDefault(BankingReconciliationState())
+        store.reconciliationState()
 
     fun linkAccount(bankAccount: BankingAccount, localAccount: FinanceAccount): BankingReconciliationState {
         require(localAccount.currency in bankAccount.currencies) { "Bank and PersonalHub currencies differ" }
@@ -78,9 +78,31 @@ internal class BankingRepository(context: Context) {
 
     fun markSuggestionAccepted(suggestion: BankingSuggestion, transactionUuid: String) {
         store.updateReconciliationState { state ->
+            require(transactionUuid !in state.acceptedSuggestions.values && transactionUuid !in state.matchedTransactions.values)
+            require(suggestion.key !in state.matchedTransactions)
             require(suggestion.key !in state.acceptedSuggestions) { "Bank suggestion was already accepted" }
             state.copy(acceptedSuggestions = state.acceptedSuggestions + (suggestion.key to transactionUuid))
         }
+    }
+
+    fun confirmLocalMatch(key: String, uuid: String, accounts: List<FinanceAccount>, rows: List<TransactionView>): BankingReconciliationState =
+        store.updateReconciliationState { state ->
+            require(key !in state.matchedTransactions && uuid !in state.matchedTransactions.values && uuid !in state.acceptedSuggestions.values)
+            val snapshot = requireNotNull(cached())
+            val candidates = bankingLocalCandidates(snapshot, state, accounts.associateBy { it.id }, rows)
+            require(uuid in candidates[key].orEmpty()) { "Movimenti modificati: ripeti il confronto" }
+            val expected = rows.single { it.value.uuid == uuid }.value
+            val db = com.gernalix.personalhub.core.database.PersonalHubDatabase.get(app).openHelper.readableDatabase
+            db.query("SELECT t.accountId,t.currency,t.amount,t.occurredAt,a.currency FROM finance_transactions t JOIN finance_accounts a ON a.id=t.accountId WHERE t.uuid=?", arrayOf(uuid)).use { live ->
+                require(live.moveToFirst() && live.getString(0) == expected.accountId && live.getString(1) == expected.currency &&
+                    BigDecimal(live.getString(2)).compareTo(BigDecimal(expected.amount)) == 0 && live.getLong(3) == expected.occurredAt &&
+                    live.getString(4) == expected.currency) { "Movimento PH modificato: ripeti il confronto" }
+            }
+            state.copy(matchedTransactions = state.matchedTransactions + (key to uuid))
+        }
+
+    fun removeLocalMatch(key: String): BankingReconciliationState = store.updateReconciliationState {
+        it.copy(matchedTransactions = it.matchedTransactions - key)
     }
 
     fun processAlerts(
