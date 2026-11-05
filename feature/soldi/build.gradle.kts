@@ -10,6 +10,7 @@ android {
     compileSdk = 37
     defaultConfig {
         minSdk = 29
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("int", "VERSION_CODE", personalHubVersion.toString())
         buildConfigField("String", "VERSION_NAME", "\"$personalHubVersion\"")
     }
@@ -26,6 +27,8 @@ dependencies {
     implementation(project(":core:hub-context"))
     implementation(project(":core:alerts"))
     implementation(project(":core:ui"))
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.google.play.services.auth)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.onnxruntime.android)
     implementation(platform(libs.androidx.compose.bom))

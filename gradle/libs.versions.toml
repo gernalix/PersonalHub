@@ -25,6 +25,7 @@ profileinstaller = "1.4.1"
 robolectric = "4.17"
 room = "2.8.5"
 work = "2.12.0"
+playServicesAuth = "22.0.0"
 uiautomator = "2.4.0"
 startup = "1.2.0"
 
@@ -67,6 +68,7 @@ coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version
 androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version.ref = "startup" }
 errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version.ref = "errorProneAnnotations" }
 google-places = { module = "com.google.android.libraries.places:places", version.ref = "places" }
+google-play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 google-play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }

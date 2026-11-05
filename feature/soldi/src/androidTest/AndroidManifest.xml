@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity android:name="com.gernalix.personalhub.soldi.BankingRenderTestActivity" android:exported="false" />
+        <activity android:name="com.gernalix.personalhub.soldi.PlaySubscriptionsTestActivity" android:exported="false" />
     </application>
 </manifest>
