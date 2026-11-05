@@ -88,6 +88,7 @@ internal fun PlaySubscriptionsScreen(onRequestNotifications: () -> Unit) {
         item {
             Text("Abbonamenti Google Play", style = MaterialTheme.typography.titleLarge)
             Text("Importa le sottoscrizioni per consultare rinnovi e previsioni. Gli addebiti effettivi restano nei movimenti bancari.")
+            Text("Lo storico include i rinnovi disattivati. Le copie identiche sono unite; le versioni non confermate dall'ultimo file sono escluse dalle stime.", style = MaterialTheme.typography.bodySmall)
             Button(enabled = !busy, onClick = {
                 action {
                     val auth = PlayAuthorization.request(context)
@@ -198,10 +199,11 @@ internal fun playChangeDescriptions(source: String): List<String> {
         val action = when ((row.text("type") ?: row.text("changeType"))?.uppercase()) {
             "CANCELLATION", "CANCEL", "CANCELLED", "CANCELED" -> "Cancellazione"
             "REACTIVATION", "REACTIVATE" -> "Riattivazione"
-            "PAYMENT_METHOD_CHANGE", "PAYMENT_METHOD_CHANGED" -> "Metodo di pagamento modificato"
+            "PAYMENT_METHOD_CHANGE", "PAYMENT_METHOD_CHANGED", "UPDATEPAYMENTMETHOD" -> "Metodo di pagamento modificato"
+            "CONFIRMPRICECHANGE" -> "Modifica del prezzo confermata"
             else -> "Modifica dell'abbonamento"
         }
-        val date = (row.text("timestamp") ?: row.text("changeTime"))?.let { runCatching { playDate(Instant.parse(it)) }.getOrNull() }
+        val date = (row.text("timestamp") ?: row.text("changeTime") ?: row.text("date"))?.let { runCatching { playDate(Instant.parse(it)) }.getOrNull() }
         if (date == null) action else "$action · $date"
     }
 }

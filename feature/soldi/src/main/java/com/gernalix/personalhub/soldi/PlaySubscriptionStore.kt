@@ -21,7 +21,9 @@ internal class PlaySubscriptionStore(context: Context) {
         require(merged.size <= 10000) { "Troppe sottoscrizioni" }
         previous.copy(subscriptions = merged, importedAt = now,
             unconfirmedKeys = if (fullSnapshot) merged.map { it.key }.toSet() - rows.map { it.key }.toSet()
-                else previous.unconfirmedKeys - rows.map { it.key }.toSet())
+                else (previous.unconfirmedKeys + previous.subscriptions.filter { sub ->
+                    rows.any { it.key.startsWith("snapshot:") } && sub.key.startsWith("snapshot:")
+                }.map { it.key }) - rows.map { it.key }.toSet())
     }
     fun link(match: PlayBankMatch) = update { previous ->
         val subscription = previous.subscriptions.single { it.key == match.subscriptionKey }
