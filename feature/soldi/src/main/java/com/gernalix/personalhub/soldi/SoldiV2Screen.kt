@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import com.gernalix.personalhub.soldi.capsules.playsubscriptions.PlaySubscriptionsCapsule
 import com.gernalix.personalhub.core.ui.HubFeedbackHost
 
 import android.Manifest
@@ -503,7 +504,7 @@ internal fun SoldiV2Screen(
 
                 bottom == BottomDestination.GMAIL -> GmailReceiptsScreen(accounts, transactions)
 
-                bottom == BottomDestination.SUBSCRIPTIONS -> PlaySubscriptionsScreen(::requestNotifications)
+                bottom == BottomDestination.SUBSCRIPTIONS -> PlaySubscriptionsCapsule.Screen(::requestNotifications)
 
                 bottom == BottomDestination.BANKS -> BankingScreen(
                     repository = bankingRepository,

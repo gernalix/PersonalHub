@@ -31,17 +31,17 @@ internal class GmailReceiptStore(context: Context) {
         val rows = root.getJSONArray("receipts")
         val links = root.getJSONObject("links")
         val excluded = root.getJSONArray("excluded")
-        return GmailCatalog(root.text("account"), root.text("history"), (0 until rows.length()).map { index ->
+        return GmailCatalog(root.gmailText("account"), root.gmailText("history"), (0 until rows.length()).map { index ->
             val row = rows.getJSONObject(index)
             GmailReceipt(row.getString("id"), row.getString("subject"), row.getString("sender"), Instant.parse(row.getString("received")),
-                row.text("merchant"), row.text("order"), row.text("date")?.let(LocalDate::parse), row.text("amount")?.let(::BigDecimal),
-                row.text("currency"), row.getString("parser"), row.optBoolean("available", true), row.optString("kind", "receipt"), row.text("tracking"))
+                row.gmailText("merchant"), row.gmailText("order"), row.gmailText("date")?.let(LocalDate::parse), row.gmailText("amount")?.let(::BigDecimal),
+                row.gmailText("currency"), row.getString("parser"), row.optBoolean("available", true), row.optString("kind", "receipt"), row.gmailText("tracking"))
         }, links.keys().asSequence().associateWith { links.getString(it) }, (0 until excluded.length()).map { excluded.getString(it) }.toSet(),
-            root.optBoolean("automatic"), root.optInt("days", 90), root.text("updated")?.let(Instant::parse),
+            root.optBoolean("automatic"), root.optInt("days", 90), root.gmailText("updated")?.let(Instant::parse),
             root.optJSONArray("appointments")?.let { events -> (0 until events.length()).map { i ->
                 val e = events.getJSONObject(i)
                 GmailAppointment(e.getString("uid"), e.getString("message"), e.getString("title"), Instant.parse(e.getString("start")),
-                    e.getString("location"), e.getInt("sequence"), e.getBoolean("cancelled"), e.getBoolean("allDay"), e.text("dateOnly")?.let(LocalDate::parse))
+                    e.getString("location"), e.getInt("sequence"), e.getBoolean("cancelled"), e.getBoolean("allDay"), e.gmailText("dateOnly")?.let(LocalDate::parse))
             } }.orEmpty(), root.optString("status", "idle"))
     }
     fun update(change: (GmailCatalog) -> GmailCatalog): GmailCatalog = DatabaseGate.access {

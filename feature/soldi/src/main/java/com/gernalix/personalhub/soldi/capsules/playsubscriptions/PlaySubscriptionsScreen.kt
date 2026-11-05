@@ -1,5 +1,7 @@
-package com.gernalix.personalhub.soldi
+package com.gernalix.personalhub.soldi.capsules.playsubscriptions
 
+import com.gernalix.personalhub.soldi.BankingRepository
+import com.gernalix.personalhub.soldi.FinanceReminderScheduler
 import android.app.Activity
 import android.content.Intent
 import androidx.core.net.toUri

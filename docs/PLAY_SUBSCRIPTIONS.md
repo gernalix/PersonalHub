@@ -128,3 +128,10 @@ anche nell'override di `requestAccessToken`, così il rinnovo non tenta di
 aggiungere scope. Google presenta comunque il consenso quando necessario.
 
 Riferimento: https://developers.google.com/identity/oauth2/web/guides/use-token-model
+
+## Confine della capsula
+
+L'implementazione Android è privata a Soldi in `capsules.playsubscriptions`.
+`PlaySubscriptionsCapsule` espone schermata, promemoria e lavoro in background;
+il worker pubblico conserva il nome originale per i job WorkManager già salvati.
+Lo spostamento non cambia schema, namespace SQLite o identità dei record.

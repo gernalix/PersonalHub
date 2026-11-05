@@ -26,7 +26,7 @@ internal object GmailCalendarParser {
         val calendars = mutableListOf<String>()
         fun visit(part: JSONObject, depth: Int) {
             require(depth <= 12)
-            if (part.optString("mimeType") == "text/calendar") part.optJSONObject("body")?.text("data")?.let {
+            if (part.optString("mimeType") == "text/calendar") part.optJSONObject("body")?.gmailText("data")?.let {
                 require(it.length <= 512 * 1024)
                 calendars += Base64.getUrlDecoder().decode(it).toString(Charsets.UTF_8)
             }

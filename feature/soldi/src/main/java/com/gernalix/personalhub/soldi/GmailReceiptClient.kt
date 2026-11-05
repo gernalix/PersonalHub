@@ -76,7 +76,7 @@ internal class GmailReceiptClient(private val store: GmailReceiptStore, private 
                     } else changed += row.getString("id")
                 }
                 require(changed.size <= 5000) { "Troppi messaggi: riduci lo storico" }
-                page = response.text("nextPageToken")
+                page = response.gmailText("nextPageToken")
                 if (page != null) require(seen.add(page))
                 if (history && page == null) cursor = response.getString("historyId")
             } while (page != null)
@@ -101,7 +101,7 @@ internal class GmailReceiptClient(private val store: GmailReceiptStore, private 
                 fun hydrateCalendar(part: JSONObject, depth: Int) {
                     require(depth <= 12)
                     val body = part.optJSONObject("body")
-                    if (part.optString("mimeType") == "text/calendar" && body?.text("data") == null && body?.text("attachmentId") != null) {
+                    if (part.optString("mimeType") == "text/calendar" && body?.gmailText("data") == null && body?.gmailText("attachmentId") != null) {
                         val attachmentId = body.getString("attachmentId")
                         require(attachmentId.matches(Regex("[A-Za-z0-9_-]{1,500}")))
                         val attachment = transport.get("messages/$id/attachments/$attachmentId")

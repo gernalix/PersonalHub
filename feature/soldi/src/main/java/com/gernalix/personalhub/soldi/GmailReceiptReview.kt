@@ -21,7 +21,7 @@ ${messageText.take(32000)}
         val root = JSONObject(json.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim())
         require(root.keys().asSequence().toSet() == setOf("messageId", "merchant", "orderId", "date", "amount", "currency"))
         require(root.getString("messageId") == receipt.messageId)
-        return fields(receipt, root.text("merchant"), root.text("orderId"), root.text("date"), root.text("amount"), root.text("currency"))
+        return fields(receipt, root.gmailText("merchant"), root.gmailText("orderId"), root.gmailText("date"), root.gmailText("amount"), root.gmailText("currency"))
     }
     fun fields(receipt: GmailReceipt, merchant: String?, order: String?, date: String?, amount: String?, currency: String?): GmailReceipt {
         fun clean(value: String?, max: Int) = value?.trim()?.takeIf { it.isNotBlank() }?.also { require(it.length <= max && it.none { c -> c.isISOControl() }) }

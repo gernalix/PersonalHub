@@ -69,8 +69,8 @@ internal fun GmailAppointmentReviewDialog(receipt: GmailReceipt, onDismiss: () -
                 OutlinedTextField(json, { json = it }, label = { Text("Risposta JSON dell’AI") })
                 TextButton(onClick = {
                     runCatching { GmailAppointmentReview.proposal(receipt, json) }.onSuccess { proposal ->
-                        title = proposal.text("title").orEmpty(); date = proposal.text("date").orEmpty(); time = proposal.text("time").orEmpty()
-                        zone = proposal.text("zone").orEmpty(); location = proposal.text("location").orEmpty(); error = null
+                        title = proposal.gmailText("title").orEmpty(); date = proposal.gmailText("date").orEmpty(); time = proposal.gmailText("time").orEmpty()
+                        zone = proposal.gmailText("zone").orEmpty(); location = proposal.gmailText("location").orEmpty(); error = null
                     }.onFailure { error = "Risposta non valida o riferita a un altro messaggio." }
                 }) { Text("Carica proposta da verificare") }
             }

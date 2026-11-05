@@ -39,7 +39,7 @@ internal object GmailReceiptParser {
         fun visit(part: JSONObject, depth: Int) {
             require(depth <= 12)
             val mime = part.optString("mimeType")
-            val data = part.optJSONObject("body")?.text("data")
+            val data = part.optJSONObject("body")?.gmailText("data")
             if (data != null && mime in setOf("text/plain", "text/html")) {
                 require(data.length <= 2 * 1024 * 1024)
                 bodies += mime to Base64.getUrlDecoder().decode(data).toString(Charsets.UTF_8)
@@ -72,19 +72,19 @@ internal object GmailReceiptParser {
                 BigDecimal(m.groupValues[2].replace(',', '.')) to currency
             }.distinct().toList()
         val payment = source?.optJSONObject("totalPaymentDue")
-        val structuredAmount = source?.text("price") ?: payment?.text("price") ?: source?.text("totalPaymentDue")
+        val structuredAmount = source?.gmailText("price") ?: payment?.gmailText("price") ?: source?.gmailText("totalPaymentDue")
         val amount = if (source != null) structuredAmount?.toBigDecimalOrNull()?.takeIf { it.signum() > 0 && it.scale() <= 2 }
             else totals.singleOrNull()?.first?.takeIf { it.signum() > 0 }
-        val currency = if (source != null) (source.text("priceCurrency") ?: payment?.text("priceCurrency"))?.takeIf { it.matches(Regex("[A-Z]{3}")) } else totals.singleOrNull()?.second
+        val currency = if (source != null) (source.gmailText("priceCurrency") ?: payment?.gmailText("priceCurrency"))?.takeIf { it.matches(Regex("[A-Z]{3}")) } else totals.singleOrNull()?.second
         val dates = Regex("(?im)^\\s*(?:date|data|order date|invoice date|dato)\\s*:\\s*(\\d{4}-\\d{2}-\\d{2})\\s*$")
             .findAll(plain).mapNotNull { runCatching { LocalDate.parse(it.groupValues[1]) }.getOrNull() }.distinct().toList()
-        val date = if (source != null) (source.text("orderDate") ?: source.text("dateIssued"))?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+        val date = if (source != null) (source.gmailText("orderDate") ?: source.gmailText("dateIssued"))?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
             else dates.singleOrNull()
-        val merchant = source?.optJSONObject("merchant")?.text("name") ?: source?.optJSONObject("broker")?.text("name")
+        val merchant = source?.optJSONObject("merchant")?.gmailText("name") ?: source?.optJSONObject("broker")?.gmailText("name")
             ?: Regex("(?im)^\\s*(?:merchant|venditore|negozio|seller)\\s*:\\s*(.{1,200})$").find(plain)?.groupValues?.get(1)?.trim()
-        val order = source?.text("orderNumber") ?: source?.text("confirmationNumber")
+        val order = source?.gmailText("orderNumber") ?: source?.gmailText("confirmationNumber")
             ?: Regex("(?im)^\\s*(?:order|ordine|invoice)(?: (?:id|number|numero))?\\s*[:#]\\s*([A-Za-z0-9._-]{1,100})\\s*$").find(plain)?.groupValues?.get(1)
-        val tracking = source?.text("trackingNumber") ?: Regex("(?im)^\\s*(?:tracking(?: number| code)?|numero tracciamento)\\s*[:#]\\s*([A-Za-z0-9-]{6,60})\\s*$").find(plain)?.groupValues?.get(1)
+        val tracking = source?.gmailText("trackingNumber") ?: Regex("(?im)^\\s*(?:tracking(?: number| code)?|numero tracciamento)\\s*[:#]\\s*([A-Za-z0-9-]{6,60})\\s*$").find(plain)?.groupValues?.get(1)
         return GmailReceipt(message.getString("id"), subject, sender, Instant.ofEpochMilli(message.getString("internalDate").toLong()),
             merchant, order, date, amount, currency, if (source != null) "schema.org" else "campi espliciti", kind = kind, tracking = tracking)
     }
@@ -109,3 +109,8 @@ internal fun receiptBankCandidates(receipts: List<GmailReceipt>, snapshot: Banki
     // Ambiguity in either direction stays for manual review; never pick the first equal amount.
     return if (!uniqueOnly) candidates else candidates.filter { row -> candidates.count { it.messageId == row.messageId } == 1 && candidates.count { it.bankKey == row.bankKey } == 1 }
 }
+
+/** Scalar JSON metadata only; independent of the Google Play capsule. */
+internal fun JSONObject.gmailText(key: String): String? = opt(key)
+    .takeUnless { it == null || it == JSONObject.NULL || it is JSONObject || it is JSONArray }
+    ?.toString()?.takeIf { it.isNotBlank() }

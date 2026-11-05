@@ -28,7 +28,7 @@ internal suspend fun readGmailInvoicePdf(context: Context, receipt: GmailReceipt
     require(pdfs.size == 1) { "Apri Gmail e seleziona la fattura: nessun PDF univoco" }
     val body = pdfs.single().getJSONObject("body")
     require(body.optLong("size", 0) in 1..2 * 1024 * 1024)
-    val data = body.text("data") ?: body.getString("attachmentId").let { id ->
+    val data = body.gmailText("data") ?: body.getString("attachmentId").let { id ->
         require(id.matches(Regex("[A-Za-z0-9_-]{1,500}")))
         transport.get("messages/${receipt.messageId}/attachments/$id").getString("data")
     }
