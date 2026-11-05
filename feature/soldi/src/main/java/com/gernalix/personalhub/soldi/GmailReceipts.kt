@@ -54,6 +54,7 @@ internal object GmailReceiptParser {
             .ifBlank { html.replace(Regex("(?is)<(script|style)\\b[^>]*>.*?</\\1>"), " ")
                 .replace(Regex("(?i)<br\\s*/?>|</(?:p|div|tr)>"), "\n").replace(Regex("<[^>]+>"), " ")
                 .replace("&nbsp;", " ").replace("&amp;", "&") }
+        val provider = GmailProviderReceipts.parse(sender, plain)
         val structured = Regex("(?is)<script\\b[^>]*type\\s*=\\s*['\"]application/ld\\+json['\"][^>]*>(.*?)</script>")
             .findAll(html).mapNotNull { runCatching { JSONObject(it.groupValues[1]) }.getOrNull() }
             .filter { it.optString("@type") in setOf("Order", "Invoice", "ParcelDelivery") }.toList()
@@ -74,19 +75,19 @@ internal object GmailReceiptParser {
         val payment = source?.optJSONObject("totalPaymentDue")
         val structuredAmount = source?.gmailText("price") ?: payment?.gmailText("price") ?: source?.gmailText("totalPaymentDue")
         val amount = if (source != null) structuredAmount?.toBigDecimalOrNull()?.takeIf { it.signum() > 0 && it.scale() <= 2 }
-            else totals.singleOrNull()?.first?.takeIf { it.signum() > 0 }
-        val currency = if (source != null) (source.gmailText("priceCurrency") ?: payment?.gmailText("priceCurrency"))?.takeIf { it.matches(Regex("[A-Z]{3}")) } else totals.singleOrNull()?.second
+            else totals.singleOrNull()?.first?.takeIf { it.signum() > 0 } ?: provider?.amount
+        val currency = if (source != null) (source.gmailText("priceCurrency") ?: payment?.gmailText("priceCurrency"))?.takeIf { it.matches(Regex("[A-Z]{3}")) } else totals.singleOrNull()?.second ?: provider?.currency
         val dates = Regex("(?im)^\\s*(?:date|data|order date|invoice date|dato)\\s*:\\s*(\\d{4}-\\d{2}-\\d{2})\\s*$")
             .findAll(plain).mapNotNull { runCatching { LocalDate.parse(it.groupValues[1]) }.getOrNull() }.distinct().toList()
         val date = if (source != null) (source.gmailText("orderDate") ?: source.gmailText("dateIssued"))?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
-            else dates.singleOrNull()
+            else dates.singleOrNull() ?: provider?.date
         val merchant = source?.optJSONObject("merchant")?.gmailText("name") ?: source?.optJSONObject("broker")?.gmailText("name")
-            ?: Regex("(?im)^\\s*(?:merchant|venditore|negozio|seller)\\s*:\\s*(.{1,200})$").find(plain)?.groupValues?.get(1)?.trim()
+            ?: Regex("(?im)^\\s*(?:merchant|venditore|negozio|seller)\\s*:\\s*(.{1,200})$").find(plain)?.groupValues?.get(1)?.trim() ?: provider?.merchant
         val order = source?.gmailText("orderNumber") ?: source?.gmailText("confirmationNumber")
             ?: Regex("(?im)^\\s*(?:order|ordine|invoice)(?: (?:id|number|numero))?\\s*[:#]\\s*([A-Za-z0-9._-]{1,100})\\s*$").find(plain)?.groupValues?.get(1)
         val tracking = source?.gmailText("trackingNumber") ?: Regex("(?im)^\\s*(?:tracking(?: number| code)?|numero tracciamento)\\s*[:#]\\s*([A-Za-z0-9-]{6,60})\\s*$").find(plain)?.groupValues?.get(1)
         return GmailReceipt(message.getString("id"), subject, sender, Instant.ofEpochMilli(message.getString("internalDate").toLong()),
-            merchant, order, date, amount, currency, if (source != null) "schema.org" else "campi espliciti", kind = kind, tracking = tracking)
+            merchant, order, date, amount, currency, if (source != null) "schema.org" else provider?.provider ?: "campi espliciti", kind = kind, tracking = tracking)
     }
 }
 
@@ -101,7 +102,8 @@ internal fun receiptBankCandidates(receipts: List<GmailReceipt>, snapshot: Banki
                 bank.currency == receipt.currency && bank.amount.negate().compareTo(receipt.amount) == 0 && bank.date != null &&
                 kotlin.math.abs(java.time.temporal.ChronoUnit.DAYS.between(receipt.date, bank.date)) <= 3 &&
                 bank.description?.let { description ->
-                    val tokens = receipt.merchant!!.lowercase().split(Regex("[^\\p{L}\\p{N}]+" )).filter { it.length >= 3 }
+                    val merchant = receipt.merchant!!.lowercase().let { if (it == "google play") "google" else it }
+                    val tokens = merchant.split(Regex("[^\\p{L}\\p{N}]+" )).filter { it.length >= 3 }
                     tokens.isNotEmpty() && tokens.all { it in description.lowercase() }
                 } == true
         }.map { ReceiptBankMatch(receipt.messageId, "${it.accountId}:${it.id}") }
