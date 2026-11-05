@@ -1,5 +1,6 @@
 package com.gernalix.personalhub.soldi
 
+import com.gernalix.personalhub.soldi.capsules.playsubscriptions.*
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
@@ -134,6 +135,17 @@ class PlaySubscriptionsDeviceTest {
             assertFalse(updated.single().key in current.unconfirmedKeys)
             assertEquals(1, current.forecastSubscriptions.count { it.title == "Synthetic snapshot" })
             assertEquals(2, current.subscriptions.count { it.title == "Synthetic snapshot" })
+        } finally { store.update { saved } }
+    }
+
+    @Test fun capsuleRetainsWorkerIdentityAndRunsDisabledCatalogWithoutAuthorization() = runBlocking {
+        val store = PlaySubscriptionStore(context)
+        val saved = store.read()
+        try {
+            store.update { it.copy(automatic = false, job = null, reminders = false) }
+            assertTrue(PlaySubscriptionsCapsule.reminders(context).isEmpty())
+            assertEquals(androidx.work.ListenableWorker.Result.success(), PlaySubscriptionsCapsule.runWorker(context, 0))
+            assertEquals("com.gernalix.personalhub.soldi.PlaySubscriptionWorker", PlaySubscriptionWorker::class.java.name)
         } finally { store.update { saved } }
     }
 

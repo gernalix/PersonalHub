@@ -1,7 +1,10 @@
-package com.gernalix.personalhub.soldi
+package com.gernalix.personalhub.soldi.capsules.playsubscriptions
 
+import com.gernalix.personalhub.soldi.FinanceReminderScheduler
+import com.gernalix.personalhub.soldi.PlaySubscriptionWorker
 import android.content.Context
 import androidx.work.*
+import androidx.work.ListenableWorker.Result
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
@@ -138,28 +141,27 @@ internal object PlaySubscriptionWork {
     }
 }
 
-class PlaySubscriptionWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        val store = PlaySubscriptionStore(applicationContext)
-        return try {
-            val catalog = withContext(Dispatchers.IO) { store.read() }
-            if (!catalog.automatic && catalog.job == null) return Result.success()
-            val auth = PlayAuthorization.request(applicationContext)
-            if (auth.hasResolution() || auth.accessToken.isNullOrBlank()) throw PlayAuthorizationNeeded()
-            val updated = PlayPortabilityClient(applicationContext).sync(auth.accessToken!!)
-            if (!updated.automatic) WorkManager.getInstance(applicationContext).cancelUniqueWork("soldi-play-daily")
-            if (updated.job != null) Result.retry() else Result.success()
-        } catch (_: PlayAuthorizationNeeded) {
-            withContext(Dispatchers.IO) { store.update { it.copy(status = "authorization") } }
-            Result.success()
-        } catch (error: PlayApiFailure) {
-            withContext(Dispatchers.IO) { store.update { it.copy(status = if (error.statusCode in listOf(401, 403)) "authorization" else "failed") } }
-            if (error.statusCode == 429 || error.statusCode >= 500) Result.retry() else Result.success()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            withContext(Dispatchers.IO) { store.update { it.copy(status = "failed") } }
-            if (runAttemptCount < 3) Result.retry() else Result.failure()
-        }
+internal suspend fun runPlaySubscriptionWork(context: Context, runAttemptCount: Int): ListenableWorker.Result {
+    val applicationContext = context.applicationContext
+    val store = PlaySubscriptionStore(applicationContext)
+    return try {
+        val catalog = withContext(Dispatchers.IO) { store.read() }
+        if (!catalog.automatic && catalog.job == null) return Result.success()
+        val auth = PlayAuthorization.request(applicationContext)
+        if (auth.hasResolution() || auth.accessToken.isNullOrBlank()) throw PlayAuthorizationNeeded()
+        val updated = PlayPortabilityClient(applicationContext).sync(auth.accessToken!!)
+        if (!updated.automatic) WorkManager.getInstance(applicationContext).cancelUniqueWork("soldi-play-daily")
+        if (updated.job != null) Result.retry() else Result.success()
+    } catch (_: PlayAuthorizationNeeded) {
+        withContext(Dispatchers.IO) { store.update { it.copy(status = "authorization") } }
+        Result.success()
+    } catch (error: PlayApiFailure) {
+        withContext(Dispatchers.IO) { store.update { it.copy(status = if (error.statusCode in listOf(401, 403)) "authorization" else "failed") } }
+        if (error.statusCode == 429 || error.statusCode >= 500) Result.retry() else Result.success()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        withContext(Dispatchers.IO) { store.update { it.copy(status = "failed") } }
+        if (runAttemptCount < 3) Result.retry() else Result.failure()
     }
 }
