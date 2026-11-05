@@ -36,6 +36,10 @@ i collegamenti già salvati restano consultabili e da rivedere.
 I parser riconoscono JSON-LD schema.org Order/Invoice/ParcelDelivery e campi testuali espliciti
 (venditore, data ISO, totale con valuta, numero ordine). Non inferiscono valuta
 da `$`/`kr` ambigui né usano la ricezione dell’email come data dell’acquisto.
+I formati ricorrenti Google Play e i pagamenti PayPal completati hanno parser
+dedicati; le autorizzazioni di pagamenti automatici PayPal non diventano ricevute
+di addebiti. Sono supportate date con mesi in inglese/italiano/danese e totali
+localizzati con suffissi periodici. `kr` resta privo di valuta da confermare.
 Formati non riconosciuti restano incompleti: si aprono in Gmail, si verificano
 e si completano a mano. I PDF possono essere letti su richiesta con OCR locale
 riusando ML Kit (un PDF, fino a 2 MiB e tre pagine); i risultati passano sempre

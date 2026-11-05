@@ -16,10 +16,10 @@ import java.util.Base64
 @Config(sdk = [35])
 class GmailReceiptsTest {
     private val now = Instant.parse("2026-11-05T12:00:00Z")
-    private fun message(body: String, mime: String = "text/plain", subject: String = "Order receipt") = JSONObject().apply {
+    private fun message(body: String, mime: String = "text/plain", subject: String = "Order receipt", sender: String = "") = JSONObject().apply {
         put("id", "abc123"); put("internalDate", now.toEpochMilli().toString())
         put("payload", JSONObject().apply {
-            put("mimeType", mime); put("headers", JSONArray().put(JSONObject().put("name", "Subject").put("value", subject)))
+            put("mimeType", mime); put("headers", JSONArray().put(JSONObject().put("name", "Subject").put("value", subject)).put(JSONObject().put("name", "From").put("value", sender)))
             put("body", JSONObject().put("data", Base64.getUrlEncoder().withoutPadding().encodeToString(body.toByteArray())))
         })
     }
@@ -71,6 +71,31 @@ class GmailReceiptsTest {
         val verified = GmailAppointmentReview.fields(invitation, "Clinic", "2026-11-05", "10:00", "Europe/Copenhagen", "Clinic")
         assertEquals(Instant.parse("2026-11-05T09:00:00Z"), verified.startsAt)
         assertTrue(runCatching { GmailAppointmentReview.fields(invitation, "Clinic", "2026-03-29", "02:30", "Europe/Copenhagen", "Clinic") }.isFailure)
+    }
+
+    @Test fun googlePlayLocalizedTotalsAndEnglishDatesAreExtractedWithoutGuessingKr() {
+        val receipt = requireNotNull(GmailReceiptParser.parse(message(
+            "Order number: GPA.1111-2222-3333-44444..0\r\nOrder date: Nov 5, 2026 8:00:00 AM GMT+1\r\nTotal: 49,00 kr./md.\r\n",
+            sender = "Google Play <googleplay-noreply@google.com>")))
+        assertEquals("Google Play", receipt.merchant); assertEquals(java.time.LocalDate.parse("2026-11-05"), receipt.date)
+        assertEquals(BigDecimal("49.00"), receipt.amount); assertNull(receipt.currency); assertFalse(receipt.complete)
+        val euro = requireNotNull(GmailReceiptParser.parse(message("Order date: Nov 5, 2026 8:00:00 AM GMT+1\nTotal: €1.234,56 / month", sender = "googleplay-noreply@google.com")))
+        assertEquals(BigDecimal("1234.56"), euro.amount); assertEquals("EUR", euro.currency)
+        val paid = requireNotNull(GmailReceiptParser.parse(message("Order date: Nov 4, 2026 8:00:00 AM GMT+1\nTotal: 12.99 EUR", sender = "googleplay-noreply@google.com")))
+        val googleBank = snapshot().copy(transactions = snapshot().transactions.map { it.copy(description = "GOOGLE *Example") })
+        assertEquals(1, receiptBankCandidates(listOf(paid), googleBank, emptyMap(), now).size)
+        assertNull(GmailProviderReceipts.parse("fake@other.invalid", "Order date: Nov 5, 2026\nTotal: 49.00 USD"))
+        assertNull(GmailProviderReceipts.parse("googleplay-noreply@google.com", "Order date: Feb 30, 2026\nTotal: 49.00 USD")?.date)
+    }
+    @Test fun paypalCompletedPaymentIsDistinctFromAuthorizationAndPreservesCurrency() {
+        val body = "Hai inviato un pagamento di 9,99 EUR a Example Shop (qa@example.invalid)\nData 5 novembre 2026"
+        val receipt = GmailProviderReceipts.parse("service@paypal.it", body)!!
+        assertEquals("Example Shop", receipt.merchant); assertEquals(BigDecimal("9.99"), receipt.amount)
+        assertEquals("EUR", receipt.currency); assertEquals(LocalDate.parse("2026-11-05"), receipt.date)
+        assertNull(GmailProviderReceipts.parse("service@paypal.it", "Hai autorizzato un pagamento automatico a Example Shop"))
+        assertNull(GmailProviderReceipts.parse("googleplay-noreply@google.com", "Total: -9.99 EUR")?.amount)
+        assertNull(GmailProviderReceipts.parse("googleplay-noreply@google.com", "Total: - EUR 9.99")?.amount)
+        assertNull(GmailProviderReceipts.parse("googleplay-noreply@google.com", "Total: €1,234.567,89")?.amount)
     }
 
     @Test fun matchesRequireFreshCompleteBookedDebitCurrencyMerchantAndUniqueBothDirections() {
