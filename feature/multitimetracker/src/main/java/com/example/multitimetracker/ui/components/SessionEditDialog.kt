@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +47,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -62,8 +62,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.multitimetracker.R
 import com.example.multitimetracker.isTimedTag
 import com.example.multitimetracker.model.SessionUi
@@ -136,10 +134,10 @@ fun SessionEditDialog(
     var isDeleting by remember { mutableStateOf(false) }
     var createSinceWhen by remember(session.id, isNewSession) { mutableStateOf(false) }
     val saveScope = rememberCoroutineScope()
-    var name by remember { mutableStateOf(session.title) }
+    var name by remember(session.id) { mutableStateOf(session.title) }
 
     // Tag selection: same closure/exclusions model as tasks
-    var selectedManual by remember { mutableStateOf(session.tagIds) }
+    var selectedManual by remember(session.id) { mutableStateOf(session.tagIds) }
     val initialClosure = remember(session.tagIds, tagParentsByChild) { TagHierarchy.closure(session.tagIds, tagParentsByChild) }
     var excludedAuto by remember { mutableStateOf(initialClosure - session.tagIds) }
 
@@ -200,15 +198,16 @@ fun SessionEditDialog(
     fun utcZ(ts: Long): String = utcZFmt.format(Instant.ofEpochMilli(ts))
     fun localDateTime(ts: Long): String = dateTimeFmt.format(Instant.ofEpochMilli(ts).atZone(zoneId))
 
-    AlertDialog(
-        modifier = Modifier.imePadding(),
+    com.gernalix.personalhub.core.ui.HubFullscreenDialog(
         onDismissRequest = {
             // v352: if this dialog is for a freshly-created session (from the "+" action),
             // cancel must not leave behind a phantom session.
             if (isNewSession && session.id > 0L) onDelete(session.id)
             onDismiss()
         },
-        title = {
+    ) {
+      Surface(Modifier.fillMaxSize().semantics { if (!isNewSession) contentDescription = "hub-detail-timer/session/${session.id}" }, color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -265,6 +264,15 @@ fun SessionEditDialog(
                     }
                 }
 
+
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
                     shape = MaterialTheme.shapes.medium
@@ -295,20 +303,9 @@ fun SessionEditDialog(
                         )
                     }
                 }
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 560.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 230.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
@@ -397,8 +394,7 @@ fun SessionEditDialog(
 
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = true),
+                        .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(
@@ -475,10 +471,9 @@ fun SessionEditDialog(
                     }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {}
-    )
+        }
+      }
+    }
 
     if (showTagPicker) {
         SessionTagPickerDialog(
@@ -641,14 +636,10 @@ private fun SessionTagPickerDialog(
         keyboard?.show()
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
+    com.gernalix.personalhub.core.ui.HubFullscreenDialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .imePadding(),
+                .fillMaxSize(),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(

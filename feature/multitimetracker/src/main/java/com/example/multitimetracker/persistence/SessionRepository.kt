@@ -68,6 +68,14 @@ internal class SessionRepository(private val context: Context) {
         }
     }
 
+    fun hasSessionHistory(): Boolean {
+        SnapshotSqlite.ensureSessionTables(context)
+        val db = SnapshotSqlite.openReadableDb(context)
+        return try {
+            db.rawQuery("SELECT 1 FROM ${SnapshotSqlite.SESSIONS_TABLE} LIMIT 1", null).use { it.moveToFirst() }
+        } finally { db.close() }
+    }
+
     fun readAllSessions(): List<SessionUi> {
         // Defensive: ensure tables exist even on weird DB states.
         SnapshotSqlite.ensureSessionTables(context)

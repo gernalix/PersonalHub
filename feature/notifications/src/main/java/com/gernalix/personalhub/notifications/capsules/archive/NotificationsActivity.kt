@@ -44,7 +44,7 @@ class NotificationsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        setContent { MaterialTheme { Surface {
+        setContent { com.gernalix.personalhub.core.ui.HubTheme { Surface {
             com.gernalix.personalhub.core.ui.ModuleHistoryHost("notifications", intent.getLongExtra(com.gernalix.personalhub.notifications.api.NotificationsRoute.EXTRA_EVENT_ID, -1)) {
             var conversations by remember { mutableStateOf(false) }
             if(conversations) ConversationsScreen(onBack={conversations=false}) else ArchiveScreen(generation, exportResult,

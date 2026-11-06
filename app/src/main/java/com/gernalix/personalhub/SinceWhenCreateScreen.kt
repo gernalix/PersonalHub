@@ -10,6 +10,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,11 +80,11 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
             saving = false
         }
     }
-    AlertDialog(
+    com.gernalix.personalhub.core.ui.HubEditorDialog(
         onDismissRequest = { if (!saving) onBack() },
         title = { Text(stringResource(R.string.since_when_create_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(androidx.compose.ui.Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },

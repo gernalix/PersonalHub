@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -219,6 +222,10 @@ fun NowScreen(
             AppTopBar(
                 title = stringResource(R.string.now),
                 actions = {
+                    IconButton(onClick = ::openNewSessionDraft, enabled = !state.isReadOnly,
+                        modifier = Modifier.testTag("new-session-action")) {
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.new_session))
+                    }
                     ScreenHelpAction(
                         title = stringResource(R.string.now_intro_title),
                         body = stringResource(R.string.now_intro_body)

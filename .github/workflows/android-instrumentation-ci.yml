@@ -97,3 +97,15 @@ jobs:
           path: build/ci-instrumentation-diagnostics/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Preserve library instrumentation reports
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: library-instrumentation-reports
+          path: |
+            feature/*/build/outputs/androidTest-results/connected/
+            feature/*/build/reports/androidTests/connected/
+            core/database/build/outputs/androidTest-results/connected/
+            core/database/build/reports/androidTests/connected/
+          if-no-files-found: ignore
+          retention-days: 7

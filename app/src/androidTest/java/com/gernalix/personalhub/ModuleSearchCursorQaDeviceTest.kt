@@ -37,7 +37,7 @@ class ModuleSearchCursorQaDeviceTest {
         com.gernalix.personalhub.core.database.PersonalHubDatabase.get(context).openHelper.writableDatabase
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         context.startActivity(LauncherShortcutsCapsule.moduleIntent(context, module).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        val denyPermission = By.res(java.util.regex.Pattern.compile(".*:id/permission_deny_button"))
+        val denyPermission = By.res(java.util.regex.Pattern.compile(".*:id/permission_deny(?:_and_dont_ask_again)?_button"))
             .pkg(java.util.regex.Pattern.compile("com\\.(google\\.android|android)\\.permissioncontroller"))
         try {
             // Fresh CI can request several permissions after cold database setup.

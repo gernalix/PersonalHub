@@ -138,19 +138,25 @@ class HubHistorySearchQaDeviceTest {
         preferences.edit().putBoolean("compact", true).commit()
         try {
             composeRule.setContent { PersonalHubTheme { Surface { PersonalHubApp() } } }
-            HubModule.entries.forEach { composeRule.onNodeWithContentDescription(context.getString(it.titleRes)).assertIsDisplayed() }
+            HubModule.entries.forEach {
+                composeRule.onNodeWithTag("home-grid").performScrollToNode(hasText(context.getString(it.titleRes)))
+                composeRule.onNodeWithText(context.getString(it.titleRes)).assertIsDisplayed()
+            }
             listOf(R.string.home_context, R.string.home_tags, R.string.home_history_search,
                 R.string.since_when_title, com.gernalix.personalhub.core.ui.R.string.countdown_title, R.string.settings_title).forEach {
-                composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed()
+                composeRule.onNodeWithTag("home-grid").performScrollToNode(hasText(context.getString(it)))
+                composeRule.onNodeWithText(context.getString(it)).assertIsDisplayed()
             }
             listOf(R.string.home_alerts to R.string.home_alerts_it, R.string.home_notifications to R.string.home_notifications_it).forEach { (english, italian) ->
-                composeRule.onNodeWithContentDescription(com.gernalix.personalhub.core.alerts.AlertText.get(context, english, italian)).assertIsDisplayed()
+                val label = com.gernalix.personalhub.core.alerts.AlertText.get(context, english, italian)
+                composeRule.onNodeWithTag("home-grid").performScrollToNode(hasText(label))
+                composeRule.onNodeWithText(label).assertIsDisplayed()
             }
-            composeRule.onNodeWithText(context.getString(com.gernalix.personalhub.core.ui.R.string.home_layout_extended)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(com.gernalix.personalhub.core.ui.R.string.home_layout_extended)).assertIsDisplayed()
             composeRule.onNodeWithTag("home-layout-switch").performClick()
             composeRule.runOnIdle { assertTrue(!preferences.getBoolean("compact", true)) }
             composeRule.onNodeWithTag("home-layout-switch").performClick()
-            composeRule.onNodeWithContentDescription(context.getString(R.string.settings_title)).assertIsDisplayed()
+            composeRule.onNodeWithTag("home-layout-switch").assertIsDisplayed()
             composeRule.runOnIdle { assertTrue(preferences.getBoolean("compact", false)) }
         } finally { preferences.edit().putBoolean("compact", previous).commit() }
     }
@@ -343,7 +349,7 @@ class HubHistorySearchQaDeviceTest {
 
     private fun qaContext(): Context {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        check(context.packageName.endsWith(".qa")) {
+        check(context.packageName.matches(Regex("com\\.gernalix\\.personalhub\\.qa[0-9]*"))) {
             "History/Search QA must run against the isolated .qa package"
         }
         check(

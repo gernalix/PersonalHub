@@ -19,6 +19,8 @@ interface SessionCore {
     // --- Reads ---
     fun readSessionById(sessionId: Long): SessionUi?
     fun readAllSessions(): List<SessionUi>
+    /** Includes deletion tombstones: an empty visible list can still be authoritative. */
+    fun hasSessionHistory(): Boolean = readAllSessions().isNotEmpty()
     fun searchSessions(query: String, limit: Int): List<SessionUi>
     fun readTemporalSessions(fromMs: Long, toMs: Long, limit: Int, offset: Int): List<SessionUi>
     fun readRunningSessions(): List<SessionUi>

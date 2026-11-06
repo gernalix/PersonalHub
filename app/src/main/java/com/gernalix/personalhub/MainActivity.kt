@@ -10,6 +10,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ViewModule
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +23,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.safeDrawing
@@ -25,7 +30,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -93,7 +98,9 @@ internal fun Intent.isPersonalHubLauncherIntent(): Boolean =
 @Composable
 fun PersonalHubApp(launcherGeneration: Int = 0) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val homePreferences = remember(context) { context.getSharedPreferences("home_layout", android.content.Context.MODE_PRIVATE) }
+    var homeQuery by rememberSaveable { mutableStateOf("") }
     var compact by rememberSaveable { mutableStateOf(homePreferences.getBoolean("compact", false)) }
     var showSettings by rememberSaveable(launcherGeneration) { mutableStateOf(false) }
     var topDestination by rememberSaveable(launcherGeneration) { mutableStateOf<String?>(null) }
@@ -126,108 +133,106 @@ fun PersonalHubApp(launcherGeneration: Int = 0) {
         return
     }
     CompositionLocalProvider(LocalCompactHome provides compact) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = stringResource(
-                R.string.home_active_profile,
-                DatabaseProfiles.active(context).name,
-            ),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .imePadding()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            TextButton(onClick = {
-                compact = !compact
-                homePreferences.edit { putBoolean("compact", compact)}
-            }, modifier = Modifier.testTag("home-layout-switch")) {
-                Text(stringResource(if (compact) com.gernalix.personalhub.core.ui.R.string.home_layout_extended else com.gernalix.personalhub.core.ui.R.string.home_layout_compact))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.home_active_profile, DatabaseProfiles.active(context).name),
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { compact = !compact; homePreferences.edit { putBoolean("compact", compact) } },
+                    modifier = Modifier.testTag("home-layout-switch")) {
+                    Icon(Icons.Filled.ViewModule, contentDescription = stringResource(if (compact)
+                        com.gernalix.personalhub.core.ui.R.string.home_layout_extended else com.gernalix.personalhub.core.ui.R.string.home_layout_compact))
+                }
+                IconButton(onClick = { showSettings = true }) {
+                    Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_title))
+                }
             }
-            TextButton(
-                onClick = { topDestination = "audit" },
-                modifier = Modifier.testTag("home-audit-button"),
+            com.gernalix.personalhub.core.ui.HubSearchField(
+                value = homeQuery, onValueChange = { homeQuery = it }, showSearchIcon = true,
+                label = AlertText.get(context, R.string.home_find_action, R.string.home_find_action_it), modifier = Modifier.testTag("home-search"),
+            )
+            fun matches(title: String, subtitle: String = "") = homeQuery.isBlank() ||
+                "$title $subtitle".contains(homeQuery.trim(), ignoreCase = true)
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = if (compact) 100.dp else 156.dp),
+                modifier = Modifier.weight(1f).testTag("home-grid"),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(R.string.audit_title))
+                items(HubModule.entries.filter { matches(resources.getString(it.titleRes), resources.getString(it.subtitleRes)) }, key = { it.name }) { module ->
+                    ModuleTile(
+                        module = module,
+                        onClick = {
+                            context.startActivity(
+                                LauncherShortcutsCapsule.moduleIntent(context, module),
+                            )
+                        },
+                    )
+                }
+                if (matches(resources.getString(R.string.home_manual_check_in))) item(key = "home-manual-check-in") {
+                    HomeActionTile("📍", R.string.home_manual_check_in, R.string.home_manual_check_in_help) {
+                        context.startActivity(com.gernalix.luoghi.hub.PlacesManualCheckInRoute.intent(context))
+                    }
+                }
+                if (matches(resources.getString(R.string.home_context))) item(key = "home-context") {
+                    HomeActionTile("🔗", R.string.home_context, R.string.home_context_help) { topDestination = "composer" }
+                }
+                if (matches(resources.getString(R.string.home_tags))) item(key = "home-tags") {
+                    HomeActionTile("🏷️", R.string.home_tags, R.string.home_tags_help) {
+                        context.startActivity(Intent(context, HubTagsActivity::class.java))
+                    }
+                }
+                if (matches(AlertText.get(context, R.string.home_alerts, R.string.home_alerts_it))) item(key = "home-alerts") {
+                    HomeActionTile(
+                        "🔔",
+                        AlertText.get(context, R.string.home_alerts, R.string.home_alerts_it),
+                        AlertText.get(context, R.string.home_alerts_help, R.string.home_alerts_help_it),
+                    ) {
+                        context.startActivity(UnifiedAlertsRoute.intent(context))
+                    }
+                }
+                if (matches(AlertText.get(context, R.string.home_notifications, R.string.home_notifications_it))) item(key = "home-notifications") {
+                    HomeActionTile("📥", AlertText.get(context, R.string.home_notifications, R.string.home_notifications_it), AlertText.get(context, R.string.home_notifications_help, R.string.home_notifications_help_it)) {
+                        context.startActivity(NotificationsRoute.intent(context))
+                    }
+                }
+                if (matches(resources.getString(R.string.home_history_search))) item(key = "home-history") {
+                    HomeActionTile("📜", R.string.home_history_search, R.string.home_history_search_help) { topDestination = "history" }
+                }
+                if (matches(resources.getString(R.string.since_when_title))) item(key = "home-since-when") {
+                    HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }
+                }
+                if (matches(resources.getString(com.gernalix.personalhub.core.ui.R.string.countdown_title))) item(key = "home-countdown") {
+                    HomeActionTile("⏳", com.gernalix.personalhub.core.ui.R.string.countdown_title, com.gernalix.personalhub.core.ui.R.string.countdown_help) { topDestination = "countdown" }
+                }
+                if (matches(resources.getString(R.string.settings_title))) item(key = "home-settings") {
+                    HomeActionTile("⚙️", R.string.settings_title, R.string.home_settings_help) { showSettings = true }
+                }
             }
-            HomeAutoExportStatusIndicator()
-        }
-        LazyVerticalGrid(
-            columns = if (compact) GridCells.Fixed(4) else GridCells.Adaptive(minSize = 240.dp),
-            modifier = Modifier.weight(1f).testTag("home-grid"),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(HubModule.entries, key = { it.name }) { module ->
-                ModuleTile(
-                    module = module,
-                    onClick = {
-                        context.startActivity(
-                            LauncherShortcutsCapsule.moduleIntent(context, module),
-                        )
-                    },
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { topDestination = "audit" }, modifier = Modifier.testTag("home-audit-button")) {
+                    Text(stringResource(R.string.audit_title))
+                }
+                HomeAutoExportStatusIndicator()
+                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                Text(
+                    text = BuildConfig.NV.toString(),
+                    modifier = Modifier,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            item(key = "home-manual-check-in") {
-                HomeActionTile("📍", R.string.home_manual_check_in, R.string.home_manual_check_in_help) {
-                    context.startActivity(com.gernalix.luoghi.hub.PlacesManualCheckInRoute.intent(context))
-                }
-            }
-            item(key = "home-context") {
-                HomeActionTile("🔗", R.string.home_context, R.string.home_context_help) { topDestination = "composer" }
-            }
-            item(key = "home-tags") {
-                HomeActionTile("🏷️", R.string.home_tags, R.string.home_tags_help) {
-                    context.startActivity(Intent(context, HubTagsActivity::class.java))
-                }
-            }
-            item(key = "home-alerts") {
-                HomeActionTile(
-                    "🔔",
-                    AlertText.get(context, R.string.home_alerts, R.string.home_alerts_it),
-                    AlertText.get(context, R.string.home_alerts_help, R.string.home_alerts_help_it),
-                ) {
-                    context.startActivity(UnifiedAlertsRoute.intent(context))
-                }
-            }
-            item(key = "home-notifications") {
-                HomeActionTile("📥", AlertText.get(context, R.string.home_notifications, R.string.home_notifications_it), AlertText.get(context, R.string.home_notifications_help, R.string.home_notifications_help_it)) {
-                    context.startActivity(NotificationsRoute.intent(context))
-                }
-            }
-            item(key = "home-history") {
-                HomeActionTile("📜", R.string.home_history_search, R.string.home_history_search_help) { topDestination = "history" }
-            }
-            item(key = "home-since-when") {
-                HomeActionTile("⏱️", R.string.since_when_title, R.string.since_when_home_help) { topDestination = "since_when" }
-            }
-            item(key = "home-countdown") {
-                HomeActionTile("⏳", com.gernalix.personalhub.core.ui.R.string.countdown_title, com.gernalix.personalhub.core.ui.R.string.countdown_help) { topDestination = "countdown" }
-            }
-            item(key = "home-settings") {
-                HomeActionTile("⚙️", R.string.settings_title, R.string.home_settings_help) { showSettings = true }
-            }
         }
-        Text(
-            text = BuildConfig.NV.toString(),
-            modifier = Modifier.align(Alignment.End),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
     }
 }
 
@@ -245,19 +250,18 @@ private fun HomeActionTile(icon: String, title: String, subtitle: String, onClic
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 126.dp).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(icon, style = MaterialTheme.typography.headlineSmall)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(
                     subtitle,
@@ -283,18 +287,15 @@ private fun ModuleTile(module: HubModule, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 126.dp).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Icon(
                 painter = painterResource(module.shortcutIconRes),
@@ -302,13 +303,12 @@ private fun ModuleTile(module: HubModule, onClick: () -> Unit) {
                 tint = androidx.compose.ui.graphics.Color.Unspecified,
             )
             Column(
-                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = stringResource(module.titleRes),
                     style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
@@ -325,8 +325,13 @@ private fun ModuleTile(module: HubModule, onClick: () -> Unit) {
 
 @Composable
 private fun CompactHomeTile(title: String, onClick: () -> Unit, icon: @Composable () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(1f).semantics(mergeDescendants = true) { contentDescription = title }, shape = RoundedCornerShape(8.dp)) {
-        Column(Modifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center) { icon() }
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp)
+        .semantics(mergeDescendants = true) { contentDescription = title }, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.fillMaxWidth().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            icon()
+            Text(title, style = MaterialTheme.typography.labelLarge, maxLines = 2,
+                overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        }
     }
 }

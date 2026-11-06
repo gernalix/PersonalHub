@@ -2204,7 +2204,7 @@ private fun ContactEditScreen(
                 candidates = duplicateCandidates,
                 onCandidateClick = onDuplicateCandidateClick,
             )
-            Spacer(modifier = Modifier.height(240.dp))
+
         }
     }
 
