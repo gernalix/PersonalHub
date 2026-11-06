@@ -31,6 +31,7 @@ class PlacesSearchDraftDeviceTest {
                     onRefreshLocation = {}, onToggleTagFilter = {},
                     onExplore = {}, onGlobalMap = {}, onGlobalStats = {},
                     onHistorySearch = {}, onOpenVisits = {}, onNewPlace = {}, onManualCheckIn = {},
+                    onImportTimeline = {},
                 )
             }
         }

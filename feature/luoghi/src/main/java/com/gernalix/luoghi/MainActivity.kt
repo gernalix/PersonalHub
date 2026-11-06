@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -54,6 +55,7 @@ import com.gernalix.luoghi.capsules.mapviewer.MapViewerCapsule
 import com.gernalix.luoghi.capsules.geofence.PlaceGeofenceAction
 import com.gernalix.luoghi.capsules.places.PlaceListUiModel
 import com.gernalix.luoghi.data.PlaceGeofenceConfigEntity
+import com.gernalix.luoghi.data.GoogleTimelineImport
 import com.gernalix.luoghi.ui.visits.VisitsScreen
 import com.gernalix.luoghi.ui.visits.formatVisitTimestampForInput
 import com.gernalix.luoghi.ui.visits.parseVisitTimestampInput
@@ -66,6 +68,8 @@ import com.gernalix.luoghi.hub.PlacesHubAdapter
 import com.gernalix.personalhub.contracts.database.HubDeepLinkContract
 import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private var hubPlaceId by mutableStateOf<String?>(null)
@@ -150,7 +154,34 @@ private fun LuoghiNavigation(
     manualRequest: Int,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
+    var timelineImporting by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var timelineImportFeedback by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+    val timelineDocumentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null && !timelineImporting) {
+            timelineImporting = true
+            scope.launch {
+                try {
+                    val result = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            GoogleTimelineImport.importFrom(context, stream)
+                        } ?: error("Cannot open Timeline JSON")
+                    }
+                    timelineImportFeedback = resources.getString(
+                        R.string.timeline_import_success,
+                        result.visits, result.places, result.skipped,
+                    )
+                } catch (_: Exception) {
+                    timelineImportFeedback = resources.getString(R.string.timeline_import_failure)
+                } finally {
+                    timelineImporting = false
+                }
+            }
+        }
+    }
     var destinationName by rememberSaveable { mutableStateOf(AppDestination.HOME.name) }
     var selectedPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var visitsFilterPlaceId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -244,11 +275,28 @@ private fun LuoghiNavigation(
         if (state.dataLoaded && (selectedPlaceId != null) && (selectedItem == null)) openHome()
     }
     BackHandler(enabled = destination != AppDestination.HOME, onBack = ::navigateBack)
+    if (timelineImportFeedback != null) {
+        AlertDialog(
+            onDismissRequest = { timelineImportFeedback = null },
+            title = { Text(stringResource(R.string.timeline_import_title)) },
+            text = { Text(timelineImportFeedback.orEmpty()) },
+            confirmButton = {
+                TextButton(onClick = { timelineImportFeedback = null }) {
+                    Text("OK")
+                }
+            },
+        )
+    }
 
     when (destination) {
         AppDestination.HOME -> HomeScreen(
             state = state,
             onManualCheckIn = { manualVisitPlaceId = null; manualVisitOpen = true },
+            onImportTimeline = {
+                if (!timelineImporting) {
+                    timelineDocumentPicker.launch("*/*")
+                }
+            },
             onCheckAction = onCheckAction,
             onAmbiguousCheckIn = vm::selectAmbiguousCheckIn,
             onCancelAmbiguousCheckIn = vm::newPlace,

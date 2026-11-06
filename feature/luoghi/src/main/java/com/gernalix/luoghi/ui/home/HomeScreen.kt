@@ -94,6 +94,7 @@ fun HomeScreen(
     onOpenVisits: (String?) -> Unit,
     onNewPlace: () -> Unit,
     onManualCheckIn: () -> Unit,
+    onImportTimeline: () -> Unit,
 ) {
     val context = LocalContext.current
     val recentVisits = state.visits.take(3)
@@ -152,6 +153,13 @@ fun HomeScreen(
                     enabled = state.dataLoaded && state.places.any { !it.archived },
                     modifier = Modifier.fillMaxWidth().testTag("places-manual-check-in"),
                 ) { Text(stringResource(R.string.manual_check_in)) }
+            }
+            item(key = "import-google-timeline") {
+                OutlinedButton(
+                    onClick = onImportTimeline,
+                    enabled = state.dataLoaded,
+                    modifier = Modifier.fillMaxWidth().testTag("places-import-google-timeline"),
+                ) { Text(stringResource(R.string.timeline_import_action)) }
             }
             item(key = "global-actions") {
                 Row(
