@@ -294,4 +294,8 @@
     <string name="manual_visit_no_places">Aggiungi prima un luogo in Luoghi.</string>
     <string name="manual_visit_invalid_interval">Il check-out deve essere successivo al check-in.</string>
     <string name="manual_visit_save_failed">Impossibile salvare la visita. I dati inseriti sono ancora disponibili: riprova.</string>
+    <string name="timeline_import_action">Import Google Timeline (JSON)</string>
+    <string name="timeline_import_title">Google Timeline import</string>
+    <string name="timeline_import_success">Imported %1$d visits and %2$d places. Skipped %3$d existing or invalid records.</string>
+    <string name="timeline_import_failure">Import failed. The existing database was preserved.</string>
 </resources>
