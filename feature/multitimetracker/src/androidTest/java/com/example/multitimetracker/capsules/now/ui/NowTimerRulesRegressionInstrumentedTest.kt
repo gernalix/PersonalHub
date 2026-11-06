@@ -15,6 +15,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -212,8 +214,13 @@ class NowTimerRulesRegressionInstrumentedTest {
 
         composeRule.onNodeWithTag(sessionTag(running.id)).performTouchInput { longClick() }
         val deleteLabel = targetString(R.string.elimina)
-        composeRule.onNodeWithText(deleteLabel).performClick()
+        composeRule.onNodeWithText(deleteLabel).performScrollTo().assertIsDisplayed().performClick()
         composeRule.runOnIdle { assertTrue(deleted.isEmpty()) }
+        // A newly attached platform dialog can draw after Compose becomes idle,
+        // particularly on the software-rendered API 35 CI image.
+        composeRule.waitUntil(5_000) {
+            composeRule.onNodeWithText(targetString(R.string.elimina_sessione)).isDisplayed()
+        }
         composeRule.onNodeWithText(targetString(R.string.elimina_sessione)).assertIsDisplayed()
 
         val deleteNodes = composeRule.onAllNodesWithText(deleteLabel)
