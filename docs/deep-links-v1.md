@@ -32,6 +32,16 @@ Search timestamps are ISO-8601 offset date-times, for example `2026-09-11T11:15:
 - Opening a permalink is read-only navigation. Mutation always requires an in-app user action.
 - Credentials, tokens, secrets, and private authentication material must never be placed in a permalink.
 
+### Since When creation proposals
+
+`personalhub://since_when/v1/create?source={JSON}` opens a counter proposal for review.
+The optional `enabled=true` only preselects the creation control; an external link
+never authorizes an automatic database write. The user must confirm inside the app.
+Internal opt-in creation uses a separate nonexported host route, and internal
+review/creation intents are confined to PersonalHub's package. Source descriptors
+can contain personal titles and timestamps and must not be sent to an unrestricted
+external intent resolver.
+
 ## Workflowy bridge
 
 Workflowy is an optional external knowledge surface, not a second PersonalHub database. The Home setting `Integra Workflowy` is the single global feature gate and is off by default. When off, Workflowy-specific actions, linked-node affordances, settings, Android share target and Workflowy-days background work are hidden/disabled. Existing Hub Context links remain stored and reappear if the integration is enabled again.

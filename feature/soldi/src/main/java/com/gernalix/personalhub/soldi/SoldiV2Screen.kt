@@ -1,5 +1,7 @@
 package com.gernalix.personalhub.soldi
 
+import com.gernalix.personalhub.core.ui.reviewSinceWhenCreate
+
 import com.gernalix.personalhub.soldi.capsules.playsubscriptions.PlaySubscriptionsCapsule
 import com.gernalix.personalhub.core.ui.HubFeedbackHost
 
@@ -543,7 +545,7 @@ internal fun SoldiV2Screen(
                             val source = SoldiTransactionHubAdapter(context.applicationContext)
                                 .sinceWhenSource(row.value.uuid)
                             if (source != null && source.timestampSources.isNotEmpty()) {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                                context.reviewSinceWhenCreate(source)
                             }
                         } },
                     )

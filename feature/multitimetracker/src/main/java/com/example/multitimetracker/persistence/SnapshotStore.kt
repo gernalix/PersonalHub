@@ -401,12 +401,8 @@ object SnapshotStore {
         SnapshotSqlite.writeSnapshot(context, json)
         CriticalDataGuard.rememberLastGood(context, afterCounts)
 
-        // 2) Human-readable JSON: keep writing this as a debugging aid.
-        runCatching {
-            externalSnapshotFile(context)?.writeText(json, Charsets.UTF_8)
-        }
-
-        // 3) Legacy: keep prefs for backward compatibility across incremental installs.
+        // Keep the legacy private prefs for compatibility. External snapshots are
+        // read only for recovery; ordinary saves must not publish personal history.
         runCatching {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit {

@@ -5,6 +5,8 @@
 
 package com.gernalix.sostanze.ui
 
+import com.gernalix.personalhub.core.ui.reviewSinceWhenCreate
+
 import androidx.core.content.edit
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableDoubleStateOf
@@ -298,7 +300,7 @@ fun SostanzeApp(initialSubstanceId: Long? = null, viewModel: SostanzeViewModel =
                     sinceWhenSources = sinceWhenSources,
                     onCreateSinceWhen = { id ->
                         sinceWhenSources[id]?.let { source ->
-                            context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                            context.reviewSinceWhenCreate(source)
                         }
                     },
                 )

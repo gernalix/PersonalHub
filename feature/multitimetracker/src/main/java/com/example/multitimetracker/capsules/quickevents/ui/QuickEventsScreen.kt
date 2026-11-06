@@ -6,6 +6,9 @@
 
 package com.example.multitimetracker.capsules.quickevents.ui
 
+import com.gernalix.personalhub.core.ui.reviewSinceWhenCreate
+import com.gernalix.personalhub.core.ui.launchSinceWhenCreate
+
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
@@ -398,7 +401,7 @@ fun QuickEventsScreen(
                                             isDefault = true,
                                         )),
                                     )
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(source)))
+                                    context.reviewSinceWhenCreate(source)
                                 }
                             }
                         )
@@ -436,7 +439,7 @@ fun QuickEventsScreen(
             },
             onCreated = { id, entryTitle, timestampMs, createCounter ->
                 creatingEntry = false
-                if (createCounter) context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(quickEventSinceWhenDescriptor(id, entryTitle, timestampMs), startEnabled = true)))
+                if (createCounter) context.launchSinceWhenCreate(quickEventSinceWhenDescriptor(id, entryTitle, timestampMs))
             },
             onDelete = null
         )
@@ -495,7 +498,7 @@ fun QuickEventsScreen(
             },
             onCreated = { id, entryTitle, timestampMs, createCounter ->
                 customTemplate = null
-                if (createCounter) context.startActivity(Intent(Intent.ACTION_VIEW, HubDeepLinkContract.sinceWhenCreateUri(quickEventSinceWhenDescriptor(id, entryTitle, timestampMs), startEnabled = true)))
+                if (createCounter) context.launchSinceWhenCreate(quickEventSinceWhenDescriptor(id, entryTitle, timestampMs))
             },
             onDelete = null
         )

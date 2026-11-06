@@ -4,6 +4,8 @@ import android.net.Uri
 
 /** Stable public permalink contract for canonical PersonalHub data and stable module launch URIs. */
 object HubDeepLinkContract {
+    /** Internal navigation protocol; the receiving host Activity is not exported. */
+    const val ACTION_CREATE_SINCE_WHEN_INTERNAL = "com.gernalix.personalhub.action.CREATE_SINCE_WHEN_INTERNAL"
     const val SCHEME = "personalhub"
     const val VERSION = "v1"
 

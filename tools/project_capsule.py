@@ -71,7 +71,7 @@ def inside(repo: Path, relative: str, *, must_exist: bool = True) -> bool:
         target = (repo / relative).resolve()
         target.relative_to(repo.resolve())
         return not must_exist or target.exists()
-    except ValueError:
+    except (OSError, RuntimeError, ValueError):
         return False
 
 
@@ -80,20 +80,34 @@ def check(repo: Path, mode: str, db: Path, changed_files: list[str], timeout: in
     def add(name: str, passed: bool | None, detail: str = '') -> None:
         checks.append({'check': name, 'state': 'pass' if passed is True else 'fail' if passed is False else 'unverified', 'detail': detail})
 
-    manifest_path = next((repo / name for name in ('project-capsule.yaml', 'project-capsule.yml', 'project-capsule.json') if (repo / name).is_file()), None)
-    if manifest_path is None:
-        add('manifest', False, 'root manifest absent')
-        return {'schema': 'c2.project-capsule-check.v1', 'mode': mode, 'status': 'FAIL', 'checks': checks}
     try:
+        repo = repo.resolve()
+        # Select links before following them, including dangling/looping links.
+        # An unsafe primary manifest must not fall through to another filename.
+        manifest_path = next((repo / name for name in ('project-capsule.yaml', 'project-capsule.yml', 'project-capsule.json')
+                              if (repo / name).is_symlink() or (repo / name).is_file()), None)
+        if manifest_path is None:
+            add('manifest', False, 'root manifest absent')
+            return {'schema': 'c2.project-capsule-check.v1', 'mode': mode, 'status': 'FAIL', 'checks': checks}
+        resolved_manifest = manifest_path.resolve()
+        resolved_manifest.relative_to(repo)
+        if not resolved_manifest.is_file():
+            raise ValueError('root manifest must be a regular file')
+        text = resolved_manifest.read_text()
         if manifest_path.suffix == '.json':
-            manifest = json.loads(manifest_path.read_text())
+            manifest = json.loads(text)
         else:
             import yaml
-            manifest = yaml.safe_load(manifest_path.read_text())
+            try:
+                manifest = yaml.safe_load(text)
+            except yaml.YAMLError as exc:
+                # Parser messages and marks can contain source-line secrets.
+                add('manifest', False, f'invalid YAML manifest ({type(exc).__name__})')
+                return {'schema': 'c2.project-capsule-check.v1', 'mode': mode, 'status': 'FAIL', 'checks': checks}
         if not isinstance(manifest, dict):
             raise ValueError('root must be an object')
-    except (OSError, ValueError, ImportError) as exc:
-        add('manifest', False, str(exc))
+    except (OSError, RuntimeError, ValueError, ImportError) as exc:
+        add('manifest', False, f'manifest load failed ({type(exc).__name__})')
         return {'schema': 'c2.project-capsule-check.v1', 'mode': mode, 'status': 'FAIL', 'checks': checks}
     add('version', manifest.get('schema_version') == 'c2.project-capsule.v1')
     contract = json.loads((Path(__file__).resolve().parent.parent / 'docs/project-capsule/schema-v1.json').read_text())
@@ -182,7 +196,7 @@ def main() -> int:
     parser.add_argument('--changed-file', action='append', default=[])
     parser.add_argument('--timeout', type=int, default=300)
     args = parser.parse_args()
-    report = check(args.repo.resolve(), args.mode, args.megavault_db, args.changed_file, args.timeout)
+    report = check(args.repo, args.mode, args.megavault_db, args.changed_file, args.timeout)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report['status'] == 'PASS' else 1
 

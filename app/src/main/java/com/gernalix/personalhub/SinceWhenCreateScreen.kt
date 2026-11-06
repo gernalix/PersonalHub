@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,7 +30,21 @@ import com.gernalix.personalhub.core.ui.SinceWhenCreationControl
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: () -> Unit, startEnabled: Boolean = false) {
+internal fun SinceWhenCreateScreen(
+    source: SinceWhenSourceDescriptor,
+    onBack: () -> Unit,
+    startEnabled: Boolean = false,
+    autoCreate: Boolean = false,
+) {
+    key(source, startEnabled, autoCreate) {
+        SinceWhenCreateContent(source, onBack, startEnabled, autoCreate)
+    }
+}
+
+@Composable
+private fun SinceWhenCreateContent(
+    source: SinceWhenSourceDescriptor, onBack: () -> Unit, startEnabled: Boolean, autoCreate: Boolean,
+) {
     val context = LocalContext.current
     val saveErrorMessage = stringResource(R.string.since_when_save_error)
     val dao = remember { PersonalHubDatabase.get(context).sinceWhenCounterDao() }
@@ -50,9 +65,9 @@ internal fun SinceWhenCreateScreen(source: SinceWhenSourceDescriptor, onBack: ()
             dao.findSourceSnapshot(source.entityType, source.entityId, selected.timestamp)?.id
         } else null
     }
-    LaunchedEffect(source, startEnabled, selectedSourceId) {
+    LaunchedEffect(source, startEnabled, autoCreate, selectedSourceId) {
         val choice = source.timestampSources.firstOrNull { it.id == selectedSourceId }
-        if (!startEnabled || !enabled || choice == null || autoCreateAttempted) return@LaunchedEffect
+        if (!autoCreate || !startEnabled || !enabled || choice == null || autoCreateAttempted) return@LaunchedEffect
         autoCreateAttempted = true
         saving = true
         error = null

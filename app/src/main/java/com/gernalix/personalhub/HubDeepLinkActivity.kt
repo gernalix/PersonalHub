@@ -86,7 +86,9 @@ private fun HubDeepLinkEntry(uri: Uri?, onBack: () -> Unit) {
     val parsed = remember(uri) { HubDeepLinkContract.parse(uri) }
     when (val target = parsed.target) {
         is HubDeepLinkContract.EntityTarget -> EntityDeepLink(target, onBack)
-        is HubDeepLinkContract.SinceWhenCreateTarget -> SinceWhenCreateScreen(target.source, onBack, startEnabled = target.startEnabled)
+        is HubDeepLinkContract.SinceWhenCreateTarget -> SinceWhenCreateScreen(
+            target.source, onBack, startEnabled = target.startEnabled, autoCreate = false,
+        )
         is HubDeepLinkContract.ContextTarget -> ContextDeepLink(target.contextId, onBack)
         is HubDeepLinkContract.EventTarget -> HubHistorySearchScreen(onBack = onBack, initialEventId = target.eventId)
         is HubDeepLinkContract.SearchTarget -> SearchDeepLink(target, onBack)

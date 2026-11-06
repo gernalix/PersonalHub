@@ -34,7 +34,7 @@ class SinceWhenAutonomyDeviceTest {
         val marker = sql.query("SELECT completedAt FROM since_when_migration_state WHERE `key`=?", arrayOf(key)).use { if(it.moveToFirst()) it.getLong(0) else null }
         val title = "QA925611 autonomous ${System.currentTimeMillis()}"
         var scenario: ActivityScenario<SinceWhenActivity>? = null
-        var sourceScenario: ActivityScenario<HubDeepLinkActivity>? = null
+        var sourceScenario: ActivityScenario<SinceWhenCreateActivity>? = null
         try {
             sql.execSQL("DELETE FROM since_when_migration_state WHERE `key`=?", arrayOf(key))
             sql.execSQL("INSERT OR REPLACE INTO snapshot(id,json,saved_at_ms) VALUES(1,?,1)", arrayOf("malformed"))
@@ -63,7 +63,7 @@ class SinceWhenAutonomyDeviceTest {
             scenario = null
             val source = SinceWhenSourceDescriptor("places/place", "qa925611-$title", "$title source", listOf(SinceWhenTimestampSource("createdAt", "QA start", 1790000012345L, true)))
             sql.execSQL("INSERT INTO hub_entities VALUES(?,'places/place','places','places',?,'TOMBSTONED',1,1)", arrayOf(source.entityId,source.entityId))
-            sourceScenario = ActivityScenario.launch(Intent(context, HubDeepLinkActivity::class.java).setData(HubDeepLinkContract.sinceWhenCreateUri(source, startEnabled = true)))
+            sourceScenario = ActivityScenario.launch(Intent(context, SinceWhenCreateActivity::class.java).setAction(HubDeepLinkContract.ACTION_CREATE_SINCE_WHEN_INTERNAL).setData(HubDeepLinkContract.sinceWhenCreateUri(source, startEnabled = true)))
             compose.waitUntil(10000) { runBlocking { db.sinceWhenCounterDao().all().any { it.title == source.defaultCounterTitle } } }
             val sourceRow = db.sinceWhenCounterDao().all().single { it.title == source.defaultCounterTitle }
             assertEquals(1790000012345L, sourceRow.initialTimestamp)
