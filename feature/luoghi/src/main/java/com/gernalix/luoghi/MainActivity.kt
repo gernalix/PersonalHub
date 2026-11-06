@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -153,6 +154,7 @@ private fun LuoghiNavigation(
     manualRequest: Int,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var timelineImporting by androidx.compose.runtime.remember { mutableStateOf(false) }
     var timelineImportFeedback by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
@@ -168,12 +170,12 @@ private fun LuoghiNavigation(
                             GoogleTimelineImport.importFrom(context, stream)
                         } ?: error("Cannot open Timeline JSON")
                     }
-                    timelineImportFeedback = context.getString(
+                    timelineImportFeedback = resources.getString(
                         R.string.timeline_import_success,
                         result.visits, result.places, result.skipped,
                     )
                 } catch (_: Exception) {
-                    timelineImportFeedback = context.getString(R.string.timeline_import_failure)
+                    timelineImportFeedback = resources.getString(R.string.timeline_import_failure)
                 } finally {
                     timelineImporting = false
                 }
